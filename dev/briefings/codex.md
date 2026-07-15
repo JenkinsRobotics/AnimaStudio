@@ -63,6 +63,15 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — supplied UI research reconciled:** Accepted context-sensitive
+  workspace/selection tools, shared tree↔viewport↔timeline selection, typed
+  progressive inspectors, exact plus draggable numeric fields, synchronized
+  dope-sheet/graph views, media waveforms, and a filterable/exportable hardware
+  log. Anima deliberately does not adopt Bottango's fixed 30 fps, implicit live
+  mirroring, modeling scope, or physics framing: display fps is configurable,
+  hardware motion requires explicit arming and bounded seeks, production models
+  remain external, and the viewport stays kinematic.
+
 - **2026-07-14 — task-focused workspaces:** Jonathan's SolidWorks/Photoshop
   workspace model is now part of the Studio plan. One open project will expose
   Assets, Rig, Animate, Show, and Hardware workspaces. The global header stays

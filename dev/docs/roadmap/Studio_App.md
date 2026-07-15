@@ -218,6 +218,44 @@ such as panel visibility, split positions, viewport camera, and the locally
 focused editor. Import is allowed to begin as the existing workspace tab, then
 become the Assets workspace without changing project semantics.
 
+### Context and interaction rules
+
+- Available commands are the intersection of the active workspace, current
+  selection, loaded capabilities, and safety state. The contextual header does
+  not show irrelevant controls. Tooltips describe the action, shortcut, units,
+  and disabled reason.
+- Rig owns structural editing. Animate may select and pose parts/DOFs but cannot
+  silently create, delete, reparent, or redefine the rig.
+- The Parts tree, 3D viewport, timeline tracks, graph curves, and inspector use
+  one shared selection identity. A single selection opens its typed inspector;
+  multiple selection exposes only valid common operations.
+- The inspector uses progressive disclosure: human-readable common fields
+  first, type-specific geometry/DOF/output controls second, and diagnostics or
+  raw identifiers last.
+- Numeric controls support exact keyboard entry and unit labels. Frequently
+  adjusted values should later support label-drag scrubbing, fine/coarse
+  modifiers, and reset-to-authored/default actions without sacrificing exact
+  text editing.
+- Animate's bottom editor switches between a dope sheet for timing/track
+  membership and a graph editor for time, value, and interpolation. Both remain
+  synchronized with viewport and tree selection. Media waveforms stay in the
+  dope sheet rather than cluttering the motion graph.
+- Timeline truth is continuous seconds in AnimaCore. Frame notation is a
+  configurable display/editing grid (for example 24, 25, 30, or 60 fps), never
+  a hard-coded evaluation rate or hardware update rate.
+- Hardware visualization is offline by default. Connecting does not arm;
+  viewport manipulation and timeline scrubbing affect real hardware only after
+  explicit arming. Live seeks use bounded transitions and remain subordinate to
+  device limits, failsafes, and emergency stop.
+- Hardware diagnostics provide searchable/filterable incoming, outgoing,
+  informational, warning, and error messages, with freeze, clear, copy, and
+  export actions. Raw traffic is a diagnostic view, not the primary workflow.
+- Studio may provide simple proxy geometry for rig readability, but it is not a
+  mesh or CAD modeler. Production models continue to come from Blender,
+  SolidWorks, Onshape, and other dedicated tools.
+- The primary viewport is kinematic. Physics/dynamics simulation remains
+  deferred and must not leak into the first authoring contracts.
+
 The long-term creative environment includes:
 
 - Project and asset browser

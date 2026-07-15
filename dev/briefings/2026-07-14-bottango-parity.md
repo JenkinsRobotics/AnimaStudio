@@ -58,6 +58,8 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | DOF rig refactor per Jonathan (typed joints, Onshape mate model) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima`, `dev/docs/roadmap/Character_Format.md` (structure/rig sections) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
 | Codex | B01 workspace interaction + UI standards pass | `studio/Sources/AnimaStudioApp/StudioTheme.swift`, `studio/Sources/AnimaStudioApp/ViewportCameraControls.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 8 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
 | Codex | B01 task-focused workspace architecture plan | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | documentation review; `git diff --check` | released 2026-07-14 |
+| Codex | Bottango UI research reconciliation | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | official-doc verification; `git diff --check` | released 2026-07-14 |
+| Claude | Anima firmware v0 (B05/B08 device side, Arduino/ESP32) | `firmware/**` | `arduino-cli compile` clean for `arduino:avr:uno` + `esp32:esp32:esp32`; behavior mirrors `anima_studio/sim.py` + `Wire_Protocol.md` | in progress |
 
 ## Requests
 
@@ -201,3 +203,13 @@ change needed in the Handoff log instead of inventing commands.
   Layout preferences remain user-local presentation state by default and never
   create a duplicate project model. This is documented in `Studio_App.md` and
   incorporated into B01 acceptance.
+- **2026-07-14 (Codex, supplied UI research):** Verified the provided Bottango
+  analysis against current official documentation and incorporated the useful
+  interaction requirements: workspace+selection contextual tools, one shared
+  selection across tree/viewport/timeline/graph, progressive inspectors,
+  precise and scrubbable numeric fields, dope-sheet/graph separation, media
+  waveforms, and a searchable/filterable/exportable hardware log. Explicitly
+  kept Anima continuous-time with configurable display fps, kinematic-only,
+  external-model-first, and safely offline until separately connected and
+  armed; those boundaries supersede Bottango-specific 30 fps, modeling,
+  physics, and automatic live-mirroring assumptions.

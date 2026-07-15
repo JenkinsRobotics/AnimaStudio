@@ -68,6 +68,12 @@ its user flow, tests, and `STATUS.md` update land together.
 - Panel visibility, sizing, and arrangement restore independently per
   workspace; user-local layout preferences do not silently mutate the shared
   project document.
+- Contextual commands depend on both the active workspace and selection. The
+  Parts tree, viewport, timeline/graph, and inspector share one selection
+  identity instead of maintaining parallel UI-only selections.
+- Tooltips disclose shortcuts, units, and disabled reasons. Numeric fields
+  permit exact entry; high-frequency numeric controls may add label-drag
+  scrubbing with fine/coarse modifiers.
 
 ### B02–B04 — Structure, joints, and outputs
 
@@ -92,6 +98,12 @@ time, value, and interpolation. Planned interpolation must cover:
 - visual velocity/acceleration limit warnings without silently changing the
   authored curve.
 
+AnimaCore stores and evaluates continuous seconds. A project-configurable frame
+display rate controls timecode/grid snapping only and must not become the
+runtime or hardware update rate. Tree, viewport, track, and graph selection stay
+synchronized; media waveforms appear in the dope sheet and are hidden from the
+motion graph.
+
 ### B05/B08 — Safe live hardware loop
 
 ```text
@@ -107,6 +119,11 @@ Wire Protocol host → device/firmware → actuator
 Connecting is not arming. Arming is explicit, visible, reversible, and always
 subordinate to device/runtime failsafes. Studio never becomes the only safety
 layer.
+
+The Hardware workspace includes a bounded diagnostic log with search, driver
+filtering, freeze, clear, copy/export, and separate incoming/outgoing/info/
+warning/error visibility. Armed timeline seeks and scrubbing use safe bounded
+transitions rather than instantly commanding arbitrary poses.
 
 ## Delivery order and gates
 
