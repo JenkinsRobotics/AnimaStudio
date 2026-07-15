@@ -129,11 +129,14 @@ class SimulatedDevice:
 
     def receive_line(self, line: str) -> str:
         """Handle one host→device line, return the device→host reply line."""
-        self._last_rx_ms = self._now_ms  # any traffic resets the failsafe timer
         try:
-            return self._handle(line.rstrip("\r\n"))
+            reply = self._handle(line.rstrip("\r\n"))
         except _CommandError as error:
             return f"ERR,{error.code},{error.message}"
+        # Only a successfully parsed command refreshes the failsafe heartbeat —
+        # line noise must never keep a servo armed (Wire_Protocol.md).
+        self._last_rx_ms = self._now_ms
+        return reply
 
     def _handle(self, line: str) -> str:
         parts = line.split(",")
@@ -173,6 +176,8 @@ class SimulatedDevice:
             key, separator, raw = field.partition("=")
             if not separator or not raw:
                 raise _err(ERR_PARSE, "parse")
+            if key in keys:
+                raise _err(ERR_PARSE, "duplicate-key")
             keys[key] = raw
 
         known = {"pin", "min_us", "max_us", "invert", "neutral", "failsafe_ms"}
@@ -212,11 +217,15 @@ class SimulatedDevice:
 
         # Validate every target before applying any: a frame is atomic.
         targets: list[tuple[_Channel, float]] = []
+        seen_channels: set[int] = set()
         for pair in parts[2:]:
             raw_channel, separator, raw_value = pair.partition(":")
             if not separator:
                 raise _err(ERR_PARSE, "parse")
             channel = self._parse_channel(raw_channel)
+            if channel in seen_channels:
+                raise _err(ERR_PARSE, "duplicate-channel")
+            seen_channels.add(channel)
             if channel not in self._channels:
                 raise _err(ERR_NOT_CONFIGURED, "not-configured")
             targets.append((self._channels[channel], self._parse_value(raw_value)))

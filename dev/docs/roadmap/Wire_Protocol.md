@@ -42,10 +42,19 @@ baked into animation data.
 
 ## Failsafe
 
-If a device receives no line for `failsafe_ms` (default 2000, set via
-`CFG` key on channel or a future `SET` global), it disables all outputs
-— same behavior as `STOP`. A disconnected cable must never leave a
+If a device handles no **successfully parsed command** for
+`failsafe_ms` (default 2000, set per channel via the `CFG`
+`failsafe_ms` key), it disables that channel's output — same behavior
+as `STOP`. Malformed or rejected lines (anything answered with `ERR`)
+do **not** refresh the heartbeat: line noise from a dying connection
+must never keep a servo armed. A disconnected cable must never leave a
 servo straining.
+
+## Strictness
+
+Ambiguous input is rejected, never resolved silently: a duplicate key
+within one `CFG`, or the same channel listed twice within one `FRM`,
+is `ERR,1` — no last-write-wins.
 
 ## Streaming rates
 

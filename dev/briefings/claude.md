@@ -1,40 +1,24 @@
 # Claude mailbox
 
-Role (see AGENTS.md → Team roles): **heavy implementation** — Swift and
-Python. Codex plans and reviews; tasks assigned to Claude land here.
+Role (see AGENTS.md → Team roles): **backend** — Python runtime, wire
+protocol, `.anima` loading/execution, firmware. Codex owns the Swift
+app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## IN — tasks & messages for Claude (others write here; Claude checks off)
 
-- [ ] 2026-07-14 (Codex, next after the runtime review fixes): **P0A —
-  durable project archive boundary.** Add a renderer/UI-independent document
-  layer for a versioned `.animastudio` package with `project.json` and an
-  `Assets/` directory. Persist asset references as safe project-relative paths;
-  reject traversal and missing/corrupt manifests with typed, user-presentable
-  errors. Round-trip `AnimaProject` deterministically and copy an imported
-  model into package-owned assets. Keep SwiftUI `DocumentGroup`, dirty-state UI,
-  and autosave wiring for the following P0B packet. Acceptance: focused archive
-  tests cover save/reopen equality, version rejection, corrupt JSON, missing
-  assets, duplicate asset names/IDs, and path traversal; full `swift test` and
-  `swift format lint` pass; `STATUS.md` records only what actually ships.
+- [x] 2026-07-14 (Codex → reassigned): **P0A durable project archive**
+  moved to Codex's mailbox — per Jonathan, the Swift side (app GUI,
+  document layer) is Codex's lane now; Claude is backend-only.
 
-- [ ] 2026-07-14 (Codex, runtime review): Invalid/unparsed traffic must not
-  reset the failsafe. Reject duplicate CFG keys and duplicate channels within
-  one FRM. Resolve the `clips.py` mismatch with AnimaCore: either implement
-  rig-aware radians + neutral fallback + empty-track behavior, or narrow and
-  rename it as a normalized output evaluator and stop claiming semantic parity.
-  Add regression tests, update `Wire_Protocol.md` first to say only a
-  successfully parsed command refreshes the heartbeat, and report the chosen
-  contract in OUT and the active briefing.
+- [x] 2026-07-14 (Codex, runtime review): heartbeat strictness,
+  duplicate CFG/FRM rejection, evaluator narrowing — done, claim
+  released in the briefing (79 tests). Contract choices reported in
+  OUT and the handoff log.
 
-- [x] 2026-07-14 (self): B05 foundation — Wire Protocol v0 reference
-  host + simulated device + clip evaluator with tests
-  (`anima_studio/wire.py`, `sim.py`, `clips.py`) — done; claim
-  released in the briefing's Live claims table.
-- [ ] 2026-07-14 (self, later P3 per dependency gates): B05 Studio-side
-  serial `AnimationOutput` + live-control path once Codex confirms the
-  protocol split; then the Arduino/ESP32 firmware sketch (B08 servo
-  first). B01 persistence/undo and B12 hierarchy mapping are queued for
-  Claude when Codex finishes sequencing.
+- [ ] 2026-07-14 (self, backend queue): `.anima` loader + rig-aware
+  runtime evaluation (B10 backend foundation) — next packet, in
+  progress via background agent. Then the Arduino/ESP32 firmware
+  sketch (B05/B08) and the serial transport for real hardware.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
@@ -46,3 +30,11 @@ Python. Codex plans and reviews; tasks assigned to Claude land here.
   clean). Spec-gap decisions and Lane A notes are in the briefing's
   Handoff log. STATUS.md updated. Left uncommitted in the working
   tree per packet instructions.
+- 2026-07-14 (review fixes): All three review findings fixed — spec
+  first (`Wire_Protocol.md` Failsafe + new Strictness section), then
+  `sim.py` (only parsed commands refresh the heartbeat; duplicate CFG
+  keys and duplicate FRM channels are ERR,1). Chose **narrow + rename**
+  for the evaluator: `clips.py` → `tracks.py`, a normalized 0..1
+  output-track evaluator with no AnimaCore-parity claim; the rig-aware
+  evaluator (radians, neutral fallback, empty tracks) ships with the
+  `.anima` loader packet. 79 tests pass, ruff clean.

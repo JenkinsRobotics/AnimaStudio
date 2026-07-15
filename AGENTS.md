@@ -26,11 +26,14 @@ conflict between agent edits):
 The current goal is Bottango-level capability, working straight down
 [`dev/docs/roadmap/Bottango_Parity.md`](dev/docs/roadmap/Bottango_Parity.md).
 
-- **Claude Code — heavy implementation** (Swift and Python). Larger
-  token budget; writes the bulk of the code and tests.
-- **Codex — planning + review.** Reviews Claude's commits/diffs, plans
-  and sequences the next checklist slices, assigns tasks. Small direct
-  fixes are fine; big implementations go to Claude.
+- **Claude Code — backend** (per Jonathan, 2026-07-14, superseding the
+  earlier all-implementation split): the Python runtime
+  (`anima_studio/`), the wire protocol and its simulator, `.anima`
+  loading/execution, and the microcontroller firmware
+  (`firmware/`, when it exists).
+- **Codex — Swift app GUI** (`studio/`), plus planning + review across
+  both lanes: reviews commits/diffs, sequences the next checklist
+  slices, assigns tasks.
 - Planning is teamwork — either agent may propose; disagreements get a
   mailbox note, not a silent revert.
 

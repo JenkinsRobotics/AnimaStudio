@@ -1,9 +1,12 @@
-"""Minimal keyframe clip evaluation mirroring AnimaCore semantics.
+"""Normalized output-track evaluation for wire streaming.
 
-The Python twin of ``studio/Sources/AnimaCore/AnimationEvaluator.swift``:
-hold/linear interpolation, deterministic evaluation, time clamping to the
-clip range, and value clamping to per-track limits. Bézier interpolation
-is planned — Studio lands it first (see the active briefing).
+Deterministic hold/linear keyframe evaluation over normalized 0..1
+channel values — what the runtime feeds to `wire.encode_frm`. This is
+deliberately NOT a rig evaluator and claims no semantic parity with
+AnimaCore's `AnimationEvaluator.swift` (rig-aware joint radians, neutral
+fallback, empty tracks); that stays in Swift, and a rig-aware runtime
+evaluator arrives with the `.anima` loader. Bézier interpolation is
+planned — Studio lands it first (see the active briefing).
 """
 
 from __future__ import annotations

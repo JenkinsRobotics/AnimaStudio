@@ -3,7 +3,7 @@ end-to-end clip → wire → servo loop."""
 
 import pytest
 
-from anima_studio.clips import Clip, Interpolation, Keyframe, Track, evaluate_clip
+from anima_studio.tracks import Clip, Interpolation, Keyframe, Track, evaluate_clip
 from anima_studio.sim import SimulatedDevice
 from anima_studio.wire import (
     ERR_BAD_CHANNEL,
@@ -284,3 +284,52 @@ class TestEndToEnd:
         assert device.channel_enabled(0) and device.channel_enabled(1)
         device.tick(last_line_ms + 2000)
         assert not device.channel_enabled(0) and not device.channel_enabled(1)
+
+
+class TestHeartbeatStrictness:
+    """Review fixes: only parsed commands refresh the failsafe; ambiguous
+    input is rejected, never last-write-wins (Wire_Protocol.md)."""
+
+    def _armed_device(self) -> SimulatedDevice:
+        device = make_device()
+        assert isinstance(parse_reply(device.receive_line(CFG_LINE)), Ok)
+        assert isinstance(parse_reply(device.receive_line(encode_en(0, True))), Ok)
+        return device
+
+    def test_malformed_line_does_not_refresh_failsafe(self):
+        device = self._armed_device()  # last good traffic at t=0
+        device.tick(1500)
+        assert isinstance(parse_reply(device.receive_line("garbage,noise")), Err)
+        device.tick(2000)  # would still be alive if garbage counted
+        assert not device.channel_enabled(0)
+
+    def test_rejected_known_command_does_not_refresh_failsafe(self):
+        device = self._armed_device()
+        device.tick(1500)
+        reply = parse_reply(device.receive_line("FRM,33,0:9.9"))  # ERR bad-value
+        assert isinstance(reply, Err)
+        device.tick(2000)
+        assert not device.channel_enabled(0)
+
+    def test_parsed_command_does_refresh_failsafe(self):
+        device = self._armed_device()
+        device.tick(1500)
+        assert device.receive_line(encode_ping()) == "PONG"
+        device.tick(2000)  # only 500 ms since the PING
+        assert device.channel_enabled(0)
+        device.tick(3500)  # 2000 ms since the PING
+        assert not device.channel_enabled(0)
+
+    def test_duplicate_cfg_key_rejected(self):
+        device = make_device()
+        line = "CFG,0,servo,pin=9,min_us=600,max_us=2400,pin=10"
+        reply = parse_reply(device.receive_line(line))
+        assert isinstance(reply, Err) and reply.code == ERR_PARSE
+        with pytest.raises(KeyError):
+            device.channel_value(0)  # nothing was configured
+
+    def test_duplicate_frm_channel_rejected_atomically(self):
+        device = self._armed_device()
+        reply = parse_reply(device.receive_line("FRM,0,0:0.100,0:0.900"))
+        assert isinstance(reply, Err) and reply.code == ERR_PARSE
+        assert device.channel_value(0) == 0.5  # untouched neutral
