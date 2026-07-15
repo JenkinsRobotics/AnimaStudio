@@ -77,7 +77,15 @@
   UI Dev's Agent command opens one reusable floating macOS utility panel with
   voice/chat/docs/ideas presentation, prompt starters, and a composer. It is
   explicitly labeled as a UI prototype; microphone and Send remain disabled
-  until an agent service is connected.
+  until an agent service is connected. UI Dev can also launch the real
+  Navigator, Inspector, and Timeline surfaces as reusable floating utility
+  panels for focused design review. Its 3D Workspace command opens a normal
+  resizable workspace window—not a floating palette—with the production
+  RealityKit viewport, an isolated sample rig, selection, transform editing,
+  camera controls, guides, shading, edges, reflections, shadows, and grid
+  controls. Each surface has one reusable window instance, restores its saved
+  frame, and enforces a readable minimum size through the shared Studio window
+  factory.
   Rig preserves Structures and the complete Mate family and adds focused
   Connectors, Assemble, and Inspect groups before the planned Motors, 3D Models
   & Media, and Events groups. Its creation families stay docked in the ribbon

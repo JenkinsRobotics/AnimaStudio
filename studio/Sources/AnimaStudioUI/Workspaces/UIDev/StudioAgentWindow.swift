@@ -4,22 +4,14 @@ import SwiftUI
 @MainActor
 enum StudioAgentPanel {
   private static let panel: NSPanel = {
-    let panel = NSPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 360, height: 620),
-      styleMask: [.titled, .closable, .resizable, .utilityWindow],
-      backing: .buffered,
-      defer: false
-    )
-    panel.title = "Anima Agent"
-    panel.contentMinSize = NSSize(width: 320, height: 520)
-    panel.isFloatingPanel = true
-    panel.hidesOnDeactivate = false
-    panel.isReleasedWhenClosed = false
-    panel.collectionBehavior = [.fullScreenAuxiliary]
-    panel.contentViewController = NSHostingController(rootView: StudioAgentWindow())
-    panel.setFrameAutosaveName("AnimaAgentUtilityPanel")
-    panel.center()
-    return panel
+    StudioWindowFactory.utilityPanel(
+      title: "Anima Agent",
+      autosaveName: "AnimaAgentUtilityPanel",
+      contentSize: NSSize(width: 360, height: 620),
+      minimumSize: NSSize(width: 320, height: 520)
+    ) {
+      StudioAgentWindow()
+    }
   }()
 
   static func show() {

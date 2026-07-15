@@ -210,6 +210,24 @@ struct UIDevWorkspaceView: View {
 
   private var panelGallery: some View {
     LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 16) {
+      sampleCard(
+        title: "Launch real surfaces",
+        detail: "Side tools reuse floating panels; the 3D canvas uses a normal workspace window."
+      ) {
+        VStack(spacing: 9) {
+          ForEach(UIDevUtilityWindowKind.allCases) { kind in
+            Button("Open \(kind.title)", systemImage: kind.systemImage) {
+              UIDevUtilityWindowRegistry.show(kind)
+            }
+            .buttonStyle(
+              StudioButtonStyle(
+                role: kind == .workspace3D ? .primary : .secondary,
+                expandsHorizontally: true
+              )
+            )
+          }
+        }
+      }
       UIDevSamplePanel(
         title: "Inspector",
         systemImage: "slider.horizontal.3",

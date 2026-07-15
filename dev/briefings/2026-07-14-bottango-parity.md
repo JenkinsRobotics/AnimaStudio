@@ -159,6 +159,19 @@ change needed in the Handoff log instead of inventing commands.
   one-panel reuse test), Xcode/root-app build, strict signature, live UI Dev
   selector/gallery accessibility labels, and `git diff --check`.
 
+- **2026-07-15 (Codex, launchable UI Dev windows):** Extended the UI Dev
+  workspace from a component gallery into a live window lab. Navigator,
+  Inspector, and Timeline commands open the production views in reusable
+  floating utility panels; 3D Workspace opens a normal resizable window with
+  the production RealityKit viewport and a private sample rig. The viewport
+  carries real selection, transforms, mate feature picking, camera state,
+  guides, shading, mesh edges, reflections, shadows, and grid controls without
+  touching the user's active project. Added a shared AppKit/SwiftUI window
+  factory for saved frames, readable minimum sizes, and consistent lifecycle,
+  then moved the Agent panel onto it. Repeated launches reuse one instance per
+  surface. Verified claimed-file lint, 136 merged Swift tests, Xcode/root-app
+  build, strict signature, live window launch checks, and `git diff --check`.
+
 - **2026-07-15 (Claude, viewport sub-object selection):** Jonathan's
   view-cube hover interaction now works on components in the main viewport.
   Outside mate placement, the focused component shows its inferred

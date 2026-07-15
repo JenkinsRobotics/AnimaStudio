@@ -11,7 +11,7 @@ struct UIDevRibbonView: View {
           title: "Windows",
           systemImage: "macwindow.on.rectangle",
           tint: StudioPalette.accent,
-          detail: "1 live · 3 gallery"
+          detail: "5 live"
         ) {
           CreationToolButton(
             title: "Agent",
@@ -21,7 +21,19 @@ struct UIDevRibbonView: View {
             action: openAgentWindow
           )
           .keyboardShortcut("a", modifiers: [.command, .shift])
-          sectionButton(.panels, title: "Panels", systemImage: "sidebar.left")
+          windowButton(.navigator)
+          windowButton(.inspector)
+          windowButton(.timeline)
+          windowButton(.workspace3D)
+        }
+
+        CreationToolGroup(
+          title: "Patterns",
+          systemImage: "rectangle.3.group",
+          tint: StudioPalette.sourceModel,
+          detail: "Gallery"
+        ) {
+          sectionButton(.panels, title: "Panels", systemImage: "macwindow.on.rectangle")
           sectionButton(.dialogs, title: "Dialogs", systemImage: "rectangle.on.rectangle.angled")
           sectionButton(.popovers, title: "Popovers", systemImage: "bubble.left")
         }
@@ -52,6 +64,19 @@ struct UIDevRibbonView: View {
     .scrollIndicators(.hidden)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("UI Dev workspace tools")
+  }
+
+  private func windowButton(_ kind: UIDevUtilityWindowKind) -> some View {
+    CreationToolButton(
+      title: kind.title,
+      systemImage: kind.systemImage,
+      tint: kind == .workspace3D ? StudioPalette.semanticPart : StudioPalette.accent,
+      help: kind == .workspace3D
+        ? "Open a reusable workspace window containing the real interactive 3D viewport."
+        : "Open the real \(kind.title) as a reusable floating side panel."
+    ) {
+      UIDevUtilityWindowRegistry.show(kind)
+    }
   }
 
   private func sectionButton(
