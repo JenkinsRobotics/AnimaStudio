@@ -178,6 +178,46 @@ the first milestone.
 
 ## Primary Workspaces
 
+Studio uses task-focused workspaces in the same sense as professional CAD,
+animation, and image-editing applications. A workspace is a presentation of
+one open project, not a separate document or data model. Switching workspaces
+changes the contextual header, available commands, panel arrangement, and
+default editor while preserving the project, undo history, and shared
+selection whenever that selection remains meaningful.
+
+### Planned built-in workspaces
+
+| Workspace | Primary task | Contextual header and default layout |
+|---|---|---|
+| Assets | Import, inspect, relink, and organize source files | Import/relink tools; asset browser + large preview + metadata inspector |
+| Rig | Build semantic parts, typed joints/DOFs, pivots, limits, and hierarchy mappings | Create/join/transform tools; Parts tree + 3D viewport + rig inspector |
+| Animate | Author poses, clips, keys, curves, and recorded motion | Transport/auto-key/interpolation tools; viewport + timeline/graph + animation inspector |
+| Show | Arrange character clips, audio, screens, lights, events, and scene logic | Show transport/trigger tools; multi-track scene timeline + cue/logic panels |
+| Hardware | Map outputs, calibrate, test, monitor, and arm physical targets | Connection/calibration/safety tools; mapping table + telemetry + guarded live controls |
+
+The window chrome has two layers:
+
+1. A stable global header for project identity, save/open, undo/redo, workspace
+   switching, connection state, and the guarded Master Live control.
+2. A workspace-owned contextual header for the active task's tools. Rig shows
+   part/joint tools; Animate shows transport and keying tools; Hardware shows
+   connection, calibration, and safety actions.
+
+Each built-in workspace declares a stable identifier, title/icon, contextual
+commands, allowed panels, default layout, and capability requirements. Panel
+sizes and visibility are restored per workspace. Those layout preferences are
+user-local by default so opening a project does not overwrite another person's
+preferred arrangement; explicit shareable layout presets may be added later.
+Plugins may eventually contribute panels and commands to compatible
+workspaces, but the initial descriptor contract is proven by built-in
+workspaces first.
+
+Workspace switching must not duplicate editor state. The document remains the
+single source of truth; workspace views hold only transient presentation state
+such as panel visibility, split positions, viewport camera, and the locally
+focused editor. Import is allowed to begin as the existing workspace tab, then
+become the Assets workspace without changing project semantics.
+
 The long-term creative environment includes:
 
 - Project and asset browser

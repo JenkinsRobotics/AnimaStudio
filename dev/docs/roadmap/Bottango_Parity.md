@@ -34,7 +34,7 @@ its user flow, tests, and `STATUS.md` update land together.
 
 | ID | Bottango documentation area | Anima deliverable | Home | Status / dependency |
 |---|---|---|---|---|
-| B01 | Workspace & UI | Project home; Build/Animate/Show/Hardware modes; contextual tools; camera/orbit; selection; inspector; save/load/save-as; dirty state; autosave/recovery; undo/redo | `AnimaStudioApp`, document layer | **Foundation:** Build/Animate shell, tree, viewport, inspector exist. Persistence, dirty state, autosave, undo/redo planned. Must finish before hardware authoring. |
+| B01 | Workspace & UI | Project home; task-focused Assets/Rig/Animate/Show/Hardware workspaces; stable global header plus workspace-owned contextual headers; restorable panel layouts; camera/orbit; selection; inspector; save/load/save-as; dirty state; autosave/recovery; undo/redo | `AnimaStudioApp`, document layer | **Foundation:** Build/Animate/Import/Hardware shell, tree, viewport, inspector, camera, and selection exist. Workspace descriptors/layout restoration, Show, persistence, dirty state, autosave, undo/redo planned. Must finish before hardware authoring. |
 | B02 | Structures | Semantic parts as animation controls; imported or primitive visual stand-ins; transforms; pivots; home pose; parent/child hierarchy; duplicate/delete/reparent | `AnimaCore` rig model + Studio Build mode + viewport | **Planned.** Imported assets exist, but model nodes cannot become persistent semantic parts. Depends on B01 persistence. |
 | B03 | Joints | Revolute and prismatic joints first; parent/child connection; axis; pivot; neutral; min/max; offsets; duplicate assemblies; viewport gizmos | `AnimaCore`, `RealityKitViewport`, Build inspector | **Foundation:** scalar joint definition and clamping exist. Editing, hierarchy binding, joint types, pivots, and gizmos planned. Depends on B02. |
 | B04 | Motors / actuator mapping | Separate semantic joints from output channels; normalized mapping; inversion; neutral/home; signal range; velocity limit; resolve conflicting home values | format mapping + runtime output config + Studio Hardware inspector | **Planned.** Must not put servo pins or pulse widths in core timeline data. Depends on B03 and the shared output contract. |
@@ -61,7 +61,13 @@ its user flow, tests, and `STATUS.md` update land together.
 - Structural and animation edits participate in undo/redo.
 - Unsaved state, autosave, recovery, missing assets, and load failures are
   visible rather than silent.
-- Mode changes alter the available tools without creating separate data models.
+- Workspace changes alter the contextual header, available tools, panels, and
+  default layout without creating separate project or editor data models.
+- The global header remains stable across workspaces and owns project commands,
+  workspace switching, connection state, and guarded Master Live state.
+- Panel visibility, sizing, and arrangement restore independently per
+  workspace; user-local layout preferences do not silently mutate the shared
+  project document.
 
 ### B02–B04 — Structure, joints, and outputs
 

@@ -63,6 +63,13 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — task-focused workspaces:** Jonathan's SolidWorks/Photoshop
+  workspace model is now part of the Studio plan. One open project will expose
+  Assets, Rig, Animate, Show, and Hardware workspaces. The global header stays
+  stable; a second contextual header, panels, shortcuts, and default layout
+  belong to the active workspace. Layout state stays presentational and
+  user-local by default rather than creating duplicate project models.
+
 - **2026-07-14 — workspace interaction + UI standards result:** Native
   tree multi-selection, direct 3D geometry picking with Command/Shift extension,
   Escape/close deselection, real project/asset/joint name
