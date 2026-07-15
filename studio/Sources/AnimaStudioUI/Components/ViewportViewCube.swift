@@ -65,15 +65,22 @@ struct ViewportViewCube: View {
         context.fill(path, with: .color(fillColor(for: face.face)))
         context.stroke(path, with: .color(.white.opacity(0.58)), lineWidth: 1)
 
-        var labelContext = context
-        labelContext.clip(to: path)
-        labelContext.translateBy(x: face.center.x, y: face.center.y)
-        labelContext.rotate(
-          by: .radians(Double(ViewCubeGeometry.labelAngleRadians(for: face)))
-        )
         let label = Text(face.face.title)
           .font(.system(size: 8, weight: .bold, design: .rounded))
           .foregroundStyle(.white)
+        let labelPosition = ViewCubeGeometry.labelPosition(for: face)
+        var labelContext = context
+        labelContext.translateBy(x: labelPosition.x, y: labelPosition.y)
+        labelContext.rotate(
+          by: .radians(
+            Double(
+              ViewCubeGeometry.labelRotationRadians(
+                for: face,
+                orientation: orientation
+              )
+            )
+          )
+        )
         labelContext.draw(label, at: .zero)
       }
 

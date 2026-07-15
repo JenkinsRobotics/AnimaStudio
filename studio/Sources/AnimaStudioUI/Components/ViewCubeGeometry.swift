@@ -23,6 +23,15 @@ enum ViewCubeFace: String, CaseIterable {
     }
   }
 
+  var labelRightDirection: SIMD3<Float> {
+    switch self {
+    case .front, .top, .bottom: SIMD3<Float>(1, 0, 0)
+    case .back: SIMD3<Float>(-1, 0, 0)
+    case .right: SIMD3<Float>(0, 0, -1)
+    case .left: SIMD3<Float>(0, 0, 1)
+    }
+  }
+
   var vertices: [SIMD3<Float>] {
     switch self {
     case .front:
@@ -205,17 +214,20 @@ enum ViewCubeGeometry {
     return nil
   }
 
-  static func labelAngleRadians(for face: ProjectedViewCubeFace) -> CGFloat {
-    guard face.points.count >= 2 else { return 0 }
-    let start = face.points[0]
-    let end = face.points[1]
-    var radians = atan2(end.y - start.y, end.x - start.x)
-    if radians > .pi / 2 {
-      radians -= .pi
-    } else if radians < -.pi / 2 {
-      radians += .pi
-    }
-    return radians
+  static func labelPosition(for face: ProjectedViewCubeFace) -> CGPoint {
+    face.center
+  }
+
+  static func labelRotationRadians(
+    for face: ProjectedViewCubeFace,
+    orientation: PreviewCameraOrientation
+  ) -> CGFloat {
+    let basis = cameraBasis(for: orientation.direction.vector)
+    let direction = face.face.labelRightDirection
+    return atan2(
+      -CGFloat(simd_dot(direction, basis.up)),
+      CGFloat(simd_dot(direction, basis.right))
+    )
   }
 
   private static func cameraBasis(

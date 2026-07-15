@@ -65,10 +65,11 @@
   controls Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, grid,
   viewport appearance, and Balanced/Soft/Bright/High Contrast RealityKit
   lighting rigs. These settings persist as user-local presentation preferences
-  and do not alter project data. Cube face names rotate and clip with their
-  projected planes, its XYZ triad shares one origin and follows only the
-  positive axis directions, and hovering previews the exact clickable face,
-  edge, or corner. The viewport also provides Home/front/right/top presets,
+  and do not alter project data. Cube face names behave as fixed-size decals at
+  their face centers, using one face-local orientation without readability flip
+  correction, clipping, or scaling; its XYZ triad shares one origin and follows
+  only the positive axis directions, and hovering previews the exact clickable
+  face, edge, or corner. The viewport also provides Home/front/right/top presets,
   trackpad pan/pinch, and persistent Default, SolidWorks, Onshape, Fusion 360,
   and Custom mouse profiles. Default and Onshape map right drag to orbit and
   middle drag to pan; SolidWorks maps middle drag to orbit and Control- or
@@ -100,7 +101,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Sixty-three tests pass with `cd studio && swift test`, including real
+  inspector. Sixty-four tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python

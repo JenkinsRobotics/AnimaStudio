@@ -146,11 +146,13 @@ standard CAD navigation vocabulary:
 - clicking a corner selects the corresponding trimetric view;
 - the surrounding arrows rotate the current view in 15-degree increments.
 
-Visible face names rotate and clip with their projected planes. Pointer hover
-previews the exact face, edge, or corner that a click will select. The embedded
-XYZ triad shares one visible origin and projects only the positive X, Y, and Z
-directions through the same camera basis, so its directions remain synchronized
-with the cube rather than acting as a static legend.
+Visible face names behave like fixed decals anchored at each projected face
+center. Each decal has one face-local orientation: it follows its face but is
+never dynamically reoriented for readability, clipped, or scaled. Pointer hover
+previews the exact face, edge, or corner that a click will select. The
+embedded XYZ triad shares one visible origin and projects only the positive X,
+Y, and Z directions through the same camera basis, so its directions remain
+synchronized with the cube rather than acting as a static legend.
 
 Camera and render controls are intentionally split from the RealityKit scene
 implementation. `PreviewCameraState` owns renderer-facing camera data,

@@ -63,12 +63,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — view-cube label stabilization complete:** Replaced the
+  readability-adjusted face-label transform with one fixed-size decal anchored
+  to each projected face center and oriented once in that face's local frame.
+  Labels follow their face but no longer flip-correct, resize, clip, or
+  continuously readjust while orbiting. Cube orientation,
+  positive XYZ triad, hover targets, face/edge/corner selection, and navigation
+  behavior are unchanged. Sixty-four Swift tests pass.
+
 - **2026-07-14 — direct viewport display/navigation controls complete:** The
   cube now has an adjacent labeled Display menu with independent
   Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, four real
   RealityKit lighting rigs, camera/projection/FOV, grid, appearance, and input
-  settings. Its plane labels rotate and clip with projected faces; a shared
-  origin emits projected positive X/Y/Z axes; hover highlights the exact face,
+  settings. Its face labels remain centered on projected faces; a shared origin
+  emits projected positive X/Y/Z axes; hover highlights the exact face,
   edge, or corner before selection. Mouse profiles now include Default,
   SolidWorks, Onshape, Fusion 360, and a genuinely editable conflict-free
   Custom mapping. HUD composition, lighting, render behavior, navigation

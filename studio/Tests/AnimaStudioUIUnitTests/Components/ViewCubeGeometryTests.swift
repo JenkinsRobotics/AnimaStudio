@@ -111,15 +111,42 @@ final class ViewCubeGeometryTests: XCTestCase {
     XCTAssertTrue(axes.allSatisfy { $0.endpoint != origin })
   }
 
-  func testSideLabelRotationFollowsItsProjectedPlane() throws {
-    let face = try XCTUnwrap(
-      ViewCubeGeometry.projectedFaces(
-        in: size,
-        orientation: PreviewCameraOrientation(direction: .home)
-      ).first(where: { $0.face == .right })
-    )
+  func testFaceLabelsStayAnchoredAtProjectedFaceCenters() {
+    let orientations = [
+      PreviewCameraOrientation(direction: .home),
+      PreviewCameraOrientation(direction: .right),
+      PreviewCameraOrientation(direction: .top),
+    ]
 
-    XCTAssertNotEqual(ViewCubeGeometry.labelAngleRadians(for: face), 0, accuracy: 0.001)
+    for orientation in orientations {
+      for face in ViewCubeGeometry.projectedFaces(in: size, orientation: orientation) {
+        XCTAssertEqual(ViewCubeGeometry.labelPosition(for: face), face.center)
+      }
+    }
+  }
+
+  func testFaceLabelDecalsUseAStableLocalOrientationInPrincipalViews() throws {
+    let cases: [(ViewCubeFace, PreviewCameraDirection)] = [
+      (.front, .front),
+      (.back, .back),
+      (.right, .right),
+      (.left, .left),
+      (.top, .top),
+      (.bottom, .bottom),
+    ]
+
+    for (expectedFace, direction) in cases {
+      let orientation = PreviewCameraOrientation(direction: direction)
+      let face = try XCTUnwrap(
+        ViewCubeGeometry.projectedFaces(in: size, orientation: orientation)
+          .first(where: { $0.face == expectedFace })
+      )
+      XCTAssertEqual(
+        ViewCubeGeometry.labelRotationRadians(for: face, orientation: orientation),
+        0,
+        accuracy: 0.001
+      )
+    }
   }
 
   @MainActor
