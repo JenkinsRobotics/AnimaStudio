@@ -24,7 +24,17 @@
   into the viewport, is normalized for preview framing, and appears in the
   project asset tree. Six tests pass with `cd studio && swift test`, including a
   real USD hierarchy load through RealityKit. The Python package skeleton also
-  installs with `pip install -e ".[dev]"`; it has no runtime behavior yet.
+  installs with `pip install -e ".[dev]"`. The Python runtime now implements
+  the Anima Wire Protocol v0 reference host (`anima_studio/wire.py` — encode
+  HELLO/CFG/FRM/EN/STOP/PING, parse ANIMA/OK/ERR/PONG, 3-decimal normalized
+  values), an in-process simulated device (`anima_studio/sim.py` — handshake,
+  servo CFG, device-side linear FRM interpolation on an explicit `tick(now_ms)`
+  clock, E-stop, per-channel 2000 ms failsafe, spec ERR codes), and a keyframe
+  clip evaluator mirroring AnimaCore semantics (`anima_studio/clips.py` —
+  hold/linear, time and joint-limit clamping, deterministic; no Bézier yet).
+  74 Python tests pass with `.venv/bin/pytest anima_studio/tests -q`
+  (lint: `.venv/bin/ruff check .`), including an end-to-end clip → FRM stream →
+  simulated servo → failsafe test.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
