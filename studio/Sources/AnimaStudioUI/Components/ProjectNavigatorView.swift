@@ -9,6 +9,7 @@ struct ProjectNavigatorView: View {
   @State private var renameTarget: NavigatorRenameTarget?
   @State private var renameText = ""
   @State private var collapsedGroupIDs: Set<UUID> = []
+  @State private var activeDragPayload: NavigatorDragPayload?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -148,14 +149,20 @@ struct ProjectNavigatorView: View {
               detail: "\(group.componentIDs.count)",
               isLocked: group.isLocked
             )
+            .navigatorDragSource(
+              .componentGroup(group.id),
+              activePayload: $activeDragPayload
+            )
+            .navigatorDropTarget(
+              activePayload: $activeDragPayload,
+              behavior: .componentGroup
+            ) { payload, intent in
+              handleDrop(payload, intent: intent, onto: group)
+            }
           }
           .tag(NavigatorItem.componentGroup(group.id))
           .contextMenu {
             componentGroupActions(group)
-          }
-          .draggable(NavigatorDragPayload.componentGroup(group.id).encodedValue)
-          .dropDestination(for: String.self) { values, _ in
-            handleDrop(values, onto: group)
           }
         }
 
@@ -177,8 +184,8 @@ struct ProjectNavigatorView: View {
       }
       .frame(maxWidth: .infinity)
       .contentShape(Rectangle())
-      .dropDestination(for: String.self) { values, _ in
-        handleTopLevelDrop(values)
+      .navigatorTopLevelDropTarget(activePayload: $activeDragPayload) { sourceID in
+        workspace.moveDraggedComponents(startingWith: sourceID, toGroup: nil)
       }
       .help("Drop a component here to move it out of a group")
     }
@@ -197,9 +204,10 @@ struct ProjectNavigatorView: View {
         .contextMenu {
           mateActions(joint)
         }
-        .draggable(NavigatorDragPayload.mate(joint.id).encodedValue)
-        .dropDestination(for: String.self) { values, _ in
-          handleMateDrop(values, before: joint.id)
+        .navigatorDragSource(.mate(joint.id), activePayload: $activeDragPayload)
+        .navigatorDropTarget(activePayload: $activeDragPayload, behavior: .mate) {
+          payload, intent in
+          handleMateDrop(payload, intent: intent, relativeTo: joint.id)
         }
       }
       if workspace.project.rig.joints.isEmpty {
@@ -270,8 +278,7 @@ struct ProjectNavigatorView: View {
           .help("Open the component and mate creation palette")
 
           Button(groupButtonTitle, systemImage: "folder.badge.plus") {
-            let groupID = workspace.createComponentGroup()
-            collapsedGroupIDs.remove(groupID)
+            createGroupFromSelection()
           }
           .buttonStyle(.borderedProminent)
           .help(groupButtonHelp)
@@ -410,42 +417,66 @@ struct ProjectNavigatorView: View {
     .contextMenu {
       componentActions(part)
     }
-    .draggable(NavigatorDragPayload.component(part.id).encodedValue)
-    .dropDestination(for: String.self) { values, _ in
-      handleComponentDrop(values, before: part.id)
+    .navigatorDragSource(.component(part.id), activePayload: $activeDragPayload)
+    .navigatorDropTarget(activePayload: $activeDragPayload, behavior: .component) {
+      payload, intent in
+      handleComponentDrop(payload, intent: intent, relativeTo: part.id)
     }
   }
 
-  private func handleComponentDrop(_ values: [String], before destinationID: PartID) -> Bool {
-    guard case .component(let sourceID) = firstDragPayload(in: values) else { return false }
-    return workspace.moveComponent(sourceID, before: destinationID)
+  private func handleComponentDrop(
+    _ payload: NavigatorDragPayload,
+    intent: NavigatorDropIntent,
+    relativeTo destinationID: PartID
+  ) -> Bool {
+    guard case .component(let sourceID) = payload else { return false }
+    switch intent {
+    case .before:
+      return workspace.moveComponent(sourceID, relativeTo: destinationID, placement: .before)
+    case .group:
+      guard let groupID = workspace.groupComponents(draggedID: sourceID, onto: destinationID)
+      else { return false }
+      collapsedGroupIDs.remove(groupID)
+      return true
+    case .after:
+      return workspace.moveComponent(sourceID, relativeTo: destinationID, placement: .after)
+    }
   }
 
-  private func handleDrop(_ values: [String], onto group: NavigatorComponentGroup) -> Bool {
-    switch firstDragPayload(in: values) {
+  private func handleDrop(
+    _ payload: NavigatorDragPayload,
+    intent: NavigatorDropIntent,
+    onto group: NavigatorComponentGroup
+  ) -> Bool {
+    switch payload {
     case .component(let sourceID):
-      let didMove = workspace.moveComponent(sourceID, toGroup: group.id)
+      guard intent == .group else { return false }
+      let didMove = workspace.moveDraggedComponents(startingWith: sourceID, toGroup: group.id)
       if didMove { collapsedGroupIDs.remove(group.id) }
       return didMove
     case .componentGroup(let sourceID):
-      return workspace.moveComponentGroup(sourceID, before: group.id)
-    case .mate, nil:
+      guard intent != .group else { return false }
+      return workspace.moveComponentGroup(
+        sourceID,
+        relativeTo: group.id,
+        placement: intent == .before ? .before : .after
+      )
+    case .mate:
       return false
     }
   }
 
-  private func handleTopLevelDrop(_ values: [String]) -> Bool {
-    guard case .component(let sourceID) = firstDragPayload(in: values) else { return false }
-    return workspace.moveComponent(sourceID, toGroup: nil)
-  }
-
-  private func handleMateDrop(_ values: [String], before destinationID: JointID) -> Bool {
-    guard case .mate(let sourceID) = firstDragPayload(in: values) else { return false }
-    return workspace.moveMate(sourceID, before: destinationID)
-  }
-
-  private func firstDragPayload(in values: [String]) -> NavigatorDragPayload? {
-    values.lazy.compactMap(NavigatorDragPayload.init(encodedValue:)).first
+  private func handleMateDrop(
+    _ payload: NavigatorDragPayload,
+    intent: NavigatorDropIntent,
+    relativeTo destinationID: JointID
+  ) -> Bool {
+    guard case .mate(let sourceID) = payload, intent != .group else { return false }
+    return workspace.moveMate(
+      sourceID,
+      relativeTo: destinationID,
+      placement: intent == .before ? .before : .after
+    )
   }
 
   @ViewBuilder
@@ -454,6 +485,11 @@ struct ProjectNavigatorView: View {
       beginRename(.component(part.id), currentName: part.displayName)
     }
     .disabled(workspace.isComponentLocked(part.id))
+
+    Button(contextGroupButtonTitle, systemImage: "folder.badge.plus") {
+      createGroupFromSelection()
+    }
+    .disabled(workspace.selectedUnlockedComponentIDs.isEmpty)
 
     if workspace.isComponentLockedByGroup(part.id) {
       Button("Locked by Group", systemImage: "lock.fill") {}
@@ -593,6 +629,16 @@ struct ProjectNavigatorView: View {
     case .mate(let id): workspace.renameJoint(id: id, to: renameText)
     }
     self.renameTarget = nil
+  }
+
+  private var contextGroupButtonTitle: String {
+    let count = workspace.selectedUnlockedComponentIDs.count
+    return count > 0 ? "Group Selected (\(count))" : "Group Selected"
+  }
+
+  private func createGroupFromSelection() {
+    let groupID = workspace.createComponentGroup()
+    collapsedGroupIDs.remove(groupID)
   }
 }
 

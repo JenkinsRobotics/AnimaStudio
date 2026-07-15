@@ -63,6 +63,16 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — drop feedback/group creation correction complete:** Replaced
+  whole-row ambiguous drops with a dedicated interaction module. Component-row
+  edges render insertion lines and reorder before/after; the center renders a
+  bordered **+ Group** target and creates an expanded folder from the target and
+  active component selection. Existing folders and the top-level heading move
+  the active selection as a unit. Group/Mate rows use insertion lines. The
+  selected-component context menu now includes **Group Selected (N)** alongside
+  the existing footer action. Eighty-one Swift tests, claimed-file format lint,
+  native Xcode build, strict signature verification, and rebuilt root app pass.
+
 - **2026-07-14 — navigator drag/grouping follow-up complete:** Components drag
   before peers to reorder across top-level and groups, onto a group to append,
   or onto the Components heading to return to top level. Groups and Mates drag

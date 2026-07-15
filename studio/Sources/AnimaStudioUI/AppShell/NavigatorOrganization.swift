@@ -25,7 +25,7 @@ enum NavigatorMoveDirection {
   case down
 }
 
-enum NavigatorDragPayload: Equatable {
+enum NavigatorDragPayload: Equatable, Sendable {
   case component(PartID)
   case componentGroup(UUID)
   case mate(JointID)
@@ -33,6 +33,11 @@ enum NavigatorDragPayload: Equatable {
   private static let componentPrefix = "anima-component:"
   private static let componentGroupPrefix = "anima-component-group:"
   private static let matePrefix = "anima-mate:"
+  static let typeIdentifier = "org.animastudio.navigator-item"
+
+  var itemProvider: NSItemProvider {
+    NSItemProvider(item: encodedValue as NSString, typeIdentifier: Self.typeIdentifier)
+  }
 
   var encodedValue: String {
     switch self {
@@ -92,6 +97,15 @@ enum NavigatorOrdering {
     value: Value,
     before destination: Value
   ) -> [Value] {
+    moving(values, value: value, relativeTo: destination, placement: .before)
+  }
+
+  static func moving<Value: Equatable>(
+    _ values: [Value],
+    value: Value,
+    relativeTo destination: Value,
+    placement: NavigatorRelativePlacement
+  ) -> [Value] {
     guard value != destination, values.contains(value), values.contains(destination) else {
       return values
     }
@@ -99,7 +113,13 @@ enum NavigatorOrdering {
     var result = values
     result.removeAll { $0 == value }
     guard let destinationIndex = result.firstIndex(of: destination) else { return values }
-    result.insert(value, at: destinationIndex)
+    let insertionIndex = placement == .before ? destinationIndex : destinationIndex + 1
+    result.insert(value, at: insertionIndex)
     return result
   }
+}
+
+enum NavigatorRelativePlacement {
+  case before
+  case after
 }

@@ -32,6 +32,74 @@ final class NavigatorOrganizationTests: XCTestCase {
       NavigatorOrdering.moving(["A", "B"], value: "A", before: "A"),
       ["A", "B"]
     )
+    XCTAssertEqual(
+      NavigatorOrdering.moving(
+        ["A", "B", "C", "D"],
+        value: "A",
+        relativeTo: "C",
+        placement: .after
+      ),
+      ["B", "C", "A", "D"]
+    )
+  }
+
+  func testDropBehaviorUsesLinesAtRowEdgesAndGroupTargetAtCenter() {
+    let payload = NavigatorDragPayload.component(PartID())
+
+    XCTAssertEqual(
+      NavigatorDropBehavior.component.intent(
+        for: payload,
+        verticalPosition: 2,
+        rowHeight: 24
+      ),
+      .before
+    )
+    XCTAssertEqual(
+      NavigatorDropBehavior.component.intent(
+        for: payload,
+        verticalPosition: 12,
+        rowHeight: 24
+      ),
+      .group
+    )
+    XCTAssertEqual(
+      NavigatorDropBehavior.component.intent(
+        for: payload,
+        verticalPosition: 22,
+        rowHeight: 24
+      ),
+      .after
+    )
+  }
+
+  func testGroupAndMateTargetsOnlyAcceptTheirSupportedPayloads() {
+    let component = NavigatorDragPayload.component(PartID())
+    let group = NavigatorDragPayload.componentGroup(UUID())
+    let mate = NavigatorDragPayload.mate("mate_1")
+
+    XCTAssertEqual(
+      NavigatorDropBehavior.componentGroup.intent(
+        for: component,
+        verticalPosition: 2,
+        rowHeight: 24
+      ),
+      .group
+    )
+    XCTAssertEqual(
+      NavigatorDropBehavior.componentGroup.intent(
+        for: group,
+        verticalPosition: 20,
+        rowHeight: 24
+      ),
+      .after
+    )
+    XCTAssertEqual(
+      NavigatorDropBehavior.mate.intent(for: mate, verticalPosition: 2, rowHeight: 24),
+      .before
+    )
+    XCTAssertNil(
+      NavigatorDropBehavior.mate.intent(for: component, verticalPosition: 2, rowHeight: 24)
+    )
   }
 
   func testDragPayloadsRoundTripWithoutConflatingTreeItemKinds() {
@@ -123,6 +191,49 @@ final class NavigatorOrganizationTests: XCTestCase {
 
     XCTAssertTrue(model.moveComponent(ids[1], toGroup: nil))
     XCTAssertNil(model.componentGroup(containing: ids[1]))
+  }
+
+  @MainActor
+  func testCenterDropCreatesAGroupFromTheActiveComponentSelection() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    let ids = model.project.rig.parts.map(\.id)
+    model.selection = [.part(ids[0]), .part(ids[1])]
+
+    let groupID = try XCTUnwrap(model.groupComponents(draggedID: ids[0], onto: ids[2]))
+
+    XCTAssertEqual(model.componentGroups.first?.componentIDs, ids)
+    XCTAssertEqual(model.selection, [.componentGroup(groupID)])
+  }
+
+  @MainActor
+  func testCenterDropOntoGroupedComponentAddsSelectionToExistingFolder() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    let ids = model.project.rig.parts.map(\.id)
+    model.selection = [.part(ids[2])]
+    let groupID = model.createComponentGroup(named: "Existing")
+    model.selection = [.part(ids[0]), .part(ids[1])]
+
+    XCTAssertEqual(model.groupComponents(draggedID: ids[0], onto: ids[2]), groupID)
+    XCTAssertEqual(model.componentGroups.first?.componentIDs, [ids[2], ids[0], ids[1]])
+    XCTAssertEqual(model.selection, [.componentGroup(groupID)])
+  }
+
+  @MainActor
+  func testInsertionDropCanPlaceAComponentAfterItsTarget() {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    let ids = model.project.rig.parts.map(\.id)
+
+    XCTAssertTrue(model.moveComponent(ids[0], relativeTo: ids[1], placement: .after))
+    XCTAssertEqual(model.project.rig.parts.map(\.id), [ids[1], ids[0], ids[2]])
   }
 
   @MainActor

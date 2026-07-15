@@ -96,14 +96,16 @@
   semantic Components and Mates remain separate editable-role rows in teal and
   purple. Component disclosure groups support contextual rename, move up/down,
   move-to-group, dissolve, and lock/unlock; Mates support contextual rename,
-  reorder, and lock/unlock. Components can now be dragged before component rows,
-  onto groups, or onto the Components heading for top-level placement; groups
-  and Mates can be dragged before peers. The footer changes to **Group Selected
-  (N)** for a valid multi-selection and reports when locked selections will be
-  skipped. Locked items reject inspector, transform, and organization edits,
-  hide transform handles, and locked groups protect their members. Group and
-  lock organization is currently in-session pending the durable `.animastudio`
-  document layer.
+  reorder, and lock/unlock. Component-row edges now show insertion lines for
+  before/after placement; the center shows a bordered **+ Group** target and
+  creates an expanded folder containing the target plus the dragged active
+  multi-selection. Existing folders accept the dragged selection, while the
+  Components heading returns it to top level. Groups and Mates show peer
+  insertion lines. The footer and selected-row context menu expose **Group
+  Selected (N)** and report when locked selections will be skipped. Locked
+  items reject inspector, transform, and organization edits, hide transform
+  handles, and locked groups protect their members. Group and lock organization
+  is currently in-session pending the durable `.animastudio` document layer.
   Source-node inspection explains ownership, source appearance, mapping, and
   reimport prerequisites. Shared theme metrics and
   reusable panel, text-field, picker, readout, and primary-button styles keep

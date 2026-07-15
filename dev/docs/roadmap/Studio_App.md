@@ -100,18 +100,22 @@ The working Components/Mates navigator supports native disclosure groups,
 search, multi-selection, contextual rename, move up/down, moving components
 between groups, dissolving groups, and lock/unlock. Component, group, and Mate
 rows use typed drag payloads: dropping a component before another reorders or
-moves it into that component's group; dropping it on a group appends it; and
-dropping it on the Components heading returns it to the top level. Groups and
-Mates reorder by dropping before a peer. The footer exposes the selected,
-unlocked component count as an explicit **Group Selected (N)** action rather
-than hiding grouping behind a generic New Group label. A locked component or
-Mate rejects name, configuration, and organization edits at the workspace-model
-boundary; a locked group also protects its members. Groups and locks are
-currently in-session Studio organization state. The P0 durable `.animastudio`
-document must persist them as editor metadata without leaking folders into the
-renderer-independent rig or runtime `.anima` contract. Reparenting physical
-component relationships, duplicate, delete, and undo/redo remain separate
-semantic operations and must not be faked by folder organization.
+moves it into that component's group; dropping at a component row's upper or
+lower edge shows an insertion line and places it before or after. Hovering the
+row center shows a bordered **+ Group** target; dropping there creates a folder
+containing the target plus the dragged component's active multi-selection.
+Dropping on an existing group appends the dragged selection, and dropping on
+the Components heading returns it to the top level. Groups and Mates use
+before/after insertion lines. The footer and selected-component context menu
+both expose the selected, unlocked component count as **Group Selected (N)**.
+A locked component or Mate rejects name, configuration, and organization edits
+at the workspace-model boundary; a locked group also protects its members.
+Groups and locks are currently in-session Studio organization state. The P0
+durable `.animastudio` document must persist them as editor metadata without
+leaking folders into the renderer-independent rig or runtime `.anima` contract.
+Reparenting physical component relationships, duplicate, delete, and undo/redo
+remain separate semantic operations and must not be faked by folder
+organization.
 
 Mapping bridges the two layers. A semantic part may collect multiple source
 nodes so a detailed imported subtree can behave as one rigid link; a source
