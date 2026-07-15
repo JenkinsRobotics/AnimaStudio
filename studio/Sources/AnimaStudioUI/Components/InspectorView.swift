@@ -4,7 +4,6 @@ import SwiftUI
 
 struct InspectorView: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @State private var componentTab = ComponentInspectorTab.properties
 
   var body: some View {
     VStack(spacing: 0) {
@@ -104,7 +103,7 @@ struct InspectorView: View {
       }
       componentTabPicker
       Group {
-        switch componentTab {
+        switch workspace.componentInspectorTab {
         case .properties:
           featureReadout(for: selectedPart)
           partInspector(selectedPart)
@@ -141,7 +140,7 @@ struct InspectorView: View {
 
   private var componentTabPicker: some View {
     Section {
-      Picker("Component Inspector", selection: $componentTab) {
+      Picker("Component Inspector", selection: $workspace.componentInspectorTab) {
         ForEach(ComponentInspectorTab.allCases) { tab in
           Label(tab.title, systemImage: tab.systemImage).tag(tab)
         }

@@ -240,6 +240,7 @@ struct StudioWorkspaceView: View {
         }
       )
       .frame(minWidth: 520, minHeight: 420)
+      .componentViewportContextMenu(workspace: workspace)
 
       viewportTitle
       cameraHUD

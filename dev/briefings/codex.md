@@ -90,6 +90,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — selected-component viewport context menu complete:** A
+  right-click in the viewport now exposes native actions for the selected
+  semantic component: Properties, Appearance, Frame Selection, Show/Hide,
+  Lock/Unlock, position/rotation reset, and Clear Selection. The presentation
+  lives in a focused SwiftUI modifier while state projection and commands live
+  in a separate workspace-model extension; group-owned locks resolve to Unlock
+  Group and every mutating command reuses model-level lock enforcement. Five
+  focused tests and all 162 Swift tests, strict format lint, Xcode/root-app
+  builds, signature verification, and `git diff --check` pass. The rebuilt app
+  launched, but macOS again exposed no window to accessibility automation, so
+  the final pointer/menu feel remains a human click-through.
+
 - **2026-07-15 — selection-driven Inspector and Appearance editor complete:**
   Selecting a component, model node, asset, group, mate, or animation now
   restores the right-side Inspector if it was hidden. Semantic proxy components

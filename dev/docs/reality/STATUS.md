@@ -180,7 +180,11 @@
   RealityKit proxy body immediately; locked components reject these edits.
   Overrides are deliberately in-session presentation state until the durable
   project document defines non-destructive material-override persistence, and
-  imported source-model materials remain source-owned and read-only. During
+  imported source-model materials remain source-owned and read-only. A selected
+  semantic component also has a native viewport context menu for direct
+  Properties or Appearance inspection, framing, show/hide, lock/unlock,
+  position/rotation reset, and clearing selection. Menu commands use the same
+  model-owned lock guards as the Inspector and transform gizmo. During
   mate placement, transform handles are suppressed so connector markers own the
   click target. Outside mate placement, the focused component shows the same
   inferred face-center/edge-midpoint/corner/axis/origin candidates as quiet
@@ -225,10 +229,11 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Ninety-two tests pass with `cd studio && swift test`, including real
-  USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
-  identity coverage, hierarchy filtering/ancestor retention, frame timecode and
-  stepping, adjacent-key navigation, and loop/non-loop playback. The Python
+  inspector. One hundred sixty-two tests pass with
+  `cd studio && swift test`, including real USD hierarchy loading/projection
+  through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
+  filtering/ancestor retention, frame timecode and stepping, adjacent-key
+  navigation, and loop/non-loop playback. The Python
   package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
   the Anima Wire Protocol v0 reference host (`anima_studio/wire.py` — encode
