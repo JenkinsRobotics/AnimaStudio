@@ -123,27 +123,38 @@ struct CreationPaletteView: View {
     CreationToolGroup(
       title: "Mates",
       systemImage: "rotate.3d",
-      tint: StudioPalette.joint
+      tint: StudioPalette.joint,
+      detail: "1 live · 7 awaiting backend"
     ) {
-      CreationToolButton(
-        title: "Revolute Mate",
-        systemImage: "rotate.3d",
-        tint: StudioPalette.joint,
-        isEnabled: workspace.canCreateRevoluteJoint,
-        help: workspace.canCreateRevoluteJoint
-          ? "Choose a connector on the moving component, then one on the fixed component"
-          : "Add two unlocked components before creating a mate"
-      ) {
-        workspace.beginRevoluteMatePlacement()
+      ForEach(MateCreationToolKind.allCases) { kind in
+        CreationToolButton(
+          title: kind.title,
+          systemImage: kind.systemImage,
+          tint: StudioPalette.joint,
+          isEnabled: isMateToolEnabled(kind),
+          help: mateToolHelp(kind)
+        ) {
+          if kind == .revolute {
+            workspace.beginRevoluteMatePlacement()
+          }
+        }
       }
-      CreationToolButton(
-        title: "Insert Mate",
-        systemImage: "arrow.triangle.branch",
-        tint: StudioPalette.joint,
-        isEnabled: false,
-        help: "Inserting mates between two existing components is planned"
-      ) {}
     }
+  }
+
+  private func isMateToolEnabled(_ kind: MateCreationToolKind) -> Bool {
+    kind.isImplemented && workspace.canCreateRevoluteJoint
+  }
+
+  private func mateToolHelp(_ kind: MateCreationToolKind) -> String {
+    guard kind.isImplemented else {
+      return "\(kind.motionSummary) Creation awaits the typed-mate backend."
+    }
+    guard workspace.canCreateRevoluteJoint else {
+      return "\(kind.motionSummary) Add two unlocked components before creating this mate."
+    }
+    return
+      "\(kind.motionSummary) Choose a connector on the moving component, then one on the fixed component."
   }
 
   private func futureGroup(

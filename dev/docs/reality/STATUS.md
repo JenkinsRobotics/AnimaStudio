@@ -44,9 +44,14 @@
   revolute motion about that connector rather than the component origin.
   Component names, XYZ positions, XYZ rest rotations, and mate names, axis,
   parent/child
-  connection, and angular limits are inspectable/editable in memory. Motors,
-  extra joint insertion, 3D Models & Media, and Events are present as clearly
-  disabled reference groups rather than fake working features. Its project
+  connection, and angular limits are inspectable/editable in memory. The Rig
+  ribbon presents Fastened, Parallel, Slider, Revolute, Cylindrical, Pin Slot,
+  Planar, and Ball mate families in a stable operator-facing catalog. Revolute
+  is the only live creation action until the typed-mate/DOF backend lands; the
+  other seven remain clearly disabled with motion summaries instead of writing
+  incorrect scalar-joint data. Motors, 3D Models & Media, and Events are also
+  present as clearly disabled reference groups rather than fake working
+  features. Its project
   window now uses a CAD-style three-level header: a compact global
   document/live row, a dedicated workspace selector plus Assets, Rig, Animate,
   Show, and Hardware tabs with Command-1…5 switching, and a workspace-owned

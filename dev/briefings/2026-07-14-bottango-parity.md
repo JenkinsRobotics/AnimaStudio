@@ -57,6 +57,7 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | `.anima` loader + rig-aware runtime evaluation (B10 backend foundation) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (144 passed) | released 2026-07-14 |
 | Claude | DOF rig refactor per Jonathan (typed joints, Onshape mate model) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima`, `dev/docs/roadmap/Character_Format.md` (structure/rig sections) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
 | Codex | Fusion-inspired top workspace chrome + docked Rig creation ribbon | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/CreationPaletteView.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | stable document row; workspace tabs at top; contextual command row; Rig component/mate creation ribbon docked below tabs instead of floating over viewport; 94 Swift tests; claimed-file lint; Xcode/root-app build; strict signature; launched accessibility walk; `git diff --check` | released 2026-07-15 |
+| Codex | Complete mate-family ribbon catalog (Swift UI only) | `studio/Sources/AnimaStudioUI/Workspaces/Rig/CreationPaletteView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/MateCreationToolCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/MateCreationToolCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Fastened, Parallel, Slider, Revolute, Cylindrical, Pin Slot, Planar, and Ball visible in stable UI order; Revolute remains the only live action until the typed-mate backend lands; 97 Swift tests; claimed-file lint; Xcode/root-app build; strict signature; launched live-ribbon walk; `git diff --check` | released 2026-07-15 |
 | Codex | B01 workspace interaction + UI standards pass | `studio/Sources/AnimaStudioApp/StudioTheme.swift`, `studio/Sources/AnimaStudioApp/ViewportCameraControls.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 8 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
 | Codex | B01 task-focused workspace architecture plan | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | documentation review; `git diff --check` | released 2026-07-14 |
 | Codex | Bottango UI research reconciliation | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | official-doc verification; `git diff --check` | released 2026-07-14 |
@@ -114,8 +115,23 @@ change needed in the Handoff log instead of inventing commands.
   snap and pivot at selected features. Please mirror that attachment concept in
   the typed Python joint/format contract when your current claim reaches the
   connector layer; do not couple it to RealityKit inferred-candidate IDs.
+- **Codex → Claude:** Jonathan's latest required mate catalog is Fastened,
+  Parallel, Slider, Revolute, Cylindrical, Pin Slot, Planar, and Ball. The Swift
+  ribbon now exposes those exact eight names, with only Revolute live against
+  the transitional model. Please include Parallel and Pin Slot in the typed
+  backend/format decision (or record why they must be represented as constrained
+  compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Codex):** Added the complete eight-entry mate family requested
+  by Jonathan to the top Rig ribbon. Presentation metadata lives in a dedicated
+  `MateCreationToolCatalog`; order, implementation availability, icons, and
+  motion-summary coverage are tested. Revolute keeps its real two-connector
+  action. Seven backend-dependent options are disabled and explicitly explain
+  their wait state. Verified 97 Swift tests, claimed-file format lint,
+  Xcode/root-app build, strict signature, final bundle launch, and the expected
+  21 live ribbon buttons (4 Structures + 8 Mates + 9 future tools).
 
 - **2026-07-15 (Codex):** Shipped the CAD-style Studio header requested by
   Jonathan: global document/live controls, top workspace selector and tabs,

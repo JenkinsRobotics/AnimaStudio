@@ -63,6 +63,15 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — complete mate-family ribbon catalog:** Added Fastened,
+  Parallel, Slider, Revolute, Cylindrical, Pin Slot, Planar, and Ball to the Rig
+  ribbon in a dedicated, tested UI catalog. Every option has its own icon and
+  concise motion summary. Revolute remains the sole live action; the other seven
+  are visibly disabled until Claude's typed-mate/DOF backend is ready, avoiding
+  incorrect writes into the transitional scalar joint model. Ninety-seven Swift
+  tests, claimed-file lint, Xcode/root-app build, strict signature, launch,
+  live-ribbon accessibility count, and `git diff --check` pass.
+
 - **2026-07-15 — CAD-style workspace header complete:** Reorganized the native
   app chrome into a compact document/live row, a dedicated selector plus
   Assets/Rig/Animate/Show/Hardware tab row, and a contextual command ribbon.
