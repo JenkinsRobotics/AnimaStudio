@@ -47,4 +47,20 @@ final class WorkspaceChromeTests: XCTestCase {
       StudioMetrics.compactRibbonHeight
     )
   }
+
+  func testWorkspaceSelectorKeepsAReadableMinimumWidth() {
+    XCTAssertGreaterThanOrEqual(WorkspaceSelectorMetrics.minimumWidth, 220)
+    XCTAssertGreaterThanOrEqual(
+      WorkspaceSelectorMetrics.idealWidth,
+      WorkspaceSelectorMetrics.minimumWidth
+    )
+    XCTAssertGreaterThanOrEqual(
+      WorkspaceSelectorMetrics.maximumWidth,
+      WorkspaceSelectorMetrics.idealWidth
+    )
+    XCTAssertGreaterThanOrEqual(
+      WorkspaceSelectorMetrics.menuWidth,
+      WorkspaceSelectorMetrics.minimumWidth
+    )
+  }
 }
