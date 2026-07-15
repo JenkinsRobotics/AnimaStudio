@@ -25,27 +25,14 @@ struct CreationPaletteView: View {
   @Bindable var workspace: StudioWorkspaceModel
 
   var body: some View {
-    VStack(spacing: 0) {
-      HStack(spacing: 8) {
-        Label("Add to Rig", systemImage: "plus.circle.fill")
-          .font(.callout.weight(.semibold))
-        Text("Create simple rig proxies now; replace them with imported geometry later.")
-          .font(.caption)
-          .foregroundStyle(.white.opacity(0.72))
-        Spacer()
-        Button("Close creation tools", systemImage: "xmark") {
-          workspace.showsCreationPalette = false
-        }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
-      }
-      .foregroundStyle(.white)
-      .padding(.horizontal, 12)
-      .frame(height: 34)
-      .background(StudioPalette.accent)
+    HStack(spacing: 0) {
+      ribbonIdentity
+
+      Divider()
+        .padding(.vertical, 10)
 
       ScrollView(.horizontal) {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 0) {
           structuresGroup
           matesGroup
           futureGroup(
@@ -76,20 +63,41 @@ struct CreationPaletteView: View {
             ]
           )
         }
-        .padding(10)
+        .padding(.vertical, 8)
       }
-      .scrollIndicators(.visible)
+      .scrollIndicators(.hidden)
+
+      Button("Close creation tools", systemImage: "xmark") {
+        workspace.showsCreationPalette = false
+      }
+      .labelStyle(.iconOnly)
+      .buttonStyle(.plain)
+      .frame(width: 32, height: 32)
+      .help("Collapse the Rig creation ribbon")
+      .padding(.trailing, 8)
     }
-    .frame(maxWidth: 1_140)
-    .background(StudioPalette.panel)
-    .clipShape(RoundedRectangle(cornerRadius: 14))
-    .overlay {
-      RoundedRectangle(cornerRadius: 14)
-        .stroke(StudioPalette.border, lineWidth: 1)
-    }
-    .shadow(color: .black.opacity(0.42), radius: 18, y: 7)
+    .frame(maxWidth: .infinity)
+    .frame(height: StudioMetrics.rigCreationRibbonHeight)
+    .background(StudioPalette.ribbonChrome)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Rig creation tools")
+  }
+
+  private var ribbonIdentity: some View {
+    VStack(alignment: .leading, spacing: 7) {
+      Label("RIG", systemImage: "point.3.connected.trianglepath.dotted")
+        .font(.caption.weight(.bold))
+        .tracking(0.8)
+        .foregroundStyle(StudioPalette.accent)
+      Text("ADD COMPONENTS")
+        .font(.system(size: 9, weight: .semibold))
+        .foregroundStyle(.white)
+      Text("Build the semantic rig")
+        .font(.system(size: 9))
+        .foregroundStyle(StudioPalette.muted)
+    }
+    .padding(.horizontal, 14)
+    .frame(width: 164, alignment: .leading)
   }
 
   private var structuresGroup: some View {
@@ -170,7 +178,7 @@ private struct CreationToolGroup<Content: View>: View {
   @ViewBuilder let content: () -> Content
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 7) {
       HStack(spacing: 6) {
         Label(title, systemImage: systemImage)
           .font(.caption.weight(.semibold))
@@ -185,11 +193,13 @@ private struct CreationToolGroup<Content: View>: View {
         content()
       }
     }
-    .padding(9)
-    .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 10))
+    .padding(.horizontal, 12)
+    .frame(height: 92)
     .overlay {
-      RoundedRectangle(cornerRadius: 10)
-        .stroke(StudioPalette.border, lineWidth: 1)
+      HStack {
+        Spacer()
+        Divider()
+      }
     }
   }
 }
@@ -213,7 +223,7 @@ private struct CreationToolButton: View {
           .lineLimit(1)
       }
       .foregroundStyle(tint)
-      .frame(width: 70, height: 58)
+      .frame(width: 68, height: 57)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)

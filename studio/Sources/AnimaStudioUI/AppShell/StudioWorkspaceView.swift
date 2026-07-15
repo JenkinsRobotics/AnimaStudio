@@ -32,10 +32,14 @@ struct StudioWorkspaceView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      WorkspaceSwitcherBar(
+      StudioDocumentBar(
         workspace: workspace,
-        viewportAppearance: viewportAppearanceBinding,
         closeProject: closeProject
+      )
+      Divider()
+      WorkspaceTabBar(
+        workspace: workspace,
+        viewportAppearance: viewportAppearanceBinding
       )
       Divider()
       WorkspaceToolBar(
@@ -218,9 +222,7 @@ struct StudioWorkspaceView: View {
       if workspace.activeWorkspace == .rig {
         VStack {
           Spacer()
-          if workspace.showsCreationPalette {
-            CreationPaletteView(workspace: workspace)
-          } else if !workspace.project.rig.joints.isEmpty {
+          if !workspace.showsCreationPalette && !workspace.project.rig.joints.isEmpty {
             RigGuideOverlay(workspace: workspace)
           }
         }

@@ -63,6 +63,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — CAD-style workspace header complete:** Reorganized the native
+  app chrome into a compact document/live row, a dedicated selector plus
+  Assets/Rig/Animate/Show/Hardware tab row, and a contextual command ribbon.
+  Rig's existing Structures, Mates, Motors, 3D Models & Media, and Events tools
+  now dock across the top rather than cover the viewport; collapsing the ribbon
+  exposes a compact **Add Components** command that restores it. The app's
+  accessibility tree confirmed the full header and empty-Rig flow in the
+  launched signed bundle. Ninety-four Swift tests, claimed-file lint, Xcode
+  build, strict signature verification, root-app rebuild, launch, and
+  `git diff --check` pass.
+
 - **2026-07-15 — connector mates + render-quality pass complete:** Revolute
   Mate is now a two-click connector workflow: choose the moving component's
   inferred proxy feature, then the fixed component's feature. Studio stores

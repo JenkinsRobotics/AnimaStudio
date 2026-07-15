@@ -1,184 +1,214 @@
 import RealityKitViewport
 import SwiftUI
 
-struct WorkspaceSwitcherBar: View {
+struct StudioDocumentBar: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @Binding var viewportAppearance: PreviewAppearance
   let closeProject: () -> Void
 
   var body: some View {
-    HStack(spacing: 10) {
-      Button(action: closeProject) {
-        Image(systemName: "xmark")
-          .font(.caption.bold())
-          .frame(width: 27, height: 27)
-          .background(Color.white.opacity(0.12), in: Circle())
-      }
-      .buttonStyle(.plain)
-      .help("Close project and return home")
+    ZStack {
+      HStack(spacing: 5) {
+        Button(action: closeProject) {
+          Image(systemName: "house.fill")
+        }
+        .help("Return to Anima Studio home")
 
-      Menu {
-        Section("Viewport Appearance") {
-          ForEach(PreviewAppearance.allCases) { appearance in
-            Button {
-              viewportAppearance = appearance
-            } label: {
-              Label(
-                appearance.title,
-                systemImage: viewportAppearance == appearance
-                  ? "checkmark.circle.fill" : appearance.systemImage
-              )
-            }
-          }
+        Button("Projects", systemImage: "square.grid.2x2") {}
+          .disabled(true)
+          .help("Project browser arrives with the document layer")
+
+        Menu {
+          Button("New Project", systemImage: "doc.badge.plus") {}
+            .disabled(true)
+          Button("Open Project…", systemImage: "folder") {}
+            .disabled(true)
+        } label: {
+          Image(systemName: "doc")
         }
+        .menuIndicator(.visible)
+        .help("Project file commands")
+
         Divider()
-        Section("About") {
-          Text("Anima Studio 0.1.0")
-          Text("Kinematic preview · Open source")
-        }
-      } label: {
-        Image(systemName: "gearshape.fill")
-          .frame(width: 27, height: 27)
-          .background(Color.white.opacity(0.12), in: Circle())
+          .frame(height: 18)
+
+        Button("Save", systemImage: "square.and.arrow.down") {}
+          .disabled(true)
+          .help("Project saving arrives with the document layer")
+        Button("Undo", systemImage: "arrow.uturn.backward") {}
+          .disabled(true)
+          .help("Undo history arrives with durable projects")
+        Button("Redo", systemImage: "arrow.uturn.forward") {}
+          .disabled(true)
+          .help("Redo history arrives with durable projects")
+
+        Spacer()
       }
-      .menuStyle(.borderlessButton)
-      .menuIndicator(.hidden)
-      .help("Studio settings and viewport appearance")
+      .labelStyle(.iconOnly)
+      .buttonStyle(.borderless)
+
+      HStack(spacing: 7) {
+        Image(systemName: "cube.fill")
+          .font(.caption)
+          .foregroundStyle(StudioPalette.hardware)
+        TextField("Project name", text: $workspace.project.name)
+          .textFieldStyle(.plain)
+          .font(.callout.weight(.medium))
+          .multilineTextAlignment(.center)
+          .frame(width: 250)
+          .accessibilityLabel("Project name")
+      }
+
+      HStack(spacing: 9) {
+        Spacer()
+
+        Circle()
+          .fill(Color.secondary)
+          .frame(width: 7, height: 7)
+        Text("No Driver")
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+
+        Divider()
+          .frame(height: 18)
+
+        Text("MASTER LIVE")
+          .font(.system(size: 9, weight: .semibold))
+        Toggle("", isOn: .constant(false))
+          .labelsHidden()
+          .toggleStyle(.switch)
+          .controlSize(.mini)
+          .disabled(true)
+          .help("Hardware output is unavailable")
+      }
+    }
+    .padding(.horizontal, 10)
+    .frame(height: StudioMetrics.documentBarHeight)
+    .background(StudioPalette.documentChrome)
+  }
+}
+
+struct WorkspaceTabBar: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  @Binding var viewportAppearance: PreviewAppearance
+
+  var body: some View {
+    HStack(alignment: .bottom, spacing: 4) {
+      workspaceSelector
+
+      Divider()
+        .frame(height: 34)
+        .padding(.horizontal, 4)
 
       ForEach(StudioWorkspaceKind.allCases) { kind in
-        let descriptor = kind.descriptor
+        workspaceTab(for: kind)
+      }
+
+      Spacer(minLength: 20)
+
+      settingsMenu
+      workspaceLayoutMenu
+    }
+    .padding(.horizontal, 10)
+    .frame(height: StudioMetrics.workspaceTabBarHeight)
+    .background(StudioPalette.chrome)
+  }
+
+  private var workspaceSelector: some View {
+    Menu {
+      ForEach(StudioWorkspaceKind.allCases) { kind in
         Button {
           workspace.switchWorkspace(to: kind)
         } label: {
-          Label(descriptor.title, systemImage: descriptor.systemImage)
-            .font(.callout.weight(workspace.activeWorkspace == kind ? .semibold : .regular))
-            .foregroundStyle(
-              workspace.activeWorkspace == kind ? Color.white : StudioPalette.muted
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 29)
-            .background(
-              workspace.activeWorkspace == kind
-                ? Color.white.opacity(0.18) : Color.black.opacity(0.16),
-              in: Capsule()
-            )
+          Label(kind.descriptor.title, systemImage: kind.descriptor.systemImage)
         }
-        .buttonStyle(.plain)
-        .frame(maxWidth: 170)
         .keyboardShortcut(
           KeyEquivalent(Character(String(kind.shortcutNumber))),
           modifiers: .command
         )
-        .help("\(descriptor.purpose) (⌘\(kind.shortcutNumber))")
       }
-
-      Spacer(minLength: 16)
-
-      HStack(spacing: 7) {
-        Circle()
-          .fill(Color.secondary)
-          .frame(width: 8, height: 8)
-        Text("No Driver")
-          .font(.caption)
-          .foregroundStyle(StudioPalette.muted)
-      }
-
-      Divider()
-        .frame(height: 26)
-
-      VStack(alignment: .trailing, spacing: 0) {
-        Text("MASTER LIVE")
-          .font(.caption2.weight(.semibold))
-        Text("Hardware output unavailable")
-          .font(.system(size: 9))
-          .foregroundStyle(StudioPalette.muted)
-      }
-
-      Toggle("", isOn: .constant(false))
-        .labelsHidden()
-        .toggleStyle(.switch)
-        .disabled(true)
-    }
-    .padding(.horizontal, 12)
-    .frame(height: StudioMetrics.modeBarHeight)
-    .background(StudioPalette.chrome)
-  }
-}
-
-struct WorkspaceToolBar: View {
-  @Bindable var workspace: StudioWorkspaceModel
-  let importModel: () -> Void
-
-  var body: some View {
-    HStack(spacing: 12) {
-      globalProjectControls
-
-      Divider()
-        .frame(height: 28)
-
-      workspaceIdentity
-      WorkspaceContextualTools(workspace: workspace, importModel: importModel)
-
-      Spacer(minLength: 12)
-
-      if workspace.isLoadingModelHierarchy {
-        ProgressView()
-          .controlSize(.small)
-        Text("Reading model…")
-          .font(.caption)
-          .foregroundStyle(StudioPalette.muted)
-      }
-
-      workspaceLayoutMenu
-    }
-    .buttonStyle(.borderless)
-    .padding(.horizontal, 14)
-    .frame(height: StudioMetrics.toolBarHeight)
-    .background(StudioPalette.chrome.opacity(0.96))
-  }
-
-  private var globalProjectControls: some View {
-    Group {
-      TextField("Project name", text: $workspace.project.name)
-        .textFieldStyle(.plain)
-        .font(.title3.italic())
-        .lineLimit(1)
-        .padding(.horizontal, 8)
-        .frame(height: StudioMetrics.fieldHeight)
-        .frame(minWidth: 150, maxWidth: 230, alignment: .leading)
-        .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-          RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
-            .stroke(StudioPalette.border, lineWidth: 1)
+    } label: {
+      HStack(spacing: 9) {
+        Image(systemName: workspace.activeWorkspace.descriptor.systemImage)
+          .font(.title3)
+          .foregroundStyle(StudioPalette.accent)
+          .frame(width: 24)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(workspace.activeWorkspace.descriptor.title.uppercased())
+            .font(.caption.weight(.bold))
+          Text("WORKSPACE")
+            .font(.system(size: 8, weight: .medium))
+            .foregroundStyle(StudioPalette.muted)
         }
-        .help("Editable project name")
-
-      Button("Save", systemImage: "square.and.arrow.down") {}
-        .labelStyle(.iconOnly)
-        .disabled(true)
-        .help("Project saving arrives with the document layer")
-      Button("Open", systemImage: "folder") {}
-        .labelStyle(.iconOnly)
-        .disabled(true)
-        .help("Project opening arrives with the document layer")
-      Button("Undo", systemImage: "arrow.uturn.backward") {}
-        .labelStyle(.iconOnly)
-        .disabled(true)
-        .help("Undo history is planned for the durable document")
-      Button("Redo", systemImage: "arrow.uturn.forward") {}
-        .labelStyle(.iconOnly)
-        .disabled(true)
-        .help("Redo history is planned for the durable document")
+        Image(systemName: "chevron.down")
+          .font(.system(size: 8, weight: .bold))
+          .foregroundStyle(StudioPalette.muted)
+      }
+      .padding(.horizontal, 10)
+      .frame(width: 150, height: 38, alignment: .leading)
+      .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 6))
+      .overlay {
+        RoundedRectangle(cornerRadius: 6)
+          .stroke(StudioPalette.border, lineWidth: 1)
+      }
     }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .help("Choose a task-focused workspace")
   }
 
-  private var workspaceIdentity: some View {
-    let descriptor = workspace.activeWorkspace.descriptor
-    return Label(descriptor.title.uppercased(), systemImage: descriptor.systemImage)
-      .font(.caption2.weight(.bold))
-      .tracking(0.8)
-      .foregroundStyle(StudioPalette.accent)
-      .help(descriptor.purpose)
+  private func workspaceTab(for kind: StudioWorkspaceKind) -> some View {
+    let descriptor = kind.descriptor
+    let isActive = workspace.activeWorkspace == kind
+    return Button {
+      workspace.switchWorkspace(to: kind)
+    } label: {
+      VStack(spacing: 7) {
+        Label(descriptor.title.uppercased(), systemImage: descriptor.systemImage)
+          .labelStyle(.titleAndIcon)
+          .font(.system(size: 10, weight: isActive ? .bold : .medium))
+          .foregroundStyle(isActive ? Color.white : StudioPalette.muted)
+        Rectangle()
+          .fill(isActive ? StudioPalette.accent : Color.clear)
+          .frame(height: 2)
+      }
+      .padding(.horizontal, 12)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .keyboardShortcut(
+      KeyEquivalent(Character(String(kind.shortcutNumber))),
+      modifiers: .command
+    )
+    .help("\(descriptor.purpose) (⌘\(kind.shortcutNumber))")
+  }
+
+  private var settingsMenu: some View {
+    Menu {
+      Section("Viewport Appearance") {
+        ForEach(PreviewAppearance.allCases) { appearance in
+          Button {
+            viewportAppearance = appearance
+          } label: {
+            Label(
+              appearance.title,
+              systemImage: viewportAppearance == appearance
+                ? "checkmark.circle.fill" : appearance.systemImage
+            )
+          }
+        }
+      }
+      Divider()
+      Section("About") {
+        Text("Anima Studio 0.1.0")
+        Text("Kinematic preview · Open source")
+      }
+    } label: {
+      Image(systemName: "gearshape")
+        .frame(width: 28, height: 28)
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .help("Studio settings and viewport appearance")
   }
 
   private var workspaceLayoutMenu: some View {
@@ -215,12 +245,82 @@ struct WorkspaceToolBar: View {
         workspace.resetActivePresentation()
       }
     } label: {
-      Label("Workspace Layout", systemImage: "rectangle.3.group")
+      Image(systemName: "rectangle.3.group")
+        .frame(width: 28, height: 28)
     }
-    .labelStyle(.iconOnly)
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
-    .help("Show, hide, or reset panels for this workspace")
+    .help("Show, hide, or reset workspace panels")
+  }
+}
+
+enum WorkspaceRibbonPresentation: Equatable {
+  case compact
+  case rigCreation
+
+  static func resolve(
+    workspace: StudioWorkspaceKind,
+    showsRigCreationTools: Bool
+  ) -> Self {
+    workspace == .rig && showsRigCreationTools ? .rigCreation : .compact
+  }
+}
+
+struct WorkspaceToolBar: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  let importModel: () -> Void
+
+  var body: some View {
+    switch WorkspaceRibbonPresentation.resolve(
+      workspace: workspace.activeWorkspace,
+      showsRigCreationTools: workspace.showsCreationPalette
+    ) {
+    case .rigCreation:
+      CreationPaletteView(workspace: workspace)
+    case .compact:
+      compactRibbon
+    }
+  }
+
+  private var compactRibbon: some View {
+    HStack(spacing: 12) {
+      workspaceIdentity
+
+      Divider()
+        .frame(height: 32)
+
+      WorkspaceContextualTools(workspace: workspace, importModel: importModel)
+
+      Spacer(minLength: 12)
+
+      if workspace.isLoadingModelHierarchy {
+        ProgressView()
+          .controlSize(.small)
+        Text("Reading model…")
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+      }
+    }
+    .buttonStyle(.borderless)
+    .padding(.horizontal, 14)
+    .frame(height: StudioMetrics.compactRibbonHeight)
+    .background(StudioPalette.ribbonChrome)
+  }
+
+  private var workspaceIdentity: some View {
+    let descriptor = workspace.activeWorkspace.descriptor
+    return VStack(alignment: .leading, spacing: 2) {
+      Label(descriptor.title.uppercased(), systemImage: descriptor.systemImage)
+        .font(.caption2.weight(.bold))
+        .tracking(0.8)
+        .foregroundStyle(StudioPalette.accent)
+      Text(descriptor.purpose)
+        .font(.system(size: 9))
+        .foregroundStyle(StudioPalette.muted)
+        .lineLimit(1)
+    }
+    .frame(width: 190, alignment: .leading)
+    .help(descriptor.purpose)
   }
 }
 
@@ -270,10 +370,10 @@ private struct WorkspaceContextualTools: View {
         .disabled(true)
         .help("Scale gizmos arrive with semantic parts")
       frameSelectionButton
-      Button("Create Part", systemImage: "plus.square.dashed") {
+      Button("Add Components", systemImage: "plus.square.dashed") {
         workspace.showCreationTools()
       }
-      .help("Open the rig creation palette")
+      .help("Expand the Rig creation ribbon")
     }
   }
 

@@ -47,10 +47,14 @@
   connection, and angular limits are inspectable/editable in memory. Motors,
   extra joint insertion, 3D Models & Media, and Events are present as clearly
   disabled reference groups rather than fake working features. Its project
-  window now has task-focused Assets, Rig,
-  Animate, Show, and Hardware workspaces with Command-1…5 switching, a stable
-  global project/live bar, workspace-owned contextual tools, and independently
-  restorable in-session navigator/inspector/bottom-panel visibility. Assets
+  window now uses a CAD-style three-level header: a compact global
+  document/live row, a dedicated workspace selector plus Assets, Rig, Animate,
+  Show, and Hardware tabs with Command-1…5 switching, and a workspace-owned
+  command ribbon. Rig's Structures, Mates, Motors, 3D Models & Media, and Events
+  creation families are docked in that top ribbon rather than floating over the
+  viewport; collapsing them restores a compact Rig tool row. Panel visibility
+  remains independently restorable in-session for the navigator, inspector,
+  and bottom editor. Assets
   centers import and hierarchy inspection; Rig centers components and mates;
   Animate owns the working timeline dock with transport, every clip motion
   track, clickable keyframes, click/drag scrubbing, adjacent-key and frame

@@ -2,7 +2,9 @@ import SwiftUI
 
 enum StudioPalette {
   static let canvas = Color(red: 0.105, green: 0.105, blue: 0.125)
+  static let documentChrome = Color(red: 0.115, green: 0.115, blue: 0.135)
   static let chrome = Color(red: 0.15, green: 0.15, blue: 0.18)
+  static let ribbonChrome = Color(red: 0.18, green: 0.185, blue: 0.21)
   static let panel = Color(red: 0.22, green: 0.23, blue: 0.26)
   static let panelInset = Color(red: 0.16, green: 0.17, blue: 0.19)
   static let field = Color(red: 0.12, green: 0.13, blue: 0.15)
@@ -16,8 +18,10 @@ enum StudioPalette {
 }
 
 enum StudioMetrics {
-  static let modeBarHeight: CGFloat = 43
-  static let toolBarHeight: CGFloat = 47
+  static let documentBarHeight: CGFloat = 34
+  static let workspaceTabBarHeight: CGFloat = 51
+  static let compactRibbonHeight: CGFloat = 53
+  static let rigCreationRibbonHeight: CGFloat = 112
   static let panelHeaderHeight: CGFloat = 38
   static let panelCornerRadius: CGFloat = 16
   static let panelPadding: CGFloat = 14
