@@ -1,11 +1,13 @@
 """Load ``.character.anima`` YAML into the runtime mechanism rig model.
 
 Parses the character-format 2.0 subset that ``anima_studio.rig``
-models — identity, parts, typed joints with per-DOF limits (``_deg``
-degree keys and ``_m`` meter keys in the file; radians and meters in
-the model), generic 0..1 parameters, hold/linear clips whose tracks
-are keyed by DOF path or parameter name, and the target → normalized
-output-channel mappings — and rejects, with a ``CharacterFormatError``
+models — identity, parts, typed joints with per-DOF optional ``limits``
+blocks and per-joint ``offset`` blocks (``_deg`` degree keys and ``_m``
+meter keys in the file; radians and meters in the model), generic 0..1
+parameters, hold/linear clips whose tracks are keyed by DOF path or
+parameter name, the ``relations`` DOF-coupling list, and the target →
+normalized output-channel mappings — and rejects, with a
+``CharacterFormatError``
 naming the offending path, every spec section this runtime does not
 execute yet (``expressions``, ``lip_sync``, ``digital``, ``voice``)
 and every format-1.0 section superseded by the mechanism model
@@ -23,14 +25,19 @@ import yaml
 
 from anima_studio.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
+    RELATION_DISPLAY_KEYS,
+    RELATION_KIND_DOF_KINDS,
     DegreeOfFreedom,
     DofKind,
     Identity,
     Joint,
+    JointOffset,
     JointType,
     OutputMapping,
     Parameter,
     Part,
+    Relation,
+    RelationKind,
     Rig,
     RigClip,
     RotationDof,
@@ -48,10 +55,19 @@ _UNSUPPORTED_TOP_LEVEL = ("expressions", "lip_sync", "digital", "voice")
 # Format-1.0 sections replaced by the parts/joints/DOF model.
 _SUPERSEDED_TOP_LEVEL = ("blend_shapes", "bones", "physical")
 
-# Per-DOF-kind limit keys: explicit units in the file, always.
+# Per-DOF-kind limit/neutral keys: explicit units in the file, always.
+# min/max live inside the optional per-DOF ``limits`` block; the
+# neutral key sits beside it on the dof entry.
 _DOF_LIMIT_KEYS: dict[DofKind, tuple[str, str, str]] = {
     DofKind.ROTATION: ("min_deg", "max_deg", "neutral_deg"),
     DofKind.TRANSLATION: ("min_m", "max_m", "neutral_m"),
+}
+
+# Per-driven-DOF-kind relation offset key (mirrors the outputs
+# ``range_deg``/``range_m`` pattern).
+_RELATION_OFFSET_KEYS: dict[DofKind, str] = {
+    DofKind.ROTATION: "offset_deg",
+    DofKind.TRANSLATION: "offset_m",
 }
 
 
@@ -91,6 +107,7 @@ def parse_character(text: str) -> Rig:
         dof_paths.update(joint.dof_paths())
     clips = _parse_clips(document.get("clips"), dof_paths, parameters)
     outputs = _parse_outputs(document.get("outputs"), dof_paths, parameters)
+    relations = _parse_relations(document.get("relations"), dof_paths)
 
     try:
         return Rig(
@@ -100,6 +117,7 @@ def parse_character(text: str) -> Rig:
             parameters=parameters,
             clips=clips,
             outputs=outputs,
+            relations=relations,
         )
     except ValueError as error:
         # Rig re-validates cross-references; the checks above should
@@ -141,6 +159,7 @@ def _check_top_level_fields(document: dict) -> None:
         "parameters",
         "clips",
         "outputs",
+        "relations",
     }
     for key in document:
         if key in _UNSUPPORTED_TOP_LEVEL:
@@ -229,7 +248,9 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
         path = f"joints.{name}"
         entry = _mapping(entry, path)
         _reject_unknown_fields(
-            entry, path, {"type", "parent", "child", "dofs", "description"}
+            entry,
+            path,
+            {"type", "parent", "child", "dofs", "offset", "description"},
         )
         for required in ("type", "parent", "child"):
             if required not in entry:
@@ -286,6 +307,7 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
             dofs.append(
                 _parse_dof(dof_name, kind, dof_map, f"{path}.dofs.{dof_name}")
             )
+        offset = _parse_joint_offset(entry.get("offset"), f"{path}.offset")
         try:
             joints[str(name)] = Joint(
                 name=str(name),
@@ -296,21 +318,72 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
                 description=_string(
                     entry.get("description", ""), f"{path}.description"
                 ),
+                offset=offset,
             )
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
     return joints
 
 
+def _parse_joint_offset(raw: object, path: str) -> JointOffset | None:
+    """The optional per-joint as-mated ``offset`` block (K9 carry).
+
+    Translation in meters along the connector frame axes, rotation
+    about connector Z in degrees (radians in the model). The runtime
+    stores it for round-trip; Studio consumes it spatially.
+    """
+    if raw is None:
+        return None
+    entry = _mapping(raw, path)
+    _reject_unknown_fields(entry, path, {"translation_m", "rotation_deg"})
+    if not entry:
+        raise CharacterFormatError(
+            path, "empty offset block: give translation_m and/or rotation_deg"
+        )
+    translation = (0.0, 0.0, 0.0)
+    if "translation_m" in entry:
+        raw_translation = entry["translation_m"]
+        if not isinstance(raw_translation, list) or len(raw_translation) != 3:
+            raise CharacterFormatError(
+                f"{path}.translation_m",
+                f"expected a three-number list, got {raw_translation!r}",
+            )
+        translation = tuple(
+            _number(component, f"{path}.translation_m[{index}]")
+            for index, component in enumerate(raw_translation)
+        )
+    rotation_degrees = _number(
+        entry.get("rotation_deg", 0.0), f"{path}.rotation_deg"
+    )
+    return JointOffset(
+        translation_meters=translation,
+        rotation_radians=math.radians(rotation_degrees),
+    )
+
+
 def _infer_dof_kind(entry: dict, path: str) -> DofKind:
-    """A dof entry's kind, declared by its explicit-unit limit keys."""
-    has_rotation = "min_deg" in entry or "max_deg" in entry
-    has_translation = "min_m" in entry or "max_m" in entry
+    """A dof entry's kind, declared by its explicit-unit keys.
+
+    With the ``limits`` block optional, the unit family may come from
+    the limit keys inside it and/or the neutral key beside it; exactly
+    one family must be declared (an unlimited dof therefore always
+    carries an explicit ``neutral_deg``/``neutral_m``).
+    """
+    limits = entry.get("limits")
+    limit_keys = set(limits) if isinstance(limits, dict) else set()
+    has_rotation = (
+        bool({"min_deg", "max_deg"} & limit_keys) or "neutral_deg" in entry
+    )
+    has_translation = (
+        bool({"min_m", "max_m"} & limit_keys) or "neutral_m" in entry
+    )
     if has_rotation == has_translation:
         raise CharacterFormatError(
             path,
-            "dof limits must use exactly one unit family: min_deg/max_deg "
-            "(rotation) or min_m/max_m (translation)",
+            "dof must declare exactly one unit family through its limits "
+            "block (min_deg/max_deg or min_m/max_m) and/or its neutral key "
+            "(neutral_deg or neutral_m); an unlimited dof needs an "
+            "explicit neutral",
         )
     return DofKind.ROTATION if has_rotation else DofKind.TRANSLATION
 
@@ -321,22 +394,28 @@ def _parse_dof(
     entry = _mapping(raw, path)
     min_key, max_key, neutral_key = _DOF_LIMIT_KEYS[kind]
     _reject_unknown_fields(
-        entry, path, {min_key, max_key, neutral_key, "axis", "description"}
+        entry, path, {"limits", neutral_key, "axis", "description"}
     )
-    for required in (min_key, max_key):
-        if required not in entry:
+    minimum: float | None = None
+    maximum: float | None = None
+    if "limits" in entry:
+        limits_path = f"{path}.limits"
+        limits = _mapping(entry["limits"], limits_path)
+        _reject_unknown_fields(limits, limits_path, {min_key, max_key})
+        for required in (min_key, max_key):
+            if required not in limits:
+                raise CharacterFormatError(
+                    f"{limits_path}.{required}", "missing required field"
+                )
+        minimum = _number(limits[min_key], f"{limits_path}.{min_key}")
+        maximum = _number(limits[max_key], f"{limits_path}.{max_key}")
+        if minimum >= maximum:
             raise CharacterFormatError(
-                f"{path}.{required}", "missing required field"
+                f"{limits_path}.{min_key}",
+                f"range must be ascending: [{minimum}, {maximum}]",
             )
-    minimum = _number(entry[min_key], f"{path}.{min_key}")
-    maximum = _number(entry[max_key], f"{path}.{max_key}")
-    if minimum >= maximum:
-        raise CharacterFormatError(
-            f"{path}.{min_key}",
-            f"range must be ascending: [{minimum}, {maximum}]",
-        )
     neutral = _number(entry.get(neutral_key, 0.0), f"{path}.{neutral_key}")
-    if not minimum <= neutral <= maximum:
+    if minimum is not None and not minimum <= neutral <= maximum:
         raise CharacterFormatError(
             f"{path}.{neutral_key}",
             f"{neutral} outside range [{minimum}, {maximum}]",
@@ -358,8 +437,8 @@ def _parse_dof(
         if kind is DofKind.ROTATION:
             return RotationDof(
                 name=name,
-                min_radians=math.radians(minimum),
-                max_radians=math.radians(maximum),
+                min_radians=None if minimum is None else math.radians(minimum),
+                max_radians=None if maximum is None else math.radians(maximum),
                 neutral_radians=math.radians(neutral),
                 axis=axis,
                 description=description,
@@ -451,9 +530,15 @@ def _target_bounds(
     dof_paths: dict[str, DegreeOfFreedom],
     parameters: dict[str, Parameter],
 ) -> tuple[float, float] | None:
-    """Model-unit bounds of a track/output target, or None if undeclared."""
+    """Model-unit bounds of a track/output target, or None if undeclared.
+
+    An unlimited DOF gets infinite bounds: its track values pass
+    validation untouched and evaluation never clamps them.
+    """
     dof = dof_paths.get(target)
     if dof is not None:
+        if not dof.has_limits:
+            return -math.inf, math.inf
         return dof.minimum, dof.maximum
     if target in parameters:
         return 0.0, 1.0
@@ -578,6 +663,13 @@ def _parse_outputs(
                 )
         target = _string(entry["target"], f"{path}.target")
         dof = dof_paths.get(target)
+        if dof is not None and not dof.has_limits:
+            raise CharacterFormatError(
+                f"{path}.target",
+                f"{target!r} has no limits; a bounded actuator channel "
+                f"needs a dof range to project to 0..1 — add a limits "
+                f"block to the dof or remove this mapping",
+            )
         if dof is not None:
             range_key = "range_deg" if dof.kind is DofKind.ROTATION else "range_m"
         elif target in parameters:
@@ -624,6 +716,111 @@ def _parse_outputs(
             )
         )
     return tuple(mappings)
+
+
+def _parse_relations(
+    raw: object, dof_paths: dict[str, DegreeOfFreedom]
+) -> tuple[Relation, ...]:
+    """The ``relations`` list: linear DOF couplings (Kinematics.md §5).
+
+    ``ratio`` is the semantic signed float in model units (driven model
+    unit per driver model unit); the optional offset key matches the
+    driven DOF's file units (``offset_deg``/``offset_m``) and converts
+    to model units. Graph-level rules — acyclic, one driver per DOF,
+    no animation tracks on a driven DOF — are enforced by ``Rig``.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise CharacterFormatError(
+            "relations",
+            f"expected a list of dof couplings, got {type(raw).__name__}",
+        )
+    relations: list[Relation] = []
+    for index, entry in enumerate(raw):
+        path = f"relations[{index}]"
+        entry = _mapping(entry, path)
+        for required in ("kind", "driver", "driven", "ratio"):
+            if required not in entry:
+                raise CharacterFormatError(
+                    f"{path}.{required}", "missing required field"
+                )
+        try:
+            kind = RelationKind(entry["kind"])
+        except ValueError:
+            valid = ", ".join(sorted(k.value for k in RelationKind))
+            raise CharacterFormatError(
+                f"{path}.kind",
+                f"unknown relation kind {entry['kind']!r} "
+                f"(expected one of: {valid})",
+            ) from None
+        driver_kind, driven_kind = RELATION_KIND_DOF_KINDS[kind]
+        for role, expected_kind in (
+            ("driver", driver_kind),
+            ("driven", driven_kind),
+        ):
+            target = _string(entry[role], f"{path}.{role}")
+            dof = dof_paths.get(target)
+            if dof is None:
+                raise CharacterFormatError(
+                    f"{path}.{role}", "references an undeclared dof path"
+                )
+            if dof.kind is not expected_kind:
+                raise CharacterFormatError(
+                    f"{path}.{role}",
+                    f"{kind.value} requires a {expected_kind.value} dof, "
+                    f"got {dof.kind.value} ({target!r})",
+                )
+        offset_key = _RELATION_OFFSET_KEYS[driven_kind]
+        _reject_unknown_fields(
+            entry,
+            path,
+            {"kind", "driver", "driven", "ratio", offset_key, "display"},
+        )
+        ratio = _number(entry["ratio"], f"{path}.ratio")
+        if ratio == 0.0:
+            raise CharacterFormatError(
+                f"{path}.ratio",
+                "must be nonzero: a zero ratio pins the driven dof "
+                "instead of coupling it",
+            )
+        offset = _number(entry.get(offset_key, 0.0), f"{path}.{offset_key}")
+        if offset_key == "offset_deg":
+            offset = math.radians(offset)
+        display: dict[str, float] = {}
+        if "display" in entry:
+            display_path = f"{path}.display"
+            display_map = _mapping(entry["display"], display_path)
+            allowed_keys = RELATION_DISPLAY_KEYS[kind]
+            for key, value in display_map.items():
+                key_path = f"{display_path}.{key}"
+                if key not in allowed_keys:
+                    valid = ", ".join(sorted(allowed_keys)) or "none"
+                    raise CharacterFormatError(
+                        key_path,
+                        f"unknown display field for {kind.value} "
+                        f"(expected: {valid})",
+                    )
+                number = _number(value, key_path)
+                if number <= 0:
+                    raise CharacterFormatError(
+                        key_path, f"must be > 0: {value!r}"
+                    )
+                display[str(key)] = number
+        try:
+            relations.append(
+                Relation(
+                    kind=kind,
+                    driver=_string(entry["driver"], f"{path}.driver"),
+                    driven=_string(entry["driven"], f"{path}.driven"),
+                    ratio=ratio,
+                    offset=offset,
+                    display=display,
+                )
+            )
+        except ValueError as error:
+            raise CharacterFormatError(path, str(error)) from error
+    return tuple(relations)
 
 
 # Primitive validators --------------------------------------------------------

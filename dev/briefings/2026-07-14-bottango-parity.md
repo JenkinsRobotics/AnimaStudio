@@ -85,6 +85,11 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | UI Dev living design-system workspace + Agent utility window | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | shell-level UI Dev selector entry; focused ribbon gallery tools; reusable button/window/popup standards; real Agent utility window launcher with honest disconnected state; tests/lint; Xcode/root-app build, signature, launch; `git diff --check` | released 2026-07-15 |
 
 | Claude | Kinematics plan: DOF limits, manual drive, flip/align, relations (docs only) | `dev/docs/roadmap/Kinematics.md`, `dev/briefings/**` | plan review by Jonathan + Codex; `git diff --check` | released 2026-07-15 |
+| Codex | UI Dev launchable side panels + real 3D workspace window | `studio/Sources/AnimaStudioUI/Theme/StudioWindowFactory.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Navigator/Inspector/Timeline reusable utility panels; reusable normal 3D workspace window containing real RealityKit viewport + isolated sample rig; direct ribbon/gallery launchers; one window per kind; tests/lint; Xcode/root-app build, signature, launch; `git diff --check` | released 2026-07-15 |
+
+| Claude | Python kinematics parity: optional per-DOF limits + relations evaluation + format spec (K2/K5/K7 backend) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/rc_car.character.anima`, `examples/six_axis_arm.character.anima`, `examples/walle_style.character.anima`, `dev/docs/roadmap/Character_Format.md` (2.0 section) — `tracks.py` not needed (infinite track bounds cover the unlimited case) | `.venv/bin/ruff check .` clean + `.venv/bin/pytest anima_studio/tests -q` (287 passed) | released 2026-07-15 |
+| Codex | UI Dev Mate/triad labs + docked Agent | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Agent constrained to UI Dev canvas; explicit floating-panel template; interactive Mate editor and triad-manipulator design labs; focused/full tests, lint, root-app build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
+| Codex | Integrated workspace selector sizing/menu | `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceSelector.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | non-squishing minimum selector width; anchored custom popover visually continuous with button; selected row, icons, purposes, shortcuts; focused/full tests, lint, root-app build/signature/live walkthrough; `git diff --check` | in progress |
 
 ## Requests
 
@@ -131,6 +136,51 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, Python kinematics parity — K2/K5/K7/K9 backend):**
+  Shipped the backend half of `Kinematics.md` in `rig.py`/`loader.py`
+  (287 tests, ruff clean; claim released above). **Limits (§2):**
+  per-DOF limits are now optional — `RotationDof`/`TranslationDof`
+  take `min_*`/`max_*` of `None` (both or neither), neutral stays
+  required, an unlimited DOF evaluates unclamped (its tracks get
+  ±inf bounds, so `tracks.py` needed no change), and an output
+  mapping on an unlimited DOF is a load/validation error naming the
+  fix. **Relations (§5):** new `Relation` core type
+  (`driven = ratio × driver + offset`, kinds gear/rack_pinion/screw/
+  linear with DOF-kind pairing validation), acyclic + one-driver-per-
+  DOF + no-animation-on-driven enforced at construction/load; ratio is
+  one signed nonzero float; per-kind `display` fields (teeth,
+  pinion_diameter_mm, lead_mm_per_rev) round-trip non-semantically.
+  **Violation API (the decision Codex must mirror):** `evaluate_pose`
+  applies relations in dependency order after clip resolution and
+  returns violations *on the pose* — `Pose.limit_violations:
+  tuple[LimitViolation, ...]` (dof_path, value, min_value, max_value,
+  native units; empty without relations) — nothing clamps; and
+  `project_channels` raises `LimitViolationError` if a *mapped* DOF is
+  violated (hardware refuses to arm; unmapped violated DOF don't block
+  other channels). **Format (Character_Format.md, new 2.0 section,
+  K2/K5/K9-marked):** `limits:` is a nested optional block
+  (`{min_deg,max_deg}`/`{min_m,max_m}`) — the old flat spelling is
+  rejected; an unlimited DOF declares its unit family via required
+  `neutral_deg`/`neutral_m`; per-joint `offset:` block
+  (`translation_m: [x,y,z]`, `rotation_deg`) is stored for round-trip
+  only (runtime computes DOF values, not spatial transforms — Studio
+  consumes it spatially); `relations:` list carries kind, driver,
+  driven, `ratio` (**model units**: driven-model-unit per
+  driver-model-unit — unitless for gear/linear, m/rad for
+  rack_pinion/screw), optional `offset_deg`/`offset_m` (file units,
+  key must match driven kind, mirrors outputs' range_deg/range_m
+  pattern), optional `display`. **Ambiguities I resolved (flag if
+  wrong):** (1) translation file units stay meters `_m` — Kinematics
+  §2's "millimeters" is dialog display, not file format; (2) `ratio`
+  is stored in model units since it's the semantic float; (3) ratio
+  0 is rejected (pins the driven DOF instead of coupling); (4) file
+  keeps `anima_version: "2.0"` despite the limits-block schema change
+  (pre-release format, loader is reference). All three examples moved
+  to the block syntax; rc_car now has a steering rack_pinion relation
+  (driven `rack.travel` mapped to channel 2), a joint `offset`, and an
+  unlimited free-spinning `drive.spin` DOF, streamed end-to-end into
+  `SimulatedDevice`. Not committed per packet instructions.
 
 - **2026-07-15 (Claude, kinematics plan):** Per Jonathan (Onshape mate
   dialog + relations as the reference), wrote

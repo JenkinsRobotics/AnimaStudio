@@ -26,15 +26,17 @@ joints:
     parent: body
     child: neck
     dofs:
-      rotation: { min_deg: -15, max_deg: 45, neutral_deg: 0, axis: [0, 1, 0] }
+      rotation:
+        limits: { min_deg: -15, max_deg: 45 }
+        neutral_deg: 0
+        axis: [0, 1, 0]
   neck_extend:
     type: prismatic
     parent: neck
     child: head
     dofs:
       extension:
-        min_m: 0.0
-        max_m: 0.12
+        limits: { min_m: 0.0, max_m: 0.12 }
         neutral_m: 0.02
         axis: [0, 0, 1]
         description: "Telescoping neck travel"

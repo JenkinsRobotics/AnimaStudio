@@ -2,11 +2,158 @@
 
 > File extension: `.character.anima`  
 > Format: YAML  
-> Version: 1.0 (draft)
+> Version: 2.0 — the mechanism-rig format the Python runtime loads
+> (`anima_studio/loader.py` is the reference implementation). The 1.0
+> draft below it is kept for the expressive-face/voice sections that
+> have not been redesigned yet; its `bones`, `blend_shapes`, and
+> `physical` sections are superseded and rejected by the 2.0 loader.
 
-A character file defines the identity and expressive range of an Anima character. It is authored once per character and referenced by scene files. The same character file covers both digital and physical output.
+A character file defines the identity and movable structure of an Anima character. It is authored once per character and referenced by scene files. The same character file covers both digital and physical output.
 
 ---
+
+## Format 2.0 — mechanism rig
+
+A 2.0 character is a mechanism: rigid `parts` connected by typed
+`joints` (mates, in the Onshape sense), plus generic 0..1
+`parameters`, keyframed `clips`, DOF-coupling `relations`, and
+target → channel `outputs`. Units in files are operator units —
+degrees for rotation, meters for translation — converted to radians
+and meters in every runtime model. Unknown fields anywhere are load
+errors: reject, never silently drop.
+
+> **K2/K5/K9 contract.** The `limits` block, the `relations` list, and
+> the joint `offset` block below are the shared kinematics contract
+> from `Kinematics.md` (§2 limits, §5 relations, §4 offsets). Swift
+> `AnimaCore` must mirror these semantics exactly (Codex's K-packets);
+> the Python loader/rig already implements them.
+
+```yaml
+anima_version: "2.0"
+type: character
+
+identity:
+  name: rc_car                 # required, non-empty
+
+parts:                         # rigid bodies; kinematics lives in joints
+  chassis: { }
+  front_axle: { parent: chassis, model_node: "car/front_axle" }
+
+joints:
+  steering:
+    type: revolute             # fastened | parallel | revolute | prismatic
+                               # | cylindrical | pin_slot | planar | ball
+    parent: chassis
+    child: front_axle
+    offset:                    # optional as-mated offset (K9): spatial
+      translation_m: [0, 0, 0] #   only — Studio applies it to the zero
+      rotation_deg: 2.5        #   pose; the headless runtime round-trips it
+    dofs:                      # count/kinds fixed by the joint type
+      rotation:
+        limits: { min_deg: -30, max_deg: 30 }   # OPTIONAL block (K2)
+        neutral_deg: 0
+        axis: [0, 0, 1]
+  drive:
+    type: revolute
+    parent: chassis
+    child: drive_axle          # (declare the part; elided here)
+    dofs:
+      spin:
+        neutral_deg: 0         # no limits: continuous rotation (a wheel)
+
+relations:                     # linear DOF couplings (K5)
+  - kind: rack_pinion          # gear | rack_pinion | screw | linear
+    driver: steering.rotation  # dof path "<joint>.<dof>"
+    driven: rack.travel
+    ratio: 0.02                # semantic signed float, MODEL units
+    offset_m: 0.0              # optional; unit key matches driven kind
+    display: { pinion_diameter_mm: 40 }   # optional, non-semantic
+
+parameters:
+  throttle: { default: 0.0 }   # generic scalar channel, always 0..1
+
+clips:
+  launch:
+    duration_s: 2.0
+    loop: false
+    tracks:                    # sparse entries; strictly increasing time
+      - time: 0.0
+        values: { steering.rotation: 0.0, throttle: 0.0 }
+      - time: 2.0
+        values: { steering.rotation: 25.0 }
+        interpolation: linear  # hold | linear (default linear)
+
+outputs:                       # evaluated target → normalized channel
+  - target: steering.rotation
+    channel: 0
+    range_deg: [-30, 30]       # descending pair inverts the channel
+  - target: throttle
+    channel: 1
+    range: [0.0, 1.0]
+```
+
+### DOF limits (optional per DOF — K2)
+
+- `limits` is an optional block: `{ min_deg, max_deg }` on a rotation
+  DOF, `{ min_m, max_m }` on a translation DOF. Present limits are
+  hard stops: `min < max`, the neutral must lie inside them, and
+  evaluation clamps clip values to them (load rejects out-of-range
+  keyframes outright).
+- **No `limits` block = unbounded DOF** (a wheel keeps spinning).
+  Evaluation never clamps it. The DOF entry must then declare its unit
+  family through an explicit `neutral_deg` / `neutral_m` — neutral is
+  always required, limits are not.
+- An unbounded DOF **cannot be an `outputs` target**: a bounded
+  actuator channel needs a range to project to 0..1. That mapping is a
+  load error naming the fix (add limits or remove the mapping) — never
+  a silent clamp or default. Continuous actuators lift this later
+  (B08).
+
+### Joint offset (K9 — format carry)
+
+`offset` stores the Onshape-style as-mated offset between the two
+connector frames: `translation_m: [x, y, z]` and/or `rotation_deg`
+about connector Z, applied before DOF values. It shifts the zero pose
+spatially and consumes no DOF. The headless runtime computes DOF
+values and channel projections, not spatial part transforms, so it
+stores the block for round-trip only; **Studio consumes it
+spatially.**
+
+### Relations (K5)
+
+`driven_value = ratio × driver_value + offset`, evaluated after driver
+DOF resolve from the clip/pose, in dependency order (chains are legal).
+
+| Field | Meaning |
+|---|---|
+| `kind` | `gear` (rot→rot), `rack_pinion` (rot→trans), `screw` (rot→trans, same mate allowed: cylindrical), `linear` (trans→trans). The kind fixes the driver/driven DOF kinds; mismatches are load errors. |
+| `driver`, `driven` | DOF paths (`"<joint>.<dof>"`); must resolve to declared DOF |
+| `ratio` | required, nonzero signed float, **model units**: driven model unit per driver model unit (unitless for gear/linear; meters per radian for rack_pinion/screw). The one semantic value. |
+| `offset_deg` / `offset_m` | optional (default 0); the key must match the driven DOF's kind; file units, converted to model units |
+| `display` | optional, non-semantic round-trip fields per kind: gear `driver_teeth`/`driven_teeth`, rack_pinion `pinion_diameter_mm`, screw `lead_mm_per_rev`; positive numbers. No consistency with `ratio` is enforced. |
+
+Rules (load errors, never silent fixes):
+
+- The relation graph is **acyclic** and each DOF is driven by **at
+  most one** relation.
+- A driven DOF may not carry animation tracks — one source of truth
+  for its motion.
+- **Limits never clamp a relation.** The relation always computes; a
+  driven value outside its enabled limits is reported as a limit
+  violation on the evaluated pose (`Pose.limit_violations` in the
+  Python runtime), and projecting a violated mapped DOF to a channel
+  raises (`LimitViolationError`) — hardware must refuse to arm while
+  violated.
+
+---
+
+## Format 1.0 (draft) — superseded sections below
+
+> Everything from here down is the 1.0 draft. `bones`,
+> `blend_shapes`, and `physical` are superseded by the 2.0 mechanism
+> model above and rejected by the 2.0 loader; `expressions`,
+> `lip_sync`, `digital`, and `voice` are future 2.0 work and are also
+> rejected until designed.
 
 ## File Structure Overview
 

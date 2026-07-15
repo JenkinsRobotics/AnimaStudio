@@ -6,20 +6,26 @@ import pytest
 
 from anima_studio.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
+    RELATION_KIND_DOF_KINDS,
     DofKind,
     Identity,
     Joint,
+    JointOffset,
     JointType,
+    LimitViolationError,
     OutputMapping,
     Parameter,
     Part,
     Pose,
+    Relation,
+    RelationKind,
     Rig,
     RigClip,
     RotationDof,
     TranslationDof,
     evaluate_pose,
     project_channels,
+    relations_in_dependency_order,
 )
 from anima_studio.sim import SimulatedDevice
 from anima_studio.tracks import Clip, Keyframe, Track
@@ -493,6 +499,484 @@ class TestProjectChannels:
         assert device.channel_pulse_us(0) == pytest.approx(
             expected_pulse_us, abs=1.0)  # 3-decimal wire quantization
 
+class TestJointOffset:
+    def test_default_is_absent(self):
+        assert pan_joint().offset is None
+
+    def test_offset_round_trips_on_the_joint(self):
+        offset = JointOffset(
+            translation_meters=(0.0, 0.0, 0.01), rotation_radians=0.1
+        )
+        joint = Joint(
+            name="pan",
+            joint_type=JointType.REVOLUTE,
+            parent_part="base",
+            child_part="carriage",
+            dofs=(rotation_dof(),),
+            offset=offset,
+        )
+        assert joint.offset == offset
+
+    def test_bad_translation_shape_rejected(self):
+        with pytest.raises(ValueError):
+            JointOffset(translation_meters=(0.0, 0.1))
+
+
+class TestOptionalLimits:
+    def spin_joint(self) -> Joint:
+        return Joint(
+            name="spin",
+            joint_type=JointType.REVOLUTE,
+            parent_part="base",
+            child_part="carriage",
+            dofs=(RotationDof(name="rotation"),),
+        )
+
+    def test_unlimited_dof_legal(self):
+        dof = RotationDof(name="rotation")
+        assert not dof.has_limits
+        assert dof.minimum is None and dof.maximum is None
+        assert dof.neutral == 0.0
+
+    def test_limited_dof_reports_limits(self):
+        assert rotation_dof().has_limits
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"min_radians": -1.0},  # min without max
+            {"max_radians": 1.0},  # max without min
+        ],
+    )
+    def test_partial_rotation_limits_rejected(self, kwargs):
+        with pytest.raises(ValueError):
+            RotationDof(name="rotation", **kwargs)
+
+    def test_partial_translation_limits_rejected(self):
+        with pytest.raises(ValueError):
+            TranslationDof(name="travel", min_meters=0.0)
+
+    def test_unlimited_dof_skips_neutral_range_check(self):
+        assert RotationDof(
+            name="rotation", neutral_radians=100.0
+        ).neutral == 100.0
+
+    def test_unlimited_dof_evaluates_unclamped(self):
+        three_turns_radians = 6 * math.pi
+        clip = RigClip(
+            clip=Clip(
+                name="spin_up",
+                duration_seconds=1.0,
+                tracks={
+                    "spin.rotation": Track(
+                        keyframes=(
+                            Keyframe(time_seconds=0.0, value=0.0),
+                            Keyframe(
+                                time_seconds=1.0, value=three_turns_radians
+                            ),
+                        ),
+                        minimum_value=-math.inf,
+                        maximum_value=math.inf,
+                    ),
+                },
+            ),
+        )
+        rig = mechanism_rig(
+            joints={"pan": pan_joint(), "slide": slide_joint(),
+                    "spin": self.spin_joint()},
+            clips={"spin_up": clip},
+        )
+        pose = evaluate_pose(rig, "spin_up", 1.0)
+        assert pose.dof_values["spin.rotation"] == three_turns_radians
+        assert pose.limit_violations == ()
+
+    def test_output_mapping_on_unlimited_dof_rejected(self):
+        with pytest.raises(ValueError, match="unlimited"):
+            mechanism_rig(
+                joints={"pan": pan_joint(), "slide": slide_joint(),
+                        "spin": self.spin_joint()},
+                outputs=(
+                    OutputMapping(
+                        target="spin.rotation",
+                        channel=0,
+                        value_at_zero=-1.0,
+                        value_at_one=1.0,
+                    ),
+                ),
+            )
+
+
+def four_joint_rig(
+    relations: tuple[Relation, ...] = (),
+    clips: dict | None = None,
+    outputs: tuple[OutputMapping, ...] = (),
+) -> Rig:
+    """Two rotations (pan, roll) and two translations (slide, push)."""
+    return Rig(
+        identity=Identity(name="relations"),
+        parts={
+            "base": Part(name="base"),
+            "carriage": Part(name="carriage", parent="base"),
+            "slider": Part(name="slider", parent="base"),
+            "wheel": Part(name="wheel", parent="base"),
+            "pusher": Part(name="pusher", parent="base"),
+        },
+        joints={
+            "pan": pan_joint(),
+            "slide": Joint(
+                name="slide",
+                joint_type=JointType.PRISMATIC,
+                parent_part="base",
+                child_part="slider",
+                dofs=(translation_dof(min_meters=-0.1, max_meters=0.1),),
+            ),
+            "roll": Joint(
+                name="roll",
+                joint_type=JointType.REVOLUTE,
+                parent_part="base",
+                child_part="wheel",
+                dofs=(
+                    rotation_dof(min_radians=-math.pi, max_radians=math.pi),
+                ),
+            ),
+            "push": Joint(
+                name="push",
+                joint_type=JointType.PRISMATIC,
+                parent_part="base",
+                child_part="pusher",
+                dofs=(translation_dof(min_meters=-0.2, max_meters=0.2),),
+            ),
+        },
+        clips=clips or {},
+        outputs=outputs,
+        relations=relations,
+    )
+
+
+def pan_drive_clip(value_radians: float) -> RigClip:
+    """Drive pan.rotation from 0 to ``value_radians`` over one second."""
+    return RigClip(
+        clip=Clip(
+            name="drive",
+            duration_seconds=1.0,
+            tracks={
+                "pan.rotation": Track(
+                    keyframes=(
+                        Keyframe(time_seconds=0.0, value=0.0),
+                        Keyframe(time_seconds=1.0, value=value_radians),
+                    ),
+                    minimum_value=-PAN_RANGE_RADIANS,
+                    maximum_value=PAN_RANGE_RADIANS,
+                ),
+            },
+        ),
+    )
+
+
+class TestRelationValidation:
+    def test_kind_pairing_table(self):
+        assert RELATION_KIND_DOF_KINDS == {
+            RelationKind.GEAR: (DofKind.ROTATION, DofKind.ROTATION),
+            RelationKind.RACK_PINION: (
+                DofKind.ROTATION, DofKind.TRANSLATION),
+            RelationKind.SCREW: (DofKind.ROTATION, DofKind.TRANSLATION),
+            RelationKind.LINEAR: (
+                DofKind.TRANSLATION, DofKind.TRANSLATION),
+        }
+
+    @pytest.mark.parametrize(
+        "kind,driver,driven",
+        [
+            (RelationKind.GEAR, "pan.rotation", "roll.rotation"),
+            (RelationKind.RACK_PINION, "pan.rotation", "slide.translation"),
+            (RelationKind.SCREW, "pan.rotation", "slide.translation"),
+            (RelationKind.LINEAR, "slide.translation", "push.translation"),
+        ],
+    )
+    def test_valid_pairing_accepted(self, kind, driver, driven):
+        rig = four_joint_rig(relations=(
+            Relation(kind=kind, driver=driver, driven=driven, ratio=0.5),
+        ))
+        assert rig.relations[0].kind is kind
+
+    @pytest.mark.parametrize(
+        "kind,driver,driven",
+        [
+            (RelationKind.GEAR, "pan.rotation", "slide.translation"),
+            (RelationKind.GEAR, "slide.translation", "roll.rotation"),
+            (RelationKind.RACK_PINION, "slide.translation",
+             "push.translation"),
+            (RelationKind.SCREW, "pan.rotation", "roll.rotation"),
+            (RelationKind.LINEAR, "pan.rotation", "push.translation"),
+            (RelationKind.LINEAR, "slide.translation", "roll.rotation"),
+        ],
+    )
+    def test_wrong_pairing_rejected(self, kind, driver, driven):
+        with pytest.raises(ValueError):
+            four_joint_rig(relations=(
+                Relation(kind=kind, driver=driver, driven=driven, ratio=0.5),
+            ))
+
+    def test_non_dof_path_rejected(self):
+        with pytest.raises(ValueError):
+            Relation(
+                kind=RelationKind.GEAR,
+                driver="pan",
+                driven="roll.rotation",
+                ratio=1.0,
+            )
+
+    def test_self_coupling_rejected(self):
+        with pytest.raises(ValueError):
+            Relation(
+                kind=RelationKind.GEAR,
+                driver="pan.rotation",
+                driven="pan.rotation",
+                ratio=1.0,
+            )
+
+    @pytest.mark.parametrize("ratio", [0.0, math.inf, math.nan])
+    def test_bad_ratio_rejected(self, ratio):
+        with pytest.raises(ValueError):
+            Relation(
+                kind=RelationKind.GEAR,
+                driver="pan.rotation",
+                driven="roll.rotation",
+                ratio=ratio,
+            )
+
+    def test_display_field_for_wrong_kind_rejected(self):
+        with pytest.raises(ValueError):
+            Relation(
+                kind=RelationKind.GEAR,
+                driver="pan.rotation",
+                driven="roll.rotation",
+                ratio=0.5,
+                display={"lead_mm_per_rev": 2.0},
+            )
+
+    def test_undeclared_dof_rejected(self):
+        with pytest.raises(ValueError):
+            four_joint_rig(relations=(
+                Relation(
+                    kind=RelationKind.GEAR,
+                    driver="pan.rotation",
+                    driven="ghost.rotation",
+                    ratio=0.5,
+                ),
+            ))
+
+    def test_double_driver_rejected(self):
+        gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=0.5,
+        )
+        other_gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=-0.5,
+        )
+        with pytest.raises(ValueError, match="two relations"):
+            four_joint_rig(relations=(gear, other_gear))
+
+    def test_cycle_rejected(self):
+        forward = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=0.5,
+        )
+        backward = Relation(
+            kind=RelationKind.GEAR,
+            driver="roll.rotation",
+            driven="pan.rotation",
+            ratio=2.0,
+        )
+        with pytest.raises(ValueError, match="cycle"):
+            four_joint_rig(relations=(forward, backward))
+
+    def test_animated_driven_dof_rejected(self):
+        gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=0.5,
+        )
+        roll_clip = RigClip(
+            clip=Clip(
+                name="wiggle",
+                duration_seconds=1.0,
+                tracks={
+                    "roll.rotation": Track(
+                        keyframes=(Keyframe(time_seconds=0.0, value=0.0),),
+                        minimum_value=-math.pi,
+                        maximum_value=math.pi,
+                    ),
+                },
+            ),
+        )
+        with pytest.raises(ValueError, match="source of truth"):
+            four_joint_rig(relations=(gear,), clips={"wiggle": roll_clip})
+
+    def test_dependency_order_resolves_chains(self):
+        # Declared driven-first; the order puts the driver chain first.
+        downstream = Relation(
+            kind=RelationKind.LINEAR,
+            driver="slide.translation",
+            driven="push.translation",
+            ratio=2.0,
+        )
+        upstream = Relation(
+            kind=RelationKind.RACK_PINION,
+            driver="pan.rotation",
+            driven="slide.translation",
+            ratio=0.1,
+        )
+        assert relations_in_dependency_order(
+            (downstream, upstream)) == (upstream, downstream)
+
+
+class TestRelationEvaluation:
+    def test_gear_math_negative_ratio_and_offset(self):
+        gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=-2.0,
+            offset=0.1,
+        )
+        rig = four_joint_rig(
+            relations=(gear,), clips={"drive": pan_drive_clip(0.3)}
+        )
+        pose = evaluate_pose(rig, "drive", 1.0)
+        assert pose.dof_values["roll.rotation"] == pytest.approx(
+            -2.0 * 0.3 + 0.1)
+        assert pose.limit_violations == ()
+
+    def test_neutral_pose_flows_through_relations(self):
+        gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=0.5,
+            offset=0.2,
+        )
+        pose = evaluate_pose(four_joint_rig(relations=(gear,)))
+        assert pose.dof_values["roll.rotation"] == pytest.approx(0.2)
+
+    def test_chain_evaluates_in_dependency_order(self):
+        # Declared out of order on purpose: pan -> slide -> push.
+        downstream = Relation(
+            kind=RelationKind.LINEAR,
+            driver="slide.translation",
+            driven="push.translation",
+            ratio=2.0,
+        )
+        upstream = Relation(
+            kind=RelationKind.RACK_PINION,
+            driver="pan.rotation",
+            driven="slide.translation",
+            ratio=0.1,
+        )
+        rig = four_joint_rig(
+            relations=(downstream, upstream),
+            clips={"drive": pan_drive_clip(0.4)},
+        )
+        pose = evaluate_pose(rig, "drive", 1.0)
+        assert pose.dof_values["slide.translation"] == pytest.approx(0.04)
+        assert pose.dof_values["push.translation"] == pytest.approx(0.08)
+        assert pose.limit_violations == ()
+
+    def violated_rig(self, outputs: tuple[OutputMapping, ...] = ()) -> Rig:
+        # pan at 0.4 rad through ratio 10 pushes roll to 4.0 rad,
+        # past its ±π limits.
+        gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=10.0,
+        )
+        return four_joint_rig(
+            relations=(gear,),
+            clips={"drive": pan_drive_clip(0.4)},
+            outputs=outputs,
+        )
+
+    def test_limit_violation_reported_not_clamped(self):
+        pose = evaluate_pose(self.violated_rig(), "drive", 1.0)
+        assert pose.dof_values["roll.rotation"] == pytest.approx(4.0)
+        violation, = pose.limit_violations
+        assert violation.dof_path == "roll.rotation"
+        assert violation.value == pytest.approx(4.0)
+        assert violation.min_value == pytest.approx(-math.pi)
+        assert violation.max_value == pytest.approx(math.pi)
+
+    def test_projection_of_mapped_violated_dof_raises(self):
+        rig = self.violated_rig(outputs=(
+            OutputMapping(
+                target="roll.rotation",
+                channel=0,
+                value_at_zero=-math.pi,
+                value_at_one=math.pi,
+            ),
+        ))
+        pose = evaluate_pose(rig, "drive", 1.0)
+        with pytest.raises(LimitViolationError, match="roll.rotation"):
+            project_channels(rig, pose)
+        # Back inside the limits the same rig projects again.
+        assert project_channels(
+            rig, evaluate_pose(rig, "drive", 0.0)
+        )[0] == pytest.approx(0.5)
+
+    def test_unmapped_violated_dof_does_not_block_other_channels(self):
+        rig = self.violated_rig(outputs=(
+            OutputMapping(
+                target="pan.rotation",
+                channel=0,
+                value_at_zero=-PAN_RANGE_RADIANS,
+                value_at_one=PAN_RANGE_RADIANS,
+            ),
+        ))
+        pose = evaluate_pose(rig, "drive", 1.0)
+        assert pose.limit_violations  # roll is violated but unmapped
+        assert 0 in project_channels(rig, pose)
+
+    def test_relation_streams_to_simulated_device(self):
+        """Clip → relation → channel projection → FRM → simulated pulse."""
+        gear = Relation(
+            kind=RelationKind.GEAR,
+            driver="pan.rotation",
+            driven="roll.rotation",
+            ratio=-1.0,
+        )
+        rig = four_joint_rig(
+            relations=(gear,),
+            clips={"drive": pan_drive_clip(math.radians(30.0))},
+            outputs=(
+                OutputMapping(
+                    target="roll.rotation",
+                    channel=0,
+                    value_at_zero=math.radians(-45.0),
+                    value_at_one=math.radians(45.0),
+                ),
+            ),
+        )
+        device = SimulatedDevice(channel_count=1)
+        assert device.receive_line(
+            "CFG,0,servo,pin=9,min_us=600,max_us=2400") == "OK"
+        assert device.receive_line("EN,0,1") == "OK"
+        channels = project_channels(rig, evaluate_pose(rig, "drive", 1.0))
+        assert device.receive_line(f"FRM,0,0:{channels[0]:.3f}") == "OK"
+        # pan +30 deg → roll -30 deg → (−30+45)/90 of the pulse span.
+        expected_pulse_us = 600 + 1800 * (15.0 / 90.0)
+        assert device.channel_pulse_us(0) == pytest.approx(
+            expected_pulse_us, abs=1.0)
+
+
+class TestProjectChannelsEndToEnd:
     def test_descending_range_equals_cfg_invert(self):
         """A descending mapping pair and the wire CFG invert flag are two
         routes to the same pulse."""

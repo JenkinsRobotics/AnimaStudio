@@ -12,7 +12,14 @@ from anima_studio.loader import (
     load_character_file,
     parse_character,
 )
-from anima_studio.rig import DofKind, JointType, evaluate_pose, project_channels
+from anima_studio.rig import (
+    DofKind,
+    JointType,
+    LimitViolationError,
+    RelationKind,
+    evaluate_pose,
+    project_channels,
+)
 from anima_studio.sim import SimulatedDevice
 from anima_studio.tracks import Interpolation
 from anima_studio.wire import Ok, encode_frm, parse_reply
@@ -34,7 +41,10 @@ BASE_DOCUMENT = {
             "parent": "base",
             "child": "carriage",
             "dofs": {
-                "rotation": {"min_deg": -45, "max_deg": 45, "neutral_deg": 0},
+                "rotation": {
+                    "limits": {"min_deg": -45, "max_deg": 45},
+                    "neutral_deg": 0,
+                },
             },
         },
     },
@@ -107,7 +117,10 @@ class TestAccepts:
             "parent": "base",
             "child": "carriage",
             "dofs": {
-                "travel": {"min_m": 0.0, "max_m": 0.2, "neutral_m": 0.05},
+                "travel": {
+                    "limits": {"min_m": 0.0, "max_m": 0.2},
+                    "neutral_m": 0.05,
+                },
             },
         }
         rig = parse(doc)
@@ -121,23 +134,23 @@ class TestAccepts:
         [
             ("fastened", None),
             ("revolute",
-             {"rotation": {"min_deg": -45, "max_deg": 45}}),
+             {"rotation": {"limits": {"min_deg": -45, "max_deg": 45}}}),
             ("prismatic",
-             {"travel": {"min_m": 0.0, "max_m": 0.1}}),
+             {"travel": {"limits": {"min_m": 0.0, "max_m": 0.1}}}),
             ("cylindrical",
-             {"rotation": {"min_deg": -90, "max_deg": 90},
-              "travel": {"min_m": 0.0, "max_m": 0.1}}),
+             {"rotation": {"limits": {"min_deg": -90, "max_deg": 90}},
+              "travel": {"limits": {"min_m": 0.0, "max_m": 0.1}}}),
             ("pin_slot",
-             {"rotation": {"min_deg": -90, "max_deg": 90},
-              "travel": {"min_m": 0.0, "max_m": 0.1}}),
+             {"rotation": {"limits": {"min_deg": -90, "max_deg": 90}},
+              "travel": {"limits": {"min_m": 0.0, "max_m": 0.1}}}),
             ("planar",
-             {"slide_x": {"min_m": -0.1, "max_m": 0.1},
-              "slide_y": {"min_m": -0.1, "max_m": 0.1},
-              "rotation": {"min_deg": -180, "max_deg": 180}}),
+             {"slide_x": {"limits": {"min_m": -0.1, "max_m": 0.1}},
+              "slide_y": {"limits": {"min_m": -0.1, "max_m": 0.1}},
+              "rotation": {"limits": {"min_deg": -180, "max_deg": 180}}}),
             ("ball",
-             {"rotation_x": {"min_deg": -30, "max_deg": 30},
-              "rotation_y": {"min_deg": -30, "max_deg": 30},
-              "rotation_z": {"min_deg": -30, "max_deg": 30}}),
+             {"rotation_x": {"limits": {"min_deg": -30, "max_deg": 30}},
+              "rotation_y": {"limits": {"min_deg": -30, "max_deg": 30}},
+              "rotation_z": {"limits": {"min_deg": -30, "max_deg": 30}}}),
         ],
     )
     def test_every_joint_type_parses(self, joint_type, dofs):
@@ -154,7 +167,7 @@ class TestAccepts:
     def test_custom_dof_name_is_addressable(self):
         doc = document(clips={}, outputs=[])
         doc["joints"]["pan"]["dofs"] = {
-            "swing": {"min_deg": -45, "max_deg": 45},
+            "swing": {"limits": {"min_deg": -45, "max_deg": 45}},
         }
         rig = parse(doc)
         assert "pan.swing" in rig.dof_paths()
@@ -278,7 +291,9 @@ class TestRejects:
 
     def test_revolute_with_extra_dof_rejected(self):
         doc = document(clips={}, outputs=[])
-        doc["joints"]["pan"]["dofs"]["extra"] = {"min_m": 0.0, "max_m": 0.1}
+        doc["joints"]["pan"]["dofs"]["extra"] = {
+            "limits": {"min_m": 0.0, "max_m": 0.1},
+        }
         assert_rejects(doc, "joints.pan.dofs")
 
     def test_fastened_with_dofs_rejected(self):
@@ -287,7 +302,9 @@ class TestRejects:
             "type": "fastened",
             "parent": "base",
             "child": "carriage",
-            "dofs": {"rotation": {"min_deg": -45, "max_deg": 45}},
+            "dofs": {
+                "rotation": {"limits": {"min_deg": -45, "max_deg": 45}},
+            },
         }
         assert_rejects(doc, "joints.pan.dofs")
 
@@ -299,28 +316,39 @@ class TestRejects:
             "type": "prismatic",
             "parent": "base",
             "child": "carriage",
-            "dofs": {"travel": {"min_deg": -45, "max_deg": 45}},
+            "dofs": {
+                "travel": {"limits": {"min_deg": -45, "max_deg": 45}},
+            },
         }
         assert_rejects(doc, "joints.pan.dofs")
 
     def test_mixed_unit_keys_in_one_dof_rejected(self):
         doc = document(clips={}, outputs=[])
         doc["joints"]["pan"]["dofs"]["rotation"] = {
-            "min_deg": -45, "max_m": 0.1,
+            "limits": {"min_deg": -45, "max_m": 0.1},
         }
         assert_rejects(doc, "joints.pan.dofs.rotation")
 
+    def test_flat_pre_limits_block_keys_rejected(self):
+        # The pre-K2 flat spelling (min_deg beside neutral_deg) is not
+        # silently accepted; limits live in their own block now.
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["dofs"]["rotation"] = {
+            "min_deg": -45, "max_deg": 45, "neutral_deg": 0,
+        }
+        assert_rejects(doc, "rotation.max_deg")  # first flat key rejected
+
     def test_dof_missing_limit(self):
         doc = document(clips={}, outputs=[])
-        del doc["joints"]["pan"]["dofs"]["rotation"]["max_deg"]
-        assert_rejects(doc, "rotation.max_deg")
+        del doc["joints"]["pan"]["dofs"]["rotation"]["limits"]["max_deg"]
+        assert_rejects(doc, "rotation.limits.max_deg")
 
     def test_dof_descending_range(self):
         doc = document(clips={}, outputs=[])
         doc["joints"]["pan"]["dofs"]["rotation"] = {
-            "min_deg": 45, "max_deg": -45,
+            "limits": {"min_deg": 45, "max_deg": -45},
         }
-        assert_rejects(doc, "rotation.min_deg")
+        assert_rejects(doc, "rotation.limits.min_deg")
 
     def test_dof_neutral_outside_range(self):
         doc = document(clips={}, outputs=[])
@@ -401,7 +429,7 @@ class TestRejects:
             "type": "prismatic",
             "parent": "base",
             "child": "carriage",
-            "dofs": {"travel": {"min_m": 0.0, "max_m": 0.1}},
+            "dofs": {"travel": {"limits": {"min_m": 0.0, "max_m": 0.1}}},
         }
         doc["clips"]["sweep"]["tracks"][0]["values"]["lift.travel"] = 0.5
         assert_rejects(doc, "values.lift.travel")
@@ -443,7 +471,7 @@ class TestRejects:
             "type": "prismatic",
             "parent": "base",
             "child": "carriage",
-            "dofs": {"travel": {"min_m": 0.0, "max_m": 0.1}},
+            "dofs": {"travel": {"limits": {"min_m": 0.0, "max_m": 0.1}}},
         }
         doc["outputs"] = [
             {"target": "lift.travel", "channel": 0, "range_deg": [0, 45]},
@@ -464,6 +492,313 @@ class TestRejects:
         doc = document()
         doc["outputs"][0]["range_deg"] = [10, 10]
         assert_rejects(doc, "outputs[0].range_deg")
+
+
+class TestOptionalLimitsLoading:
+    def wheel_document(self) -> dict:
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["spinner"] = {
+            "type": "revolute",
+            "parent": "base",
+            "child": "carriage",
+            "dofs": {"spin": {"neutral_deg": 0}},
+        }
+        return doc
+
+    def test_unlimited_dof_loads(self):
+        rig = parse(self.wheel_document())
+        dof = rig.joints["spinner"].dofs[0]
+        assert not dof.has_limits
+        assert dof.min_radians is None and dof.max_radians is None
+        assert dof.neutral_radians == 0.0
+
+    def test_unlimited_dof_keyframes_evaluate_unclamped(self):
+        doc = self.wheel_document()
+        doc["clips"] = {
+            "spin_up": {
+                "duration_s": 1.0,
+                "tracks": [
+                    {"time": 0.0, "values": {"spinner.spin": 0.0}},
+                    {"time": 1.0, "values": {"spinner.spin": 1080.0}},
+                ],
+            },
+        }
+        rig = parse(doc)
+        pose = evaluate_pose(rig, "spin_up", 1.0)
+        assert pose.dof_values["spinner.spin"] == pytest.approx(
+            math.radians(1080))  # three full turns, no clamp
+        assert pose.limit_violations == ()
+
+    def test_unlimited_translation_dof_loads(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["feed"] = {
+            "type": "prismatic",
+            "parent": "base",
+            "child": "carriage",
+            "dofs": {"travel": {"neutral_m": 0.0}},
+        }
+        dof = parse(doc).joints["feed"].dofs[0]
+        assert dof.kind is DofKind.TRANSLATION and not dof.has_limits
+
+    def test_unlimited_dof_without_neutral_rejected(self):
+        # No limits block and no neutral key = no unit family declared.
+        doc = self.wheel_document()
+        doc["joints"]["spinner"]["dofs"]["spin"] = {"axis": [0, 0, 1]}
+        assert_rejects(doc, "spinner.dofs.spin")
+
+    def test_output_mapping_on_unlimited_dof_rejected(self):
+        doc = self.wheel_document()
+        doc["outputs"] = [
+            {"target": "spinner.spin", "channel": 0, "range_deg": [-45, 45]},
+        ]
+        assert_rejects(doc, "outputs[0].target")
+
+
+class TestJointOffsetLoading:
+    def test_offset_block_round_trips(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["offset"] = {
+            "translation_m": [0.01, 0.0, -0.002],
+            "rotation_deg": 15.0,
+        }
+        offset = parse(doc).joints["pan"].offset
+        assert offset.translation_meters == (0.01, 0.0, -0.002)
+        assert offset.rotation_radians == pytest.approx(math.radians(15.0))
+
+    def test_absent_offset_is_none(self):
+        assert parse(document()).joints["pan"].offset is None
+
+    def test_offset_does_not_change_runtime_output(self):
+        # The headless runtime computes DOF values and channel
+        # projections, not spatial part transforms; the offset is a
+        # round-trip carry Studio consumes spatially.
+        doc = document()
+        doc["joints"]["pan"]["offset"] = {"rotation_deg": 15.0}
+        with_offset = parse(doc)
+        plain = parse(document())
+        assert evaluate_pose(with_offset, "sweep", 0.5) == evaluate_pose(
+            plain, "sweep", 0.5)
+
+    def test_empty_offset_block_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["offset"] = {}
+        assert_rejects(doc, "joints.pan.offset")
+
+    def test_offset_bad_translation_shape_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["offset"] = {"translation_m": [0.01, 0.0]}
+        assert_rejects(doc, "offset.translation_m")
+
+    def test_offset_unknown_field_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["offset"] = {"scale": 2.0}
+        assert_rejects(doc, "offset.scale")
+
+
+def rack_document(**relation_overrides) -> dict:
+    """BASE_DOCUMENT plus a prismatic rack driven by pan.rotation."""
+    doc = document(clips={}, outputs=[])
+    doc["parts"]["rack_body"] = {"parent": "base"}
+    doc["joints"]["rack"] = {
+        "type": "prismatic",
+        "parent": "base",
+        "child": "rack_body",
+        "dofs": {
+            "travel": {
+                "limits": {"min_m": -0.02, "max_m": 0.02},
+                "neutral_m": 0.0,
+            },
+        },
+    }
+    relation = {
+        "kind": "rack_pinion",
+        "driver": "pan.rotation",
+        "driven": "rack.travel",
+        "ratio": 0.02,
+    }
+    relation.update(relation_overrides)
+    doc["relations"] = [relation]
+    return doc
+
+
+class TestRelationsLoading:
+    def test_relation_parses(self):
+        rig = parse(rack_document())
+        relation = rig.relations[0]
+        assert relation.kind is RelationKind.RACK_PINION
+        assert relation.driver == "pan.rotation"
+        assert relation.driven == "rack.travel"
+        assert relation.ratio == 0.02
+        assert relation.offset == 0.0
+        assert relation.display == {}
+
+    def test_relation_drives_evaluation(self):
+        doc = rack_document()
+        doc["clips"] = {
+            "steer": {
+                "duration_s": 1.0,
+                "tracks": [
+                    {"time": 0.0, "values": {"pan.rotation": 0.0}},
+                    {"time": 1.0, "values": {"pan.rotation": 30.0}},
+                ],
+            },
+        }
+        pose = evaluate_pose(parse(doc), "steer", 1.0)
+        assert pose.dof_values["rack.travel"] == pytest.approx(
+            0.02 * math.radians(30))
+        assert pose.limit_violations == ()
+
+    def test_translation_offset_key_stays_meters(self):
+        rig = parse(rack_document(offset_m=0.005))
+        assert rig.relations[0].offset == 0.005
+
+    def test_rotation_offset_key_converts_to_radians(self):
+        doc = document(clips={}, outputs=[])
+        doc["parts"]["gear_body"] = {"parent": "base"}
+        doc["joints"]["gear"] = {
+            "type": "revolute",
+            "parent": "base",
+            "child": "gear_body",
+            "dofs": {
+                "rotation": {
+                    "limits": {"min_deg": -180, "max_deg": 180},
+                },
+            },
+        }
+        doc["relations"] = [{
+            "kind": "gear",
+            "driver": "pan.rotation",
+            "driven": "gear.rotation",
+            "ratio": -0.5,
+            "offset_deg": 10.0,
+            "display": {"driver_teeth": 20, "driven_teeth": 40},
+        }]
+        relation = parse(doc).relations[0]
+        assert relation.offset == pytest.approx(math.radians(10.0))
+        assert relation.display == {"driver_teeth": 20.0,
+                                    "driven_teeth": 40.0}
+
+    def test_relations_must_be_a_list(self):
+        doc = document(clips={}, outputs=[])
+        doc["relations"] = {"kind": "gear"}
+        assert_rejects(doc, "relations")
+
+    @pytest.mark.parametrize(
+        "field", ["kind", "driver", "driven", "ratio"])
+    def test_relation_missing_required_field(self, field):
+        doc = rack_document()
+        del doc["relations"][0][field]
+        assert_rejects(doc, f"relations[0].{field}")
+
+    def test_relation_unknown_kind(self):
+        assert_rejects(rack_document(kind="belt"), "relations[0].kind")
+
+    def test_relation_undeclared_driver(self):
+        assert_rejects(
+            rack_document(driver="ghost.rotation"), "relations[0].driver")
+
+    def test_relation_wrong_dof_kind_pairing(self):
+        # rack_pinion requires a translation driven DOF; pan.rotation
+        # driving pan.rotation-kind (rotation) target is rejected.
+        doc = rack_document(driven="pan.rotation")
+        assert_rejects(doc, "relations[0].driven")
+
+    def test_relation_wrong_offset_unit_key(self):
+        # The offset key must match the driven DOF's unit family.
+        assert_rejects(
+            rack_document(offset_deg=5.0), "relations[0].offset_deg")
+
+    def test_relation_zero_ratio_rejected(self):
+        assert_rejects(rack_document(ratio=0.0), "relations[0].ratio")
+
+    def test_relation_unknown_display_field(self):
+        doc = rack_document(display={"lead_mm_per_rev": 2.0})
+        assert_rejects(doc, "relations[0].display.lead_mm_per_rev")
+
+    def test_relation_non_positive_display_value(self):
+        doc = rack_document(display={"pinion_diameter_mm": 0})
+        assert_rejects(doc, "relations[0].display.pinion_diameter_mm")
+
+    def test_animated_driven_dof_rejected(self):
+        doc = rack_document()
+        doc["clips"] = {
+            "push": {
+                "duration_s": 1.0,
+                "tracks": [
+                    {"time": 0.0, "values": {"rack.travel": 0.0}},
+                    {"time": 1.0, "values": {"rack.travel": 0.01}},
+                ],
+            },
+        }
+        with pytest.raises(CharacterFormatError, match="source of truth"):
+            parse(doc)
+
+    def test_relation_cycle_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["parts"]["gear_body"] = {"parent": "base"}
+        doc["joints"]["gear"] = {
+            "type": "revolute",
+            "parent": "base",
+            "child": "gear_body",
+            "dofs": {
+                "rotation": {"limits": {"min_deg": -180, "max_deg": 180}},
+            },
+        }
+        doc["relations"] = [
+            {"kind": "gear", "driver": "pan.rotation",
+             "driven": "gear.rotation", "ratio": 0.5},
+            {"kind": "gear", "driver": "gear.rotation",
+             "driven": "pan.rotation", "ratio": 2.0},
+        ]
+        with pytest.raises(CharacterFormatError, match="cycle"):
+            parse(doc)
+
+    def test_double_driven_dof_rejected(self):
+        doc = rack_document()
+        doc["relations"].append({
+            "kind": "screw",
+            "driver": "pan.rotation",
+            "driven": "rack.travel",
+            "ratio": 0.001,
+        })
+        with pytest.raises(CharacterFormatError, match="two relations"):
+            parse(doc)
+
+    def test_driven_limit_violation_reported_not_clamped(self):
+        # pan at 45 deg drives the rack to 0.0157 m, past 0.005 m —
+        # the value is reported, never clamped, and projecting a
+        # mapped violated DOF raises so hardware refuses to arm.
+        doc = rack_document()
+        doc["joints"]["rack"]["dofs"]["travel"]["limits"] = {
+            "min_m": -0.005, "max_m": 0.005,
+        }
+        doc["clips"] = {
+            "steer": {
+                "duration_s": 1.0,
+                "tracks": [
+                    {"time": 0.0, "values": {"pan.rotation": 0.0}},
+                    {"time": 1.0, "values": {"pan.rotation": 45.0}},
+                ],
+            },
+        }
+        doc["outputs"] = [
+            {"target": "rack.travel", "channel": 0,
+             "range_m": [-0.005, 0.005]},
+        ]
+        rig = parse(doc)
+        pose = evaluate_pose(rig, "steer", 1.0)
+        expected = 0.02 * math.radians(45)
+        assert pose.dof_values["rack.travel"] == pytest.approx(expected)
+        violation, = pose.limit_violations
+        assert violation.dof_path == "rack.travel"
+        assert violation.value == pytest.approx(expected)
+        assert violation.max_value == 0.005
+        with pytest.raises(LimitViolationError, match="rack.travel"):
+            project_channels(rig, pose)
+        # Back inside the limits, projection works again.
+        safe = evaluate_pose(rig, "steer", 0.0)
+        assert safe.limit_violations == ()
+        assert project_channels(rig, safe)[0] == pytest.approx(0.5)
 
 
 class TestExamplesEndToEnd:
@@ -529,6 +864,26 @@ class TestExamplesEndToEnd:
         pose = evaluate_pose(rig, "launch_and_swerve", 0.5)
         channels = project_channels(rig, pose)
         assert channels[1] == pytest.approx(0.8)  # throttle keyframe
+
+    def test_rc_car_relation_and_unlimited_wheel(self):
+        rig = load_character_file(EXAMPLES_DIR / "rc_car.character.anima")
+        relation, = rig.relations
+        assert relation.kind is RelationKind.RACK_PINION
+        assert rig.joints["steering"].offset is not None
+        assert not rig.joints["drive"].dofs[0].has_limits
+        # Steering at -25 deg drives the rack through the relation.
+        pose = evaluate_pose(rig, "launch_and_swerve", 1.0)
+        expected_travel_meters = 0.02 * math.radians(-25.0)
+        assert pose.dof_values["rack.travel"] == pytest.approx(
+            expected_travel_meters)
+        channels = project_channels(rig, pose)
+        assert channels[2] == pytest.approx(
+            (expected_travel_meters + 0.011) / 0.022)
+        # The unlimited wheel passes three full turns without clamping.
+        end = evaluate_pose(rig, "launch_and_swerve", 2.0)
+        assert end.dof_values["drive.spin"] == pytest.approx(
+            math.radians(1080))
+        assert end.limit_violations == ()
 
     def test_walle_style_translation_units_project(self):
         rig = load_character_file(

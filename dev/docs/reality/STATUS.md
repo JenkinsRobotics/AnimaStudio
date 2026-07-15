@@ -54,16 +54,21 @@
   summaries — only implemented kinds are selectable, and it binds to the
   joint's typed kind once the typed-mate backend lands. The Python rig model
   carries the same eight-type family (`JointType`, including `parallel`:
-  XYZ translation + Z rotation) with per-type DOF templates; 214 Python
-  tests pass. Motors, 3D Models & Media, and Events are also
+  XYZ translation + Z rotation) with per-type DOF templates, optional
+  per-DOF limits, per-joint mate offsets, and gear/rack-and-pinion/
+  screw/linear relations; 287 Python tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
   row followed by one full-width contextual command ribbon. A fixed far-left
   dropdown switches Assets, Rig, Animate, Show, and Hardware with Command-1…5;
   the former workspace-tab row has been removed. Each workspace replaces the
-  ribbon with focused, grouped tools. Assets exposes Import, Manage, and
-  Prepare; Animate exposes Transport, Keyframes, Curves, Tracks, and Reference;
+  ribbon with focused, grouped tools. The selector now keeps a readable
+  228-point minimum width and uses an anchored, visually continuous workspace
+  popover with large icon rows, purpose text, selected-row emphasis, and visible
+  Command-1…6 shortcuts instead of the cramped detached system menu. Assets
+  exposes Import, Manage, and Prepare; Animate exposes Transport, Keyframes,
+  Curves, Tracks, and Reference;
   Show exposes Sequence, Clips, Events, and Sync; Hardware exposes Connection,
   Outputs, Mapping, Calibration, Safety, and Monitor. Implemented commands are
   live, while backend-dependent commands remain visibly disabled as planned.
@@ -211,19 +216,30 @@
   AnimaCore keeps rig semantics; no Bézier yet). Per review: only successfully
   parsed commands refresh the failsafe heartbeat, and duplicate CFG keys or
   duplicate FRM channels are rejected (no last-write-wins). The runtime also
-  loads `.character.anima` files (`anima_studio/loader.py` — version/type
+  loads `.character.anima` 2.0 files (`anima_studio/loader.py` — version/type
   check, typed errors naming the offending path, unknown-field rejection;
-  unsupported spec sections — expressions, lip_sync, digital, voice,
-  blend_shape/led mappings, smoothing, easing — are rejected loudly, never
-  silently dropped) into a rig-aware model (`anima_studio/rig.py` — joints
-  with radian ranges and neutrals, blend shapes, hold/linear clips with
-  neutral fallback for every unanimated parameter, loop wrapping, and the
-  joint→normalized 0..1 servo-channel projection feeding `wire.encode_frm`);
-  `examples/jp01_minimal.character.anima` is a loadable minimal head rig.
-  144 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  unsupported/superseded spec sections are rejected loudly, never
+  silently dropped) into a mechanism-rig model (`anima_studio/rig.py` —
+  parts plus the eight typed Onshape-style mates whose type defines the
+  DOF set; per-DOF limits are optional per Kinematics.md §2: an
+  unlimited DOF is legal and never clamped, but mapping one to a
+  bounded output channel is a load error naming the fix; per-joint
+  as-mated `offset` blocks round-trip for Studio's spatial use; and
+  gear / rack_pinion / screw / linear `relations` couple DOF pairs as
+  `driven = ratio × driver + offset` with acyclic/single-driver/
+  no-animated-driven validation. `evaluate_pose` resolves clip-driven
+  DOF with neutral fallback and loop wrapping, applies relations in
+  dependency order, and reports — never clamps — driven values outside
+  their limits as `Pose.limit_violations`; `project_channels` (the
+  target→normalized 0..1 channel seam feeding `wire.encode_frm`)
+  raises `LimitViolationError` for a mapped violated DOF so hardware
+  refuses to arm). `examples/six_axis_arm|rc_car|walle_style
+  .character.anima` load end-to-end; rc_car exercises a steering
+  rack-and-pinion relation and an unlimited free-spinning axle.
+  287 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, and character file → rig evaluation →
-  channel projection → simulated servo tests.
+  relation coupling → channel projection → simulated servo tests.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later

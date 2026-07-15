@@ -31,37 +31,55 @@ joints:
     parent: base
     child: shoulder
     dofs:
-      rotation: { min_deg: -170, max_deg: 170, neutral_deg: 0, axis: [0, 0, 1] }
+      rotation:
+        limits: { min_deg: -170, max_deg: 170 }
+        neutral_deg: 0
+        axis: [0, 0, 1]
   shoulder_pitch:
     type: revolute
     parent: shoulder
     child: upper_arm
     dofs:
-      rotation: { min_deg: -90, max_deg: 90, neutral_deg: 0, axis: [0, 1, 0] }
+      rotation:
+        limits: { min_deg: -90, max_deg: 90 }
+        neutral_deg: 0
+        axis: [0, 1, 0]
   elbow_pitch:
     type: revolute
     parent: upper_arm
     child: forearm
     dofs:
-      rotation: { min_deg: -10, max_deg: 145, neutral_deg: 20, axis: [0, 1, 0] }
+      rotation:
+        limits: { min_deg: -10, max_deg: 145 }
+        neutral_deg: 20
+        axis: [0, 1, 0]
   wrist_pitch:
     type: revolute
     parent: forearm
     child: wrist_inner
     dofs:
-      rotation: { min_deg: -100, max_deg: 100, neutral_deg: 0, axis: [0, 1, 0] }
+      rotation:
+        limits: { min_deg: -100, max_deg: 100 }
+        neutral_deg: 0
+        axis: [0, 1, 0]
   wrist_roll:
     type: revolute
     parent: wrist_inner
     child: wrist_outer
     dofs:
-      rotation: { min_deg: -180, max_deg: 180, neutral_deg: 0, axis: [1, 0, 0] }
+      rotation:
+        limits: { min_deg: -180, max_deg: 180 }
+        neutral_deg: 0
+        axis: [1, 0, 0]
   wrist_yaw:
     type: revolute
     parent: wrist_outer
     child: tool_flange
     dofs:
-      rotation: { min_deg: -170, max_deg: 170, neutral_deg: 0, axis: [0, 0, 1] }
+      rotation:
+        limits: { min_deg: -170, max_deg: 170 }
+        neutral_deg: 0
+        axis: [0, 0, 1]
 
 clips:
   pick:

@@ -33,6 +33,21 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (Python kinematics parity, K2/K5/K7/K9 backend): Shipped
+  optional per-DOF limits, the `Relation` core type (gear /
+  rack_pinion / screw / linear) with dependency-ordered evaluation,
+  the per-joint `offset` round-trip carry, the Character_Format.md
+  2.0 section, and example migrations — 287 tests, ruff clean, claim
+  released. Codex: the AnimaCore mirror contract is in the handoff
+  entry — key shapes: nested optional `limits:` block per DOF
+  (unlimited DOF requires explicit neutral and cannot map to a
+  bounded channel), `relations:` with semantic model-unit `ratio` and
+  driven-kind `offset_deg`/`offset_m`, violations reported on the
+  evaluated pose (never clamped) with channel projection refusing to
+  arm a mapped violated DOF (`LimitViolationError`). Four resolved
+  spec ambiguities listed there for your review. Left uncommitted for
+  main-session integration.
+
 - 2026-07-15 (viewport sub-object selection, per Jonathan): Shipped
   view-cube-style hover + face/edge/corner/axis/origin selection in the
   main viewport (claim released in the briefing; full semantics,

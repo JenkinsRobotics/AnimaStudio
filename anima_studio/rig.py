@@ -12,6 +12,16 @@ hold/linear interpolation is reused from ``anima_studio.tracks``;
 values to the normalized 0..1 channels ``wire.encode_frm`` takes. Rigs
 come from ``.character.anima`` files via ``anima_studio.loader``.
 
+Kinematics (per ``dev/docs/roadmap/Kinematics.md``): per-DOF limits are
+optional — an unlimited DOF (a wheel) is legal and never clamped, but
+it cannot be mapped to a bounded output channel. ``Relation`` couples
+exactly two DOF linearly (gear / rack_pinion / screw / linear);
+``evaluate_pose`` resolves drivers from the clip, applies relations in
+dependency order, and reports (never clamps) driven values outside
+their limits as ``Pose.limit_violations``; ``project_channels`` raises
+``LimitViolationError`` for a mapped violated DOF so hardware refuses
+to arm.
+
 Design rule: this module is mechanism-generic. Domain vocabulary —
 character, face, vehicle, or any other application naming — lives only
 in author data such as the files under ``examples/``.
@@ -19,6 +29,7 @@ in author data such as the files under ``examples/``.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -83,8 +94,8 @@ JOINT_TYPE_DOF_TEMPLATES: dict[JointType, tuple[tuple[str, DofKind], ...]] = {
 
 def _validate_dof(
     name: str,
-    minimum: float,
-    maximum: float,
+    minimum: float | None,
+    maximum: float | None,
     neutral: float,
     axis: tuple[float, float, float] | None,
     unit: str,
@@ -93,15 +104,21 @@ def _validate_dof(
         raise ValueError("dof name must not be empty")
     if "." in name:
         raise ValueError(f"dof name must not contain '.': {name!r}")
-    if minimum >= maximum:
+    if (minimum is None) != (maximum is None):
         raise ValueError(
-            f"dof {name!r} has bad range: {minimum} >= {maximum} ({unit})"
+            f"dof {name!r} limits must set both min and max or neither "
+            f"(an unlimited dof has no partial range)"
         )
-    if not minimum <= neutral <= maximum:
-        raise ValueError(
-            f"dof {name!r} neutral {neutral} outside range "
-            f"[{minimum}, {maximum}] ({unit})"
-        )
+    if minimum is not None and maximum is not None:
+        if minimum >= maximum:
+            raise ValueError(
+                f"dof {name!r} has bad range: {minimum} >= {maximum} ({unit})"
+            )
+        if not minimum <= neutral <= maximum:
+            raise ValueError(
+                f"dof {name!r} neutral {neutral} outside range "
+                f"[{minimum}, {maximum}] ({unit})"
+            )
     if axis is not None:
         if len(axis) != 3:
             raise ValueError(f"dof {name!r} axis must have 3 components")
@@ -111,11 +128,16 @@ def _validate_dof(
 
 @dataclass(frozen=True)
 class RotationDof:
-    """One rotational degree of freedom; limits and neutral in radians."""
+    """One rotational degree of freedom; limits and neutral in radians.
+
+    Limits are optional (``None``/``None`` = continuous rotation, e.g.
+    a wheel); when present they are hard stops. Neutral is always
+    required and, when limits are present, must lie within them.
+    """
 
     name: str
-    min_radians: float
-    max_radians: float
+    min_radians: float | None = None
+    max_radians: float | None = None
     neutral_radians: float = 0.0
     axis: tuple[float, float, float] | None = None
     description: str = ""
@@ -135,11 +157,15 @@ class RotationDof:
         )
 
     @property
-    def minimum(self) -> float:
+    def has_limits(self) -> bool:
+        return self.min_radians is not None
+
+    @property
+    def minimum(self) -> float | None:
         return self.min_radians
 
     @property
-    def maximum(self) -> float:
+    def maximum(self) -> float | None:
         return self.max_radians
 
     @property
@@ -149,11 +175,16 @@ class RotationDof:
 
 @dataclass(frozen=True)
 class TranslationDof:
-    """One translational degree of freedom; limits and neutral in meters."""
+    """One translational degree of freedom; limits and neutral in meters.
+
+    Limits are optional (``None``/``None`` = unbounded travel); when
+    present they are hard stops. Neutral is always required and, when
+    limits are present, must lie within them.
+    """
 
     name: str
-    min_meters: float
-    max_meters: float
+    min_meters: float | None = None
+    max_meters: float | None = None
     neutral_meters: float = 0.0
     axis: tuple[float, float, float] | None = None
     description: str = ""
@@ -173,11 +204,15 @@ class TranslationDof:
         )
 
     @property
-    def minimum(self) -> float:
+    def has_limits(self) -> bool:
+        return self.min_meters is not None
+
+    @property
+    def minimum(self) -> float | None:
         return self.min_meters
 
     @property
-    def maximum(self) -> float:
+    def maximum(self) -> float | None:
         return self.max_meters
 
     @property
@@ -211,11 +246,37 @@ class Part:
 
 
 @dataclass(frozen=True)
+class JointOffset:
+    """As-mated offset between a joint's two connector frames.
+
+    Kinematics.md §4: translation along the connector frame axes in
+    meters plus a rotation about the connector Z axis in radians,
+    applied before DOF values shift the pose. The headless runtime
+    computes DOF values and channel projections, not spatial part
+    transforms, so it stores the offset for round-trip only; Studio
+    consumes it spatially.
+    """
+
+    translation_meters: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    rotation_radians: float = 0.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "translation_meters", tuple(self.translation_meters)
+        )
+        if len(self.translation_meters) != 3:
+            raise ValueError(
+                f"offset translation must have 3 components, got "
+                f"{self.translation_meters!r}"
+            )
+
+
+@dataclass(frozen=True)
 class Joint:
     """A typed mate connecting a child part to a parent part.
 
     The joint type defines the DOF set (count, kinds, order — see
-    ``JOINT_TYPE_DOF_TEMPLATES``); ``dofs`` supplies the named, limited
+    ``JOINT_TYPE_DOF_TEMPLATES``); ``dofs`` supplies the named
     instances. A DOF list whose kinds do not match the type is
     rejected. Each DOF is addressable as ``"<joint_name>.<dof_name>"``.
     """
@@ -226,6 +287,7 @@ class Joint:
     child_part: str
     dofs: tuple[DegreeOfFreedom, ...] = ()
     description: str = ""
+    offset: JointOffset | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dofs", tuple(self.dofs))
@@ -319,6 +381,133 @@ class OutputMapping:
         return min(max(normalized, 0.0), 1.0)
 
 
+class RelationKind(StrEnum):
+    """The four linear DOF couplings (Kinematics.md §5)."""
+
+    GEAR = "gear"
+    RACK_PINION = "rack_pinion"
+    SCREW = "screw"
+    LINEAR = "linear"
+
+
+# Each relation kind DEFINES its (driver kind, driven kind) pairing.
+RELATION_KIND_DOF_KINDS: dict[RelationKind, tuple[DofKind, DofKind]] = {
+    RelationKind.GEAR: (DofKind.ROTATION, DofKind.ROTATION),
+    RelationKind.RACK_PINION: (DofKind.ROTATION, DofKind.TRANSLATION),
+    RelationKind.SCREW: (DofKind.ROTATION, DofKind.TRANSLATION),
+    RelationKind.LINEAR: (DofKind.TRANSLATION, DofKind.TRANSLATION),
+}
+
+# Non-semantic display fields a relation may carry per kind (teeth,
+# lead, ...). They round-trip for UI display; ``ratio`` stays the one
+# semantic value and no consistency between the two is enforced.
+RELATION_DISPLAY_KEYS: dict[RelationKind, frozenset[str]] = {
+    RelationKind.GEAR: frozenset({"driver_teeth", "driven_teeth"}),
+    RelationKind.RACK_PINION: frozenset({"pinion_diameter_mm"}),
+    RelationKind.SCREW: frozenset({"lead_mm_per_rev"}),
+    RelationKind.LINEAR: frozenset(),
+}
+
+
+@dataclass(frozen=True)
+class Relation:
+    """A linear coupling between exactly two DOF (Kinematics.md §5).
+
+    ``driven_value = ratio * driver_value + offset``, all in model
+    units: ``ratio`` is driven model units per driver model unit
+    (unitless for gear/linear, meters per radian for rack_pinion and
+    screw) and ``offset`` is in the driven DOF's model units (radians
+    or meters). ``driver`` and ``driven`` are DOF paths
+    (``"<joint_name>.<dof_name>"``). The relation always computes —
+    no collision detection, no clamping; limit handling for the driven
+    DOF is violation reporting in ``evaluate_pose``.
+    """
+
+    kind: RelationKind
+    driver: str
+    driven: str
+    ratio: float
+    offset: float = 0.0
+    display: Mapping[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        for role, path in (("driver", self.driver), ("driven", self.driven)):
+            if "." not in path:
+                raise ValueError(
+                    f"relation {role} {path!r} must be a dof path "
+                    f"(\"<joint_name>.<dof_name>\")"
+                )
+        if self.driver == self.driven:
+            raise ValueError(
+                f"relation cannot couple dof {self.driver!r} to itself"
+            )
+        if not math.isfinite(self.ratio) or self.ratio == 0.0:
+            raise ValueError(
+                f"relation {self.describe()} ratio must be a nonzero "
+                f"finite number, got {self.ratio!r}"
+            )
+        if not math.isfinite(self.offset):
+            raise ValueError(
+                f"relation {self.describe()} offset must be finite, "
+                f"got {self.offset!r}"
+            )
+        allowed = RELATION_DISPLAY_KEYS[self.kind]
+        for key, value in self.display.items():
+            if key not in allowed:
+                valid = ", ".join(sorted(allowed)) or "none"
+                raise ValueError(
+                    f"relation {self.describe()} has unknown display "
+                    f"field {key!r} for kind {self.kind.value!r} "
+                    f"(expected: {valid})"
+                )
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                raise ValueError(
+                    f"relation {self.describe()} display field {key!r} "
+                    f"must be a number, got {value!r}"
+                )
+            if value <= 0:
+                raise ValueError(
+                    f"relation {self.describe()} display field {key!r} "
+                    f"must be > 0, got {value!r}"
+                )
+
+    def describe(self) -> str:
+        """Stable human identity used in validation errors."""
+        return f"{self.kind.value} {self.driver} -> {self.driven}"
+
+
+def relations_in_dependency_order(
+    relations: tuple[Relation, ...],
+) -> tuple[Relation, ...]:
+    """Order relations so every driver is resolved before its driven.
+
+    Raises ``ValueError`` on a cycle. Deterministic: ready relations
+    keep their declaration order (assumes at most one relation per
+    driven DOF, which ``Rig`` validates).
+    """
+    pending = list(relations)
+    pending_driven = {relation.driven for relation in pending}
+    order: list[Relation] = []
+    while pending:
+        ready = [
+            relation
+            for relation in pending
+            if relation.driver not in pending_driven
+        ]
+        if not ready:
+            unresolved = ", ".join(
+                relation.describe() for relation in pending
+            )
+            raise ValueError(
+                f"relation graph has a cycle (unresolvable: {unresolved})"
+            )
+        for relation in ready:
+            order.append(relation)
+            pending.remove(relation)
+            pending_driven.discard(relation.driven)
+    return tuple(order)
+
+
 @dataclass(frozen=True)
 class RigClip:
     """A named clip plus its rig-level playback flags."""
@@ -346,6 +535,13 @@ class Rig:
     parameter names, and every key must resolve to a declared DOF or
     parameter. Parameter names never contain ``.`` and DOF paths always
     do, so the two namespaces cannot collide.
+
+    Relation rules (validated here): the graph is acyclic, at most one
+    relation drives any DOF, a driven DOF carries no animation tracks
+    (one source of truth), and each kind's (driver, driven) DOF-kind
+    pairing must match ``RELATION_KIND_DOF_KINDS``. An output mapping
+    may not target a DOF without limits — a bounded actuator channel
+    needs a range to project to 0..1.
     """
 
     identity: Identity
@@ -354,8 +550,11 @@ class Rig:
     parameters: Mapping[str, Parameter] = field(default_factory=dict)
     clips: Mapping[str, RigClip] = field(default_factory=dict)
     outputs: tuple[OutputMapping, ...] = ()
+    relations: tuple[Relation, ...] = ()
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "outputs", tuple(self.outputs))
+        object.__setattr__(self, "relations", tuple(self.relations))
         for kind, items in (
             ("part", self.parts),
             ("joint", self.joints),
@@ -380,21 +579,60 @@ class Rig:
                         f"{part_name!r}"
                     )
         paths = self.dof_paths()
+        driven_by: dict[str, Relation] = {}
+        for relation in self.relations:
+            expected = RELATION_KIND_DOF_KINDS[relation.kind]
+            for role, path, expected_kind in (
+                ("driver", relation.driver, expected[0]),
+                ("driven", relation.driven, expected[1]),
+            ):
+                dof = paths.get(path)
+                if dof is None:
+                    raise ValueError(
+                        f"relation {relation.describe()} {role} references "
+                        f"undeclared dof {path!r}"
+                    )
+                if dof.kind is not expected_kind:
+                    raise ValueError(
+                        f"relation {relation.describe()} {role} must be a "
+                        f"{expected_kind.value} dof, got {dof.kind.value} "
+                        f"({path!r})"
+                    )
+            if relation.driven in driven_by:
+                raise ValueError(
+                    f"dof {relation.driven!r} is driven by two relations: "
+                    f"{driven_by[relation.driven].describe()} and "
+                    f"{relation.describe()} (at most one driver per dof)"
+                )
+            driven_by[relation.driven] = relation
+        relations_in_dependency_order(self.relations)  # rejects cycles
         for clip_name, rig_clip in self.clips.items():
             for key in rig_clip.clip.tracks:
                 if key not in paths and key not in self.parameters:
                     raise ValueError(
                         f"clip {clip_name!r} animates unknown target {key!r}"
                     )
+                if key in driven_by:
+                    raise ValueError(
+                        f"clip {clip_name!r} animates {key!r}, which is "
+                        f"driven by relation {driven_by[key].describe()}; "
+                        f"a driven dof has one source of truth — remove "
+                        f"the track or the relation"
+                    )
         seen_channels: set[int] = set()
         for mapping in self.outputs:
-            if (
-                mapping.target not in paths
-                and mapping.target not in self.parameters
-            ):
+            dof = paths.get(mapping.target)
+            if dof is None and mapping.target not in self.parameters:
                 raise ValueError(
                     f"output mapping references unknown target "
                     f"{mapping.target!r}"
+                )
+            if dof is not None and not dof.has_limits:
+                raise ValueError(
+                    f"output mapping on channel {mapping.channel} targets "
+                    f"unlimited dof {mapping.target!r}: a bounded actuator "
+                    f"channel needs a dof range to project to 0..1 — add "
+                    f"limits to the dof or remove the mapping"
                 )
             if mapping.channel in seen_channels:
                 raise ValueError(f"duplicate output channel: {mapping.channel}")
@@ -409,16 +647,41 @@ class Rig:
 
 
 @dataclass(frozen=True)
+class LimitViolation:
+    """A relation-driven DOF evaluated outside its enabled limits.
+
+    Values are in the DOF's native units (radians / meters). Per
+    Kinematics.md §5 the relation always computes and nothing clamps —
+    the violation is reported here, and ``project_channels`` refuses
+    to project the violated DOF.
+    """
+
+    dof_path: str
+    value: float
+    min_value: float
+    max_value: float
+
+
+class LimitViolationError(ValueError):
+    """Channel projection refused: a mapped DOF is outside its limits."""
+
+
+@dataclass(frozen=True)
 class Pose:
     """One evaluated rig state.
 
     ``dof_values`` is keyed by DOF path in each DOF's native units
     (radians for rotation, meters for translation); ``parameter_values``
-    is keyed by parameter name, 0..1.
+    is keyed by parameter name, 0..1. ``limit_violations`` lists every
+    relation-driven DOF whose computed value exited its enabled limits
+    (in relation dependency order); it is empty for a rig without
+    relations, because clip values are load-validated against limits
+    and neutrals must lie within them.
     """
 
     dof_values: Mapping[str, float]
     parameter_values: Mapping[str, float]
+    limit_violations: tuple[LimitViolation, ...] = ()
 
 
 def evaluate_pose(
@@ -430,6 +693,11 @@ def evaluate_pose(
     neutral pose. Every DOF or parameter the clip does not animate
     falls back to its neutral. Looping clips wrap time modulo the
     duration; non-looping clips clamp.
+
+    Order per Kinematics.md §5: driver DOF resolve from the clip (or
+    neutral), relations apply in dependency order, then limits — a
+    driven value outside its enabled limits is reported in
+    ``Pose.limit_violations``, never clamped.
     """
     animated: Mapping[int | str, float] = {}
     if clip_name is not None:
@@ -441,15 +709,34 @@ def evaluate_pose(
             time_seconds = time_seconds % duration_seconds
         animated = evaluate_clip(rig_clip.clip, time_seconds)
 
+    paths = rig.dof_paths()
+    dof_values = {
+        path: animated.get(path, dof.neutral) for path, dof in paths.items()
+    }
+    violations: list[LimitViolation] = []
+    for relation in relations_in_dependency_order(rig.relations):
+        driven_value = (
+            relation.ratio * dof_values[relation.driver] + relation.offset
+        )
+        dof_values[relation.driven] = driven_value
+        dof = paths[relation.driven]
+        if dof.has_limits and not dof.minimum <= driven_value <= dof.maximum:
+            violations.append(
+                LimitViolation(
+                    dof_path=relation.driven,
+                    value=driven_value,
+                    min_value=dof.minimum,
+                    max_value=dof.maximum,
+                )
+            )
+
     return Pose(
-        dof_values={
-            path: animated.get(path, dof.neutral)
-            for path, dof in rig.dof_paths().items()
-        },
+        dof_values=dof_values,
         parameter_values={
             name: animated.get(name, parameter.neutral_value)
             for name, parameter in rig.parameters.items()
         },
+        limit_violations=tuple(violations),
     )
 
 
@@ -457,10 +744,24 @@ def project_channels(rig: Rig, pose: Pose) -> dict[int, float]:
     """Project a pose's mapped targets to normalized 0..1 channel values.
 
     The result is exactly what ``wire.encode_frm`` takes. Unmapped DOF
-    and parameters are omitted.
+    and parameters are omitted. A mapping whose target is in
+    ``pose.limit_violations`` raises ``LimitViolationError`` — hardware
+    must refuse to arm on a violated pose, never clamp it.
     """
+    violated = {
+        violation.dof_path: violation
+        for violation in pose.limit_violations
+    }
     channels: dict[int, float] = {}
     for mapping in rig.outputs:
+        violation = violated.get(mapping.target)
+        if violation is not None:
+            raise LimitViolationError(
+                f"channel {mapping.channel} target {mapping.target!r} is "
+                f"outside its limits ({violation.value} not in "
+                f"[{violation.min_value}, {violation.max_value}]); "
+                f"refusing to project a violated dof to hardware"
+            )
         if "." in mapping.target:
             value = pose.dof_values[mapping.target]
         else:
