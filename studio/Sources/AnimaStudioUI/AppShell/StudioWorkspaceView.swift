@@ -11,6 +11,7 @@ struct StudioWorkspaceView: View {
   @State private var isImportingModel = false
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.overview
+  @State private var showsUIDevAgentPanel = false
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
@@ -45,7 +46,7 @@ struct StudioWorkspaceView: View {
         isUIDevWorkspace: $isUIDevWorkspace,
         uiDevSection: $uiDevSection,
         importModel: { isImportingModel = true },
-        openAgentWindow: StudioAgentPanel.show
+        toggleAgentPanel: { showsUIDevAgentPanel.toggle() }
       )
       Divider()
 
@@ -120,10 +121,22 @@ struct StudioWorkspaceView: View {
   @ViewBuilder
   private var workspaceCanvas: some View {
     if isUIDevWorkspace {
-      UIDevWorkspaceView(
-        selectedSection: $uiDevSection,
-        openAgentWindow: StudioAgentPanel.show
-      )
+      HStack(spacing: 0) {
+        UIDevWorkspaceView(
+          selectedSection: $uiDevSection,
+          showAgentPanel: { showsUIDevAgentPanel = true }
+        )
+
+        if showsUIDevAgentPanel {
+          Divider()
+          StudioAgentPanelView {
+            showsUIDevAgentPanel = false
+          }
+          .frame(width: UIDevAgentPanelDescriptor.width)
+          .transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+      }
+      .animation(.easeInOut(duration: 0.18), value: showsUIDevAgentPanel)
     } else {
       authoringWorkspaceCanvas
     }

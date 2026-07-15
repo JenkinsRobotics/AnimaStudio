@@ -1,26 +1,8 @@
-import AppKit
 import SwiftUI
 
-@MainActor
-enum StudioAgentPanel {
-  private static let panel: NSPanel = {
-    StudioWindowFactory.utilityPanel(
-      title: "Anima Agent",
-      autosaveName: "AnimaAgentUtilityPanel",
-      contentSize: NSSize(width: 360, height: 620),
-      minimumSize: NSSize(width: 320, height: 520)
-    ) {
-      StudioAgentWindow()
-    }
-  }()
+struct StudioAgentPanelView: View {
+  let close: () -> Void
 
-  static func show() {
-    panel.makeKeyAndOrderFront(nil)
-    NSApp.activate()
-  }
-}
-
-struct StudioAgentWindow: View {
   @State private var selectedMode = AgentMode.chat
   @State private var draft = ""
 
@@ -39,25 +21,21 @@ struct StudioAgentWindow: View {
   }
 
   private var windowHeader: some View {
-    HStack(spacing: 9) {
-      Image(systemName: "sparkles")
-        .foregroundStyle(StudioPalette.accent)
-      VStack(alignment: .leading, spacing: 1) {
-        Text("ANIMA AGENT")
-          .font(.caption.weight(.bold))
-          .tracking(0.9)
-        Text("Studio assistant concept")
-          .font(.caption2)
-          .foregroundStyle(StudioPalette.muted)
-      }
-      Spacer()
+    StudioPanelHeader(
+      title: "Anima Agent",
+      detail: "Docked Studio assistant concept",
+      systemImage: "sparkles"
+    ) {
       Label("Prototype", systemImage: "hammer")
         .font(.caption2.weight(.semibold))
         .foregroundStyle(StudioPalette.muted)
+      Button("Close Agent", systemImage: "xmark") {
+        close()
+      }
+      .labelStyle(.iconOnly)
+      .buttonStyle(StudioIconButtonStyle())
+      .help("Close the Agent side panel")
     }
-    .padding(.horizontal, 14)
-    .frame(height: 52)
-    .background(StudioPalette.chrome)
   }
 
   private var modeStrip: some View {

@@ -69,15 +69,18 @@
   live, while backend-dependent commands remain visibly disabled as planned.
   A shell-level **UI Dev** workspace follows the five project-authoring
   workspaces in the selector without becoming saved character data. Its ribbon
-  opens Windows, Controls, and Foundations galleries for the living Studio UI
+  opens Windows, Interaction Labs, Controls, and Foundations galleries for the living Studio UI
   standard: action hierarchy and states, labeled/unit-aware inputs, native
   menus, reusable panel chrome, blocking dialogs, contextual popovers, and
   semantic color/geometry tokens. Canonical reusable styles now cover primary,
   secondary, quiet, destructive, selected-icon, card, and popover treatments.
-  UI Dev's Agent command opens one reusable floating macOS utility panel with
-  voice/chat/docs/ideas presentation, prompt starters, and a composer. It is
-  explicitly labeled as a UI prototype; microphone and Send remain disabled
-  until an agent service is connected. UI Dev can also launch the real
+  UI Dev's Agent command toggles a right-side panel constrained inside the main
+  app canvas, with voice/chat/docs/ideas presentation, prompt starters, a
+  composer, and an explicit close affordance. It is labeled as a UI prototype;
+  microphone and Send remain disabled until an agent service is connected. A
+  separate Floating Template demonstrates the always-above-workspace AppKit
+  utility-panel behavior for the few compact tools that genuinely require it.
+  UI Dev can also launch the real
   Navigator, Inspector, and Timeline surfaces as reusable floating utility
   panels for focused design review. Its 3D Workspace command opens a normal
   resizable workspace window—not a floating palette—with the production
@@ -86,6 +89,15 @@
   controls. Each surface has one reusable window instance, restores its saved
   frame, and enforces a readable minimum size through the shared Studio window
   factory.
+  Its Mate Editor interaction lab provides a live compact/expanded panel for
+  mate-kind selection, connector picking, offset XYZ/rotation fields,
+  simulation-connection disclosure, accept/cancel, flip/reorient, preview, and
+  solve affordances. Its Triad Manipulator lab provides a code-drawn,
+  hoverable/drag-responsive center ball, XYZ translation arrows, rotation
+  rings, plane pads, ghosted restricted motion, live units, and controls for
+  handle scale and stroke weight. Both are explicitly design prototypes for
+  refining operator readability and interaction; they do not claim the planned
+  typed-mate/DriveTarget backend is shipped.
   Rig preserves Structures and the complete Mate family and adds focused
   Connectors, Assemble, and Inspect groups before the planned Motors, 3D Models
   & Media, and Events groups. Its creation families stay docked in the ribbon

@@ -6,6 +6,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case inputs
   case menus
   case panels
+  case mateEditor
+  case triadManipulator
   case dialogs
   case popovers
   case tokens
@@ -19,6 +21,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .inputs: "Inputs"
     case .menus: "Menus"
     case .panels: "Windows & Panels"
+    case .mateEditor: "Mate Editor"
+    case .triadManipulator: "Triad Manipulator"
     case .dialogs: "Dialogs"
     case .popovers: "Popovers"
     case .tokens: "Design Tokens"
@@ -32,6 +36,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .inputs: "character.cursor.ibeam"
     case .menus: "filemenu.and.selection"
     case .panels: "macwindow.on.rectangle"
+    case .mateEditor: "link.badge.plus"
+    case .triadManipulator: "move.3d"
     case .dialogs: "rectangle.on.rectangle.angled"
     case .popovers: "bubble.left.and.text.bubble.right"
     case .tokens: "paintpalette"
@@ -45,6 +51,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .inputs: "Text, number, picker, search, toggle, unit, and read-only fields."
     case .menus: "System-native command menus with consistent labels and hierarchy."
     case .panels: "Reusable headers, spacing, surfaces, resizing, and dismissal patterns."
+    case .mateEditor: "Refine the compact connector, offset, and mate-action workflow."
+    case .triadManipulator: "Tune the interactive translation, rotation, and plane handles."
     case .dialogs: "Alerts and confirmation flows reserved for blocking decisions."
     case .popovers: "Lightweight contextual help and settings without leaving the task."
     case .tokens: "One source of truth for color, spacing, radii, and control dimensions."
@@ -57,4 +65,10 @@ enum UIDevWorkspaceDescriptor {
   static let systemImage = "hammer.fill"
   static let purpose = "Build and review the Studio design system"
   static let shortcutNumber = 6
+}
+
+enum UIDevAgentPanelDescriptor {
+  static let title = "Anima Agent"
+  static let width: CGFloat = 360
+  static let isDocked = true
 }

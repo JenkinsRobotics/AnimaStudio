@@ -8,11 +8,12 @@ final class UIDevUtilityWindowTests: XCTestCase {
   func testWindowCatalogSeparatesSidePanelsFromThe3DWorkspace() {
     XCTAssertEqual(
       UIDevUtilityWindowKind.allCases,
-      [.navigator, .inspector, .timeline, .workspace3D]
+      [.navigator, .inspector, .timeline, .floatingTemplate, .workspace3D]
     )
     XCTAssertTrue(UIDevUtilityWindowKind.navigator.isUtilityPanel)
     XCTAssertTrue(UIDevUtilityWindowKind.inspector.isUtilityPanel)
     XCTAssertTrue(UIDevUtilityWindowKind.timeline.isUtilityPanel)
+    XCTAssertTrue(UIDevUtilityWindowKind.floatingTemplate.isUtilityPanel)
     XCTAssertFalse(UIDevUtilityWindowKind.workspace3D.isUtilityPanel)
 
     for kind in UIDevUtilityWindowKind.allCases {

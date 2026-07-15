@@ -2,7 +2,7 @@ import SwiftUI
 
 struct UIDevWorkspaceView: View {
   @Binding var selectedSection: UIDevSection
-  let openAgentWindow: () -> Void
+  let showAgentPanel: () -> Void
 
   @State private var sampleName = "Head Pan"
   @State private var sampleValue = 42.0
@@ -83,6 +83,8 @@ struct UIDevWorkspaceView: View {
     case .inputs: inputGallery
     case .menus: menuGallery
     case .panels: panelGallery
+    case .mateEditor: UIDevMateEditorLab()
+    case .triadManipulator: UIDevTriadManipulatorLab()
     case .dialogs: dialogGallery
     case .popovers: popoverGallery
     case .tokens: tokenGallery
@@ -212,16 +214,21 @@ struct UIDevWorkspaceView: View {
     LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 16) {
       sampleCard(
         title: "Launch real surfaces",
-        detail: "Side tools reuse floating panels; the 3D canvas uses a normal workspace window."
+        detail: "The Agent docks in this app; floating tools and full workspaces are explicit."
       ) {
         VStack(spacing: 9) {
+          Button("Show Docked Agent", systemImage: "sparkles") {
+            showAgentPanel()
+          }
+          .buttonStyle(StudioButtonStyle(role: .primary, expandsHorizontally: true))
+
           ForEach(UIDevUtilityWindowKind.allCases) { kind in
             Button("Open \(kind.title)", systemImage: kind.systemImage) {
               UIDevUtilityWindowRegistry.show(kind)
             }
             .buttonStyle(
               StudioButtonStyle(
-                role: kind == .workspace3D ? .primary : .secondary,
+                role: .secondary,
                 expandsHorizontally: true
               )
             )
@@ -237,10 +244,10 @@ struct UIDevWorkspaceView: View {
         UIDevSamplePanel(
           title: "Anima Agent",
           systemImage: "sparkles",
-          detail: "Utility windows use the same surface, spacing, controls, and status language."
+          detail: "Persistent assistance stays constrained to the app as a docked side panel."
         )
-        Button("Open Agent Window", systemImage: "macwindow.badge.plus") {
-          openAgentWindow()
+        Button("Show Agent Side Panel", systemImage: "sidebar.right") {
+          showAgentPanel()
         }
         .buttonStyle(StudioButtonStyle(role: .primary, expandsHorizontally: true))
       }

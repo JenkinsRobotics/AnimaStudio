@@ -130,6 +130,54 @@ struct StudioSectionHeader: View {
   }
 }
 
+/// Canonical chrome for docked panels and auxiliary window content.
+struct StudioPanelHeader<Trailing: View>: View {
+  let title: String
+  let detail: String
+  let systemImage: String
+  @ViewBuilder let trailing: () -> Trailing
+
+  init(
+    title: String,
+    detail: String,
+    systemImage: String,
+    @ViewBuilder trailing: @escaping () -> Trailing
+  ) {
+    self.title = title
+    self.detail = detail
+    self.systemImage = systemImage
+    self.trailing = trailing
+  }
+
+  var body: some View {
+    HStack(spacing: 9) {
+      Image(systemName: systemImage)
+        .foregroundStyle(StudioPalette.accent)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(title.uppercased())
+          .font(.caption.weight(.bold))
+          .tracking(0.8)
+        Text(detail)
+          .font(.caption2)
+          .foregroundStyle(StudioPalette.muted)
+      }
+      Spacer(minLength: 8)
+      trailing()
+    }
+    .padding(.horizontal, 14)
+    .frame(height: 52)
+    .background(StudioPalette.chrome)
+  }
+}
+
+extension StudioPanelHeader where Trailing == EmptyView {
+  init(title: String, detail: String, systemImage: String) {
+    self.init(title: title, detail: detail, systemImage: systemImage) {
+      EmptyView()
+    }
+  }
+}
+
 extension View {
   func studioCardSurface() -> some View {
     padding(StudioMetrics.panelPadding)

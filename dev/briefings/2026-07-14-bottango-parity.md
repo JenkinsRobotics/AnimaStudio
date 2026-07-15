@@ -554,3 +554,21 @@ change needed in the Handoff log instead of inventing commands.
   untouched. Ninety-two Swift tests, claimed-file format lint, native Xcode
   build, strict app signature, rebuilt root-app launch, and `git diff --check`
   pass.
+
+- **2026-07-15 (Codex, UI Dev Mate/Triad labs + docked Agent):** Replaced the
+  Agent's always-floating AppKit panel with a 360-point trailing panel inside
+  the UI Dev canvas, including an explicit close action; a separately labeled
+  Floating Template retains the reusable utility-panel pattern for tools that
+  truly need it. Added dedicated interactive Mate Editor and Triad Manipulator
+  labs. Mate Editor covers type selection, connector focus, progressive Offset
+  XYZ/rotation fields with units, simulation disclosure, accept/cancel, and
+  flip/reorient/preview/solve actions. Triad is a code-drawn hover/select/drag
+  prototype with center, XYZ arrows, rotation rings, plane pads, ghosted
+  restricted motion, live readout, scale, and stroke tuning. These remain UI
+  prototypes and do not claim the planned typed-mate/DriveTarget backend.
+  Reviewed Kinematics v2 and agree with its single `DriveTarget` routing rule:
+  free parts edit rest transforms; mated parts drive permitted DOF; ambiguous
+  motion stays ghosted instead of guessing. Verified claimed-file lint, 138
+  merged Swift tests, focused seven-test recheck, Xcode/root-app build, strict
+  signature, live Agent/Mate/Triad accessibility walkthrough, and
+  `git diff --check`; Claude's active Python/format files were untouched.

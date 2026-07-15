@@ -284,7 +284,7 @@ struct WorkspaceToolBar: View {
   @Binding var isUIDevWorkspace: Bool
   @Binding var uiDevSection: UIDevSection
   let importModel: () -> Void
-  let openAgentWindow: () -> Void
+  let toggleAgentPanel: () -> Void
 
   var body: some View {
     let presentation =
@@ -307,7 +307,7 @@ struct WorkspaceToolBar: View {
         if isUIDevWorkspace {
           UIDevRibbonView(
             selectedSection: $uiDevSection,
-            openAgentWindow: openAgentWindow
+            toggleAgentPanel: toggleAgentPanel
           )
         } else {
           switch presentation {

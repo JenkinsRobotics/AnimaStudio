@@ -7,6 +7,7 @@ enum UIDevUtilityWindowKind: String, CaseIterable, Identifiable, Sendable {
   case navigator
   case inspector
   case timeline
+  case floatingTemplate
   case workspace3D
 
   var id: Self { self }
@@ -16,6 +17,7 @@ enum UIDevUtilityWindowKind: String, CaseIterable, Identifiable, Sendable {
     case .navigator: "Navigator"
     case .inspector: "Inspector"
     case .timeline: "Timeline"
+    case .floatingTemplate: "Floating Template"
     case .workspace3D: "3D Workspace"
     }
   }
@@ -25,6 +27,7 @@ enum UIDevUtilityWindowKind: String, CaseIterable, Identifiable, Sendable {
     case .navigator: "sidebar.left"
     case .inspector: "sidebar.right"
     case .timeline: "rectangle.bottomthird.inset.filled"
+    case .floatingTemplate: "macwindow.badge.plus"
     case .workspace3D: "view.3d"
     }
   }
@@ -36,6 +39,7 @@ enum UIDevUtilityWindowKind: String, CaseIterable, Identifiable, Sendable {
     case .navigator: NSSize(width: 330, height: 640)
     case .inspector: NSSize(width: 360, height: 640)
     case .timeline: NSSize(width: 980, height: 360)
+    case .floatingTemplate: NSSize(width: 360, height: 420)
     case .workspace3D: NSSize(width: 960, height: 680)
     }
   }
@@ -45,6 +49,7 @@ enum UIDevUtilityWindowKind: String, CaseIterable, Identifiable, Sendable {
     case .navigator: NSSize(width: 290, height: 420)
     case .inspector: NSSize(width: 320, height: 420)
     case .timeline: NSSize(width: 680, height: 280)
+    case .floatingTemplate: NSSize(width: 320, height: 320)
     case .workspace3D: NSSize(width: 720, height: 520)
     }
   }
@@ -180,6 +185,8 @@ private struct UIDevUtilityWindowContent: View {
           .padding(12)
       case .timeline:
         TimelineEditorView(workspace: workspace)
+      case .floatingTemplate:
+        UIDevFloatingPanelTemplateView()
       case .workspace3D:
         UIDev3DWorkspaceWindow(workspace: workspace)
       }

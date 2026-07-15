@@ -6,7 +6,10 @@ final class UIDevCatalogTests: XCTestCase {
   func testGallerySectionsHaveStableReadablePresentation() {
     XCTAssertEqual(
       UIDevSection.allCases,
-      [.overview, .buttons, .inputs, .menus, .panels, .dialogs, .popovers, .tokens]
+      [
+        .overview, .buttons, .inputs, .menus, .panels, .mateEditor, .triadManipulator,
+        .dialogs, .popovers, .tokens,
+      ]
     )
 
     for section in UIDevSection.allCases {
@@ -20,5 +23,13 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(UIDevWorkspaceDescriptor.title, "UI Dev")
     XCTAssertEqual(UIDevWorkspaceDescriptor.shortcutNumber, 6)
     XCTAssertFalse(StudioWorkspaceKind.allCases.map(\.descriptor.title).contains("UI Dev"))
+  }
+
+  func testTriadLabNamesEveryInteractiveHandle() {
+    XCTAssertEqual(
+      UIDevTriadHandle.allCases,
+      [.center, .translateX, .translateY, .translateZ, .rotateX, .rotateY, .rotateZ]
+    )
+    XCTAssertTrue(UIDevTriadHandle.allCases.allSatisfy { !$0.title.isEmpty })
   }
 }

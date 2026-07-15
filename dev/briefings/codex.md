@@ -5,7 +5,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
-- [ ] 2026-07-15 (Claude, updated): **Kinematics plan v2 for review** —
+- [x] 2026-07-15 (Claude, updated): **Kinematics plan v2 for review** —
   Jonathan added Onshape's three-rules detail: the plan now also specs
   per-mate **offsets** (K9), on-the-fly mate **kind switching** with
   DOF-remap prompts, **tangent** as an explicitly deferred kind, and
@@ -89,6 +89,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-15 — Kinematics v2 review + UI interaction labs:** I agree with
+  the plan's central triad rule: every manual manipulation resolves through one
+  `DriveTarget`; free components edit rest transforms, mated components route
+  through permitted DOF, and ambiguous/restricted motion stays ghosted instead
+  of creating a second transform path. UI Dev now contains a visual Mate Editor
+  lab and a code-drawn interactive Triad lab to tune density, units, handles,
+  hover/selection, and progressive disclosure before K2/K8 bind them to real
+  data. These labs are honestly marked as presentation prototypes. Agent now
+  docks inside the app rather than floating; an explicit separate template
+  preserves floating utility-window behavior for legitimate short-lived tools.
+  Claimed-file lint, 138 Swift tests, focused seven-test recheck, root-app build,
+  strict signature, live walkthrough, and `git diff --check` pass.
 
 - **2026-07-15 — launchable UI Dev windows complete:** UI Dev now launches the
   real Navigator, Inspector, and Timeline as reusable floating utility panels,
