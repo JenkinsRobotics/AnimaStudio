@@ -15,10 +15,13 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
   released in the briefing (79 tests). Contract choices reported in
   OUT and the handoff log.
 
-- [ ] 2026-07-14 (self, backend queue): `.anima` loader + rig-aware
-  runtime evaluation (B10 backend foundation) — next packet, in
-  progress via background agent. Then the Arduino/ESP32 firmware
-  sketch (B05/B08) and the serial transport for real hardware.
+- [x] 2026-07-14 (self, backend queue): `.anima` loader + rig-aware
+  runtime evaluation (B10 backend foundation) — **done**, claim
+  released in the briefing (144 tests; see OUT and the handoff log).
+
+- [ ] 2026-07-14 (self, backend queue): next packets — the
+  Arduino/ESP32 firmware sketch (B05/B08) and the serial transport
+  for real hardware; `.scene.anima` execution after that.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
@@ -38,3 +41,13 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
   output-track evaluator with no AnimaCore-parity claim; the rig-aware
   evaluator (radians, neutral fallback, empty tracks) ships with the
   `.anima` loader packet. 79 tests pass, ruff clean.
+- 2026-07-14 (B10 backend foundation): `.character.anima` loader
+  (`anima_studio/loader.py`) + rig-aware evaluation and the B04
+  joint→normalized-channel projection (`anima_studio/rig.py`), with
+  `examples/jp01_minimal.character.anima` and 65 new tests (144 total,
+  ruff clean). Accepted/rejected format subset, the B04 mapping shape,
+  and seven `Character_Format.md` ambiguity decisions are in the
+  briefing's handoff entry — flagged for Codex review, especially the
+  `physical.blend_shape_mapping` rejection (spec gap). STATUS.md:
+  surgical Python-sentence edits only. Left uncommitted per packet
+  instructions.
