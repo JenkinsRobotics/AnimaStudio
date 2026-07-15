@@ -30,9 +30,13 @@ final class StudioWorkspaceModel {
     rig: SampleContent.rig,
     clips: [SampleContent.clip]
   )
-  var selection: NavigatorItem? = .animation(SampleContent.clip.name)
+  var selection: Set<NavigatorItem> = [.structure]
   var playheadSeconds = 0.0
   var isPlaying = false
+  var showsPreviewGrid = true
+  var cameraProjection: PreviewCameraProjection = .perspective
+  var cameraViewpoint: PreviewCameraViewpoint = .home
+  var cameraCommandRevision = 0
   var importedModelURL: URL?
   var importedModelHierarchy: ModelHierarchyNode?
   var isLoadingModelHierarchy = false
@@ -50,6 +54,28 @@ final class StudioWorkspaceModel {
       rig: project.rig,
       atSeconds: playheadSeconds
     )
+  }
+
+  var primarySelection: NavigatorItem? {
+    selection.count == 1 ? selection.first : nil
+  }
+
+  var selectionCount: Int {
+    selection.count
+  }
+
+  var selectedModelPath: ModelEntityPath? {
+    guard case .modelNode(let path) = primarySelection else { return nil }
+    return path
+  }
+
+  var canFrameSelection: Bool {
+    switch primarySelection {
+    case .modelNode, .structure, .joint:
+      true
+    case .project, .asset, .animation, nil:
+      false
+    }
   }
 
   func importModel(from url: URL) async {
@@ -80,7 +106,49 @@ final class StudioWorkspaceModel {
     project.assets.append(asset)
     importedModelURL = url
     importedModelHierarchy = hierarchy
-    selection = .modelNode(hierarchy.id)
+    selection = [.modelNode(hierarchy.id)]
+  }
+
+  func clearSelection() {
+    selection.removeAll()
+  }
+
+  func selectModelNode(at path: ModelEntityPath, extendingSelection: Bool) {
+    let item = NavigatorItem.modelNode(path)
+    if extendingSelection {
+      if selection.contains(item) {
+        selection.remove(item)
+      } else {
+        selection.insert(item)
+      }
+    } else {
+      selection = [item]
+    }
+  }
+
+  func renameAsset(id: AssetID, to name: String) {
+    guard let index = project.assets.firstIndex(where: { $0.id == id }) else { return }
+    project.assets[index].name = name
+  }
+
+  func renameJoint(id: JointID, to name: String) {
+    guard let index = project.rig.joints.firstIndex(where: { $0.id == id }) else { return }
+    project.rig.joints[index].displayName = name
+  }
+
+  func setJointAxis(id: JointID, to axis: JointAxis) {
+    guard let index = project.rig.joints.firstIndex(where: { $0.id == id }) else { return }
+    project.rig.joints[index].axis = axis
+  }
+
+  func setCameraViewpoint(_ viewpoint: PreviewCameraViewpoint) {
+    cameraViewpoint = viewpoint
+    cameraCommandRevision += 1
+  }
+
+  func frameSelection() {
+    guard canFrameSelection else { return }
+    setCameraViewpoint(selectedModelPath == nil ? .home : .selection)
   }
 
   func togglePlayback() {

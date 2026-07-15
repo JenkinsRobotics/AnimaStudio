@@ -1,14 +1,5 @@
 import SwiftUI
 
-enum StudioPalette {
-  static let canvas = Color(red: 0.105, green: 0.105, blue: 0.125)
-  static let chrome = Color(red: 0.15, green: 0.15, blue: 0.18)
-  static let panel = Color(red: 0.22, green: 0.23, blue: 0.26)
-  static let panelInset = Color(red: 0.16, green: 0.17, blue: 0.19)
-  static let accent = Color(red: 0.12, green: 0.58, blue: 0.90)
-  static let muted = Color.white.opacity(0.62)
-}
-
 struct WorkspaceModeBar: View {
   @Bindable var workspace: StudioWorkspaceModel
   let closeProject: () -> Void
@@ -23,6 +14,20 @@ struct WorkspaceModeBar: View {
       }
       .buttonStyle(.plain)
       .help("Close project and return home")
+
+      Menu {
+        Text("Anima Studio 0.1.0")
+        Divider()
+        Text("Kinematic preview")
+        Text("Open-source workspace")
+      } label: {
+        Image(systemName: "gearshape.fill")
+          .frame(width: 27, height: 27)
+          .background(Color.white.opacity(0.12), in: Circle())
+      }
+      .menuStyle(.borderlessButton)
+      .menuIndicator(.hidden)
+      .help("Workspace information")
 
       ForEach(WorkspaceMode.allCases) { mode in
         Button {
@@ -73,7 +78,7 @@ struct WorkspaceModeBar: View {
         .disabled(true)
     }
     .padding(.horizontal, 12)
-    .frame(height: 43)
+    .frame(height: StudioMetrics.modeBarHeight)
     .background(StudioPalette.chrome)
   }
 }
@@ -84,10 +89,19 @@ struct WorkspaceToolBar: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      Text(workspace.project.name)
+      TextField("Project name", text: $workspace.project.name)
+        .textFieldStyle(.plain)
         .font(.title3.italic())
         .lineLimit(1)
-        .frame(minWidth: 150, alignment: .leading)
+        .padding(.horizontal, 8)
+        .frame(height: StudioMetrics.fieldHeight)
+        .frame(minWidth: 150, maxWidth: 240, alignment: .leading)
+        .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+          RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+            .stroke(StudioPalette.border, lineWidth: 1)
+        }
+        .help("Editable project name")
 
       Group {
         Button("Save", systemImage: "square.and.arrow.down") {}
@@ -113,9 +127,42 @@ struct WorkspaceToolBar: View {
       Divider()
         .frame(height: 28)
 
-      Button(action: importModel) {
-        Label("Import Model", systemImage: "square.and.arrow.down.on.square")
+      Button {
+        workspace.showsPreviewGrid.toggle()
+      } label: {
+        Label(
+          workspace.showsPreviewGrid ? "Hide Grid" : "Show Grid",
+          systemImage: workspace.showsPreviewGrid ? "eye.fill" : "eye.slash"
+        )
       }
+      .labelStyle(.iconOnly)
+      .help(workspace.showsPreviewGrid ? "Hide viewport grid" : "Show viewport grid")
+
+      Group {
+        Button("Move", systemImage: "arrow.up.and.down.and.arrow.left.and.right") {}
+        Button("Rotate", systemImage: "rotate.right") {}
+        Button("Scale", systemImage: "arrow.up.left.and.arrow.down.right") {}
+      }
+      .labelStyle(.iconOnly)
+      .disabled(true)
+      .help("Transform gizmos arrive with editable semantic parts")
+
+      Button {
+        workspace.frameSelection()
+      } label: {
+        Label("Frame Selection", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
+      }
+      .labelStyle(.iconOnly)
+      .disabled(!workspace.canFrameSelection)
+      .help("Move the camera to frame the selected model node")
+
+      Divider()
+        .frame(height: 28)
+
+      Button(action: importModel) {
+        Label("Import Model", systemImage: "plus.square.on.square")
+      }
+      .labelStyle(.iconOnly)
       .disabled(workspace.isLoadingModelHierarchy)
       .help("Import a USD, USDZ, or RealityKit model")
 
@@ -129,13 +176,10 @@ struct WorkspaceToolBar: View {
           .foregroundStyle(StudioPalette.muted)
       }
 
-      Label("Orbit Camera", systemImage: "rotate.3d")
-        .font(.caption)
-        .foregroundStyle(StudioPalette.muted)
     }
     .buttonStyle(.borderless)
     .padding(.horizontal, 14)
-    .frame(height: 47)
+    .frame(height: StudioMetrics.toolBarHeight)
     .background(StudioPalette.chrome.opacity(0.96))
   }
 }
@@ -143,15 +187,28 @@ struct WorkspaceToolBar: View {
 struct WorkspacePanelHeader: View {
   let title: String
   let systemImage: String
+  var closeAction: (() -> Void)?
 
   var body: some View {
-    Label(title, systemImage: systemImage)
-      .font(.callout.weight(.semibold))
-      .foregroundStyle(.white)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 14)
-      .frame(height: 38)
-      .background(StudioPalette.accent)
+    HStack(spacing: 8) {
+      Label(title, systemImage: systemImage)
+        .font(.callout.weight(.semibold))
+      Spacer(minLength: 8)
+      if let closeAction {
+        Button(action: closeAction) {
+          Image(systemName: "xmark")
+            .font(.caption.bold())
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Clear selection")
+      }
+    }
+    .foregroundStyle(.white)
+    .padding(.horizontal, StudioMetrics.panelPadding)
+    .frame(height: StudioMetrics.panelHeaderHeight)
+    .background(StudioPalette.accent)
   }
 }
 

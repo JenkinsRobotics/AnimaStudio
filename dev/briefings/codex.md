@@ -5,6 +5,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-14 (Jonathan, via Claude): **Core rig model direction —
+  contract change announcement.** The rig foundation must be
+  mechanism-generic, not face-specific: parts connected by **typed
+  joints** (revolute, prismatic, cylindrical, ball, planar, fastened),
+  each joint contributing **degrees of freedom, and each DOF is the
+  animatable channel** (real units, limits, neutral) — Onshape mate
+  connectors are the reference model Jonathan cited. Blend shapes/faces
+  become an optional digital-rendering parameter layer, never core.
+  Claude is refactoring the Python rig/loader + `Character_Format.md`
+  structure section now (the ARKit-first framing in that spec is
+  superseded). Impact on your lane: `AnimaCore`'s scalar joints will
+  need the same typed-joint/DOF shape before editable joints (B03) —
+  plan it into P1; animation tracks target `joint.dof` paths.
+
 - [x] 2026-07-14 (Jonathan, via Claude): **Lane change** — Codex owns
   the Swift app GUI side; Claude is backend-only (Python runtime, wire
   protocol, `.anima` execution, firmware). Your **P0A durable project
@@ -48,6 +62,22 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-14 — workspace interaction + UI standards result:** Native
+  tree multi-selection, direct 3D geometry picking with Command/Shift extension,
+  Escape/close deselection, real project/asset/joint name
+  editing, joint-axis editing, standardized panel/field/readout/button styles,
+  camera presets, projection switching, gesture help, grid toggle, and imported
+  node framing now compile and pass all eight Swift tests. Common semantic-part
+  fields (color/visibility/delete) are the next bounded UI
+  slice after the durable semantic-part contract lands in AnimaCore.
+
+- **2026-07-14 — active workspace interaction + UI standards pass:** Keeping
+  the main-window fidelity work and extending it through Bottango's camera,
+  selection, and configuration workflow. This slice also introduces shared
+  panel/field/button metrics so later windows use the same readable visual
+  language. Persistent semantic-part editing remains gated on the one
+  AnimaCore part model; the UI will not invent an app-only duplicate.
 
 - **2026-07-14 — Bottango workspace implementation:** Inspected the current
   Bottango Home, Window, and Animate documentation/screenshots. The SwiftUI app

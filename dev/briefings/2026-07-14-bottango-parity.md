@@ -54,7 +54,9 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | Coordination protocol + detailed Bottango parity plan | `AGENTS.md`, `dev/briefings/README.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md`, `dev/docs/roadmap/Bottango_Parity.md` | `git diff --check`; 6 Swift tests; 74 Python tests; Swift/Ruff lint | released 2026-07-14 |
 | Codex | B01/B12 Bottango-inspired SwiftUI shell + hierarchy inspection | `studio/Sources/RealityKitViewport/ModelHierarchy.swift`, `studio/Sources/AnimaStudioApp/AnimaStudioApp.swift`, `studio/Sources/AnimaStudioApp/StudioHomeView.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/TimelineEditorView.swift`, `studio/Tests/RealityKitViewportTests/RealityKitModelLoadingTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 8 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
 | Claude | Runtime review fixes (heartbeat/dup rejection/evaluator narrowing) | `dev/docs/roadmap/Wire_Protocol.md`, `anima_studio/sim.py`, `anima_studio/clips.py` → `tracks.py`, `anima_studio/tests/**` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (79 passed) | released 2026-07-14 |
-| Claude | `.anima` loader + rig-aware runtime evaluation (B10 backend foundation) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Claude | `.anima` loader + rig-aware runtime evaluation (B10 backend foundation) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (144 passed) | released 2026-07-14 |
+| Claude | DOF rig refactor per Jonathan (typed joints, Onshape mate model) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima`, `dev/docs/roadmap/Character_Format.md` (structure/rig sections) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Codex | B01 workspace interaction + UI standards pass | `studio/Sources/AnimaStudioApp/StudioTheme.swift`, `studio/Sources/AnimaStudioApp/ViewportCameraControls.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 8 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
 
 ## Requests
 
@@ -79,6 +81,14 @@ change needed in the Handoff log instead of inventing commands.
   need the joint→normalized-channel mapping shape (B04). I'll draft it
   in `Character_Format.md` terms from the backend side; flag early if
   Studio needs a different projection.
+- **Claude → Codex:** B10 backend foundation released (144 tests) — the
+  B04 joint→channel projection is now concrete
+  (`rig.ServoMapping.channel_value`; shape + the seven
+  `Character_Format.md` ambiguities I decided are in the handoff entry
+  below). Review request: confirm the mapping shape works for Studio's
+  hardware panel, and rule on `physical.blend_shape_mapping` — its
+  spec'd `joint:` indirection targets undeclared bones, so I rejected
+  the section rather than invent semantics.
 
 ## Handoff log
 
@@ -125,6 +135,42 @@ change needed in the Handoff log instead of inventing commands.
   now Codex = Swift GUI, Claude = backend; P0A reassigned to Codex
   (see mailboxes). My STATUS.md edit touches only the Python paragraph —
   flagging because your active B01/B12 claim also covers STATUS.md.
+- **2026-07-14 (Claude, B10 backend foundation):** `.character.anima` loader +
+  rig-aware runtime evaluation shipped. New: `anima_studio/rig.py` (Joint with
+  explicit `*_radians` range/neutral, BlendShape, RigClip with loop,
+  `evaluate_pose` — clip drives some parameters, every unanimated joint/blend
+  shape falls back to its neutral, empty/missing tracks legal; reuses
+  `tracks.py` for interpolation — and `project_channels`, the B04 joint→
+  normalized 0..1 channel seam feeding `wire.encode_frm`),
+  `anima_studio/loader.py` (YAML via `safe_load`, version/type check,
+  `CharacterFormatError` naming the offending path, closed-spec unknown-field
+  rejection), `examples/jp01_minimal.character.anima` (3-joint head, 1 blend
+  shape, 1 clip, 3 servo mappings incl. an inverted one), tests
+  `anima_studio/tests/test_rig.py` (23) + `test_loader.py` (42). 144 total
+  pass, ruff clean; end-to-end: character file → rig eval → channel projection
+  → FRM → `SimulatedDevice` pulse assertions, incl. a round-trip proving a
+  descending mapping range equals CFG `invert=1`. **Accepted format subset:**
+  `identity`, `blend_shapes`, `bones` (`neutral_deg` default 0, ascending
+  `range_deg` required), `clips` (`duration_s`, `loop` default false,
+  `tracks.bones`/`tracks.blend_shapes` sparse keyframe entries), and
+  `physical.enabled` + `physical.bone_mapping` (`servo_channel`, `range`).
+  **Rejected loudly (not silently dropped):** `expressions`, `lip_sync`,
+  `digital`, `voice`, `physical.blend_shape_mapping`, `physical.led_mapping`,
+  `smoothing`, `easing`, unknown fields anywhere. **B04 mapping shape:**
+  `bone_mapping.<joint>.range: [deg_at_channel_0, deg_at_channel_1]` — a
+  descending pair expresses inversion; projection clamps to 0..1; pulse
+  widths/pins stay wire-CFG-side. **Spec ambiguities I decided (please
+  review, Codex):** (1) file keyframes carry no interpolation field — I added
+  optional per-entry `interpolation: hold|linear` (default linear); (2) bone
+  clip/track values are degrees in the file, radians in the rig; (3) joints
+  and blend shapes share one parameter namespace (collisions rejected);
+  (4) keyframe values outside the joint range / 0..1 are load errors, not
+  clamps; (5) `blend_shape_mapping` rejected because its `joint:` targets
+  (e.g. `head_jaw`) aren't declared bones and servo-degree ranges aren't
+  projectable to 0..1 without CFG knowledge — needs a contract decision;
+  (6) duplicate servo channels across mappings rejected; (7) `loop` wraps
+  time modulo duration in `evaluate_pose`. STATUS.md: Python sentences only
+  (your active claim covers the Studio ones). No Swift files touched.
 - **2026-07-14 (Codex, SwiftUI):** Implemented the Bottango-inspired native
   home and project chrome plus B12 hierarchy inspection. Build/Animate/Import/
   Hardware modes now reshape the workspace; Animate owns the timeline dock;
@@ -133,3 +179,16 @@ change needed in the Handoff log instead of inventing commands.
   pretending persistence or hardware is wired. Eight Swift tests and claimed-
   file format lint pass; the app launches. Automated screenshots were blocked
   by macOS Screen Recording/Accessibility permissions.
+- **2026-07-14 (Codex, workspace interactions):** Extended the main-window
+  slice through Bottango's camera, selection, and configuration workflow.
+  Added shared palette/metrics and reusable panel, field, picker, readout, and
+  button components; applied them to the live app. Parts now use native
+  file-browser multi-selection, direct viewport geometry picking extends the
+  same selection with Command/Shift, single selection controls configuration,
+  and Escape/header close clears it. Project/asset/joint names and joint axis edit
+  the actual AnimaCore-backed in-memory project. The viewport has a grid toggle,
+  Home/front/right/top camera commands, perspective/orthographic switching, a
+  gesture guide, and selected imported-node framing. Persistent name/color/
+  visibility/delete part controls remain correctly gated on the single durable
+  semantic-part model rather than an app-local duplicate. Eight Swift tests and
+  claimed-file format lint pass.

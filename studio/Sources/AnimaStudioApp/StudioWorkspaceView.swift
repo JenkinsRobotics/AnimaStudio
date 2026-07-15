@@ -1,4 +1,5 @@
 import AnimaCore
+import AppKit
 import RealityKitViewport
 import SwiftUI
 import UniformTypeIdentifiers
@@ -29,6 +30,9 @@ struct StudioWorkspaceView: View {
     }
     .background(StudioPalette.canvas)
     .preferredColorScheme(.dark)
+    .onExitCommand {
+      workspace.clearSelection()
+    }
     .fileImporter(
       isPresented: $isImportingModel,
       allowedContentTypes: Self.modelContentTypes,
@@ -79,12 +83,14 @@ struct StudioWorkspaceView: View {
           workspace: workspace,
           importModel: { isImportingModel = true }
         )
-        .frame(width: 290)
+        .frame(width: StudioMetrics.navigatorWidth)
 
         Spacer(minLength: 360)
 
-        InspectorView(workspace: workspace)
-          .frame(width: 300)
+        if showsInspector {
+          InspectorView(workspace: workspace)
+            .frame(width: StudioMetrics.inspectorWidth)
+        }
       }
       .padding(16)
     }
@@ -96,7 +102,20 @@ struct StudioWorkspaceView: View {
     ZStack(alignment: .top) {
       RobotPreviewView(
         frame: workspace.evaluatedFrame,
-        modelURL: workspace.importedModelURL
+        modelURL: workspace.importedModelURL,
+        showsGrid: workspace.showsPreviewGrid,
+        projection: workspace.cameraProjection,
+        viewpoint: workspace.cameraViewpoint,
+        cameraCommandRevision: workspace.cameraCommandRevision,
+        focusedModelPath: workspace.selectedModelPath,
+        importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
+        onSelectModelPath: { path in
+          let modifiers = NSEvent.modifierFlags
+          workspace.selectModelNode(
+            at: path,
+            extendingSelection: modifiers.contains(.command) || modifiers.contains(.shift)
+          )
+        }
       )
       .frame(minWidth: 520, minHeight: 420)
 
@@ -111,6 +130,13 @@ struct StudioWorkspaceView: View {
       .padding(.vertical, 6)
       .background(.ultraThinMaterial, in: Capsule())
       .padding(.top, 12)
+
+      HStack {
+        Spacer()
+        ViewportCameraControls(workspace: workspace)
+          .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
+      }
+      .padding(.top, 10)
     }
   }
 
@@ -125,6 +151,20 @@ struct StudioWorkspaceView: View {
         )
       )
       .frame(maxWidth: 420)
+    }
+  }
+
+  private var showsInspector: Bool {
+    switch workspace.mode {
+    case .animate, .importAssets, .hardware:
+      true
+    case .build:
+      switch workspace.primarySelection {
+      case .asset, .modelNode, .joint:
+        true
+      case .project, .structure, .animation, nil:
+        false
+      }
     }
   }
 

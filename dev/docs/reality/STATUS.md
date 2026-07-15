@@ -23,7 +23,17 @@
   mode tabs, a contextual project/tool row, floating Parts and Inspector panels,
   a central RealityKit 3D viewport, and an Animate-only timeline dock with
   transport, tracks/keyframes, click/drag scrubbing, and looping playback. The
-  Hardware workspace visibly remains safely offline. Users can select a
+  Hardware workspace visibly remains safely offline. The viewport now provides
+  a readable grid, Home/front/right/top camera presets, perspective/orthographic
+  projection switching, orbit controls, and framing of a selected imported
+  model node. The Parts outline follows macOS file-browser selection conventions:
+  Command/Shift select multiple, one item opens its configuration, and Escape
+  or the inspector close control clears selection. Imported geometry can also
+  be selected directly in the viewport, with Command/Shift extending the same
+  Parts-tree selection. Shared theme metrics and
+  reusable panel, text-field, picker, readout, and primary-button styles keep
+  new Studio windows visually consistent. Project, asset, and joint names plus
+  a joint's rotation axis are editable in memory. Users can select a
   RealityKit-supported USD/Reality model; it loads asynchronously, is normalized
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
@@ -41,22 +51,35 @@
   time and limit clamping, deterministic; explicitly not a rig evaluator —
   AnimaCore keeps rig semantics; no Bézier yet). Per review: only successfully
   parsed commands refresh the failsafe heartbeat, and duplicate CFG keys or
-  duplicate FRM channels are rejected (no last-write-wins). 79 Python tests
-  pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
-  `.venv/bin/ruff check .`), including an end-to-end clip → FRM stream →
-  simulated servo → failsafe test.
+  duplicate FRM channels are rejected (no last-write-wins). The runtime also
+  loads `.character.anima` files (`anima_studio/loader.py` — version/type
+  check, typed errors naming the offending path, unknown-field rejection;
+  unsupported spec sections — expressions, lip_sync, digital, voice,
+  blend_shape/led mappings, smoothing, easing — are rejected loudly, never
+  silently dropped) into a rig-aware model (`anima_studio/rig.py` — joints
+  with radian ranges and neutrals, blend shapes, hold/linear clips with
+  neutral fallback for every unanimated parameter, loop wrapping, and the
+  joint→normalized 0..1 servo-channel projection feeding `wire.encode_frm`);
+  `examples/jp01_minimal.character.anima` is a loadable minimal head rig.
+  144 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
+  simulated servo → failsafe, and character file → rig evaluation →
+  channel projection → simulated servo tests.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
 - **Known gaps:** imported model hierarchies can be inspected but cannot yet be
-  mapped to persistent semantic parts; joints and keyframes are not yet
-  editable; project changes are not persisted; imported security-scoped URLs
+  mapped to persistent semantic parts; joint limits and keyframes are not yet
+  editable; project changes are not
+  persisted; imported security-scoped URLs
   last only for the current session. Project open/save, undo/redo, Home
   templates, and live hardware controls are intentionally visible but disabled.
-  There is no `.anima` parser, Bézier curve editor, audio,
-  screens/LEDs, Live2D, scene execution, output node, JaegerOS connection, or
-  JP01 character file. Studio is a working workspace foundation, not yet a
-  complete authoring workflow.
+  There is no `.anima` parsing in Studio (the Python runtime loads
+  `.character.anima` only; `.scene.anima` is unimplemented everywhere), no
+  Bézier curve editor, audio, screens/LEDs, Live2D, scene execution, output
+  node, JaegerOS connection, or full 52-blend-shape JP01 character file (a
+  minimal example head ships in `examples/`). Studio is a working workspace
+  foundation, not yet a complete authoring workflow.
 
 ## How to update this file
 

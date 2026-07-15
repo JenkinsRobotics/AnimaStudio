@@ -75,17 +75,12 @@ struct ProjectNavigatorView: View {
       .listStyle(.sidebar)
       .scrollContentBackground(.hidden)
       .background(StudioPalette.panel)
+      .accessibilityLabel("Project parts and assets")
 
       Divider()
       panelFooter
     }
-    .background(StudioPalette.panel)
-    .clipShape(RoundedRectangle(cornerRadius: 18))
-    .overlay {
-      RoundedRectangle(cornerRadius: 18)
-        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-    }
-    .shadow(color: .black.opacity(0.35), radius: 12, y: 5)
+    .studioPanelSurface()
   }
 
   @ViewBuilder
@@ -94,10 +89,8 @@ struct ProjectNavigatorView: View {
     case .importAssets:
       Button(action: importModel) {
         Label("Import Model", systemImage: "plus.circle.fill")
-          .frame(maxWidth: .infinity)
       }
-      .buttonStyle(.borderedProminent)
-      .tint(StudioPalette.accent)
+      .buttonStyle(StudioPrimaryButtonStyle())
       .disabled(workspace.isLoadingModelHierarchy)
       .padding(12)
     case .build:
@@ -107,7 +100,7 @@ struct ProjectNavigatorView: View {
         .help("Part creation follows durable project persistence")
         .padding(12)
     case .animate:
-      Text("Select joints or model nodes to inspect them.")
+      Text(selectionGuidance)
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
@@ -117,6 +110,13 @@ struct ProjectNavigatorView: View {
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
     }
+  }
+
+  private var selectionGuidance: String {
+    if workspace.selectionCount > 1 {
+      return "\(workspace.selectionCount) items selected. Command-click or Shift-click to adjust."
+    }
+    return "Select a joint or model node. Command-click or Shift-click selects multiple."
   }
 
   private var panelTitle: String {
