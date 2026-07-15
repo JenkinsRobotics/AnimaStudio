@@ -25,6 +25,49 @@ enum NavigatorMoveDirection {
   case down
 }
 
+enum NavigatorDragPayload: Equatable {
+  case component(PartID)
+  case componentGroup(UUID)
+  case mate(JointID)
+
+  private static let componentPrefix = "anima-component:"
+  private static let componentGroupPrefix = "anima-component-group:"
+  private static let matePrefix = "anima-mate:"
+
+  var encodedValue: String {
+    switch self {
+    case .component(let id):
+      Self.componentPrefix + id.rawValue.uuidString
+    case .componentGroup(let id):
+      Self.componentGroupPrefix + id.uuidString
+    case .mate(let id):
+      Self.matePrefix + id.rawValue
+    }
+  }
+
+  init?(encodedValue: String) {
+    if encodedValue.hasPrefix(Self.componentPrefix),
+      let rawID = UUID(uuidString: String(encodedValue.dropFirst(Self.componentPrefix.count)))
+    {
+      self = .component(PartID(rawValue: rawID))
+      return
+    }
+    if encodedValue.hasPrefix(Self.componentGroupPrefix),
+      let rawID = UUID(uuidString: String(encodedValue.dropFirst(Self.componentGroupPrefix.count)))
+    {
+      self = .componentGroup(rawID)
+      return
+    }
+    if encodedValue.hasPrefix(Self.matePrefix) {
+      let rawID = String(encodedValue.dropFirst(Self.matePrefix.count))
+      guard !rawID.isEmpty else { return nil }
+      self = .mate(JointID(rawValue: rawID))
+      return
+    }
+    return nil
+  }
+}
+
 enum NavigatorOrdering {
   static func moved<Value: Equatable>(
     _ values: [Value],
@@ -41,6 +84,22 @@ enum NavigatorOrdering {
 
     var result = values
     result.swapAt(sourceIndex, destinationIndex)
+    return result
+  }
+
+  static func moving<Value: Equatable>(
+    _ values: [Value],
+    value: Value,
+    before destination: Value
+  ) -> [Value] {
+    guard value != destination, values.contains(value), values.contains(destination) else {
+      return values
+    }
+
+    var result = values
+    result.removeAll { $0 == value }
+    guard let destinationIndex = result.firstIndex(of: destination) else { return values }
+    result.insert(value, at: destinationIndex)
     return result
   }
 }

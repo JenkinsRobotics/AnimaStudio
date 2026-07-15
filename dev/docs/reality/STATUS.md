@@ -96,7 +96,11 @@
   semantic Components and Mates remain separate editable-role rows in teal and
   purple. Component disclosure groups support contextual rename, move up/down,
   move-to-group, dissolve, and lock/unlock; Mates support contextual rename,
-  reorder, and lock/unlock. Locked items reject inspector and transform edits,
+  reorder, and lock/unlock. Components can now be dragged before component rows,
+  onto groups, or onto the Components heading for top-level placement; groups
+  and Mates can be dragged before peers. The footer changes to **Group Selected
+  (N)** for a valid multi-selection and reports when locked selections will be
+  skipped. Locked items reject inspector, transform, and organization edits,
   hide transform handles, and locked groups protect their members. Group and
   lock organization is currently in-session pending the durable `.animastudio`
   document layer.

@@ -63,6 +63,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — navigator drag/grouping follow-up complete:** Components drag
+  before peers to reorder across top-level and groups, onto a group to append,
+  or onto the Components heading to return to top level. Groups and Mates drag
+  before peers. Typed payload parsing and all organization mutations are kept
+  outside the SwiftUI row rendering, and locked sources/destinations are
+  rejected at the workspace-model boundary. The primary footer action now says
+  **Group Selected (N)** when unlocked components are selected, stays available
+  as **New Empty Group** otherwise, and explains locked selections. Seventy-six
+  Swift tests, recursive format lint, native Xcode build, strict signature
+  verification, and rebuilt root app pass.
+
 - **2026-07-14 — Components/Mates tree + wheel zoom complete:** Operator-facing
   terminology now uses Mate as the umbrella, with Revolute Mate as the current
   implemented type; internal `JointDefinition` stays transitional until the

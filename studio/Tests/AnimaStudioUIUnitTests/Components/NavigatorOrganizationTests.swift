@@ -19,6 +19,38 @@ final class NavigatorOrganizationTests: XCTestCase {
     )
   }
 
+  func testOrderingCanMoveAValueBeforeADestination() {
+    XCTAssertEqual(
+      NavigatorOrdering.moving(["A", "B", "C", "D"], value: "D", before: "B"),
+      ["A", "D", "B", "C"]
+    )
+    XCTAssertEqual(
+      NavigatorOrdering.moving(["A", "B", "C"], value: "A", before: "C"),
+      ["B", "A", "C"]
+    )
+    XCTAssertEqual(
+      NavigatorOrdering.moving(["A", "B"], value: "A", before: "A"),
+      ["A", "B"]
+    )
+  }
+
+  func testDragPayloadsRoundTripWithoutConflatingTreeItemKinds() {
+    let componentID = PartID()
+    let groupID = UUID()
+    let mateID = JointID(rawValue: "neck:yaw:1")
+    let payloads: [NavigatorDragPayload] = [
+      .component(componentID),
+      .componentGroup(groupID),
+      .mate(mateID),
+    ]
+
+    for payload in payloads {
+      XCTAssertEqual(NavigatorDragPayload(encodedValue: payload.encodedValue), payload)
+    }
+    XCTAssertNil(NavigatorDragPayload(encodedValue: "unknown:item"))
+    XCTAssertNil(NavigatorDragPayload(encodedValue: "anima-mate:"))
+  }
+
   @MainActor
   func testSelectedComponentsCanBeGroupedReorderedAndUngrouped() throws {
     let model = StudioWorkspaceModel()
@@ -42,6 +74,55 @@ final class NavigatorOrganizationTests: XCTestCase {
     model.dissolveComponentGroup(id: groupID)
     XCTAssertTrue(model.componentGroups.isEmpty)
     XCTAssertNil(model.componentGroup(containing: second))
+  }
+
+  @MainActor
+  func testGroupCreationUsesEverySelectedUnlockedComponent() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    let ids = model.project.rig.parts.map(\.id)
+    let lockedID = try XCTUnwrap(ids.dropFirst().first)
+    model.toggleComponentLock(lockedID)
+    model.selection = Set(ids.map(NavigatorItem.part))
+
+    XCTAssertEqual(model.selectedComponentIDs, ids)
+    XCTAssertEqual(model.selectedUnlockedComponentIDs, [ids[0], ids[2]])
+
+    let groupID = model.createComponentGroup(named: "Selected")
+    XCTAssertEqual(model.componentGroup(containing: ids[0])?.id, groupID)
+    XCTAssertNil(model.componentGroup(containing: lockedID))
+    XCTAssertEqual(model.componentGroup(containing: ids[2])?.id, groupID)
+  }
+
+  @MainActor
+  func testComponentsAndGroupsCanMoveByDragDestination() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    model.addPart(kind: .locator)
+    let ids = model.project.rig.parts.map(\.id)
+
+    model.selection = [.part(ids[0]), .part(ids[1])]
+    let firstGroupID = model.createComponentGroup(named: "First")
+    model.selection = [.part(ids[2])]
+    let secondGroupID = model.createComponentGroup(named: "Second")
+
+    XCTAssertTrue(model.moveComponent(ids[1], before: ids[0]))
+    XCTAssertEqual(model.componentGroups[0].componentIDs, [ids[1], ids[0]])
+
+    XCTAssertTrue(model.moveComponent(ids[3], toGroup: secondGroupID))
+    XCTAssertTrue(model.moveComponent(ids[1], before: ids[2]))
+    XCTAssertEqual(model.componentGroups[0].componentIDs, [ids[0]])
+    XCTAssertEqual(model.componentGroups[1].componentIDs, [ids[1], ids[2], ids[3]])
+
+    XCTAssertTrue(model.moveComponentGroup(secondGroupID, before: firstGroupID))
+    XCTAssertEqual(model.componentGroups.map(\.id), [secondGroupID, firstGroupID])
+
+    XCTAssertTrue(model.moveComponent(ids[1], toGroup: nil))
+    XCTAssertNil(model.componentGroup(containing: ids[1]))
   }
 
   @MainActor
@@ -84,6 +165,25 @@ final class NavigatorOrganizationTests: XCTestCase {
     XCTAssertEqual(lockedMate.axis, mate.axis)
     XCTAssertEqual(lockedMate.minimumRadians, mate.minimumRadians)
     XCTAssertEqual(lockedMate.maximumRadians, mate.maximumRadians)
+  }
+
+  @MainActor
+  func testMatesCanMoveByDragDestinationUnlessLocked() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    model.createRevoluteJoint()
+    model.createRevoluteJoint()
+    model.createRevoluteJoint()
+    let mateIDs = model.project.rig.joints.map(\.id)
+
+    XCTAssertTrue(model.moveMate(mateIDs[2], before: mateIDs[0]))
+    XCTAssertEqual(model.project.rig.joints.map(\.id), [mateIDs[2], mateIDs[0], mateIDs[1]])
+
+    model.toggleMateLock(mateIDs[0])
+    XCTAssertFalse(model.moveMate(mateIDs[1], before: mateIDs[0]))
+    XCTAssertEqual(model.project.rig.joints.map(\.id), [mateIDs[2], mateIDs[0], mateIDs[1]])
   }
 
   @MainActor

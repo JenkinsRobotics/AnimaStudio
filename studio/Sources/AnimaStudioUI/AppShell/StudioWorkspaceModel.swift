@@ -82,6 +82,16 @@ final class StudioWorkspaceModel {
     selection.count
   }
 
+  var selectedComponentIDs: [PartID] {
+    project.rig.parts.compactMap { part in
+      selection.contains(.part(part.id)) ? part.id : nil
+    }
+  }
+
+  var selectedUnlockedComponentIDs: [PartID] {
+    selectedComponentIDs.filter { !isComponentLocked($0) }
+  }
+
   var activePresentation: WorkspacePresentation {
     workspacePresentations[activeWorkspace] ?? activeWorkspace.descriptor.defaultPresentation
   }
@@ -328,9 +338,7 @@ final class StudioWorkspaceModel {
 
   @discardableResult
   func createComponentGroup(named name: String? = nil) -> UUID {
-    let selectedIDs = project.rig.parts.compactMap { part in
-      selection.contains(.part(part.id)) && !isComponentLocked(part.id) ? part.id : nil
-    }
+    let selectedIDs = selectedUnlockedComponentIDs
     for componentID in selectedIDs {
       removeComponentFromGroups(componentID)
     }
@@ -397,6 +405,23 @@ final class StudioWorkspaceModel {
     componentGroups = NavigatorOrdering.moved(componentGroups, value: group, direction: direction)
   }
 
+  @discardableResult
+  func moveComponentGroup(_ id: UUID, before destinationID: UUID) -> Bool {
+    guard
+      let group = componentGroups.first(where: { $0.id == id }),
+      let destination = componentGroups.first(where: { $0.id == destinationID }),
+      !group.isLocked, !destination.isLocked
+    else { return false }
+    let reordered = NavigatorOrdering.moving(
+      componentGroups,
+      value: group,
+      before: destination
+    )
+    guard reordered != componentGroups else { return false }
+    componentGroups = reordered
+    return true
+  }
+
   func moveMate(_ id: JointID, direction: NavigatorMoveDirection) {
     guard !isMateLocked(id),
       let mate = project.rig.joints.first(where: { $0.id == id })
@@ -408,18 +433,74 @@ final class StudioWorkspaceModel {
     )
   }
 
-  func moveComponent(_ id: PartID, toGroup groupID: UUID?) {
-    guard !isComponentLocked(id) else { return }
-    if let sourceGroup = componentGroup(containing: id), sourceGroup.isLocked { return }
+  @discardableResult
+  func moveMate(_ id: JointID, before destinationID: JointID) -> Bool {
+    guard !isMateLocked(id), !isMateLocked(destinationID),
+      let mate = project.rig.joints.first(where: { $0.id == id }),
+      let destination = project.rig.joints.first(where: { $0.id == destinationID })
+    else { return false }
+    let reordered = NavigatorOrdering.moving(
+      project.rig.joints,
+      value: mate,
+      before: destination
+    )
+    guard reordered != project.rig.joints else { return false }
+    project.rig.joints = reordered
+    return true
+  }
+
+  @discardableResult
+  func moveComponent(_ id: PartID, before destinationID: PartID) -> Bool {
+    guard id != destinationID,
+      !isComponentLocked(id), !isComponentLocked(destinationID),
+      project.rig.parts.contains(where: { $0.id == id }),
+      project.rig.parts.contains(where: { $0.id == destinationID })
+    else { return false }
+
+    if let destinationGroup = componentGroup(containing: destinationID),
+      let destinationIndex = componentGroups.firstIndex(where: { $0.id == destinationGroup.id })
+    {
+      removeComponentFromGroups(id)
+      guard
+        let refreshedDestinationIndex = componentGroups[destinationIndex].componentIDs.firstIndex(
+          of: destinationID
+        )
+      else { return false }
+      componentGroups[destinationIndex].componentIDs.insert(id, at: refreshedDestinationIndex)
+      return true
+    }
+
+    removeComponentFromGroups(id)
+    guard let sourceIndex = project.rig.parts.firstIndex(where: { $0.id == id }) else {
+      return false
+    }
+    let component = project.rig.parts[sourceIndex]
+    project.rig.parts.remove(at: sourceIndex)
+    guard let destinationIndex = project.rig.parts.firstIndex(where: { $0.id == destinationID })
+    else {
+      project.rig.parts.insert(component, at: sourceIndex)
+      return false
+    }
+    project.rig.parts.insert(component, at: destinationIndex)
+    return true
+  }
+
+  @discardableResult
+  func moveComponent(_ id: PartID, toGroup groupID: UUID?) -> Bool {
+    guard !isComponentLocked(id) else { return false }
+    if let sourceGroup = componentGroup(containing: id), sourceGroup.isLocked { return false }
     if let groupID {
       guard let destinationIndex = componentGroups.firstIndex(where: { $0.id == groupID }),
         !componentGroups[destinationIndex].isLocked
-      else { return }
+      else { return false }
+      guard !componentGroups[destinationIndex].componentIDs.contains(id) else { return false }
       removeComponentFromGroups(id)
       componentGroups[destinationIndex].componentIDs.append(id)
     } else {
+      guard componentGroup(containing: id) != nil else { return false }
       removeComponentFromGroups(id)
     }
+    return true
   }
 
   func toggleComponentLock(_ id: PartID) {

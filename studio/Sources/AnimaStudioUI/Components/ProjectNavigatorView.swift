@@ -131,7 +131,7 @@ struct ProjectNavigatorView: View {
   }
 
   private var semanticRigSection: some View {
-    Section("Components") {
+    Section {
       if workspace.project.rig.parts.isEmpty && workspace.componentGroups.isEmpty {
         Label("No components yet", systemImage: "cube.transparent")
           .foregroundStyle(.secondary)
@@ -153,6 +153,10 @@ struct ProjectNavigatorView: View {
           .contextMenu {
             componentGroupActions(group)
           }
+          .draggable(NavigatorDragPayload.componentGroup(group.id).encodedValue)
+          .dropDestination(for: String.self) { values, _ in
+            handleDrop(values, onto: group)
+          }
         }
 
         ForEach(filteredUngroupedParts) { part in
@@ -163,6 +167,20 @@ struct ProjectNavigatorView: View {
           noFilterResults
         }
       }
+    } header: {
+      HStack(spacing: 6) {
+        Text("Components")
+        Spacer(minLength: 4)
+        Image(systemName: "tray.and.arrow.down")
+          .font(.caption2)
+          .foregroundStyle(StudioPalette.muted)
+      }
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+      .dropDestination(for: String.self) { values, _ in
+        handleTopLevelDrop(values)
+      }
+      .help("Drop a component here to move it out of a group")
     }
   }
 
@@ -178,6 +196,10 @@ struct ProjectNavigatorView: View {
         .tag(NavigatorItem.joint(joint.id))
         .contextMenu {
           mateActions(joint)
+        }
+        .draggable(NavigatorDragPayload.mate(joint.id).encodedValue)
+        .dropDestination(for: String.self) { values, _ in
+          handleMateDrop(values, before: joint.id)
         }
       }
       if workspace.project.rig.joints.isEmpty {
@@ -247,16 +269,16 @@ struct ProjectNavigatorView: View {
           .buttonStyle(.borderedProminent)
           .help("Open the component and mate creation palette")
 
-          Button("New Group", systemImage: "folder.badge.plus") {
+          Button(groupButtonTitle, systemImage: "folder.badge.plus") {
             let groupID = workspace.createComponentGroup()
             collapsedGroupIDs.remove(groupID)
           }
-          .buttonStyle(.bordered)
-          .help("Group the selected unlocked components, or create an empty group")
+          .buttonStyle(.borderedProminent)
+          .help(groupButtonHelp)
         }
         Label(
-          "Right-click components, groups, or mates to rename, move, group, and lock them.",
-          systemImage: "info.circle"
+          groupSelectionGuidance,
+          systemImage: workspace.selectedComponentIDs.isEmpty ? "info.circle" : "checkmark.circle"
         )
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
@@ -285,6 +307,34 @@ struct ProjectNavigatorView: View {
       return "\(workspace.selectionCount) items selected. Command-click or Shift-click to adjust."
     }
     return "Select a mate or model node. Command-click or Shift-click selects multiple."
+  }
+
+  private var groupButtonTitle: String {
+    let count = workspace.selectedUnlockedComponentIDs.count
+    return count > 0 ? "Group Selected (\(count))" : "New Empty Group"
+  }
+
+  private var groupButtonHelp: String {
+    workspace.selectedUnlockedComponentIDs.isEmpty
+      ? "Create an empty component group"
+      : "Create a group containing the selected unlocked components"
+  }
+
+  private var groupSelectionGuidance: String {
+    let selectedCount = workspace.selectedComponentIDs.count
+    let unlockedCount = workspace.selectedUnlockedComponentIDs.count
+    if selectedCount == 0 {
+      return
+        "Command-click or Shift-click components, then choose Group Selected. You can also drag rows."
+    }
+    if unlockedCount == 0 {
+      return "The selected components are locked. Unlock them before grouping."
+    }
+    if unlockedCount < selectedCount {
+      return
+        "\(unlockedCount) unlocked selected components will be grouped; locked components stay in place."
+    }
+    return "\(unlockedCount) selected component\(unlockedCount == 1 ? "" : "s") will be grouped."
   }
 
   private var panelTitle: String {
@@ -360,6 +410,42 @@ struct ProjectNavigatorView: View {
     .contextMenu {
       componentActions(part)
     }
+    .draggable(NavigatorDragPayload.component(part.id).encodedValue)
+    .dropDestination(for: String.self) { values, _ in
+      handleComponentDrop(values, before: part.id)
+    }
+  }
+
+  private func handleComponentDrop(_ values: [String], before destinationID: PartID) -> Bool {
+    guard case .component(let sourceID) = firstDragPayload(in: values) else { return false }
+    return workspace.moveComponent(sourceID, before: destinationID)
+  }
+
+  private func handleDrop(_ values: [String], onto group: NavigatorComponentGroup) -> Bool {
+    switch firstDragPayload(in: values) {
+    case .component(let sourceID):
+      let didMove = workspace.moveComponent(sourceID, toGroup: group.id)
+      if didMove { collapsedGroupIDs.remove(group.id) }
+      return didMove
+    case .componentGroup(let sourceID):
+      return workspace.moveComponentGroup(sourceID, before: group.id)
+    case .mate, nil:
+      return false
+    }
+  }
+
+  private func handleTopLevelDrop(_ values: [String]) -> Bool {
+    guard case .component(let sourceID) = firstDragPayload(in: values) else { return false }
+    return workspace.moveComponent(sourceID, toGroup: nil)
+  }
+
+  private func handleMateDrop(_ values: [String], before destinationID: JointID) -> Bool {
+    guard case .mate(let sourceID) = firstDragPayload(in: values) else { return false }
+    return workspace.moveMate(sourceID, before: destinationID)
+  }
+
+  private func firstDragPayload(in values: [String]) -> NavigatorDragPayload? {
+    values.lazy.compactMap(NavigatorDragPayload.init(encodedValue:)).first
   }
 
   @ViewBuilder
