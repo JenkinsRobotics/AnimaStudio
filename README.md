@@ -40,18 +40,24 @@ driven simultaneously from one character file and one scene script.
 
 ## The three components
 
-- **Anima Runtime** (`anima_studio/`, Python) — loads and executes `.anima`
-  files, routes output to digital and physical targets. Runs standalone
-  today; becomes a JaegerOS module filling the `animation` slot when the
-  integration lands. **(planned — nothing implemented yet)**
-- **Anima Studio app** (`studio/`, Swift/SwiftUI, macOS) — a buildable native
-  foundation now includes renderer-independent joint/clip evaluation and a
-  RealityKit sample preview. Character editing, model import, scene timelines,
-  audio sync, screens/LEDs, Live2D, and live hardware remain **(planned)**.
+- **Anima Runtime** (`anima_studio/`, Python) — the headless runtime: loads
+  `.character.anima` files into a typed parts/joints/DOF mechanism rig
+  (Onshape-mate model), evaluates clips with limits and gear/rack/screw/linear
+  relations, and streams normalized channel targets over the open Anima Wire
+  Protocol to real or simulated devices. Scene execution and JaegerOS
+  integration remain **(planned)**.
+- **Anima Studio app** (`studio/`, Swift/SwiftUI, macOS) — the native
+  authoring app: CAD-style workspaces, model import, proxy components,
+  two-click connector-authored mates, face/edge selection, timeline with
+  scrubbing and looping playback. Persistence, editable curves, and live
+  hardware output remain **(planned)**.
+- **Anima firmware** (`firmware/`, Arduino/ESP32) — the open device firmware
+  speaking the wire protocol: servo config, interpolated frames, e-stop,
+  heartbeat failsafe. Compiles for Uno and ESP32.
 - **The `.anima` format** — an open, human-readable YAML format for
-  character rigs (`.character.anima`) and performance scenes
-  (`.scene.anima`). The format is the lasting contribution — any compatible
-  runtime can execute it. Full specs in
+  mechanism rigs (`.character.anima`) and performance scenes
+  (`.scene.anima`, planned). The format is the lasting contribution — any
+  compatible runtime can execute it. Specs in
   [dev/docs/roadmap/](dev/docs/roadmap/).
 
 ## Install
@@ -97,8 +103,21 @@ Planning and design docs live under [dev/docs/](dev/docs/):
   action types, logic gates
 - [STATUS](dev/docs/reality/STATUS.md) — what actually works right now
 
-Repo conventions follow the Jaeger ecosystem rules — see
-[CONVENTIONS.md](CONVENTIONS.md) and [TAXONOMY.md](TAXONOMY.md).
+Repo conventions: [CONVENTIONS.md](CONVENTIONS.md). Agent/contributor
+contract: [AGENTS.md](AGENTS.md).
+
+## Repository map
+
+| Path | What it is |
+|---|---|
+| `anima_studio/` | Python runtime: `.anima` loader, rig/DOF/relations evaluation, wire protocol host, device simulator, tests |
+| `studio/` | Swift macOS app — `App/` (thin app target), `Sources/` (AnimaCore, AnimaStudioUI, viewport packages), `Tests/` |
+| `firmware/` | Arduino/ESP32 firmware speaking the wire protocol |
+| `examples/` | Sample `.anima` files (the only place domain-specific naming lives) |
+| `dev/briefings/` | Multi-agent coordination: mailboxes, claims, handoff log |
+| `dev/docs/` | `reality/STATUS.md` (shipped truth) · `roadmap/` (planned) · `vision/` (why) |
+| `docs/` | GitHub Pages site source |
+| `Anima Studio.app` | Local development build (gitignored) — rebuild with `studio/Scripts/build-root-app.sh` |
 
 ## Ecosystem links
 

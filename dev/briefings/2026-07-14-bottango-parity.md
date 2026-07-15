@@ -93,6 +93,8 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | UI Dev embedded production-surface previews | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevDetachedWindow.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevEmbeddedWorkspacePreview.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevUtilityWindowTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/StudioAgentPresentationTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Navigator/Inspector/Timeline/3D preview in their real in-app dock regions; Agent remains right app sidebar; only explicit Detached Window uses NSPanel; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 | Codex | Live UI Kit editor + app-wide design profile | `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioDesignProfile.swift`, `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevDesignKitView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Theme/StudioDesignProfileTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | editable centralized colors/metrics; live app-wide application; automatic persistence; default/compact/high-contrast presets; reset/import/export/copy JSON; production windows/menus/controls catalog; deterministic tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 
+| Claude | Repo organization cleanup: Jaeger-template cruft removal, README repo map, CI/CONVENTIONS refresh (root level only, no studio/ source moves) | `workspace/**` (delete), `pyproject.toml.example` (delete), `TAXONOMY.md` (delete), `VERSION` (delete), `examples/*.md`, `examples/README.md`, `CONVENTIONS.md`, `README.md`, `.github/workflows/ci.yml`, `dev/docs/reality/STATUS.md`, `dev/briefings/**` | 287 pytest + 144 swift test green post-cleanup; `git diff --check` | released 2026-07-15 |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -138,6 +140,22 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, repo cleanup):** Per Jonathan, removed the
+  Jaeger-template cruft the repo was cloned with: `workspace/` (robot
+  bringup templates), `TAXONOMY.md`, `pyproject.toml.example`,
+  `VERSION`, and the eight Jaeger taxonomy docs in `examples/`
+  (git history preserves all). `examples/README.md` now documents the
+  real `.anima` files. Deleted the empty leftover
+  `studio/Sources/AnimaStudioApp/` dir (the app target lives at
+  `studio/App` — this was the "multiple studio folders" confusion).
+  CI: Python job now installs the real package and FAILS on lint/test
+  errors (the template's `|| true` was silently passing failures).
+  CONVENTIONS.md rewritten Anima-specific (two laws kept, Jaeger
+  module/slot/workspace framing dropped). README: stale "(planned —
+  nothing implemented yet)" runtime claims replaced with current
+  truth + a repository map table. No studio/ source moves — Swift
+  structure changes stay in Codex's lane.
 
 - **2026-07-15 (Claude, Python kinematics parity — K2/K5/K7/K9 backend):**
   Shipped the backend half of `Kinematics.md` in `rig.py`/`loader.py`
