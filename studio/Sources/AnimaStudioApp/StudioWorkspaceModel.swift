@@ -3,15 +3,6 @@ import Foundation
 import Observation
 import RealityKitViewport
 
-enum WorkspaceMode: String, CaseIterable, Identifiable {
-  case build = "Build"
-  case animate = "Animate"
-  case importAssets = "Import"
-  case hardware = "Hardware"
-
-  var id: Self { self }
-}
-
 enum NavigatorItem: Hashable {
   case project
   case asset(AssetID)
@@ -24,7 +15,12 @@ enum NavigatorItem: Hashable {
 @MainActor
 @Observable
 final class StudioWorkspaceModel {
-  var mode: WorkspaceMode = .build
+  var activeWorkspace: StudioWorkspaceKind = .rig
+  var workspacePresentations = Dictionary(
+    uniqueKeysWithValues: StudioWorkspaceKind.allCases.map {
+      ($0, $0.descriptor.defaultPresentation)
+    }
+  )
   var project = AnimaProject(
     name: "Untitled Character",
     rig: SampleContent.rig,
@@ -37,6 +33,7 @@ final class StudioWorkspaceModel {
   var cameraProjection: PreviewCameraProjection = .perspective
   var cameraViewpoint: PreviewCameraViewpoint = .home
   var cameraCommandRevision = 0
+  var rigGuideVisibility = RigGuideVisibility()
   var importedModelURL: URL?
   var importedModelHierarchy: ModelHierarchyNode?
   var isLoadingModelHierarchy = false
@@ -62,6 +59,10 @@ final class StudioWorkspaceModel {
 
   var selectionCount: Int {
     selection.count
+  }
+
+  var activePresentation: WorkspacePresentation {
+    workspacePresentations[activeWorkspace] ?? activeWorkspace.descriptor.defaultPresentation
   }
 
   var selectedModelPath: ModelEntityPath? {
@@ -111,6 +112,47 @@ final class StudioWorkspaceModel {
 
   func clearSelection() {
     selection.removeAll()
+  }
+
+  func switchWorkspace(to workspace: StudioWorkspaceKind) {
+    guard activeWorkspace != workspace else { return }
+    if workspace != .animate {
+      isPlaying = false
+    }
+    activeWorkspace = workspace
+  }
+
+  func toggleNavigator() {
+    updateActivePresentation { $0.showsNavigator.toggle() }
+  }
+
+  func toggleInspector() {
+    updateActivePresentation { $0.showsInspector.toggle() }
+  }
+
+  func toggleBottomEditor() {
+    guard activeWorkspace == .animate || activeWorkspace == .show else { return }
+    updateActivePresentation { $0.showsBottomEditor.toggle() }
+  }
+
+  func resetActivePresentation() {
+    workspacePresentations[activeWorkspace] = activeWorkspace.descriptor.defaultPresentation
+  }
+
+  func toggleRigConnectors() {
+    rigGuideVisibility.showsConnectors.toggle()
+  }
+
+  func toggleRigDOFHandles() {
+    rigGuideVisibility.showsDOFHandles.toggle()
+  }
+
+  func toggleRigReferencePlanes() {
+    rigGuideVisibility.showsReferencePlanes.toggle()
+  }
+
+  func toggleRigLimits() {
+    rigGuideVisibility.showsLimits.toggle()
   }
 
   func selectModelNode(at path: ModelEntityPath, extendingSelection: Bool) {
@@ -171,5 +213,13 @@ final class StudioWorkspaceModel {
     } else {
       playheadSeconds = nextTime
     }
+  }
+
+  private func updateActivePresentation(
+    _ update: (inout WorkspacePresentation) -> Void
+  ) {
+    var presentation = activePresentation
+    update(&presentation)
+    workspacePresentations[activeWorkspace] = presentation
   }
 }

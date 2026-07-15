@@ -12,7 +12,7 @@ struct StudioWorkspaceView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      WorkspaceModeBar(workspace: workspace, closeProject: closeProject)
+      WorkspaceSwitcherBar(workspace: workspace, closeProject: closeProject)
       Divider()
       WorkspaceToolBar(
         workspace: workspace,
@@ -22,11 +22,7 @@ struct StudioWorkspaceView: View {
 
       workspaceCanvas
 
-      if workspace.mode == .animate {
-        Divider()
-        TimelineEditorView(workspace: workspace)
-          .frame(minHeight: 220, idealHeight: 270, maxHeight: 340)
-      }
+      bottomEditor
     }
     .background(StudioPalette.canvas)
     .preferredColorScheme(.dark)
@@ -70,22 +66,42 @@ struct StudioWorkspaceView: View {
     }
   }
 
+  @ViewBuilder
+  private var bottomEditor: some View {
+    if workspace.activePresentation.showsBottomEditor {
+      switch workspace.activeWorkspace {
+      case .animate:
+        Divider()
+        TimelineEditorView(workspace: workspace)
+          .frame(minHeight: 220, idealHeight: 270, maxHeight: 340)
+      case .show:
+        Divider()
+        ShowTimelineView(workspace: workspace)
+          .frame(minHeight: 210, idealHeight: 250, maxHeight: 320)
+      case .assets, .rig, .hardware:
+        EmptyView()
+      }
+    }
+  }
+
   private var workspaceCanvas: some View {
     ZStack {
-      if workspace.mode == .hardware {
-        hardwareWorkspace
+      if workspace.activeWorkspace == .hardware {
+        HardwareWorkspaceView()
       } else {
         viewport
       }
 
       HStack(alignment: .top, spacing: 16) {
-        ProjectNavigatorView(
-          workspace: workspace,
-          importModel: { isImportingModel = true }
-        )
-        .frame(width: StudioMetrics.navigatorWidth)
+        if workspace.activePresentation.showsNavigator {
+          ProjectNavigatorView(
+            workspace: workspace,
+            importModel: { isImportingModel = true }
+          )
+          .frame(width: StudioMetrics.navigatorWidth)
+        }
 
-        Spacer(minLength: 360)
+        Spacer(minLength: 320)
 
         if showsInspector {
           InspectorView(workspace: workspace)
@@ -109,6 +125,8 @@ struct StudioWorkspaceView: View {
         cameraCommandRevision: workspace.cameraCommandRevision,
         focusedModelPath: workspace.selectedModelPath,
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
+        rigGuideVisibility: workspace.activeWorkspace == .rig
+          ? workspace.rigGuideVisibility : .hidden,
         onSelectModelPath: { path in
           let modifiers = NSEvent.modifierFlags
           workspace.selectModelNode(
@@ -119,46 +137,48 @@ struct StudioWorkspaceView: View {
       )
       .frame(minWidth: 520, minHeight: 420)
 
-      HStack(spacing: 6) {
-        Image(systemName: workspace.mode.systemImage)
-        Text(workspace.mode == .importAssets ? "IMPORT PREVIEW" : "3D VIEW")
-      }
-      .font(.caption2.weight(.bold))
-      .tracking(1)
-      .foregroundStyle(StudioPalette.muted)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 6)
-      .background(.ultraThinMaterial, in: Capsule())
-      .padding(.top, 12)
+      viewportTitle
+      cameraControls
 
-      HStack {
-        Spacer()
-        ViewportCameraControls(workspace: workspace)
-          .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
+      if workspace.activeWorkspace == .rig {
+        VStack {
+          Spacer()
+          RigGuideOverlay(workspace: workspace)
+            .padding(.bottom, 16)
+        }
       }
-      .padding(.top, 10)
     }
   }
 
-  private var hardwareWorkspace: some View {
-    ZStack {
-      StudioPalette.canvas
-      ContentUnavailableView(
-        "Hardware Safely Offline",
-        systemImage: "powerplug",
-        description: Text(
-          "The protocol simulator exists, but Studio connection and arming controls are not wired yet."
-        )
-      )
-      .frame(maxWidth: 420)
+  private var viewportTitle: some View {
+    HStack(spacing: 6) {
+      Image(systemName: workspace.activeWorkspace.descriptor.systemImage)
+      Text(workspace.activeWorkspace.descriptor.viewportLabel)
     }
+    .font(.caption2.weight(.bold))
+    .tracking(1)
+    .foregroundStyle(StudioPalette.muted)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 6)
+    .background(.ultraThinMaterial, in: Capsule())
+    .padding(.top, 12)
+  }
+
+  private var cameraControls: some View {
+    HStack {
+      Spacer()
+      ViewportCameraControls(workspace: workspace)
+        .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
+    }
+    .padding(.top, 10)
   }
 
   private var showsInspector: Bool {
-    switch workspace.mode {
-    case .animate, .importAssets, .hardware:
+    guard workspace.activePresentation.showsInspector else { return false }
+    return switch workspace.activeWorkspace {
+    case .assets, .animate, .show, .hardware:
       true
-    case .build:
+    case .rig:
       switch workspace.primarySelection {
       case .asset, .modelNode, .joint:
         true

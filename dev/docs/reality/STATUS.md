@@ -19,11 +19,16 @@
   time clamping, joint-limit clamping, and Codable project round-tripping. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
   New Studio Project action and honestly disabled project-open/templates until
-  persistence ships. Its project workspace has Build/Animate/Import/Hardware
-  mode tabs, a contextual project/tool row, floating Parts and Inspector panels,
-  a central RealityKit 3D viewport, and an Animate-only timeline dock with
-  transport, tracks/keyframes, click/drag scrubbing, and looping playback. The
-  Hardware workspace visibly remains safely offline. The viewport now provides
+  persistence ships. Its project window now has task-focused Assets, Rig,
+  Animate, Show, and Hardware workspaces with Command-1…5 switching, a stable
+  global project/live bar, workspace-owned contextual tools, and independently
+  restorable in-session navigator/inspector/bottom-panel visibility. Assets
+  centers import and hierarchy inspection; Rig centers parts and joints;
+  Animate owns the working timeline dock with transport, tracks/keyframes,
+  click/drag scrubbing, and looping playback; Show has a distinct multi-track
+  character/audio/screen/event timeline scaffold; Hardware has structured
+  connection, safety, mapping, and filterable-log surfaces that visibly remain
+  safely offline. The viewport now provides
   a readable grid, Home/front/right/top camera presets, perspective/orthographic
   projection switching, orbit controls, and framing of a selected imported
   model node. The Parts outline follows macOS file-browser selection conventions:
@@ -32,13 +37,16 @@
   be selected directly in the viewport, with Command/Shift extending the same
   Parts-tree selection. Shared theme metrics and
   reusable panel, text-field, picker, readout, and primary-button styles keep
-  new Studio windows visually consistent. Project, asset, and joint names plus
+  new Studio windows visually consistent. The sample Rig viewport also renders
+  a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
+  optional reference plane, and a highlighted limit arc with independent layer
+  toggles. Project, asset, and joint names plus
   a joint's rotation axis are editable in memory. Users can select a
   RealityKit-supported USD/Reality model; it loads asynchronously, is normalized
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Eight tests pass with `cd studio && swift test`, including real USD
+  inspector. Fifteen tests pass with `cd studio && swift test`, including real USD
   hierarchy loading/projection through RealityKit and duplicate/unnamed entity
   identity coverage. The Python package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
@@ -69,7 +77,9 @@
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
 - **Known gaps:** imported model hierarchies can be inspected but cannot yet be
-  mapped to persistent semantic parts; joint limits and keyframes are not yet
+  mapped to persistent semantic parts; the mate guides currently visualize the
+  sample revolute joint but are not editable handles or attached to imported
+  parts; joint limits and keyframes are not yet
   editable; project changes are not
   persisted; imported security-scoped URLs
   last only for the current session. Project open/save, undo/redo, Home

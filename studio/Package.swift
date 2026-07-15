@@ -36,5 +36,9 @@ let package = Package(
       dependencies: ["RealityKitViewport"],
       resources: [.copy("Fixtures")]
     ),
+    .testTarget(
+      name: "AnimaStudioAppTests",
+      dependencies: ["AnimaStudioApp"]
+    ),
   ]
 )

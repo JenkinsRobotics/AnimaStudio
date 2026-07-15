@@ -63,6 +63,33 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — task-focused workspace implementation complete:** Assets,
+  Rig, Animate, Show, and Hardware now own distinct contextual tools and panel
+  contents, Command-1…5 switching, and independent in-session layout state.
+  Show has its own multi-track scaffold; Hardware has offline status/safety/
+  mapping/log surfaces. The sample rig has toggleable XYZ connector, revolute
+  DOF, reference-plane, and limit layers. Fifteen Swift tests and GUI launch
+  pass. Direct gizmo dragging waits for Claude's typed joint/DOF contract.
+
+- **2026-07-14 — mate visualization contract:** Onshape's mate connector is the
+  reference anchor: origin plus local XYZ frame, with mate type exposing only
+  its valid DOF handles. Revolute=ring, prismatic=rail, cylindrical=both,
+  ball=three rings, planar=plane/in-plane handles, fastened=frame only. Limits,
+  neutral/current state, hover selection, screen-stable sizing, numeric fields,
+  and safe virtual exercise are specified in `Studio_App.md`. The current sample
+  rig now renders the connector, revolute ring, optional plane, and limit arc;
+  editable/imported attachment waits for the shared typed-DOF model.
+
+- **2026-07-14 — active task-focused workspace implementation:** Replacing the
+  four cosmetic modes with five descriptors (Assets, Rig, Animate, Show,
+  Hardware), workspace-owned contextual tools, and independent in-session panel
+  layouts. Adding a Show timeline scaffold and a structured safely-offline
+  Hardware dashboard. No Python/firmware or typed-DOF files are in this claim.
+  Jonathan's mate-connector visualization request is included as a real
+  RealityKit guide foundation: local XYZ frame, optional reference plane, and
+  limit/DOF handles on the sample rig; typed-mate-specific editing remains
+  gated on the shared DOF contract.
+
 - **2026-07-14 — supplied UI research reconciled:** Accepted context-sensitive
   workspace/selection tools, shared tree↔viewport↔timeline selection, typed
   progressive inspectors, exact plus draggable numeric fields, synchronized

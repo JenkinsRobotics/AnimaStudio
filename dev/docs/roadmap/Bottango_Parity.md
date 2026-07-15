@@ -36,7 +36,7 @@ its user flow, tests, and `STATUS.md` update land together.
 |---|---|---|---|---|
 | B01 | Workspace & UI | Project home; task-focused Assets/Rig/Animate/Show/Hardware workspaces; stable global header plus workspace-owned contextual headers; restorable panel layouts; camera/orbit; selection; inspector; save/load/save-as; dirty state; autosave/recovery; undo/redo | `AnimaStudioApp`, document layer | **Foundation:** Build/Animate/Import/Hardware shell, tree, viewport, inspector, camera, and selection exist. Workspace descriptors/layout restoration, Show, persistence, dirty state, autosave, undo/redo planned. Must finish before hardware authoring. |
 | B02 | Structures | Semantic parts as animation controls; imported or primitive visual stand-ins; transforms; pivots; home pose; parent/child hierarchy; duplicate/delete/reparent | `AnimaCore` rig model + Studio Build mode + viewport | **Planned.** Imported assets exist, but model nodes cannot become persistent semantic parts. Depends on B01 persistence. |
-| B03 | Joints | Revolute and prismatic joints first; parent/child connection; axis; pivot; neutral; min/max; offsets; duplicate assemblies; viewport gizmos | `AnimaCore`, `RealityKitViewport`, Build inspector | **Foundation:** scalar joint definition and clamping exist. Editing, hierarchy binding, joint types, pivots, and gizmos planned. Depends on B02. |
+| B03 | Joints | Typed mate connectors; revolute, prismatic, cylindrical, ball, planar, and fastened joints; per-DOF handles; parent/child connection; connector frames; pivots; neutral; min/max; offsets; duplicate assemblies; viewport guides/gizmos | `AnimaCore`, `RealityKitViewport`, Rig inspector | **Foundation:** scalar joint definition/clamping plus a sample RealityKit connector frame, revolute ring, reference plane, and limit arc exist. Typed editing, hierarchy binding, placement, compound handles, and imported-part attachment are planned. Depends on B02 and the shared DOF contract. |
 | B04 | Motors / actuator mapping | Separate semantic joints from output channels; normalized mapping; inversion; neutral/home; signal range; velocity limit; resolve conflicting home values | format mapping + runtime output config + Studio Hardware inspector | **Planned.** Must not put servo pins or pulse widths in core timeline data. Depends on B03 and the shared output contract. |
 | B05 | Hardware drivers | Add/remove/connect drivers; explicit arm/disarm (Master Live equivalent); status; multiple/network devices; logs; heartbeat; failsafe; emergency stop | Studio Hardware mode + `AnimationOutput` + runtime/firmware | **Lane B foundation in progress:** Wire Protocol v0 and Python simulator. Studio connection UI planned. Depends on B04 and protocol proof. |
 | B06 | Animating | Clip management; duration/loop; tracks; dope sheet; auto-key; select/move/copy/delete keyframes; playback; frame/time display; graph view; Bézier handles; interpolation modes; speed warnings | `AnimaCore` + timeline/graph views | **Foundation:** clips, tracks, hold/linear evaluation, transport, keyframe display, scrubbing. Editable keys, auto-key, Bézier/graph view, undo, and limit warnings planned. Depends on B01–B03. |
@@ -85,6 +85,13 @@ Imported asset node       semantic part       semantic joint       actuator map
 These are four different concepts. A model node may be collapsed or instanced;
 a joint remains meaningful with no hardware; an actuator mapping can change
 without rewriting animation.
+
+Typed joints use mate-connector frames. RealityKit renders screen-readable XYZ
+frames and only the handles allowed by the joint's DOFs: a revolute ring, a
+prismatic rail, both for cylindrical, three rotation rings for ball, a planar
+patch with in-plane handles, or no motion handle for fastened. Limit geometry,
+neutral/current markers, hover/selection feedback, and numeric inspector rows
+must remain synchronized. Virtual DOF exercise never implies hardware arming.
 
 ### B06 — Timeline and graph editor
 

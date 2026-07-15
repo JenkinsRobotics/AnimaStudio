@@ -8,74 +8,18 @@ struct ProjectNavigatorView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      WorkspacePanelHeader(title: panelTitle, systemImage: panelSystemImage)
+      WorkspacePanelHeader(
+        title: panelTitle,
+        systemImage: workspace.activeWorkspace.descriptor.systemImage
+      )
 
       List(selection: $workspace.selection) {
-        Section("Project") {
-          Label(workspace.project.name, systemImage: "shippingbox")
-            .tag(NavigatorItem.project)
-        }
-
-        if workspace.mode == .importAssets || !workspace.project.assets.isEmpty {
-          Section("Assets") {
-            if workspace.project.assets.isEmpty {
-              ContentUnavailableView(
-                "No Models",
-                systemImage: "cube.transparent",
-                description: Text("Import USD content to begin.")
-              )
-            } else {
-              ForEach(workspace.project.assets) { asset in
-                Label(asset.name, systemImage: "cube")
-                  .tag(NavigatorItem.asset(asset.id))
-              }
-            }
-          }
-        }
-
-        Section("Structure") {
-          if workspace.isLoadingModelHierarchy {
-            HStack {
-              ProgressView()
-                .controlSize(.small)
-              Text("Reading model hierarchy…")
-                .foregroundStyle(.secondary)
-            }
-          } else if let hierarchy = workspace.importedModelHierarchy {
-            OutlineGroup([hierarchy], children: \.outlineChildren) { node in
-              Label(
-                node.displayName,
-                systemImage: node.children.isEmpty ? "cube" : "square.3.layers.3d"
-              )
-              .tag(NavigatorItem.modelNode(node.id))
-            }
-          } else {
-            Label("Sample Mechanism", systemImage: "square.3.layers.3d")
-              .tag(NavigatorItem.structure)
-              .badge("2")
-          }
-        }
-
-        Section("Joints") {
-          ForEach(workspace.project.rig.joints, id: \.id) { joint in
-            Label(joint.displayName, systemImage: "rotate.3d")
-              .tag(NavigatorItem.joint(joint.id))
-          }
-        }
-
-        if workspace.mode == .animate {
-          Section("Animations") {
-            ForEach(workspace.project.clips, id: \.name) { clip in
-              Label(clip.name, systemImage: "timeline.selection")
-                .tag(NavigatorItem.animation(clip.name))
-            }
-          }
-        }
+        navigatorContent
       }
       .listStyle(.sidebar)
       .scrollContentBackground(.hidden)
       .background(StudioPalette.panel)
-      .accessibilityLabel("Project parts and assets")
+      .accessibilityLabel(panelTitle)
 
       Divider()
       panelFooter
@@ -84,28 +28,157 @@ struct ProjectNavigatorView: View {
   }
 
   @ViewBuilder
+  private var navigatorContent: some View {
+    switch workspace.activeWorkspace {
+    case .assets:
+      projectSection
+      assetSection
+      importedHierarchySection
+    case .rig:
+      projectSection
+      structureSection
+      jointSection
+    case .animate:
+      animationSection
+      structureSection
+      jointSection
+    case .show:
+      showSection
+      animationSection
+      mediaSection
+    case .hardware:
+      hardwareSection
+    }
+  }
+
+  private var projectSection: some View {
+    Section("Project") {
+      Label(workspace.project.name, systemImage: "shippingbox")
+        .tag(NavigatorItem.project)
+    }
+  }
+
+  @ViewBuilder
+  private var assetSection: some View {
+    Section("Assets") {
+      if workspace.project.assets.isEmpty {
+        Label("No imported assets", systemImage: "cube.transparent")
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(workspace.project.assets) { asset in
+          Label(asset.name, systemImage: "cube")
+            .tag(NavigatorItem.asset(asset.id))
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var importedHierarchySection: some View {
+    if workspace.importedModelHierarchy != nil || workspace.isLoadingModelHierarchy {
+      structureSection
+    }
+  }
+
+  @ViewBuilder
+  private var structureSection: some View {
+    Section("Parts & Structure") {
+      if workspace.isLoadingModelHierarchy {
+        HStack {
+          ProgressView()
+            .controlSize(.small)
+          Text("Reading model hierarchy…")
+            .foregroundStyle(.secondary)
+        }
+      } else if let hierarchy = workspace.importedModelHierarchy {
+        OutlineGroup([hierarchy], children: \.outlineChildren) { node in
+          Label(
+            node.displayName,
+            systemImage: node.children.isEmpty ? "cube" : "square.3.layers.3d"
+          )
+          .tag(NavigatorItem.modelNode(node.id))
+        }
+      } else {
+        Label("Sample Mechanism", systemImage: "square.3.layers.3d")
+          .tag(NavigatorItem.structure)
+          .badge("2")
+      }
+    }
+  }
+
+  private var jointSection: some View {
+    Section("Joints") {
+      ForEach(workspace.project.rig.joints, id: \.id) { joint in
+        Label(joint.displayName, systemImage: "rotate.3d")
+          .tag(NavigatorItem.joint(joint.id))
+      }
+    }
+  }
+
+  private var animationSection: some View {
+    Section("Animations") {
+      ForEach(workspace.project.clips, id: \.name) { clip in
+        Label(clip.name, systemImage: "timeline.selection")
+          .tag(NavigatorItem.animation(clip.name))
+      }
+    }
+  }
+
+  private var showSection: some View {
+    Section("Show") {
+      Label("No scene document", systemImage: "sparkles.rectangle.stack")
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var mediaSection: some View {
+    Section("Media & Effects") {
+      Label("No audio, screens, lights, or events", systemImage: "waveform.badge.plus")
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var hardwareSection: some View {
+    Group {
+      Section("Drivers") {
+        Label("No configured drivers", systemImage: "powerplug")
+          .foregroundStyle(.secondary)
+      }
+      Section("Actuator Mappings") {
+        Label("No output mappings", systemImage: "arrow.triangle.branch")
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  @ViewBuilder
   private var panelFooter: some View {
-    switch workspace.mode {
-    case .importAssets:
+    switch workspace.activeWorkspace {
+    case .assets:
       Button(action: importModel) {
         Label("Import Model", systemImage: "plus.circle.fill")
       }
       .buttonStyle(StudioPrimaryButtonStyle())
       .disabled(workspace.isLoadingModelHierarchy)
       .padding(12)
-    case .build:
+    case .rig:
       Button("Create Semantic Part", systemImage: "plus.circle.fill") {}
         .buttonStyle(.borderedProminent)
         .disabled(true)
-        .help("Part creation follows durable project persistence")
+        .help("Part creation follows the typed-joint project contract")
         .padding(12)
     case .animate:
       Text(selectionGuidance)
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
+    case .show:
+      Label("Scene documents are not wired yet", systemImage: "lock")
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+        .padding(12)
     case .hardware:
-      Label("No hardware drivers configured", systemImage: "powerplug")
+      Label("Hardware output is safely offline", systemImage: "lock.shield")
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
@@ -120,18 +193,11 @@ struct ProjectNavigatorView: View {
   }
 
   private var panelTitle: String {
-    switch workspace.mode {
-    case .build, .animate: "Parts"
-    case .importAssets: "Imported Assets"
+    switch workspace.activeWorkspace {
+    case .assets: "Assets"
+    case .rig, .animate: "Parts"
+    case .show: "Show Contents"
     case .hardware: "Hardware"
-    }
-  }
-
-  private var panelSystemImage: String {
-    switch workspace.mode {
-    case .build, .animate: "point.3.connected.trianglepath.dotted"
-    case .importAssets: "square.and.arrow.down"
-    case .hardware: "cable.connector"
     }
   }
 }

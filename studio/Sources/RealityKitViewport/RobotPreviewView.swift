@@ -25,6 +25,7 @@ public struct RobotPreviewView: View {
   private let focusedModelPath: ModelEntityPath?
   private let importedHierarchyRootPath: ModelEntityPath?
   private let onSelectModelPath: (ModelEntityPath) -> Void
+  private let rigGuideVisibility: RigGuideVisibility
 
   public init(
     frame: EvaluatedFrame,
@@ -35,6 +36,7 @@ public struct RobotPreviewView: View {
     cameraCommandRevision: Int = 0,
     focusedModelPath: ModelEntityPath? = nil,
     importedHierarchyRootPath: ModelEntityPath? = nil,
+    rigGuideVisibility: RigGuideVisibility = .hidden,
     onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in }
   ) {
     self.frame = frame
@@ -45,6 +47,7 @@ public struct RobotPreviewView: View {
     self.cameraCommandRevision = cameraCommandRevision
     self.focusedModelPath = focusedModelPath
     self.importedHierarchyRootPath = importedHierarchyRootPath
+    self.rigGuideVisibility = rigGuideVisibility
     self.onSelectModelPath = onSelectModelPath
   }
 
@@ -68,6 +71,7 @@ public struct RobotPreviewView: View {
       }
 
       root.findEntity(named: "previewGrid")?.isEnabled = showsGrid
+      RigGuideFactory.apply(rigGuideVisibility, to: root)
       Self.applyProjectionIfNeeded(projection, to: root)
       Self.applyCameraCommandIfNeeded(
         revision: cameraCommandRevision,
@@ -129,6 +133,7 @@ public struct RobotPreviewView: View {
     headYaw.name = SampleContent.headYawID.rawValue
     headYaw.position.y = 1.25
     sampleMechanism.addChild(headYaw)
+    headYaw.addChild(RigGuideFactory.makeRevoluteGuide())
 
     let head = ModelEntity(
       mesh: .generateBox(width: 0.72, height: 0.46, depth: 0.58),

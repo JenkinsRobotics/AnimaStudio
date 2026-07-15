@@ -14,77 +14,25 @@ struct InspectorView: View {
       )
 
       Form {
+        workspaceSummary
         modeSummary
         selectionConfiguration
-        workspaceSummary
       }
       .formStyle(.grouped)
       .scrollContentBackground(.hidden)
       .background(StudioPalette.panel)
 
-      if workspace.mode == .animate {
-        Divider()
-        Button("Create Animation", systemImage: "plus.circle.fill") {}
-          .buttonStyle(.borderedProminent)
-          .disabled(true)
-          .help("Animation creation lands with editable clips")
-          .padding(12)
-      }
+      panelFooter
     }
     .studioPanelSurface()
   }
 
-  @ViewBuilder
-  private var modeSummary: some View {
-    if workspace.mode == .hardware {
-      Section("Driver Status") {
-        LabeledContent("Connection", value: "Offline")
-        LabeledContent("Configured Drivers", value: "0")
-        LabeledContent("Master Live", value: "Disarmed")
-        Label("Output remains disabled", systemImage: "lock.shield")
-          .foregroundStyle(.secondary)
-      }
-    } else if workspace.mode == .animate {
-      Section("Active Animation") {
-        LabeledContent("Name", value: workspace.activeClip.name)
-        LabeledContent(
-          "Duration",
-          value: workspace.activeClip.durationSeconds.formatted(
-            .number.precision(.fractionLength(2))
-          ) + " s"
-        )
-        LabeledContent("Tracks", value: "\(workspace.activeClip.jointTracks.count)")
-      }
-    }
-  }
-
-  @ViewBuilder
-  private var selectionConfiguration: some View {
-    if workspace.mode == .hardware {
-      EmptyView()
-    } else if let selectedAsset {
-      assetInspector(selectedAsset)
-    } else if let selectedModelNode {
-      modelNodeInspector(selectedModelNode)
-    } else if let selectedJoint {
-      jointInspector(selectedJoint)
-    } else if workspace.selectionCount > 1 {
-      Section("Multiple Selection") {
-        LabeledContent("Selected", value: "\(workspace.selectionCount) items")
-        Text("Configuration is available when one item is selected.")
-          .foregroundStyle(.secondary)
-      }
-    } else if workspace.mode != .animate {
-      Section("Selection") {
-        Text("Select an asset, model node, or joint to configure it.")
-          .foregroundStyle(.secondary)
-      }
-    }
-  }
-
   private var workspaceSummary: some View {
     Section("Workspace") {
-      LabeledContent("Mode", value: workspace.mode.rawValue)
+      LabeledContent("Workspace", value: workspace.activeWorkspace.descriptor.title)
+      Text(workspace.activeWorkspace.descriptor.purpose)
+        .font(.caption)
+        .foregroundStyle(.secondary)
       LabeledContent(
         "Time",
         value: workspace.playheadSeconds.formatted(
@@ -97,17 +45,102 @@ struct InspectorView: View {
     }
   }
 
+  @ViewBuilder
+  private var modeSummary: some View {
+    switch workspace.activeWorkspace {
+    case .hardware:
+      Section("Safety State") {
+        LabeledContent("Connection", value: "Offline")
+        LabeledContent("Configured Drivers", value: "0")
+        LabeledContent("Master Live", value: "Disarmed")
+        Label("Output remains disabled", systemImage: "lock.shield")
+          .foregroundStyle(.secondary)
+      }
+    case .animate:
+      animationInspector(workspace.activeClip)
+    case .show:
+      Section("Show Document") {
+        LabeledContent("Status", value: "Not created")
+        LabeledContent("Characters", value: "1 preview")
+        LabeledContent("Tracks", value: "0")
+        Label("Scene persistence is required before cue editing", systemImage: "info.circle")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    case .assets:
+      Section("Asset Library") {
+        LabeledContent("Imported", value: "\(workspace.project.assets.count)")
+        LabeledContent("Missing", value: "0")
+      }
+    case .rig:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private var selectionConfiguration: some View {
+    if workspace.activeWorkspace == .hardware {
+      EmptyView()
+    } else if let selectedAnimation, workspace.activeWorkspace != .animate {
+      animationInspector(selectedAnimation)
+    } else if let selectedAsset {
+      assetInspector(selectedAsset)
+    } else if let selectedModelNode {
+      modelNodeInspector(selectedModelNode)
+    } else if let selectedJoint {
+      jointInspector(selectedJoint)
+    } else if workspace.selectionCount > 1 {
+      Section("Multiple Selection") {
+        LabeledContent("Selected", value: "\(workspace.selectionCount) items")
+        Text("Only operations shared by every selected item will appear here.")
+          .foregroundStyle(.secondary)
+      }
+    } else if workspace.activeWorkspace == .rig || workspace.activeWorkspace == .assets {
+      Section("Selection") {
+        Text("Select an asset, model node, or joint to configure it.")
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var panelFooter: some View {
+    switch workspace.activeWorkspace {
+    case .animate:
+      Divider()
+      Button("Create Animation", systemImage: "plus.circle.fill") {}
+        .buttonStyle(.borderedProminent)
+        .disabled(true)
+        .help("Animation creation lands with editable clips")
+        .padding(12)
+    case .show:
+      Divider()
+      Button("Create Scene", systemImage: "plus.circle.fill") {}
+        .buttonStyle(.borderedProminent)
+        .disabled(true)
+        .help("Scene documents are not wired yet")
+        .padding(12)
+    case .assets, .rig, .hardware:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
   private func assetInspector(_ asset: ProjectAsset) -> some View {
     Section("Model Asset") {
-      StudioTextFieldRow(
-        title: "Name",
-        text: Binding(
-          get: { asset.name },
-          set: { workspace.renameAsset(id: asset.id, to: $0) }
-        ),
-        placeholder: "Model name",
-        help: "The human-readable asset name stored in this project."
-      )
+      if workspace.activeWorkspace == .assets {
+        StudioTextFieldRow(
+          title: "Name",
+          text: Binding(
+            get: { asset.name },
+            set: { workspace.renameAsset(id: asset.id, to: $0) }
+          ),
+          placeholder: "Model name",
+          help: "The human-readable asset name stored in this project."
+        )
+      } else {
+        LabeledContent("Name", value: asset.name)
+      }
       LabeledContent("Type", value: "USD / RealityKit")
       LabeledContent("Source", value: asset.sourcePath)
         .lineLimit(3)
@@ -124,7 +157,7 @@ struct InspectorView: View {
       LabeledContent("Semantic Part", value: "Not mapped")
         .foregroundStyle(.secondary)
       Label(
-        "Imported hierarchy nodes remain read-only until mapped to a semantic part.",
+        "Map this imported node to a semantic part before assigning a mate connector.",
         systemImage: "info.circle"
       )
       .font(.caption)
@@ -135,26 +168,31 @@ struct InspectorView: View {
   @ViewBuilder
   private func jointInspector(_ joint: JointDefinition) -> some View {
     Section("Joint") {
-      StudioTextFieldRow(
-        title: "Name",
-        text: Binding(
-          get: { joint.displayName },
-          set: { workspace.renameJoint(id: joint.id, to: $0) }
-        ),
-        placeholder: "Joint name",
-        help: "The readable name shown throughout the rig and timeline."
-      )
-      StudioPickerRow(
-        title: "Rotation Axis",
-        selection: Binding(
-          get: { joint.axis },
-          set: { workspace.setJointAxis(id: joint.id, to: $0) }
-        ),
-        help: "The local axis driven by this rotational joint."
-      ) {
-        Text("X").tag(JointAxis.x)
-        Text("Y").tag(JointAxis.y)
-        Text("Z").tag(JointAxis.z)
+      if workspace.activeWorkspace == .rig {
+        StudioTextFieldRow(
+          title: "Name",
+          text: Binding(
+            get: { joint.displayName },
+            set: { workspace.renameJoint(id: joint.id, to: $0) }
+          ),
+          placeholder: "Joint name",
+          help: "The readable name shown throughout the rig and timeline."
+        )
+        StudioPickerRow(
+          title: "Rotation Axis",
+          selection: Binding(
+            get: { joint.axis },
+            set: { workspace.setJointAxis(id: joint.id, to: $0) }
+          ),
+          help: "Temporary scalar-joint control pending the typed mate/DOF contract."
+        ) {
+          Text("X").tag(JointAxis.x)
+          Text("Y").tag(JointAxis.y)
+          Text("Z").tag(JointAxis.z)
+        }
+      } else {
+        LabeledContent("Name", value: joint.displayName)
+        LabeledContent("Axis", value: joint.axis.rawValue.uppercased())
       }
       StudioReadoutRow(
         title: "Evaluated Angle",
@@ -169,6 +207,19 @@ struct InspectorView: View {
         unit: "rad",
         help: "Motion is clamped to these rig-defined limits."
       )
+    }
+  }
+
+  private func animationInspector(_ clip: AnimationClip) -> some View {
+    Section("Active Animation") {
+      LabeledContent("Name", value: clip.name)
+      LabeledContent(
+        "Duration",
+        value: clip.durationSeconds.formatted(
+          .number.precision(.fractionLength(2))
+        ) + " s"
+      )
+      LabeledContent("Tracks", value: "\(clip.jointTracks.count)")
     }
   }
 
@@ -189,11 +240,18 @@ struct InspectorView: View {
     return workspace.project.rig.joints.first { $0.id == selectedID }
   }
 
+  private var selectedAnimation: AnimationClip? {
+    guard case .animation(let name) = workspace.primarySelection else { return nil }
+    return workspace.project.clips.first { $0.name == name }
+  }
+
   private var panelTitle: String {
-    switch workspace.mode {
-    case .animate: "Animations"
+    switch workspace.activeWorkspace {
+    case .assets: "Asset Inspector"
+    case .rig: "Rig Inspector"
+    case .animate: "Animation Inspector"
+    case .show: "Show Inspector"
     case .hardware: "Hardware Status"
-    case .build, .importAssets: "Inspector"
     }
   }
 
@@ -203,10 +261,6 @@ struct InspectorView: View {
   }
 
   private var panelSystemImage: String {
-    switch workspace.mode {
-    case .animate: "play.circle.fill"
-    case .hardware: "cable.connector"
-    case .build, .importAssets: "slider.horizontal.3"
-    }
+    workspace.activeWorkspace.descriptor.systemImage
   }
 }

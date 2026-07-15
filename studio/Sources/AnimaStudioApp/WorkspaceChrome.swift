@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct WorkspaceModeBar: View {
+struct WorkspaceSwitcherBar: View {
   @Bindable var workspace: StudioWorkspaceModel
   let closeProject: () -> Void
 
@@ -29,28 +29,34 @@ struct WorkspaceModeBar: View {
       .menuIndicator(.hidden)
       .help("Workspace information")
 
-      ForEach(WorkspaceMode.allCases) { mode in
+      ForEach(StudioWorkspaceKind.allCases) { kind in
+        let descriptor = kind.descriptor
         Button {
-          workspace.mode = mode
-          if mode != .animate {
-            workspace.isPlaying = false
-          }
+          workspace.switchWorkspace(to: kind)
         } label: {
-          Label(mode.rawValue, systemImage: mode.systemImage)
-            .font(.callout.weight(workspace.mode == mode ? .semibold : .regular))
-            .foregroundStyle(workspace.mode == mode ? Color.white : StudioPalette.muted)
+          Label(descriptor.title, systemImage: descriptor.systemImage)
+            .font(.callout.weight(workspace.activeWorkspace == kind ? .semibold : .regular))
+            .foregroundStyle(
+              workspace.activeWorkspace == kind ? Color.white : StudioPalette.muted
+            )
             .frame(maxWidth: .infinity)
             .frame(height: 29)
             .background(
-              workspace.mode == mode ? Color.white.opacity(0.18) : Color.black.opacity(0.16),
+              workspace.activeWorkspace == kind
+                ? Color.white.opacity(0.18) : Color.black.opacity(0.16),
               in: Capsule()
             )
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: 190)
+        .frame(maxWidth: 170)
+        .keyboardShortcut(
+          KeyEquivalent(Character(String(kind.shortcutNumber))),
+          modifiers: .command
+        )
+        .help("\(descriptor.purpose) (⌘\(kind.shortcutNumber))")
       }
 
-      Spacer(minLength: 20)
+      Spacer(minLength: 16)
 
       HStack(spacing: 7) {
         Circle()
@@ -89,84 +95,15 @@ struct WorkspaceToolBar: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      TextField("Project name", text: $workspace.project.name)
-        .textFieldStyle(.plain)
-        .font(.title3.italic())
-        .lineLimit(1)
-        .padding(.horizontal, 8)
-        .frame(height: StudioMetrics.fieldHeight)
-        .frame(minWidth: 150, maxWidth: 240, alignment: .leading)
-        .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-          RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
-            .stroke(StudioPalette.border, lineWidth: 1)
-        }
-        .help("Editable project name")
-
-      Group {
-        Button("Save", systemImage: "square.and.arrow.down") {}
-          .disabled(true)
-          .help("Project saving arrives with the document layer")
-        Button("Open", systemImage: "folder") {}
-          .disabled(true)
-          .help("Project opening arrives with the document layer")
-      }
-      .labelStyle(.iconOnly)
+      globalProjectControls
 
       Divider()
         .frame(height: 28)
 
-      Group {
-        Button("Undo", systemImage: "arrow.uturn.backward") {}
-        Button("Redo", systemImage: "arrow.uturn.forward") {}
-      }
-      .labelStyle(.iconOnly)
-      .disabled(true)
-      .help("Undo history is planned for the durable document")
+      workspaceIdentity
+      WorkspaceContextualTools(workspace: workspace, importModel: importModel)
 
-      Divider()
-        .frame(height: 28)
-
-      Button {
-        workspace.showsPreviewGrid.toggle()
-      } label: {
-        Label(
-          workspace.showsPreviewGrid ? "Hide Grid" : "Show Grid",
-          systemImage: workspace.showsPreviewGrid ? "eye.fill" : "eye.slash"
-        )
-      }
-      .labelStyle(.iconOnly)
-      .help(workspace.showsPreviewGrid ? "Hide viewport grid" : "Show viewport grid")
-
-      Group {
-        Button("Move", systemImage: "arrow.up.and.down.and.arrow.left.and.right") {}
-        Button("Rotate", systemImage: "rotate.right") {}
-        Button("Scale", systemImage: "arrow.up.left.and.arrow.down.right") {}
-      }
-      .labelStyle(.iconOnly)
-      .disabled(true)
-      .help("Transform gizmos arrive with editable semantic parts")
-
-      Button {
-        workspace.frameSelection()
-      } label: {
-        Label("Frame Selection", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
-      }
-      .labelStyle(.iconOnly)
-      .disabled(!workspace.canFrameSelection)
-      .help("Move the camera to frame the selected model node")
-
-      Divider()
-        .frame(height: 28)
-
-      Button(action: importModel) {
-        Label("Import Model", systemImage: "plus.square.on.square")
-      }
-      .labelStyle(.iconOnly)
-      .disabled(workspace.isLoadingModelHierarchy)
-      .help("Import a USD, USDZ, or RealityKit model")
-
-      Spacer()
+      Spacer(minLength: 12)
 
       if workspace.isLoadingModelHierarchy {
         ProgressView()
@@ -176,11 +113,233 @@ struct WorkspaceToolBar: View {
           .foregroundStyle(StudioPalette.muted)
       }
 
+      workspaceLayoutMenu
     }
     .buttonStyle(.borderless)
     .padding(.horizontal, 14)
     .frame(height: StudioMetrics.toolBarHeight)
     .background(StudioPalette.chrome.opacity(0.96))
+  }
+
+  private var globalProjectControls: some View {
+    Group {
+      TextField("Project name", text: $workspace.project.name)
+        .textFieldStyle(.plain)
+        .font(.title3.italic())
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .frame(height: StudioMetrics.fieldHeight)
+        .frame(minWidth: 150, maxWidth: 230, alignment: .leading)
+        .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+          RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+            .stroke(StudioPalette.border, lineWidth: 1)
+        }
+        .help("Editable project name")
+
+      Button("Save", systemImage: "square.and.arrow.down") {}
+        .labelStyle(.iconOnly)
+        .disabled(true)
+        .help("Project saving arrives with the document layer")
+      Button("Open", systemImage: "folder") {}
+        .labelStyle(.iconOnly)
+        .disabled(true)
+        .help("Project opening arrives with the document layer")
+      Button("Undo", systemImage: "arrow.uturn.backward") {}
+        .labelStyle(.iconOnly)
+        .disabled(true)
+        .help("Undo history is planned for the durable document")
+      Button("Redo", systemImage: "arrow.uturn.forward") {}
+        .labelStyle(.iconOnly)
+        .disabled(true)
+        .help("Redo history is planned for the durable document")
+    }
+  }
+
+  private var workspaceIdentity: some View {
+    let descriptor = workspace.activeWorkspace.descriptor
+    return Label(descriptor.title.uppercased(), systemImage: descriptor.systemImage)
+      .font(.caption2.weight(.bold))
+      .tracking(0.8)
+      .foregroundStyle(StudioPalette.accent)
+      .help(descriptor.purpose)
+  }
+
+  private var workspaceLayoutMenu: some View {
+    Menu {
+      Button {
+        workspace.toggleNavigator()
+      } label: {
+        Label(
+          "Navigator",
+          systemImage: workspace.activePresentation.showsNavigator ? "checkmark" : "sidebar.left"
+        )
+      }
+      Button {
+        workspace.toggleInspector()
+      } label: {
+        Label(
+          "Inspector",
+          systemImage: workspace.activePresentation.showsInspector ? "checkmark" : "sidebar.right"
+        )
+      }
+      if workspace.activeWorkspace == .animate || workspace.activeWorkspace == .show {
+        Button {
+          workspace.toggleBottomEditor()
+        } label: {
+          Label(
+            "Bottom Editor",
+            systemImage: workspace.activePresentation.showsBottomEditor
+              ? "checkmark" : "rectangle.bottomthird.inset.filled"
+          )
+        }
+      }
+      Divider()
+      Button("Reset \(workspace.activeWorkspace.descriptor.title) Layout") {
+        workspace.resetActivePresentation()
+      }
+    } label: {
+      Label("Workspace Layout", systemImage: "rectangle.3.group")
+    }
+    .labelStyle(.iconOnly)
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .help("Show, hide, or reset panels for this workspace")
+  }
+}
+
+private struct WorkspaceContextualTools: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  let importModel: () -> Void
+
+  var body: some View {
+    switch workspace.activeWorkspace {
+    case .assets:
+      assetTools
+    case .rig:
+      rigTools
+    case .animate:
+      animationTools
+    case .show:
+      showTools
+    case .hardware:
+      hardwareTools
+    }
+  }
+
+  private var assetTools: some View {
+    Group {
+      Button(action: importModel) {
+        Label("Import Model", systemImage: "plus.square.on.square")
+      }
+      .disabled(workspace.isLoadingModelHierarchy)
+      .help("Import a USD, USDZ, or RealityKit model")
+
+      Button("Relink Asset", systemImage: "link") {}
+        .disabled(true)
+        .help("Asset relinking arrives with durable projects")
+    }
+  }
+
+  private var rigTools: some View {
+    Group {
+      gridButton
+      Button("Move", systemImage: "arrow.up.and.down.and.arrow.left.and.right") {}
+        .disabled(true)
+        .help("Move gizmos arrive with semantic parts")
+      Button("Rotate", systemImage: "rotate.right") {}
+        .disabled(true)
+        .help("Rotation gizmos arrive with typed joints and DOFs")
+      Button("Scale", systemImage: "arrow.up.left.and.arrow.down.right") {}
+        .disabled(true)
+        .help("Scale gizmos arrive with semantic parts")
+      frameSelectionButton
+      Button("Create Part", systemImage: "plus.square.dashed") {}
+        .disabled(true)
+        .help("Part creation follows the shared typed-joint model")
+    }
+  }
+
+  private var animationTools: some View {
+    Group {
+      Button(action: workspace.stopPlayback) {
+        Label("Stop", systemImage: "stop.fill")
+      }
+      .help("Stop playback")
+      Button(action: workspace.togglePlayback) {
+        Label(
+          workspace.isPlaying ? "Pause" : "Play",
+          systemImage: workspace.isPlaying ? "pause.fill" : "play.fill")
+      }
+      .help(workspace.isPlaying ? "Pause playback" : "Play animation")
+      gridButton
+      frameSelectionButton
+      Button("Auto Key", systemImage: "record.circle") {}
+        .disabled(true)
+        .help("Auto-key arrives with editable animation commands")
+      bottomEditorButton(title: "Timeline")
+    }
+  }
+
+  private var showTools: some View {
+    Group {
+      gridButton
+      Button("Add Cue", systemImage: "plus.rectangle.on.rectangle") {}
+        .disabled(true)
+        .help("Show cues arrive with scene documents")
+      Button("Add Track", systemImage: "plus.rectangle.on.folder") {}
+        .disabled(true)
+        .help("Show tracks arrive with scene documents")
+      bottomEditorButton(title: "Show Timeline")
+    }
+  }
+
+  private var hardwareTools: some View {
+    Group {
+      Button("Connect", systemImage: "cable.connector.horizontal") {}
+        .disabled(true)
+        .help("Studio transport integration is not connected yet")
+      Button("Add Driver", systemImage: "plus") {}
+        .disabled(true)
+        .help("Driver configuration follows actuator mapping")
+      Button("Emergency Stop", systemImage: "stop.circle.fill") {}
+        .disabled(true)
+        .help("No hardware session is active")
+    }
+  }
+
+  private var gridButton: some View {
+    Button {
+      workspace.showsPreviewGrid.toggle()
+    } label: {
+      Label(
+        workspace.showsPreviewGrid ? "Hide Grid" : "Show Grid",
+        systemImage: workspace.showsPreviewGrid ? "eye.fill" : "eye.slash"
+      )
+    }
+    .help(workspace.showsPreviewGrid ? "Hide viewport grid" : "Show viewport grid")
+  }
+
+  private var frameSelectionButton: some View {
+    Button {
+      workspace.frameSelection()
+    } label: {
+      Label("Frame Selection", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
+    }
+    .disabled(!workspace.canFrameSelection)
+    .help("Move the camera to frame the selected model node")
+  }
+
+  private func bottomEditorButton(title: String) -> some View {
+    Button {
+      workspace.toggleBottomEditor()
+    } label: {
+      Label(
+        workspace.activePresentation.showsBottomEditor ? "Hide \(title)" : "Show \(title)",
+        systemImage: "rectangle.bottomthird.inset.filled"
+      )
+    }
+    .help("Toggle this workspace's bottom editor")
   }
 }
 
@@ -209,16 +368,5 @@ struct WorkspacePanelHeader: View {
     .padding(.horizontal, StudioMetrics.panelPadding)
     .frame(height: StudioMetrics.panelHeaderHeight)
     .background(StudioPalette.accent)
-  }
-}
-
-extension WorkspaceMode {
-  var systemImage: String {
-    switch self {
-    case .build: "point.3.connected.trianglepath.dotted"
-    case .animate: "play.circle.fill"
-    case .importAssets: "square.and.arrow.down"
-    case .hardware: "cable.connector"
-    }
   }
 }

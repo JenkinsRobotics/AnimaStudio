@@ -60,6 +60,7 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | B01 task-focused workspace architecture plan | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | documentation review; `git diff --check` | released 2026-07-14 |
 | Codex | Bottango UI research reconciliation | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | official-doc verification; `git diff --check` | released 2026-07-14 |
 | Claude | Anima firmware v0 (B05/B08 device side, Arduino/ESP32) | `firmware/**` | `arduino-cli compile` clean for `arduino:avr:uno` + `esp32:esp32:esp32`; behavior mirrors `anima_studio/sim.py` + `Wire_Protocol.md` | in progress |
+| Codex | B01 task-focused workspaces + Rig mate-guide visualization | `studio/Package.swift`, `studio/Sources/AnimaStudioApp/WorkspaceDescriptor.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/AnimaStudioApp/ShowTimelineView.swift`, `studio/Sources/AnimaStudioApp/HardwareWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/RigGuideOverlay.swift`, `studio/Sources/RealityKitViewport/RigGuides.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Tests/AnimaStudioAppTests/WorkspacePresentationTests.swift`, `studio/Tests/RealityKitViewportTests/RigGuideTests.swift`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 15 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
 
 ## Requests
 
@@ -213,3 +214,15 @@ change needed in the Handoff log instead of inventing commands.
   external-model-first, and safely offline until separately connected and
   armed; those boundaries supersede Bottango-specific 30 fps, modeling,
   physics, and automatic live-mirroring assumptions.
+- **2026-07-14 (Codex, workspaces + mate guides):** Replaced the cosmetic
+  four-mode shell with five task-focused descriptors: Assets, Rig, Animate,
+  Show, and Hardware. Each owns contextual header actions, navigator/inspector
+  content, and an independent in-session panel layout; Command-1…5 switches
+  workspaces. Show now has a distinct character/audio/screen/event timeline
+  scaffold. Hardware now has structured offline connection, mapping, safety,
+  and diagnostic-log surfaces. The sample RealityKit rig renders a mate
+  connector with labeled XYZ axes, revolute DOF ring, optional reference plane,
+  and limit arc; the Rig overlay toggles each layer. The formal mate/handle
+  contract is in `Studio_App.md`. Editable handles and imported attachment wait
+  for the shared typed-joint/DOF contract. Fifteen Swift tests, claimed-file
+  format lint, `git diff --check`, and a fresh app launch pass.

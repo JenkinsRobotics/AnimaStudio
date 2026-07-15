@@ -89,6 +89,49 @@ and constraint warnings—belong to the viewport adapter. Joint definitions,
 limits, units, and animation values belong to `AnimaCore` and the `.anima`
 document model.
 
+### Mate connectors and DOF handles
+
+The Rig workspace visualizes each typed joint through a mate-connector frame,
+inspired by Onshape's compact assembly relationship model rather than a stack
+of unrelated constraints. The connector establishes an origin and local X/Y/Z
+orientation; the mate type determines which degrees of freedom remain
+interactive. RealityKit draws and hit-tests these guides, while AnimaCore owns
+the connector transforms, mate type, DOFs, units, neutral values, and limits.
+
+| Mate type | Viewport visualization |
+|---|---|
+| Fastened | Connector frame only; all six relative DOFs locked |
+| Revolute | Rotation ring around the primary axis, neutral tick, current marker, and shaded angular limits |
+| Prismatic | Linear arrow/rail on the primary axis with neutral, current, minimum, and maximum markers |
+| Cylindrical | Coaxial rotation ring and translation rail, independently selectable |
+| Ball | Three rotation rings sharing one origin, with orientation/limit envelope when defined |
+| Planar | Translucent reference plane with two in-plane translation handles and any permitted normal-axis rotation |
+
+Visual rules:
+
+- X, Y, and Z use a consistent accessible color-plus-label vocabulary; color is
+  never the only indication.
+- Connector and handle size remains readable in screen space as the camera
+  zooms. Occluded guides dim or use a deliberate x-ray treatment rather than
+  disappearing unpredictably inside geometry.
+- Hover identifies one available DOF; selection emphasizes its complete handle
+  and matching inspector row. Dragging previews only that DOF unless a compound
+  mate explicitly exposes more than one.
+- Limit arcs, rails, or plane bounds show the legal authored range. Neutral,
+  current, and dragged target states are distinct; approaching a limit warns,
+  and invalid targets never silently extend the limit.
+- Connector placement mode may expose inferred candidate origins/axes from
+  imported geometry, but the resulting semantic connector is explicit and
+  editable numerically. Reimport synchronization must not rely only on a
+  transient RealityKit entity pointer.
+- A virtual “exercise DOF” preview is always safe and never drives hardware.
+  Physical mirroring still requires a separately connected and armed output.
+
+The current sample rig implements the first visual foundation: a local XYZ
+connector, revolute ring, optional reference plane, and limit arc with
+independent visibility toggles. Editable handles and imported-part attachment
+follow the shared typed-joint/DOF contract.
+
 ### Why not SceneKit, Unity, or Unreal?
 
 - **SceneKit:** unsuitable for a new long-lived app because Apple has
