@@ -1,10 +1,13 @@
 import AnimaCore
 import Foundation
 import Observation
+import RealityKitViewport
 
 enum WorkspaceMode: String, CaseIterable, Identifiable {
   case build = "Build"
   case animate = "Animate"
+  case importAssets = "Import"
+  case hardware = "Hardware"
 
   var id: Self { self }
 }
@@ -13,6 +16,7 @@ enum NavigatorItem: Hashable {
   case project
   case asset(AssetID)
   case structure
+  case modelNode(ModelEntityPath)
   case joint(JointID)
   case animation(String)
 }
@@ -20,7 +24,7 @@ enum NavigatorItem: Hashable {
 @MainActor
 @Observable
 final class StudioWorkspaceModel {
-  var mode: WorkspaceMode = .animate
+  var mode: WorkspaceMode = .build
   var project = AnimaProject(
     name: "Untitled Character",
     rig: SampleContent.rig,
@@ -30,6 +34,8 @@ final class StudioWorkspaceModel {
   var playheadSeconds = 0.0
   var isPlaying = false
   var importedModelURL: URL?
+  var importedModelHierarchy: ModelHierarchyNode?
+  var isLoadingModelHierarchy = false
   var importErrorMessage: String?
 
   private let evaluator = AnimationEvaluator()
@@ -46,15 +52,24 @@ final class StudioWorkspaceModel {
     )
   }
 
-  func importModel(from url: URL) {
+  func importModel(from url: URL) async {
     guard url.isFileURL else {
       importErrorMessage = "The selected model is not a local file."
       return
     }
 
     _ = url.startAccessingSecurityScopedResource()
-    importedModelURL = url
+    isLoadingModelHierarchy = true
     importErrorMessage = nil
+    defer { isLoadingModelHierarchy = false }
+
+    let hierarchy: ModelHierarchyNode
+    do {
+      hierarchy = try await RealityKitModelHierarchy.load(contentsOf: url)
+    } catch {
+      importErrorMessage = "\(url.lastPathComponent): \(error.localizedDescription)"
+      return
+    }
 
     let asset = ProjectAsset(
       name: url.lastPathComponent,
@@ -63,7 +78,9 @@ final class StudioWorkspaceModel {
     )
     project.assets.removeAll { $0.sourcePath == asset.sourcePath }
     project.assets.append(asset)
-    selection = .asset(asset.id)
+    importedModelURL = url
+    importedModelHierarchy = hierarchy
+    selection = .modelNode(hierarchy.id)
   }
 
   func togglePlayback() {

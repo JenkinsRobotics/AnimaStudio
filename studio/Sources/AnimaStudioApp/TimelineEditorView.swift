@@ -13,14 +13,16 @@ struct TimelineEditorView: View {
     VStack(spacing: 0) {
       transport
       Divider()
+      editorModeBar
+      Divider()
       HStack(spacing: 0) {
         trackHeaders
-          .frame(width: 190)
+          .frame(width: 220)
         Divider()
         trackCanvas
       }
     }
-    .background(.bar)
+    .background(Color.black.opacity(0.92))
   }
 
   private var transport: some View {
@@ -49,7 +51,32 @@ struct TimelineEditorView: View {
     }
     .buttonStyle(.borderless)
     .padding(.horizontal)
-    .frame(height: 38)
+    .frame(height: 42)
+    .background(StudioPalette.chrome)
+  }
+
+  private var editorModeBar: some View {
+    HStack(spacing: 10) {
+      Label("Dope Sheet", systemImage: "diamond.fill")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(StudioPalette.accent)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(StudioPalette.accent.opacity(0.14), in: Capsule())
+
+      Label("Graph", systemImage: "point.3.filled.connected.trianglepath.dotted")
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+        .help("Graph editing is the next animation UI slice")
+
+      Spacer()
+      Text("AUTO-KEY PLANNED")
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(StudioPalette.muted)
+    }
+    .padding(.horizontal, 10)
+    .frame(height: 36)
+    .background(Color.black.opacity(0.86))
   }
 
   private var trackHeaders: some View {
@@ -65,6 +92,7 @@ struct TimelineEditorView: View {
       Spacer()
     }
     .padding(.horizontal, 12)
+    .background(StudioPalette.panelInset)
   }
 
   private var trackCanvas: some View {
@@ -74,13 +102,13 @@ struct TimelineEditorView: View {
         ruler(width: width)
 
         Rectangle()
-          .fill(Color.secondary.opacity(0.08))
+          .fill(StudioPalette.panel.opacity(0.58))
           .frame(height: 52)
           .offset(y: 29)
 
         ForEach(Array(keyframes.enumerated()), id: \.offset) { _, keyframe in
           Circle()
-            .fill(.orange)
+            .fill(StudioPalette.accent)
             .stroke(.white.opacity(0.8), lineWidth: 1)
             .frame(width: 10, height: 10)
             .position(
@@ -90,7 +118,7 @@ struct TimelineEditorView: View {
         }
 
         Rectangle()
-          .fill(.red)
+          .fill(StudioPalette.accent)
           .frame(width: 1.5)
           .offset(
             x: xPosition(for: workspace.playheadSeconds, width: width),
@@ -114,7 +142,7 @@ struct TimelineEditorView: View {
   private func ruler(width: CGFloat) -> some View {
     ZStack(alignment: .topLeading) {
       Rectangle()
-        .fill(Color.secondary.opacity(0.05))
+        .fill(StudioPalette.panelInset)
         .frame(height: 28)
       ForEach(0...Int(clip.durationSeconds), id: \.self) { second in
         Text("\(second)s")

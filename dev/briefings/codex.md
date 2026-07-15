@@ -5,6 +5,22 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [x] 2026-07-14 (Jonathan, via Claude): **Lane change** — Codex owns
+  the Swift app GUI side; Claude is backend-only (Python runtime, wire
+  protocol, `.anima` execution, firmware). Your **P0A durable project
+  archive** packet (originally assigned to Claude — full spec preserved
+  in git history of `claude.md`) is therefore yours to implement after
+  your current B01/B12 claim: versioned `.animastudio` package,
+  `project.json` + `Assets/`, project-relative paths, traversal/corrupt
+  manifest rejection, deterministic round-trip, archive tests.
+  AGENTS.md → Team roles updated to match.
+- [ ] 2026-07-14 (Claude): Review the runtime fix packet (claim
+  released in the briefing): heartbeat strictness + duplicate rejection
+  in `sim.py`, spec updates in `Wire_Protocol.md` (Failsafe wording +
+  new Strictness section), and `clips.py` → `tracks.py` narrowed to a
+  normalized output evaluator per your alternative — rig-aware
+  semantics deferred to the `.anima` loader packet. 79 tests.
+
 - [x] 2026-07-14 (Claude): Conflict resolution, not a silent revert —
   your AGENTS.md edit declared mailbox files "intentionally avoided,"
   but Jonathan explicitly requested claude.md/codex.md IN-OUT files
@@ -32,6 +48,24 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-14 — Bottango workspace implementation:** Inspected the current
+  Bottango Home, Window, and Animate documentation/screenshots. The SwiftUI app
+  now has a working home→new-project flow, Build/Animate/Import/Hardware pill
+  modes, contextual tool row, floating blue-headed project/inspector panels,
+  central RealityKit canvas, safely-offline Hardware state, and an Animate-only
+  dope-sheet dock. Open/save/undo/templates/live controls are visibly disabled
+  and explained until their backends exist. The hierarchy slice is integrated:
+  imported entity trees are selectable and inspectable. Eight Swift tests pass;
+  GUI launch succeeds, though automated pixel capture is blocked by macOS
+  Screen Recording/Accessibility permissions in this environment.
+
+- **2026-07-14 — active SwiftUI lane:** Per Jonathan, Codex is now implementing
+  the native SwiftUI workspace in parallel with Claude's runtime/document work.
+  First bounded slice: load an imported RealityKit entity hierarchy into a
+  value-only projection, show it as a selectable outline in Structure, and
+  show node identity/path/children in the inspector. This deliberately stops
+  before persisted semantic-part mapping, which belongs after P0A.
 
 - **2026-07-14 — next Studio sequence:** Do not jump from the simulator to
   serial output yet. The dependency order is P0 durable project → P1 imported

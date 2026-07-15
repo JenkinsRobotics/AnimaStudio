@@ -6,10 +6,10 @@ robot. Feature map and milestones: `dev/docs/roadmap/Bottango_Parity.md`.
 
 ## Work split
 
-### Lane A — Studio — Swift, `studio/`
+### Lane A — Studio — Swift, `studio/` — **Codex**
 
-Claude owns the large implementation packets. Codex plans and reviews each
-packet and may make small integration fixes.
+Per Jonathan (2026-07-14, latest): Codex owns the Swift app GUI side.
+Claude is backend-only. Codex also keeps planning + cross-lane review.
 
 Continue the Hardware Animation Milestone slices
 (`dev/docs/roadmap/Hardware_Animation_Milestone.md`):
@@ -52,6 +52,9 @@ change needed in the Handoff log instead of inventing commands.
 |---|---|---|---|---|
 | Claude | Wire protocol host + loopback simulator | `anima_studio/wire.py`, `anima_studio/sim.py`, `anima_studio/clips.py`, `anima_studio/tests/test_wire.py`, `anima_studio/tests/test_sim.py`, `anima_studio/tests/test_clips.py` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (74 passed) | released 2026-07-14 |
 | Codex | Coordination protocol + detailed Bottango parity plan | `AGENTS.md`, `dev/briefings/README.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md`, `dev/docs/roadmap/Bottango_Parity.md` | `git diff --check`; 6 Swift tests; 74 Python tests; Swift/Ruff lint | released 2026-07-14 |
+| Codex | B01/B12 Bottango-inspired SwiftUI shell + hierarchy inspection | `studio/Sources/RealityKitViewport/ModelHierarchy.swift`, `studio/Sources/AnimaStudioApp/AnimaStudioApp.swift`, `studio/Sources/AnimaStudioApp/StudioHomeView.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/TimelineEditorView.swift`, `studio/Tests/RealityKitViewportTests/RealityKitModelLoadingTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 8 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
+| Claude | Runtime review fixes (heartbeat/dup rejection/evaluator narrowing) | `dev/docs/roadmap/Wire_Protocol.md`, `anima_studio/sim.py`, `anima_studio/clips.py` → `tracks.py`, `anima_studio/tests/**` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (79 passed) | released 2026-07-14 |
+| Claude | `.anima` loader + rig-aware runtime evaluation (B10 backend foundation) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/**.anima` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
 
 ## Requests
 
@@ -70,6 +73,12 @@ change needed in the Handoff log instead of inventing commands.
   handoff entry below for spec-gap decisions). No Swift files touched.
   Review request: confirm the CFG required-keys/strictness decisions
   match what Studio's serial `AnimationOutput` will emit.
+- **Claude → Codex:** Review-fix packet released (79 tests) — see the
+  handoff entry. One open contract question for your planning pass: the
+  rig-aware runtime evaluator arriving with the `.anima` loader will
+  need the joint→normalized-channel mapping shape (B04). I'll draft it
+  in `Character_Format.md` terms from the backend side; flag early if
+  Studio needs a different projection.
 
 ## Handoff log
 
@@ -105,3 +114,22 @@ change needed in the Handoff log instead of inventing commands.
   Reviewed Wire Protocol v0 and the Python packet: device-linear interpolation
   plus host curve sampling is the correct boundary. All 74 Python tests and
   Ruff pass; safety/parity findings remain in Requests and the Codex mailbox.
+- **2026-07-14 (Claude, review fixes):** All three findings fixed, spec first:
+  `Wire_Protocol.md` now states only successfully parsed commands refresh the
+  failsafe heartbeat and adds a Strictness section (duplicate CFG keys /
+  duplicate FRM channels → `ERR,1`, no last-write-wins); `sim.py` implements
+  both; `clips.py` narrowed + renamed to `tracks.py` (normalized 0..1
+  output-track evaluator, parity claim dropped — rig-aware radians/neutral
+  fallback ship with the `.anima` loader packet). 5 regression tests added;
+  79 pass, ruff clean. Claim released. Also per Jonathan: lane ownership is
+  now Codex = Swift GUI, Claude = backend; P0A reassigned to Codex
+  (see mailboxes). My STATUS.md edit touches only the Python paragraph —
+  flagging because your active B01/B12 claim also covers STATUS.md.
+- **2026-07-14 (Codex, SwiftUI):** Implemented the Bottango-inspired native
+  home and project chrome plus B12 hierarchy inspection. Build/Animate/Import/
+  Hardware modes now reshape the workspace; Animate owns the timeline dock;
+  imported RealityKit entity trees are value-projected, selectable, and shown
+  in the inspector. Disabled actions are labeled as planned rather than
+  pretending persistence or hardware is wired. Eight Swift tests and claimed-
+  file format lint pass; the app launches. Automated screenshots were blocked
+  by macOS Screen Recording/Accessibility permissions.

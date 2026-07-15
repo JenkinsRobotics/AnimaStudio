@@ -4,27 +4,31 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct StudioWorkspaceView: View {
+  let closeProject: () -> Void
+
   @State private var workspace = StudioWorkspaceModel()
   @State private var isImportingModel = false
 
   var body: some View {
-    NavigationSplitView {
-      ProjectNavigatorView(workspace: workspace)
-    } detail: {
-      VStack(spacing: 0) {
-        HSplitView {
-          viewport
-          InspectorView(workspace: workspace)
-            .frame(minWidth: 250, idealWidth: 290, maxWidth: 340)
-        }
+    VStack(spacing: 0) {
+      WorkspaceModeBar(workspace: workspace, closeProject: closeProject)
+      Divider()
+      WorkspaceToolBar(
+        workspace: workspace,
+        importModel: { isImportingModel = true }
+      )
+      Divider()
 
+      workspaceCanvas
+
+      if workspace.mode == .animate {
         Divider()
         TimelineEditorView(workspace: workspace)
-          .frame(minHeight: 180, idealHeight: 210, maxHeight: 300)
+          .frame(minHeight: 220, idealHeight: 270, maxHeight: 340)
       }
-      .navigationTitle(workspace.project.name)
-      .toolbar { workspaceToolbar }
     }
+    .background(StudioPalette.canvas)
+    .preferredColorScheme(.dark)
     .fileImporter(
       isPresented: $isImportingModel,
       allowedContentTypes: Self.modelContentTypes,
@@ -33,7 +37,9 @@ struct StudioWorkspaceView: View {
       switch result {
       case .success(let urls):
         if let url = urls.first {
-          workspace.importModel(from: url)
+          Task { @MainActor in
+            await workspace.importModel(from: url)
+          }
         }
       case .failure(let error):
         workspace.importErrorMessage = error.localizedDescription
@@ -60,49 +66,65 @@ struct StudioWorkspaceView: View {
     }
   }
 
+  private var workspaceCanvas: some View {
+    ZStack {
+      if workspace.mode == .hardware {
+        hardwareWorkspace
+      } else {
+        viewport
+      }
+
+      HStack(alignment: .top, spacing: 16) {
+        ProjectNavigatorView(
+          workspace: workspace,
+          importModel: { isImportingModel = true }
+        )
+        .frame(width: 290)
+
+        Spacer(minLength: 360)
+
+        InspectorView(workspace: workspace)
+          .frame(width: 300)
+      }
+      .padding(16)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .clipped()
+  }
+
   private var viewport: some View {
-    ZStack(alignment: .topLeading) {
+    ZStack(alignment: .top) {
       RobotPreviewView(
         frame: workspace.evaluatedFrame,
         modelURL: workspace.importedModelURL
       )
       .frame(minWidth: 520, minHeight: 420)
 
-      VStack(alignment: .leading, spacing: 4) {
-        Label("3D View", systemImage: "view.3d")
-          .font(.caption.weight(.semibold))
-        if let modelURL = workspace.importedModelURL {
-          Text(modelURL.lastPathComponent)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        } else {
-          Text("Sample mechanism")
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        }
+      HStack(spacing: 6) {
+        Image(systemName: workspace.mode.systemImage)
+        Text(workspace.mode == .importAssets ? "IMPORT PREVIEW" : "3D VIEW")
       }
-      .padding(8)
-      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
-      .padding(10)
+      .font(.caption2.weight(.bold))
+      .tracking(1)
+      .foregroundStyle(StudioPalette.muted)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .background(.ultraThinMaterial, in: Capsule())
+      .padding(.top, 12)
     }
   }
 
-  @ToolbarContentBuilder
-  private var workspaceToolbar: some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
-      Picker("Mode", selection: $workspace.mode) {
-        ForEach(WorkspaceMode.allCases) { mode in
-          Text(mode.rawValue).tag(mode)
-        }
-      }
-      .pickerStyle(.segmented)
-      .frame(width: 180)
-
-      Button {
-        isImportingModel = true
-      } label: {
-        Label("Import Model", systemImage: "square.and.arrow.down")
-      }
+  private var hardwareWorkspace: some View {
+    ZStack {
+      StudioPalette.canvas
+      ContentUnavailableView(
+        "Hardware Safely Offline",
+        systemImage: "powerplug",
+        description: Text(
+          "The protocol simulator exists, but Studio connection and arming controls are not wired yet."
+        )
+      )
+      .frame(maxWidth: 420)
     }
   }
 
