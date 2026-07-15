@@ -1,13 +1,17 @@
-"""Load ``.character.anima`` YAML into the runtime rig model.
+"""Load ``.character.anima`` YAML into the runtime mechanism rig model.
 
-Parses the character-format subset that ``anima_studio.rig`` models —
-identity, blend shapes, bones (degrees in the file, radians in the
-rig), hold/linear clips, and the physical bone→servo channel mapping —
-and rejects, with a ``CharacterFormatError`` naming the offending path,
-every spec section this runtime does not execute yet (``expressions``,
-``lip_sync``, ``digital``, ``voice``, ``blend_shape_mapping``,
-``led_mapping``, ``smoothing``, ``easing``) rather than silently
-dropping it. Spec: ``dev/docs/roadmap/Character_Format.md``.
+Parses the character-format 2.0 subset that ``anima_studio.rig``
+models — identity, parts, typed joints with per-DOF limits (``_deg``
+degree keys and ``_m`` meter keys in the file; radians and meters in
+the model), generic 0..1 parameters, hold/linear clips whose tracks
+are keyed by DOF path or parameter name, and the target → normalized
+output-channel mappings — and rejects, with a ``CharacterFormatError``
+naming the offending path, every spec section this runtime does not
+execute yet (``expressions``, ``lip_sync``, ``digital``, ``voice``)
+and every format-1.0 section superseded by the mechanism model
+(``bones``, ``blend_shapes``, ``physical``) rather than silently
+dropping or mistranslating it. Spec:
+``dev/docs/roadmap/Character_Format.md``.
 """
 
 from __future__ import annotations
@@ -18,21 +22,37 @@ from pathlib import Path
 import yaml
 
 from anima_studio.rig import (
-    BlendShape,
+    JOINT_TYPE_DOF_TEMPLATES,
+    DegreeOfFreedom,
+    DofKind,
     Identity,
     Joint,
+    JointType,
+    OutputMapping,
+    Parameter,
+    Part,
     Rig,
     RigClip,
-    ServoMapping,
+    RotationDof,
+    TranslationDof,
 )
 from anima_studio.tracks import Clip, Interpolation, Keyframe, Track
 
-SUPPORTED_ANIMA_VERSION = "1.0"
+SUPPORTED_ANIMA_VERSION = "2.0"
 SUPPORTED_TYPE = "character"
 
 # Spec sections the runtime does not execute yet. Kept explicit so a
 # file using them fails loudly instead of playing back incompletely.
 _UNSUPPORTED_TOP_LEVEL = ("expressions", "lip_sync", "digital", "voice")
+
+# Format-1.0 sections replaced by the parts/joints/DOF model.
+_SUPERSEDED_TOP_LEVEL = ("blend_shapes", "bones", "physical")
+
+# Per-DOF-kind limit keys: explicit units in the file, always.
+_DOF_LIMIT_KEYS: dict[DofKind, tuple[str, str, str]] = {
+    DofKind.ROTATION: ("min_deg", "max_deg", "neutral_deg"),
+    DofKind.TRANSLATION: ("min_m", "max_m", "neutral_m"),
+}
 
 
 class CharacterFormatError(ValueError):
@@ -63,21 +83,23 @@ def parse_character(text: str) -> Rig:
     _check_top_level_fields(document)
 
     identity = _parse_identity(_mapping(document["identity"], "identity"))
-    blend_shapes = _parse_blend_shapes(document.get("blend_shapes"))
-    joints = _parse_bones(document.get("bones"))
-    clips = _parse_clips(document.get("clips"), joints, blend_shapes)
-    physical_enabled, servo_mappings = _parse_physical(
-        document.get("physical"), joints
-    )
+    parts = _parse_parts(document.get("parts"))
+    joints = _parse_joints(document.get("joints"), parts)
+    parameters = _parse_parameters(document.get("parameters"))
+    dof_paths: dict[str, DegreeOfFreedom] = {}
+    for joint in joints.values():
+        dof_paths.update(joint.dof_paths())
+    clips = _parse_clips(document.get("clips"), dof_paths, parameters)
+    outputs = _parse_outputs(document.get("outputs"), dof_paths, parameters)
 
     try:
         return Rig(
             identity=identity,
+            parts=parts,
             joints=joints,
-            blend_shapes=blend_shapes,
+            parameters=parameters,
             clips=clips,
-            servo_mappings=servo_mappings,
-            physical_enabled=physical_enabled,
+            outputs=outputs,
         )
     except ValueError as error:
         # Rig re-validates cross-references; the checks above should
@@ -114,16 +136,23 @@ def _check_top_level_fields(document: dict) -> None:
         "anima_version",
         "type",
         "identity",
-        "blend_shapes",
-        "bones",
+        "parts",
+        "joints",
+        "parameters",
         "clips",
-        "physical",
+        "outputs",
     }
     for key in document:
         if key in _UNSUPPORTED_TOP_LEVEL:
             raise CharacterFormatError(
                 str(key),
                 "spec section not supported by the runtime loader yet",
+            )
+        if key in _SUPERSEDED_TOP_LEVEL:
+            raise CharacterFormatError(
+                str(key),
+                "format-1.0 section superseded in 2.0 "
+                "(use parts/joints/parameters/outputs)",
             )
         if key not in supported:
             raise CharacterFormatError(str(key), "unknown field")
@@ -156,71 +185,227 @@ def _parse_identity(raw: dict) -> Identity:
     )
 
 
-def _parse_blend_shapes(raw: object) -> dict[str, BlendShape]:
+def _parse_parts(raw: object) -> dict[str, Part]:
     if raw is None:
         return {}
-    shapes: dict[str, BlendShape] = {}
-    for name, entry in _mapping(raw, "blend_shapes").items():
-        path = f"blend_shapes.{name}"
+    section = _mapping(raw, "parts")
+    declared = {str(name) for name in section}
+    parts: dict[str, Part] = {}
+    for name, entry in section.items():
+        path = f"parts.{name}"
+        entry = _mapping(entry if entry is not None else {}, path)
+        _reject_unknown_fields(
+            entry, path, {"parent", "model_node", "description"}
+        )
+        parent = entry.get("parent")
+        if parent is not None:
+            parent = _string(parent, f"{path}.parent")
+            if parent not in declared:
+                raise CharacterFormatError(
+                    f"{path}.parent", "references an undeclared part"
+                )
+        model_node = entry.get("model_node")
+        if model_node is not None:
+            model_node = _string(model_node, f"{path}.model_node")
+        try:
+            parts[str(name)] = Part(
+                name=str(name),
+                parent=parent,
+                model_node=model_node,
+                description=_string(
+                    entry.get("description", ""), f"{path}.description"
+                ),
+            )
+        except ValueError as error:
+            raise CharacterFormatError(path, str(error)) from error
+    return parts
+
+
+def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
+    if raw is None:
+        return {}
+    joints: dict[str, Joint] = {}
+    for name, entry in _mapping(raw, "joints").items():
+        path = f"joints.{name}"
         entry = _mapping(entry, path)
+        _reject_unknown_fields(
+            entry, path, {"type", "parent", "child", "dofs", "description"}
+        )
+        for required in ("type", "parent", "child"):
+            if required not in entry:
+                raise CharacterFormatError(
+                    f"{path}.{required}", "missing required field"
+                )
+        try:
+            joint_type = JointType(entry["type"])
+        except ValueError:
+            valid = ", ".join(sorted(t.value for t in JointType))
+            raise CharacterFormatError(
+                f"{path}.type",
+                f"unknown joint type {entry['type']!r} "
+                f"(expected one of: {valid})",
+            ) from None
+        parent = _string(entry["parent"], f"{path}.parent")
+        child = _string(entry["child"], f"{path}.child")
+        for field_name, part_name in (("parent", parent), ("child", child)):
+            if part_name not in parts:
+                raise CharacterFormatError(
+                    f"{path}.{field_name}", "references an undeclared part"
+                )
+        template = JOINT_TYPE_DOF_TEMPLATES[joint_type]
+        dofs_raw = _mapping(entry.get("dofs") or {}, f"{path}.dofs")
+        if len(dofs_raw) != len(template):
+            raise CharacterFormatError(
+                f"{path}.dofs",
+                f"joint type {joint_type.value!r} defines "
+                f"{len(template)} degree(s) of freedom, got {len(dofs_raw)}",
+            )
+        # The joint type defines each DOF's kind. An entry declares its
+        # kind through its unit keys and is matched against the type's
+        # kind sequence (order within one kind follows file order), so
+        # an author cannot attach a mismatched DOF list to a typed joint.
+        pending: dict[DofKind, list[tuple[str, dict]]] = {
+            kind: [] for kind in DofKind
+        }
+        for dof_name, dof_entry in dofs_raw.items():
+            dof_path = f"{path}.dofs.{dof_name}"
+            dof_map = _mapping(dof_entry, dof_path)
+            kind = _infer_dof_kind(dof_map, dof_path)
+            pending[kind].append((str(dof_name), dof_map))
+        dofs = []
+        for _, kind in template:
+            if not pending[kind]:
+                expected = ", ".join(k for _, k in template)
+                raise CharacterFormatError(
+                    f"{path}.dofs",
+                    f"joint type {joint_type.value!r} defines dof kinds "
+                    f"({expected}), which the given limit units do not "
+                    f"match",
+                )
+            dof_name, dof_map = pending[kind].pop(0)
+            dofs.append(
+                _parse_dof(dof_name, kind, dof_map, f"{path}.dofs.{dof_name}")
+            )
+        try:
+            joints[str(name)] = Joint(
+                name=str(name),
+                joint_type=joint_type,
+                parent_part=parent,
+                child_part=child,
+                dofs=tuple(dofs),
+                description=_string(
+                    entry.get("description", ""), f"{path}.description"
+                ),
+            )
+        except ValueError as error:
+            raise CharacterFormatError(path, str(error)) from error
+    return joints
+
+
+def _infer_dof_kind(entry: dict, path: str) -> DofKind:
+    """A dof entry's kind, declared by its explicit-unit limit keys."""
+    has_rotation = "min_deg" in entry or "max_deg" in entry
+    has_translation = "min_m" in entry or "max_m" in entry
+    if has_rotation == has_translation:
+        raise CharacterFormatError(
+            path,
+            "dof limits must use exactly one unit family: min_deg/max_deg "
+            "(rotation) or min_m/max_m (translation)",
+        )
+    return DofKind.ROTATION if has_rotation else DofKind.TRANSLATION
+
+
+def _parse_dof(
+    name: str, kind: DofKind, raw: object, path: str
+) -> DegreeOfFreedom:
+    entry = _mapping(raw, path)
+    min_key, max_key, neutral_key = _DOF_LIMIT_KEYS[kind]
+    _reject_unknown_fields(
+        entry, path, {min_key, max_key, neutral_key, "axis", "description"}
+    )
+    for required in (min_key, max_key):
+        if required not in entry:
+            raise CharacterFormatError(
+                f"{path}.{required}", "missing required field"
+            )
+    minimum = _number(entry[min_key], f"{path}.{min_key}")
+    maximum = _number(entry[max_key], f"{path}.{max_key}")
+    if minimum >= maximum:
+        raise CharacterFormatError(
+            f"{path}.{min_key}",
+            f"range must be ascending: [{minimum}, {maximum}]",
+        )
+    neutral = _number(entry.get(neutral_key, 0.0), f"{path}.{neutral_key}")
+    if not minimum <= neutral <= maximum:
+        raise CharacterFormatError(
+            f"{path}.{neutral_key}",
+            f"{neutral} outside range [{minimum}, {maximum}]",
+        )
+    axis_raw = entry.get("axis")
+    axis: tuple[float, float, float] | None = None
+    if axis_raw is not None:
+        if not isinstance(axis_raw, list) or len(axis_raw) != 3:
+            raise CharacterFormatError(
+                f"{path}.axis",
+                f"expected a three-number list, got {axis_raw!r}",
+            )
+        axis = tuple(
+            _number(component, f"{path}.axis[{index}]")
+            for index, component in enumerate(axis_raw)
+        )
+    description = _string(entry.get("description", ""), f"{path}.description")
+    try:
+        if kind is DofKind.ROTATION:
+            return RotationDof(
+                name=name,
+                min_radians=math.radians(minimum),
+                max_radians=math.radians(maximum),
+                neutral_radians=math.radians(neutral),
+                axis=axis,
+                description=description,
+            )
+        return TranslationDof(
+            name=name,
+            min_meters=minimum,
+            max_meters=maximum,
+            neutral_meters=neutral,
+            axis=axis,
+            description=description,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
+
+
+def _parse_parameters(raw: object) -> dict[str, Parameter]:
+    if raw is None:
+        return {}
+    parameters: dict[str, Parameter] = {}
+    for name, entry in _mapping(raw, "parameters").items():
+        path = f"parameters.{name}"
+        entry = _mapping(entry if entry is not None else {}, path)
         _reject_unknown_fields(entry, path, {"default", "description"})
         neutral = _number(entry.get("default", 0.0), f"{path}.default")
         if not 0.0 <= neutral <= 1.0:
             raise CharacterFormatError(
                 f"{path}.default", f"outside 0..1: {neutral}"
             )
-        shapes[str(name)] = BlendShape(
-            name=str(name),
-            neutral_value=neutral,
-            description=_string(
-                entry.get("description", ""), f"{path}.description"
-            ),
-        )
-    return shapes
-
-
-def _parse_bones(raw: object) -> dict[str, Joint]:
-    if raw is None:
-        return {}
-    joints: dict[str, Joint] = {}
-    for name, entry in _mapping(raw, "bones").items():
-        path = f"bones.{name}"
-        entry = _mapping(entry, path)
-        _reject_unknown_fields(
-            entry, path, {"description", "neutral_deg", "range_deg"}
-        )
-        min_deg, max_deg = _degree_pair(
-            entry.get("range_deg"), f"{path}.range_deg"
-        )
-        if min_deg >= max_deg:
-            raise CharacterFormatError(
-                f"{path}.range_deg",
-                f"range must be ascending: [{min_deg}, {max_deg}]",
+        try:
+            parameters[str(name)] = Parameter(
+                name=str(name),
+                neutral_value=neutral,
+                description=_string(
+                    entry.get("description", ""), f"{path}.description"
+                ),
             )
-        neutral_deg = _number(
-            entry.get("neutral_deg", 0.0), f"{path}.neutral_deg"
-        )
-        if not min_deg <= neutral_deg <= max_deg:
-            raise CharacterFormatError(
-                f"{path}.neutral_deg",
-                f"{neutral_deg} outside range [{min_deg}, {max_deg}]",
-            )
-        joints[str(name)] = Joint(
-            name=str(name),
-            min_radians=math.radians(min_deg),
-            max_radians=math.radians(max_deg),
-            neutral_radians=math.radians(neutral_deg),
-            description=_string(
-                entry.get("description", ""), f"{path}.description"
-            ),
-        )
-    return joints
+        except ValueError as error:
+            raise CharacterFormatError(path, str(error)) from error
+    return parameters
 
 
 def _parse_clips(
     raw: object,
-    joints: dict[str, Joint],
-    blend_shapes: dict[str, BlendShape],
+    dof_paths: dict[str, DegreeOfFreedom],
+    parameters: dict[str, Parameter],
 ) -> dict[str, RigClip]:
     if raw is None:
         return {}
@@ -243,31 +428,13 @@ def _parse_clips(
             raise CharacterFormatError(
                 f"{path}.loop", f"expected true/false, got {loop!r}"
             )
-
-        tracks: dict[int | str, Track] = {}
-        groups = _mapping(entry.get("tracks", {}), f"{path}.tracks")
-        for group_name, group in groups.items():
-            group_path = f"{path}.tracks.{group_name}"
-            if group_name == "easing":
-                raise CharacterFormatError(
-                    group_path,
-                    "easing curves are not supported yet; hold/linear only",
-                )
-            if group_name == "bones":
-                tracks.update(
-                    _parse_track_group(
-                        group, group_path, duration_seconds, joints
-                    )
-                )
-            elif group_name == "blend_shapes":
-                tracks.update(
-                    _parse_track_group(
-                        group, group_path, duration_seconds, blend_shapes
-                    )
-                )
-            else:
-                raise CharacterFormatError(group_path, "unknown field")
-
+        tracks = _parse_track_entries(
+            entry.get("tracks", []),
+            f"{path}.tracks",
+            duration_seconds,
+            dof_paths,
+            parameters,
+        )
         clips[str(name)] = RigClip(
             clip=Clip(
                 name=str(name),
@@ -279,23 +446,40 @@ def _parse_clips(
     return clips
 
 
-def _parse_track_group(
+def _target_bounds(
+    target: str,
+    dof_paths: dict[str, DegreeOfFreedom],
+    parameters: dict[str, Parameter],
+) -> tuple[float, float] | None:
+    """Model-unit bounds of a track/output target, or None if undeclared."""
+    dof = dof_paths.get(target)
+    if dof is not None:
+        return dof.minimum, dof.maximum
+    if target in parameters:
+        return 0.0, 1.0
+    return None
+
+
+def _parse_track_entries(
     raw: object,
     path: str,
     duration_seconds: float,
-    parameters: dict[str, Joint] | dict[str, BlendShape],
+    dof_paths: dict[str, DegreeOfFreedom],
+    parameters: dict[str, Parameter],
 ) -> dict[int | str, Track]:
-    """Parse one ``bones:`` / ``blend_shapes:`` keyframe-entry list.
+    """Parse one clip's keyframe-entry list.
 
-    Entries are sparse: each parameter's track is built from the entries
-    whose ``values`` mention it. Bone values are degrees in the file;
-    blend shape values are 0..1.
+    Entries are sparse: each target's track is built from the entries
+    whose ``values`` mention it. Value keys are DOF paths or parameter
+    names; rotation values are degrees in the file, translation values
+    meters, parameter values 0..1.
     """
     if not isinstance(raw, list):
         raise CharacterFormatError(
-            path, f"expected a list of keyframe entries, got {type(raw).__name__}"
+            path,
+            f"expected a list of keyframe entries, got {type(raw).__name__}",
         )
-    per_parameter: dict[str, list[Keyframe]] = {}
+    per_target: dict[str, list[Keyframe]] = {}
     previous_time = -1.0
     for index, entry in enumerate(raw):
         entry_path = f"{path}[{index}]"
@@ -333,117 +517,113 @@ def _parse_track_group(
             raise CharacterFormatError(
                 f"{entry_path}.values", "requires at least one value"
             )
-        for parameter_name, raw_value in values.items():
-            value_path = f"{entry_path}.values.{parameter_name}"
-            parameter = parameters.get(str(parameter_name))
-            if parameter is None:
+        for target_name, raw_value in values.items():
+            value_path = f"{entry_path}.values.{target_name}"
+            target = str(target_name)
+            bounds = _target_bounds(target, dof_paths, parameters)
+            if bounds is None:
                 raise CharacterFormatError(
-                    value_path, "references an undeclared parameter"
+                    value_path,
+                    "references an undeclared DOF path or parameter",
                 )
             value = _number(raw_value, value_path)
-            if isinstance(parameter, Joint):
+            dof = dof_paths.get(target)
+            if dof is not None and dof.kind is DofKind.ROTATION:
                 value = math.radians(value)
-                minimum, maximum = parameter.min_radians, parameter.max_radians
-            else:
-                minimum, maximum = 0.0, 1.0
+            minimum, maximum = bounds
             if not minimum <= value <= maximum:
                 raise CharacterFormatError(
                     value_path,
-                    f"{raw_value} outside the parameter's range",
+                    f"{raw_value} outside the target's range",
                 )
-            per_parameter.setdefault(str(parameter_name), []).append(
+            per_target.setdefault(target, []).append(
                 Keyframe(
                     time_seconds=time_seconds,
                     value=value,
                     interpolation=interpolation,
                 )
             )
-    return {
-        name: Track(
+    tracks: dict[int | str, Track] = {}
+    for target, keyframes in per_target.items():
+        minimum, maximum = _target_bounds(target, dof_paths, parameters)
+        tracks[target] = Track(
             keyframes=tuple(keyframes),
-            minimum_value=(
-                parameters[name].min_radians
-                if isinstance(parameters[name], Joint)
-                else 0.0
-            ),
-            maximum_value=(
-                parameters[name].max_radians
-                if isinstance(parameters[name], Joint)
-                else 1.0
-            ),
+            minimum_value=minimum,
+            maximum_value=maximum,
         )
-        for name, keyframes in per_parameter.items()
-    }
+    return tracks
 
 
-def _parse_physical(
-    raw: object, joints: dict[str, Joint]
-) -> tuple[bool, tuple[ServoMapping, ...]]:
+def _parse_outputs(
+    raw: object,
+    dof_paths: dict[str, DegreeOfFreedom],
+    parameters: dict[str, Parameter],
+) -> tuple[OutputMapping, ...]:
     if raw is None:
-        return False, ()
-    physical = _mapping(raw, "physical")
-    for unsupported in ("blend_shape_mapping", "led_mapping"):
-        if unsupported in physical:
-            raise CharacterFormatError(
-                f"physical.{unsupported}",
-                "not supported by the runtime loader yet",
-            )
-    _reject_unknown_fields(physical, "physical", {"enabled", "bone_mapping"})
-    enabled = physical.get("enabled", True)
-    if not isinstance(enabled, bool):
+        return ()
+    if not isinstance(raw, list):
         raise CharacterFormatError(
-            "physical.enabled", f"expected true/false, got {enabled!r}"
+            "outputs",
+            f"expected a list of channel mappings, got {type(raw).__name__}",
         )
-
-    mappings: list[ServoMapping] = []
+    mappings: list[OutputMapping] = []
     seen_channels: set[int] = set()
-    for joint_name, entry in _mapping(
-        physical.get("bone_mapping", {}), "physical.bone_mapping"
-    ).items():
-        path = f"physical.bone_mapping.{joint_name}"
+    for index, entry in enumerate(raw):
+        path = f"outputs[{index}]"
         entry = _mapping(entry, path)
-        if "smoothing" in entry:
+        for required in ("target", "channel"):
+            if required not in entry:
+                raise CharacterFormatError(
+                    f"{path}.{required}", "missing required field"
+                )
+        target = _string(entry["target"], f"{path}.target")
+        dof = dof_paths.get(target)
+        if dof is not None:
+            range_key = "range_deg" if dof.kind is DofKind.ROTATION else "range_m"
+        elif target in parameters:
+            range_key = "range"
+        else:
             raise CharacterFormatError(
-                f"{path}.smoothing",
-                "not supported by the runtime loader yet",
+                f"{path}.target",
+                "references an undeclared DOF path or parameter",
             )
-        _reject_unknown_fields(entry, path, {"servo_channel", "range"})
-        if str(joint_name) not in joints:
-            raise CharacterFormatError(path, "references an undeclared bone")
-        if "servo_channel" not in entry:
+        # Only the range key matching the target's units is legal, so a
+        # mismatched one (e.g. degrees for a translation DOF) is rejected.
+        _reject_unknown_fields(entry, path, {"target", "channel", range_key})
+        if range_key not in entry:
             raise CharacterFormatError(
-                f"{path}.servo_channel", "missing required field"
+                f"{path}.{range_key}", "missing required field"
             )
-        channel = entry["servo_channel"]
+        at_zero, at_one = _number_pair(entry[range_key], f"{path}.{range_key}")
+        if range_key == "range_deg":
+            at_zero, at_one = math.radians(at_zero), math.radians(at_one)
+        if at_zero == at_one:
+            raise CharacterFormatError(
+                f"{path}.{range_key}", "range ends must differ"
+            )
+        channel = entry["channel"]
         if not isinstance(channel, int) or isinstance(channel, bool):
             raise CharacterFormatError(
-                f"{path}.servo_channel", f"expected an integer, got {channel!r}"
+                f"{path}.channel", f"expected an integer, got {channel!r}"
             )
         if channel < 0:
             raise CharacterFormatError(
-                f"{path}.servo_channel", f"must be >= 0: {channel}"
+                f"{path}.channel", f"must be >= 0: {channel}"
             )
         if channel in seen_channels:
             raise CharacterFormatError(
-                f"{path}.servo_channel", f"duplicate servo channel: {channel}"
+                f"{path}.channel", f"duplicate output channel: {channel}"
             )
         seen_channels.add(channel)
-        angle_at_zero_deg, angle_at_one_deg = _degree_pair(
-            entry.get("range"), f"{path}.range"
-        )
-        if angle_at_zero_deg == angle_at_one_deg:
-            raise CharacterFormatError(
-                f"{path}.range", "range ends must differ"
-            )
         mappings.append(
-            ServoMapping(
-                joint_name=str(joint_name),
-                servo_channel=channel,
-                angle_at_zero_radians=math.radians(angle_at_zero_deg),
-                angle_at_one_radians=math.radians(angle_at_one_deg),
+            OutputMapping(
+                target=target,
+                channel=channel,
+                value_at_zero=at_zero,
+                value_at_one=at_one,
             )
         )
-    return enabled, tuple(mappings)
+    return tuple(mappings)
 
 
 # Primitive validators --------------------------------------------------------
@@ -471,7 +651,7 @@ def _number(value: object, path: str) -> float:
     return float(value)
 
 
-def _degree_pair(value: object, path: str) -> tuple[float, float]:
+def _number_pair(value: object, path: str) -> tuple[float, float]:
     if not isinstance(value, list) or len(value) != 2:
         raise CharacterFormatError(
             path, f"expected a two-number list, got {value!r}"

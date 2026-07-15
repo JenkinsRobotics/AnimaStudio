@@ -19,6 +19,10 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
   runtime evaluation (B10 backend foundation) — **done**, claim
   released in the briefing (144 tests; see OUT and the handoff log).
 
+- [~] 2026-07-14 (Jonathan): **DOF refactor** — generalize the rig to
+  parts + typed joints where each DOF is the animated channel (Onshape
+  mate model); de-center blend shapes. In progress via background
+  agent (rig.py, loader.py, example, Character_Format.md structure).
 - [ ] 2026-07-14 (self, backend queue): next packets — the
   Arduino/ESP32 firmware sketch (B05/B08) and the serial transport
   for real hardware; `.scene.anima` execution after that.
