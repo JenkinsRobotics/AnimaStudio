@@ -63,6 +63,15 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — B06 animation workspace pass complete:** Animate now has a
+  multi-track dope sheet and switchable hold/linear graph presentation,
+  configurable 24/25/30/60 fps notation over continuous-time truth, key/frame
+  navigation, zoom, offline scrubbing, and a functional virtual-preview loop
+  toggle. Audio/Event capability lanes remain honest empty states; key editing,
+  auto-key, Bézier handles, waveforms, and armed hardware scrubbing stay gated
+  on their durable authoring/output contracts. Twenty-four Swift tests and app
+  launch pass.
+
 - **2026-07-14 — source hierarchy pass complete:** Jonathan's Parts Menu
   research is now an explicit two-layer navigator contract. Imported assembly
   nodes preserve source hierarchy and remain selectable/searchable but visibly

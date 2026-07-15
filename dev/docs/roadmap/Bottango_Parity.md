@@ -39,7 +39,7 @@ its user flow, tests, and `STATUS.md` update land together.
 | B03 | Joints | Typed mate connectors; revolute, prismatic, cylindrical, ball, planar, and fastened joints; per-DOF handles; parent/child connection; connector frames; pivots; neutral; min/max; offsets; duplicate assemblies; viewport guides/gizmos | `AnimaCore`, `RealityKitViewport`, Rig inspector | **Foundation:** scalar joint definition/clamping plus a sample RealityKit connector frame, revolute ring, reference plane, and limit arc exist. Typed editing, hierarchy binding, placement, compound handles, and imported-part attachment are planned. Depends on B02 and the shared DOF contract. |
 | B04 | Motors / actuator mapping | Separate semantic joints from output channels; normalized mapping; inversion; neutral/home; signal range; velocity limit; resolve conflicting home values | format mapping + runtime output config + Studio Hardware inspector | **Planned.** Must not put servo pins or pulse widths in core timeline data. Depends on B03 and the shared output contract. |
 | B05 | Hardware drivers | Add/remove/connect drivers; explicit arm/disarm (Master Live equivalent); status; multiple/network devices; logs; heartbeat; failsafe; emergency stop | Studio Hardware mode + `AnimationOutput` + runtime/firmware | **Lane B foundation in progress:** Wire Protocol v0 and Python simulator. Studio connection UI planned. Depends on B04 and protocol proof. |
-| B06 | Animating | Clip management; duration/loop; tracks; dope sheet; auto-key; select/move/copy/delete keyframes; playback; frame/time display; graph view; Bézier handles; interpolation modes; speed warnings | `AnimaCore` + timeline/graph views | **Foundation:** clips, tracks, hold/linear evaluation, transport, keyframe display, scrubbing. Editable keys, auto-key, Bézier/graph view, undo, and limit warnings planned. Depends on B01–B03. |
+| B06 | Animating | Clip management; duration/loop; tracks; dope sheet; auto-key; select/move/copy/delete keyframes; playback; frame/time display; graph view; Bézier handles; interpolation modes; speed warnings | `AnimaCore` + timeline/graph views | **UI foundation:** all motion tracks render in the dope sheet; transport, scrubbing, keyframe/frame navigation, virtual-preview looping, 24/25/30/60 fps timecode, zoom, and a selectable-joint graph presentation work. Editable keys/range, auto-key, Bézier handles/evaluation, undo, and limit warnings remain planned. |
 | B07 | Audio & video | Import/copy/bookmark media; waveform/video preview; typed media tracks; trim/offset; synchronized playback; choose host versus on-device audio | asset/document layer + AVFoundation + scene actions | **Planned.** Begin only after B01 and B06 persistence/timing are stable. |
 | B08 | Supported motors & effectors | Hobby servo first; PCA9685 bank, stepper, DYNAMIXEL, custom channels, and custom/media events as adapters | runtime + firmware plugins/adapters | **Planned.** First physical acceptance target is one hobby servo; expand only after B05 proves the generic channel contract. |
 | B09 | Recording & puppeteering | Input/control schemes; live manipulation; record to tracks; overwrite/layer modes; smoothing; microphone/audio capture | Studio input adapters + timeline authoring commands | **Planned later.** Depends on editable B06 tracks and safe B05 live output. |
@@ -110,6 +110,15 @@ display rate controls timecode/grid snapping only and must not become the
 runtime or hardware update rate. Tree, viewport, track, and graph selection stay
 synchronized; media waveforms appear in the dope sheet and are hidden from the
 motion graph.
+
+The current Studio foundation renders every clip motion track as a colored
+dope-sheet row and can switch to a read-only graph of hold/linear evaluation.
+The graph shows selected joint curves, or all curves when no joint is selected.
+Transport supports frame and adjacent-key navigation, configurable 24/25/30/60
+fps display notation, horizontal time zoom, offline scrubbing, and a real
+virtual-preview loop toggle. The visible full-clip play range, Audio lane, and
+Event lane are capability placeholders until persistent range/media/event
+models land; they must not imply that hardware output is armed.
 
 ### B05/B08 — Safe live hardware loop
 

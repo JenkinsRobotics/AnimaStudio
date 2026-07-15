@@ -24,8 +24,13 @@
   global project/live bar, workspace-owned contextual tools, and independently
   restorable in-session navigator/inspector/bottom-panel visibility. Assets
   centers import and hierarchy inspection; Rig centers parts and joints;
-  Animate owns the working timeline dock with transport, tracks/keyframes,
-  click/drag scrubbing, and looping playback; Show has a distinct multi-track
+  Animate owns the working timeline dock with transport, every clip motion
+  track, clickable keyframes, click/drag scrubbing, adjacent-key and frame
+  stepping, a real loop-preview toggle, horizontal zoom, and configurable
+  24/25/30/60 fps timecode over continuous seconds. Its Dope Sheet includes
+  honest empty Audio/Event capability lanes and switches to a read-only Graph
+  presentation of hold/linear curves; selecting joints isolates their curves.
+  Show has a distinct multi-track
   character/audio/screen/event timeline scaffold; Hardware has structured
   connection, safety, mapping, and filterable-log surfaces that visibly remain
   safely offline. The viewport now provides
@@ -51,9 +56,10 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Nineteen tests pass with `cd studio && swift test`, including real
+  inspector. Twenty-four tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
-  identity coverage, and hierarchy filtering/ancestor retention. The Python
+  identity coverage, hierarchy filtering/ancestor retention, frame timecode and
+  stepping, adjacent-key navigation, and loop/non-loop playback. The Python
   package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
   the Anima Wire Protocol v0 reference host (`anima_studio/wire.py` — encode
@@ -96,7 +102,7 @@
   templates, and live hardware controls are intentionally visible but disabled.
   There is no `.anima` parsing in Studio (the Python runtime loads
   `.character.anima` only; `.scene.anima` is unimplemented everywhere), no
-  Bézier curve editor, audio, screens/LEDs, Live2D, scene execution, output
+  editable Bézier curves/handles, audio, screens/LEDs, Live2D, scene execution, output
   node, JaegerOS connection, or full 52-blend-shape JP01 character file (a
   minimal example head ships in `examples/`). Studio is a working workspace
   foundation, not yet a complete authoring workflow.

@@ -29,6 +29,10 @@ final class StudioWorkspaceModel {
   var selection: Set<NavigatorItem> = [.structure]
   var playheadSeconds = 0.0
   var isPlaying = false
+  var loopsPreviewPlayback = true
+  var timelineEditorMode: TimelineEditorMode = .dopeSheet
+  var timelineDisplayFramesPerSecond = 30
+  var timelineZoom = 1.0
   var showsPreviewGrid = true
   var cameraProjection: PreviewCameraProjection = .perspective
   var cameraViewpoint: PreviewCameraViewpoint = .home
@@ -205,11 +209,47 @@ final class StudioWorkspaceModel {
     playheadSeconds = 0
   }
 
+  func seekTimeline(to seconds: Double) {
+    isPlaying = false
+    playheadSeconds = min(max(seconds, 0), activeClip.durationSeconds)
+  }
+
+  func stepTimeline(byFrames frameDelta: Int) {
+    let framesPerSecond = max(timelineDisplayFramesPerSecond, 1)
+    seekTimeline(
+      to: playheadSeconds + Double(frameDelta) / Double(framesPerSecond)
+    )
+  }
+
+  func seekAdjacentKeyframe(forward: Bool) {
+    let times = Set(
+      activeClip.jointTracks.flatMap { track in
+        track.keyframes.map(\.timeSeconds)
+      }
+    ).sorted()
+    let epsilon = 1e-9
+    let destination: Double
+    if forward {
+      destination = times.first { $0 > playheadSeconds + epsilon } ?? activeClip.durationSeconds
+    } else {
+      destination = times.last { $0 < playheadSeconds - epsilon } ?? 0
+    }
+    seekTimeline(to: destination)
+  }
+
   func advancePlayback(by seconds: Double) {
     guard isPlaying else { return }
     let nextTime = playheadSeconds + seconds
     if nextTime >= activeClip.durationSeconds {
-      playheadSeconds = 0
+      if loopsPreviewPlayback {
+        playheadSeconds =
+          activeClip.durationSeconds > 0
+          ? nextTime.truncatingRemainder(dividingBy: activeClip.durationSeconds)
+          : 0
+      } else {
+        playheadSeconds = activeClip.durationSeconds
+        isPlaying = false
+      }
     } else {
       playheadSeconds = nextTime
     }

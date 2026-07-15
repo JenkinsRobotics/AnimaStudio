@@ -314,6 +314,10 @@ become the Assets workspace without changing project semantics.
   membership and a graph editor for time, value, and interpolation. Both remain
   synchronized with viewport and tree selection. Media waveforms stay in the
   dope sheet rather than cluttering the motion graph.
+- The first graph implementation may visualize the existing hold/linear curves
+  read-only while the document and undo layers are built. Editing key time,
+  value, interpolation, tangents, ranges, markers, media, or events must not be
+  presented as working until each operation mutates the durable project model.
 - Timeline truth is continuous seconds in AnimaCore. Frame notation is a
   configurable display/editing grid (for example 24, 25, 30, or 60 fps), never
   a hard-coded evaluation rate or hardware update rate.

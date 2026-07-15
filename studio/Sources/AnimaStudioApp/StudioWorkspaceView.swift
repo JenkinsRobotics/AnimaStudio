@@ -73,7 +73,7 @@ struct StudioWorkspaceView: View {
       case .animate:
         Divider()
         TimelineEditorView(workspace: workspace)
-          .frame(minHeight: 220, idealHeight: 270, maxHeight: 340)
+          .frame(minHeight: 260, idealHeight: 340, maxHeight: 440)
       case .show:
         Divider()
         ShowTimelineView(workspace: workspace)
