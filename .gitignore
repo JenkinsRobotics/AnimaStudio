@@ -50,6 +50,9 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 
+# Local development app assembled by studio/Scripts/build-root-app.sh
+/Anima Studio.app/
+
 # Notebooks
 .ipynb_checkpoints/
 

@@ -63,6 +63,15 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — Xcode production organization complete:** The SwiftPM-only
+  executable is now also a native `Anima Studio.app`: thin lifecycle target,
+  reusable `AnimaStudioUI` package, feature-grouped sources and mirrored tests,
+  XcodeGen source of truth, `.xcconfig` build settings, least-privilege sandbox
+  entitlements, UI-test target, Canvas preview catalog, localized resources,
+  and a complete macOS icon asset. The reproducible packaging script places an
+  ad-hoc-signed development app at the repository root. Twenty-four Swift tests,
+  format lint, Xcode build, signature/resource verification, and GUI launch pass.
+
 - **2026-07-14 — B06 animation workspace pass complete:** Animate now has a
   multi-track dope sheet and switchable hold/linear graph presentation,
   configurable 24/25/30/60 fps notation over continuous-time truth, key/frame

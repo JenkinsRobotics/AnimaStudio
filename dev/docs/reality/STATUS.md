@@ -13,8 +13,16 @@
 - **JaegerOS pin:** not yet set — for now the runtime is standalone and
   Jaegers read `.anima` files natively; the `jaeger-os` dependency and
   `animation`-slot module land later (see `dev/docs/roadmap/`)
-- **What works:** the native macOS foundation under `studio/` builds and
-  launches as a Swift package. `AnimaCore` defines project assets, joint rigs,
+- **What works:** the native macOS foundation under `studio/` builds both as a
+  Swift package and as a real `Anima Studio.app`. The checked-in Xcode project
+  is reproducibly generated from `project.yml`, with a thin native lifecycle
+  target over the reusable `AnimaStudioUI` package, shared Debug/Release
+  `.xcconfig` settings, least-privilege sandbox entitlements, localized-resource
+  support, an asset-catalog app icon, a launch-level UI-test target, and Xcode
+  Canvas previews for the home, complete workspace, and animation timeline.
+  `studio/Scripts/build-root-app.sh` assembles an ad-hoc-signed development app
+  at the repository root for direct Finder launch. `AnimaCore` defines project
+  assets, joint rigs,
   clips, hold/linear keyframes, deterministic evaluation, neutral fallback,
   time clamping, joint-limit clamping, and Codable project round-tripping. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
@@ -104,7 +112,10 @@
   `.character.anima` only; `.scene.anima` is unimplemented everywhere), no
   editable Bézier curves/handles, audio, screens/LEDs, Live2D, scene execution, output
   node, JaegerOS connection, or full 52-blend-shape JP01 character file (a
-  minimal example head ships in `examples/`). Studio is a working workspace
+  minimal example head ships in `examples/`). The root app bundle is a local
+  development artifact rather than a notarized distribution; release signing,
+  notarization, updater/distribution packaging, and App Store policy work have
+  not started. Studio is a working workspace
   foundation, not yet a complete authoring workflow.
 
 ## How to update this file

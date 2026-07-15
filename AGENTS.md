@@ -80,7 +80,8 @@ IN before working, write your OUT before stopping.**
 | `AnimaDocument` | versioned project-package encoding, migrations, project-relative asset storage and resolution | SwiftUI views, RealityKit, timeline evaluation, hardware SDKs |
 | `AnimaViewport` | renderer-neutral preview contracts | concrete renderer behavior |
 | `RealityKitViewport` | model loading/display, camera, selection, joint gizmos | persisted format semantics, hardware mapping |
-| `AnimaStudioApp` | workspace state, commands, panels, document/file interaction | duplicate evaluator logic |
+| `AnimaStudioUI` | workspace state and reusable SwiftUI views, commands, panels, presentation logic | app signing/resources, duplicate evaluator logic |
+| `AnimaStudioApp` | thin macOS lifecycle target, app resources, entitlements, app-only document/file integration | reusable workspace views, evaluator logic |
 
 Add a new target only when it represents a proven dependency boundary. Do not
 create speculative plugin packages.
@@ -130,11 +131,20 @@ themselves. A commit without a handoff entry is incomplete multi-agent work.
 
 ## Verification
 
-Swift (Studio), from `studio/`:
+Swift package (Studio), from `studio/`:
 
 ```bash
-swift format lint --recursive Sources Tests Package.swift
+swift format lint --recursive App AppUITests Sources Tests Package.swift
 swift test
+```
+
+Native Xcode app, from `studio/`:
+
+```bash
+xcodegen generate
+xcodebuild -project AnimaStudio.xcodeproj -scheme AnimaStudio \
+  -derivedDataPath /tmp/AnimaStudioDerived CODE_SIGNING_ALLOWED=NO build
+./Scripts/build-root-app.sh
 ```
 
 Python (Runtime), from the repo root:
@@ -144,5 +154,6 @@ Python (Runtime), from the repo root:
 .venv/bin/pytest anima_studio/tests
 ```
 
-For a user-facing workspace change, also launch `swift run AnimaStudio` and
-walk the changed flow when the environment permits GUI execution.
+For a user-facing workspace change, also launch the native app target (or the
+root `Anima Studio.app`) and walk the changed flow when the environment permits
+GUI execution.

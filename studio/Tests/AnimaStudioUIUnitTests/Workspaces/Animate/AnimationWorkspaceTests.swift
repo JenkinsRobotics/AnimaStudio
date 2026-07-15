@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import AnimaStudioApp
+@testable import AnimaStudioUI
 
 @MainActor
 final class AnimationWorkspaceTests: XCTestCase {

@@ -1,7 +1,7 @@
 import RealityKitViewport
 import XCTest
 
-@testable import AnimaStudioApp
+@testable import AnimaStudioUI
 
 final class HierarchyFilteringTests: XCTestCase {
   func testFilterKeepsAncestorsOfMatchingNode() throws {

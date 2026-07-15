@@ -172,24 +172,33 @@ follow the shared typed-joint/DOF contract.
 
 ## Application Architecture
 
-The planned app is a Swift package graph hosted by a thin Xcode app target.
-Dependency arrows point inward; the document model never imports a renderer or
-hardware SDK.
+The app is a local Swift package graph hosted by a thin native Xcode app target.
+The checked-in project is generated from `studio/project.yml`; build settings
+live in `.xcconfig` files rather than being scattered through the project file.
+Dependency arrows point inward, and the document model never imports a renderer
+or hardware SDK.
 
 ```text
-AnimaStudioApp
-├── AnimaDocuments       document lifecycle, undo, validation, autosave
-├── AnimaAuthoring       timeline, graph, expression and calibration tools
-├── AnimaCore            format model, evaluator, curves, blending, constraints
-├── AnimaViewport        renderer-neutral viewport contracts
-├── RealityKitViewport   USD/USDZ and mechanical-rig 3D preview
-├── Live2DViewport       Cubism/Metal digital-face preview
-├── AnimaPluginAPI       capability descriptors and narrow extension contracts
-└── AnimaRuntimeClient   offline/local/live JaegerOS preview sessions
+AnimaStudioApp            @main lifecycle, resources, signing, entitlements
+└── AnimaStudioUI         app shell, workspaces, panels, timeline presentation
+    ├── AnimaCore         project model, evaluator, curves, constraints
+    └── RealityKitViewport
+        ├── AnimaViewport renderer-neutral viewport contracts
+        └── AnimaCore
 ```
 
-`AnimaCore` should be usable from unit tests and command-line tools without
-launching AppKit, SwiftUI, RealityKit, Cubism, or JaegerOS.
+The current source tree groups `AnimaStudioUI` by `AppShell`, `Components`,
+`Theme`, `PreviewSupport`, and task-focused `Workspaces`. Unit-test folders
+mirror those groups. Xcode's Canvas opens a preview catalog for the home,
+complete-workspace, and animation-timeline states; the native app target also
+has a launch-level UI-test target. This keeps the operator-facing GUI editable
+in normal Xcode/SwiftUI workflows while retaining command-line SwiftPM tests.
+
+Future proven boundaries such as `AnimaDocument`, `Live2DViewport`,
+`AnimaPluginAPI`, and `AnimaRuntimeClient` should become separate targets only
+when their first implementation lands. `AnimaCore` remains usable from unit
+tests and command-line tools without launching AppKit, SwiftUI, RealityKit,
+Cubism, or JaegerOS.
 
 ### Core evaluated frame
 

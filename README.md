@@ -63,6 +63,20 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Launch the macOS app
+
+On a Mac with Xcode installed, double-click **Anima Studio.app** at the
+repository root after it has been assembled, or build it at any time with:
+
+```bash
+cd studio
+./Scripts/build-root-app.sh
+open "../Anima Studio.app"
+```
+
+For SwiftUI development and live Canvas previews, open
+`studio/AnimaStudio.xcodeproj` and run the **AnimaStudio** scheme on **My Mac**.
+
 ## Documentation
 
 Planning and design docs live under [dev/docs/](dev/docs/):
