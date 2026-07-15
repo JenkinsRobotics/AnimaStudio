@@ -1,9 +1,20 @@
+import AnimaCore
 import XCTest
 
 @testable import AnimaStudioUI
 
 @MainActor
 final class AnimationWorkspaceTests: XCTestCase {
+  private func sampleModel() -> StudioWorkspaceModel {
+    StudioWorkspaceModel(
+      project: AnimaProject(
+        name: "Sample",
+        rig: SampleContent.rig,
+        clips: [SampleContent.clip]
+      )
+    )
+  }
+
   func testTimecodeUsesConfigurableDisplayRate() {
     XCTAssertEqual(
       TimelineTimecode(timeSeconds: 2 + 29.0 / 30.0, framesPerSecond: 30).displayString,
@@ -20,7 +31,7 @@ final class AnimationWorkspaceTests: XCTestCase {
   }
 
   func testFrameSteppingUsesDisplayRateAndClampsToClip() {
-    let model = StudioWorkspaceModel()
+    let model = sampleModel()
     model.timelineDisplayFramesPerSecond = 25
 
     model.stepTimeline(byFrames: 1)
@@ -32,7 +43,7 @@ final class AnimationWorkspaceTests: XCTestCase {
   }
 
   func testAdjacentKeyframeNavigation() {
-    let model = StudioWorkspaceModel()
+    let model = sampleModel()
     model.seekTimeline(to: 1.25)
 
     model.seekAdjacentKeyframe(forward: true)
@@ -43,7 +54,7 @@ final class AnimationWorkspaceTests: XCTestCase {
   }
 
   func testNonLoopingPlaybackStopsAtEnd() {
-    let model = StudioWorkspaceModel()
+    let model = sampleModel()
     model.loopsPreviewPlayback = false
     model.seekTimeline(to: model.activeClip.durationSeconds - 0.01)
     model.isPlaying = true
@@ -55,7 +66,7 @@ final class AnimationWorkspaceTests: XCTestCase {
   }
 
   func testLoopingPlaybackWrapsOvershoot() {
-    let model = StudioWorkspaceModel()
+    let model = sampleModel()
     model.loopsPreviewPlayback = true
     model.seekTimeline(to: model.activeClip.durationSeconds - 0.01)
     model.isPlaying = true

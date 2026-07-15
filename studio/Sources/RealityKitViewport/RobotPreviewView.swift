@@ -1,4 +1,5 @@
 import AnimaCore
+import Foundation
 import RealityKit
 import SwiftUI
 
@@ -17,6 +18,7 @@ public enum PreviewCameraViewpoint: String, Sendable {
 
 public struct RobotPreviewView: View {
   private let frame: EvaluatedFrame
+  private let rig: CharacterRig
   private let modelURL: URL?
   private let showsGrid: Bool
   private let projection: PreviewCameraProjection
@@ -26,9 +28,11 @@ public struct RobotPreviewView: View {
   private let importedHierarchyRootPath: ModelEntityPath?
   private let onSelectModelPath: (ModelEntityPath) -> Void
   private let rigGuideVisibility: RigGuideVisibility
+  private let appearance: PreviewAppearance
 
   public init(
     frame: EvaluatedFrame,
+    rig: CharacterRig = CharacterRig(joints: []),
     modelURL: URL? = nil,
     showsGrid: Bool = true,
     projection: PreviewCameraProjection = .perspective,
@@ -37,9 +41,11 @@ public struct RobotPreviewView: View {
     focusedModelPath: ModelEntityPath? = nil,
     importedHierarchyRootPath: ModelEntityPath? = nil,
     rigGuideVisibility: RigGuideVisibility = .hidden,
+    appearance: PreviewAppearance = .midnight,
     onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in }
   ) {
     self.frame = frame
+    self.rig = rig
     self.modelURL = modelURL
     self.showsGrid = showsGrid
     self.projection = projection
@@ -48,12 +54,13 @@ public struct RobotPreviewView: View {
     self.focusedModelPath = focusedModelPath
     self.importedHierarchyRootPath = importedHierarchyRootPath
     self.rigGuideVisibility = rigGuideVisibility
+    self.appearance = appearance
     self.onSelectModelPath = onSelectModelPath
   }
 
   public var body: some View {
     RealityView { content in
-      let root = Self.makeScene()
+      let root = Self.makeScene(rig: rig, appearance: appearance)
       content.add(root)
 
       if let modelURL,
@@ -62,7 +69,6 @@ public struct RobotPreviewView: View {
         importedModel.name = "importedModel"
         Self.normalizeForPreview(importedModel)
         Self.prepareForSelection(importedModel)
-        root.findEntity(named: "sampleMechanism")?.isEnabled = false
         root.addChild(importedModel)
       }
     } update: { content in
@@ -79,18 +85,7 @@ public struct RobotPreviewView: View {
         focusedModelPath: focusedModelPath,
         to: root
       )
-
-      guard let headYaw = root.findEntity(named: SampleContent.headYawID.rawValue) else {
-        return
-      }
-
-      let radians = Float(
-        frame.jointAnglesRadians[SampleContent.headYawID] ?? 0
-      )
-      headYaw.orientation = simd_quatf(
-        angle: radians,
-        axis: SIMD3<Float>(0, 1, 0)
-      )
+      Self.applyRig(rig, frame: frame, to: root)
     }
     .realityViewCameraControls(.orbit)
     .gesture(
@@ -108,46 +103,35 @@ public struct RobotPreviewView: View {
           onSelectModelPath(path)
         }
     )
-    .background(.black.gradient)
-    .id(modelURL)
+    .background(appearance.backgroundColor.gradient)
+    .id(sceneIdentity)
   }
 
-  private static func makeScene() -> Entity {
+  private var sceneIdentity: String {
+    let partIDs = rig.parts.map { $0.id.rawValue.uuidString }.joined(separator: ",")
+    let jointIDs = rig.joints.map { $0.id.rawValue }.joined(separator: ",")
+    return "\(modelURL?.absoluteString ?? "none")|\(appearance.rawValue)|\(partIDs)|\(jointIDs)"
+  }
+
+  private static func makeScene(
+    rig: CharacterRig,
+    appearance: PreviewAppearance
+  ) -> Entity {
     let root = Entity()
     root.name = "animaPreviewRoot"
 
-    root.addChild(makeGrid())
+    root.addChild(makeGrid(appearance: appearance))
 
-    let sampleMechanism = Entity()
-    sampleMechanism.name = "sampleMechanism"
-    root.addChild(sampleMechanism)
+    for part in rig.parts {
+      root.addChild(makePart(part))
+    }
 
-    let body = ModelEntity(
-      mesh: .generateBox(width: 0.8, height: 1.1, depth: 0.5),
-      materials: [SimpleMaterial(color: .systemIndigo, isMetallic: true)]
-    )
-    body.position.y = 0.55
-    sampleMechanism.addChild(body)
-
-    let headYaw = Entity()
-    headYaw.name = SampleContent.headYawID.rawValue
-    headYaw.position.y = 1.25
-    sampleMechanism.addChild(headYaw)
-    headYaw.addChild(RigGuideFactory.makeRevoluteGuide())
-
-    let head = ModelEntity(
-      mesh: .generateBox(width: 0.72, height: 0.46, depth: 0.58),
-      materials: [SimpleMaterial(color: .systemOrange, isMetallic: false)]
-    )
-    head.position.y = 0.23
-    headYaw.addChild(head)
-
-    let face = ModelEntity(
-      mesh: .generateBox(width: 0.48, height: 0.18, depth: 0.015),
-      materials: [SimpleMaterial(color: .cyan, isMetallic: false)]
-    )
-    face.position = SIMD3<Float>(0, 0.26, 0.30)
-    headYaw.addChild(face)
+    for joint in rig.joints {
+      guard let childPartID = joint.childPartID,
+        let child = root.findEntity(named: partEntityName(childPartID))
+      else { continue }
+      child.addChild(RigGuideFactory.makeRevoluteGuide())
+    }
 
     let camera = Entity(components: PerspectiveCameraComponent())
     camera.name = "previewCamera"
@@ -155,11 +139,77 @@ public struct RobotPreviewView: View {
     camera.look(at: SIMD3<Float>(0, 0.8, 0), from: camera.position, relativeTo: nil)
     root.addChild(camera)
 
-    let light = Entity(components: DirectionalLightComponent(color: .white, intensity: 12_000))
+    let light = Entity(
+      components: DirectionalLightComponent(color: .white, intensity: appearance.lightIntensity)
+    )
     light.orientation = simd_quatf(angle: -.pi / 4, axis: SIMD3<Float>(1, 0, 0))
     root.addChild(light)
 
     return root
+  }
+
+  private static func makePart(_ part: RigPartDefinition) -> Entity {
+    let material = SimpleMaterial(color: .systemTeal, isMetallic: false)
+    let entity: ModelEntity
+    switch part.primitiveKind {
+    case .box:
+      entity = ModelEntity(
+        mesh: .generateBox(width: 0.55, height: 0.55, depth: 0.55, cornerRadius: 0.035),
+        materials: [material]
+      )
+    case .cylinder:
+      entity = ModelEntity(
+        mesh: .generateCylinder(height: 0.72, radius: 0.25),
+        materials: [material]
+      )
+    case .sphere:
+      entity = ModelEntity(
+        mesh: .generateSphere(radius: 0.32),
+        materials: [material]
+      )
+    case .locator:
+      entity = ModelEntity(
+        mesh: .generateSphere(radius: 0.08),
+        materials: [SimpleMaterial(color: .systemYellow, isMetallic: false)]
+      )
+    }
+    entity.name = partEntityName(part.id)
+    entity.position = simdPosition(part.positionMeters)
+    return entity
+  }
+
+  private static func applyRig(
+    _ rig: CharacterRig,
+    frame: EvaluatedFrame,
+    to root: Entity
+  ) {
+    for part in rig.parts {
+      root.findEntity(named: partEntityName(part.id))?.position = simdPosition(part.positionMeters)
+    }
+
+    for joint in rig.joints {
+      guard let childPartID = joint.childPartID,
+        let child = root.findEntity(named: partEntityName(childPartID))
+      else { continue }
+      let axis: SIMD3<Float> =
+        switch joint.axis {
+        case .x: SIMD3<Float>(1, 0, 0)
+        case .y: SIMD3<Float>(0, 1, 0)
+        case .z: SIMD3<Float>(0, 0, 1)
+        }
+      child.orientation = simd_quatf(
+        angle: Float(frame.jointAnglesRadians[joint.id] ?? joint.neutralRadians),
+        axis: axis
+      )
+    }
+  }
+
+  private static func partEntityName(_ id: PartID) -> String {
+    "semanticPart-\(id.rawValue.uuidString)"
+  }
+
+  private static func simdPosition(_ vector: RigVector3) -> SIMD3<Float> {
+    SIMD3<Float>(Float(vector.x), Float(vector.y), Float(vector.z))
   }
 
   private static func applyProjectionIfNeeded(
@@ -299,12 +349,12 @@ public struct RobotPreviewView: View {
     return nil
   }
 
-  private static func makeGrid() -> Entity {
+  private static func makeGrid(appearance: PreviewAppearance) -> Entity {
     let grid = Entity()
     grid.name = "previewGrid"
 
-    let minorMaterial = SimpleMaterial(color: .darkGray, isMetallic: false)
-    let majorMaterial = SimpleMaterial(color: .gray, isMetallic: false)
+    let minorMaterial = SimpleMaterial(color: appearance.minorGridColor, isMetallic: false)
+    let majorMaterial = SimpleMaterial(color: appearance.majorGridColor, isMetallic: false)
     let extent: Float = 10
     let spacing: Float = 0.5
 

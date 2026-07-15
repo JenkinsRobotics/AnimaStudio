@@ -88,11 +88,18 @@ enum RigGuideFactory {
   }
 
   static func apply(_ visibility: RigGuideVisibility, to root: Entity) {
-    guard let guides = root.findEntity(named: rootName) else { return }
-    guides.findEntity(named: connectorName)?.isEnabled = visibility.showsConnectors
-    guides.findEntity(named: dofName)?.isEnabled = visibility.showsDOFHandles
-    guides.findEntity(named: planeName)?.isEnabled = visibility.showsReferencePlanes
-    guides.findEntity(named: limitsName)?.isEnabled = visibility.showsLimits
+    for guides in entities(named: rootName, below: root) {
+      guides.findEntity(named: connectorName)?.isEnabled = visibility.showsConnectors
+      guides.findEntity(named: dofName)?.isEnabled = visibility.showsDOFHandles
+      guides.findEntity(named: planeName)?.isEnabled = visibility.showsReferencePlanes
+      guides.findEntity(named: limitsName)?.isEnabled = visibility.showsLimits
+    }
+  }
+
+  private static func entities(named name: String, below root: Entity) -> [Entity] {
+    root.children.flatMap { child in
+      (child.name == name ? [child] : []) + entities(named: name, below: child)
+    }
   }
 
   private enum AxisDirection {

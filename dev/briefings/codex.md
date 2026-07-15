@@ -63,6 +63,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — empty-project creation slice complete:** New projects now open
+  to an honest empty Rig with a Bottango-inspired Add to Rig palette. Box,
+  cylinder, sphere, and empty-point actions create real AnimaCore semantic
+  parts rendered by RealityKit; New Joint creates a revolute parent/child
+  connection with editable name, axis, and angular limits. Motors, extra joint
+  insertion, 3D Models & Media, and Events remain visible disabled references.
+  Midnight, Graphite, CAD Light, and Blueprint viewport backgrounds/grid colors
+  persist as user-local settings. Thirty-one Swift tests, claimed-file lint,
+  Xcode build, signature check, and rebuilt root-app launch pass. Claude's
+  Python/firmware and typed-rig refactor files remain untouched.
+
 - **2026-07-14 — Xcode production organization complete:** The SwiftPM-only
   executable is now also a native `Anima Studio.app`: thin lifecycle target,
   reusable `AnimaStudioUI` package, feature-grouped sources and mirrored tests,

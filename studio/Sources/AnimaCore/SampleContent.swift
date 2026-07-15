@@ -31,4 +31,10 @@ public enum SampleContent {
       )
     ]
   )
+
+  public static let emptyClip = AnimationClip(
+    name: "Main",
+    durationSeconds: 5,
+    jointTracks: []
+  )
 }

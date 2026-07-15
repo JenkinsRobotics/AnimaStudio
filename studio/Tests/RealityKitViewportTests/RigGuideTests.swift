@@ -1,3 +1,4 @@
+import RealityKit
 import XCTest
 
 @testable import RealityKitViewport
@@ -30,5 +31,20 @@ final class RigGuideTests: XCTestCase {
     XCTAssertNotNil(guide.findEntity(named: RigGuideFactory.dofName))
     XCTAssertNotNil(guide.findEntity(named: RigGuideFactory.planeName))
     XCTAssertNotNil(guide.findEntity(named: RigGuideFactory.limitsName))
+  }
+
+  func testVisibilityAppliesToEveryJointGuide() {
+    let root = Entity()
+    root.addChild(RigGuideFactory.makeRevoluteGuide())
+    root.addChild(RigGuideFactory.makeRevoluteGuide())
+
+    RigGuideFactory.apply(.hidden, to: root)
+
+    for guide in root.children {
+      XCTAssertFalse(guide.findEntity(named: RigGuideFactory.connectorName)?.isEnabled ?? true)
+      XCTAssertFalse(guide.findEntity(named: RigGuideFactory.dofName)?.isEnabled ?? true)
+      XCTAssertFalse(guide.findEntity(named: RigGuideFactory.planeName)?.isEnabled ?? true)
+      XCTAssertFalse(guide.findEntity(named: RigGuideFactory.limitsName)?.isEnabled ?? true)
+    }
   }
 }

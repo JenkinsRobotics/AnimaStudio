@@ -8,6 +8,14 @@ public struct AssetID: RawRepresentable, Hashable, Codable, Sendable {
   }
 }
 
+public struct PartID: RawRepresentable, Hashable, Codable, Sendable {
+  public let rawValue: UUID
+
+  public init(rawValue: UUID = UUID()) {
+    self.rawValue = rawValue
+  }
+}
+
 public struct JointID: RawRepresentable, Hashable, Codable, Sendable,
   ExpressibleByStringLiteral
 {

@@ -115,15 +115,21 @@ struct ProjectNavigatorView: View {
 
   private var semanticRigSection: some View {
     Section("Semantic Rig") {
-      if matchesFilter("Sample Mechanism") {
-        PartTreeRow(
-          title: "Sample Mechanism",
-          role: .semanticPart,
-          detail: "\(workspace.project.rig.joints.count) joints"
-        )
-        .tag(NavigatorItem.structure)
+      if workspace.project.rig.parts.isEmpty {
+        Label("No parts yet", systemImage: "cube.transparent")
+          .foregroundStyle(.secondary)
       } else {
-        noFilterResults
+        ForEach(filteredParts) { part in
+          PartTreeRow(
+            title: part.displayName,
+            role: .semanticPart,
+            detail: part.primitiveKind.displayName
+          )
+          .tag(NavigatorItem.part(part.id))
+        }
+        if filteredParts.isEmpty {
+          noFilterResults
+        }
       }
     }
   }
@@ -134,7 +140,10 @@ struct ProjectNavigatorView: View {
         PartTreeRow(title: joint.displayName, role: .joint)
           .tag(NavigatorItem.joint(joint.id))
       }
-      if filteredJoints.isEmpty {
+      if workspace.project.rig.joints.isEmpty {
+        Label("No joints yet", systemImage: "rotate.3d")
+          .foregroundStyle(.secondary)
+      } else if filteredJoints.isEmpty {
         noFilterResults
       }
     }
@@ -191,13 +200,14 @@ struct ProjectNavigatorView: View {
       .padding(12)
     case .rig:
       VStack(alignment: .leading, spacing: 8) {
-        Button("Create Semantic Part", systemImage: "plus.circle.fill") {}
-          .buttonStyle(.borderedProminent)
-          .disabled(true)
-          .help("Part creation follows the typed-joint project contract")
+        Button("Create Semantic Part", systemImage: "plus.circle.fill") {
+          workspace.showCreationTools()
+        }
+        .buttonStyle(.borderedProminent)
+        .help("Open the rig creation palette")
         Label(
-          "Source nodes stay locked; map them into the rig to edit relationships.",
-          systemImage: "lock"
+          "Proxy parts are editable. Imported source nodes remain locked.",
+          systemImage: "info.circle"
         )
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
@@ -243,6 +253,10 @@ struct ProjectNavigatorView: View {
 
   private var filteredJoints: [JointDefinition] {
     workspace.project.rig.joints.filter { matchesFilter($0.displayName) }
+  }
+
+  private var filteredParts: [RigPartDefinition] {
+    workspace.project.rig.parts.filter { matchesFilter($0.displayName) }
   }
 
   private var filteredClips: [AnimationClip] {

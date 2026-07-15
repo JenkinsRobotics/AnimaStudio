@@ -6,6 +6,7 @@ import RealityKitViewport
 enum NavigatorItem: Hashable {
   case project
   case asset(AssetID)
+  case part(PartID)
   case structure
   case modelNode(ModelEntityPath)
   case joint(JointID)
@@ -23,10 +24,10 @@ final class StudioWorkspaceModel {
   )
   var project = AnimaProject(
     name: "Untitled Character",
-    rig: SampleContent.rig,
-    clips: [SampleContent.clip]
+    rig: CharacterRig(joints: []),
+    clips: []
   )
-  var selection: Set<NavigatorItem> = [.structure]
+  var selection: Set<NavigatorItem> = []
   var playheadSeconds = 0.0
   var isPlaying = false
   var loopsPreviewPlayback = true
@@ -38,6 +39,7 @@ final class StudioWorkspaceModel {
   var cameraViewpoint: PreviewCameraViewpoint = .home
   var cameraCommandRevision = 0
   var rigGuideVisibility = RigGuideVisibility()
+  var showsCreationPalette = true
   var importedModelURL: URL?
   var importedModelHierarchy: ModelHierarchyNode?
   var isLoadingModelHierarchy = false
@@ -45,8 +47,18 @@ final class StudioWorkspaceModel {
 
   private let evaluator = AnimationEvaluator()
 
+  init(
+    project: AnimaProject = AnimaProject(
+      name: "Untitled Character",
+      rig: CharacterRig(joints: []),
+      clips: []
+    )
+  ) {
+    self.project = project
+  }
+
   var activeClip: AnimationClip {
-    project.clips.first ?? SampleContent.clip
+    project.clips.first ?? SampleContent.emptyClip
   }
 
   var evaluatedFrame: EvaluatedFrame {
@@ -76,11 +88,20 @@ final class StudioWorkspaceModel {
 
   var canFrameSelection: Bool {
     switch primarySelection {
-    case .modelNode, .structure, .joint:
+    case .modelNode, .part, .structure, .joint:
       true
     case .project, .asset, .animation, nil:
       false
     }
+  }
+
+  var isRigEmpty: Bool {
+    project.rig.parts.isEmpty && project.rig.joints.isEmpty
+  }
+
+  var canCreateRevoluteJoint: Bool {
+    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+    return project.rig.parts.contains { !connectedChildren.contains($0.id) }
   }
 
   func importModel(from url: URL) async {
@@ -116,6 +137,55 @@ final class StudioWorkspaceModel {
 
   func clearSelection() {
     selection.removeAll()
+  }
+
+  func showCreationTools() {
+    showsCreationPalette = true
+  }
+
+  func addPart(kind: RigPrimitiveKind) {
+    let sequence = project.rig.parts.count + 1
+    let part = RigPartDefinition(
+      displayName: "\(kind.displayName) \(sequence)",
+      primitiveKind: kind,
+      positionMeters: RigVector3(
+        x: Double((sequence - 1) % 4) * 0.8 - 0.8,
+        y: kind == .locator ? 0.15 : 0.35,
+        z: Double((sequence - 1) / 4) * -0.8
+      )
+    )
+    project.rig.parts.append(part)
+    selection = [.part(part.id)]
+  }
+
+  func createRevoluteJoint() {
+    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+    let selectedPartID: PartID? = {
+      guard case .part(let partID) = primarySelection else { return nil }
+      return partID
+    }()
+    let child =
+      project.rig.parts.first {
+        $0.id == selectedPartID && !connectedChildren.contains($0.id)
+      } ?? project.rig.parts.first { !connectedChildren.contains($0.id) }
+    guard let child else { return }
+
+    let parentID = project.rig.parts.first { $0.id != child.id }?.id
+    var sequence = project.rig.joints.count + 1
+    while project.rig.joints.contains(where: { $0.id.rawValue == "joint_\(sequence)" }) {
+      sequence += 1
+    }
+    let joint = JointDefinition(
+      id: JointID(rawValue: "joint_\(sequence)"),
+      displayName: "Joint \(sequence)",
+      axis: .y,
+      minimumRadians: -.pi / 2,
+      maximumRadians: .pi / 2,
+      parentPartID: parentID,
+      childPartID: child.id
+    )
+    project.rig.joints.append(joint)
+    selection = [.joint(joint.id)]
   }
 
   func switchWorkspace(to workspace: StudioWorkspaceKind) {
@@ -177,6 +247,18 @@ final class StudioWorkspaceModel {
     project.assets[index].name = name
   }
 
+  func renamePart(id: PartID, to name: String) {
+    guard let index = project.rig.parts.firstIndex(where: { $0.id == id }) else { return }
+    project.rig.parts[index].displayName = name
+  }
+
+  func setPartPosition(id: PartID, to positionMeters: RigVector3) {
+    guard positionMeters.x.isFinite, positionMeters.y.isFinite, positionMeters.z.isFinite,
+      let index = project.rig.parts.firstIndex(where: { $0.id == id })
+    else { return }
+    project.rig.parts[index].positionMeters = positionMeters
+  }
+
   func renameJoint(id: JointID, to name: String) {
     guard let index = project.rig.joints.firstIndex(where: { $0.id == id }) else { return }
     project.rig.joints[index].displayName = name
@@ -185,6 +267,19 @@ final class StudioWorkspaceModel {
   func setJointAxis(id: JointID, to axis: JointAxis) {
     guard let index = project.rig.joints.firstIndex(where: { $0.id == id }) else { return }
     project.rig.joints[index].axis = axis
+  }
+
+  func setJointRange(id: JointID, minimumRadians: Double, maximumRadians: Double) {
+    guard minimumRadians.isFinite, maximumRadians.isFinite,
+      minimumRadians <= maximumRadians,
+      let index = project.rig.joints.firstIndex(where: { $0.id == id })
+    else { return }
+    project.rig.joints[index].minimumRadians = minimumRadians
+    project.rig.joints[index].maximumRadians = maximumRadians
+    project.rig.joints[index].neutralRadians = min(
+      max(project.rig.joints[index].neutralRadians, minimumRadians),
+      maximumRadians
+    )
   }
 
   func setCameraViewpoint(_ viewpoint: PreviewCameraViewpoint) {

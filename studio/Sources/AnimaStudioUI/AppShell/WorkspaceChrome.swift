@@ -1,7 +1,9 @@
+import RealityKitViewport
 import SwiftUI
 
 struct WorkspaceSwitcherBar: View {
   @Bindable var workspace: StudioWorkspaceModel
+  @Binding var viewportAppearance: PreviewAppearance
   let closeProject: () -> Void
 
   var body: some View {
@@ -16,10 +18,24 @@ struct WorkspaceSwitcherBar: View {
       .help("Close project and return home")
 
       Menu {
-        Text("Anima Studio 0.1.0")
+        Section("Viewport Appearance") {
+          ForEach(PreviewAppearance.allCases) { appearance in
+            Button {
+              viewportAppearance = appearance
+            } label: {
+              Label(
+                appearance.title,
+                systemImage: viewportAppearance == appearance
+                  ? "checkmark.circle.fill" : appearance.systemImage
+              )
+            }
+          }
+        }
         Divider()
-        Text("Kinematic preview")
-        Text("Open-source workspace")
+        Section("About") {
+          Text("Anima Studio 0.1.0")
+          Text("Kinematic preview · Open source")
+        }
       } label: {
         Image(systemName: "gearshape.fill")
           .frame(width: 27, height: 27)
@@ -27,7 +43,7 @@ struct WorkspaceSwitcherBar: View {
       }
       .menuStyle(.borderlessButton)
       .menuIndicator(.hidden)
-      .help("Workspace information")
+      .help("Studio settings and viewport appearance")
 
       ForEach(StudioWorkspaceKind.allCases) { kind in
         let descriptor = kind.descriptor
@@ -254,9 +270,10 @@ private struct WorkspaceContextualTools: View {
         .disabled(true)
         .help("Scale gizmos arrive with semantic parts")
       frameSelectionButton
-      Button("Create Part", systemImage: "plus.square.dashed") {}
-        .disabled(true)
-        .help("Part creation follows the shared typed-joint model")
+      Button("Create Part", systemImage: "plus.square.dashed") {
+        workspace.showCreationTools()
+      }
+      .help("Open the rig creation palette")
     }
   }
 

@@ -113,6 +113,37 @@ struct StudioReadoutRow: View {
   }
 }
 
+struct StudioNumberFieldRow: View {
+  let title: String
+  @Binding var value: Double
+  var unit: String?
+  var help: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      StudioFieldLabel(title: title, help: help)
+      HStack(spacing: 7) {
+        TextField(title, value: $value, format: .number.precision(.fractionLength(0...3)))
+          .textFieldStyle(.plain)
+          .font(.system(.body, design: .monospaced))
+        if let unit {
+          Text(unit)
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+      }
+      .padding(.horizontal, 9)
+      .frame(height: StudioMetrics.fieldHeight)
+      .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+      .overlay {
+        RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+          .stroke(StudioPalette.border, lineWidth: 1)
+      }
+      .accessibilityLabel(title)
+    }
+  }
+}
+
 struct StudioFieldLabel: View {
   let title: String
   var help: String?

@@ -85,6 +85,8 @@ struct InspectorView: View {
       animationInspector(selectedAnimation)
     } else if let selectedAsset {
       assetInspector(selectedAsset)
+    } else if let selectedPart {
+      partInspector(selectedPart)
     } else if let selectedModelNode {
       modelNodeInspector(selectedModelNode)
     } else if let selectedJoint {
@@ -97,7 +99,7 @@ struct InspectorView: View {
       }
     } else if workspace.activeWorkspace == .rig || workspace.activeWorkspace == .assets {
       Section("Selection") {
-        Text("Select an asset, model node, or joint to configure it.")
+        Text("Select a part, model node, or joint to configure it.")
           .foregroundStyle(.secondary)
       }
     }
@@ -180,8 +182,54 @@ struct InspectorView: View {
   }
 
   @ViewBuilder
+  private func partInspector(_ part: RigPartDefinition) -> some View {
+    Section("Semantic Part") {
+      StudioTextFieldRow(
+        title: "Name",
+        text: Binding(
+          get: { part.displayName },
+          set: { workspace.renamePart(id: part.id, to: $0) }
+        ),
+        placeholder: "Part name",
+        help: "The project-owned name used by the rig and later mappings."
+      )
+      LabeledContent("Proxy Shape", value: part.primitiveKind.displayName)
+      Label("Project-owned rig proxy", systemImage: "pencil.and.outline")
+        .foregroundStyle(StudioPalette.semanticPart)
+    }
+
+    Section("Position") {
+      StudioNumberFieldRow(
+        title: "X",
+        value: partPositionBinding(part.id, keyPath: \.x),
+        unit: "m"
+      )
+      StudioNumberFieldRow(
+        title: "Y",
+        value: partPositionBinding(part.id, keyPath: \.y),
+        unit: "m"
+      )
+      StudioNumberFieldRow(
+        title: "Z",
+        value: partPositionBinding(part.id, keyPath: \.z),
+        unit: "m"
+      )
+    }
+
+    Section("Workflow") {
+      Text(
+        "Use proxy structures to establish the rig and joints. Imported production geometry can be mapped to the same semantic part later."
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
   private func jointInspector(_ joint: JointDefinition) -> some View {
     Section("Joint") {
+      LabeledContent("Type", value: "Revolute")
+      LabeledContent("Degrees of Freedom", value: "1 rotational")
       if workspace.activeWorkspace == .rig {
         StudioTextFieldRow(
           title: "Name",
@@ -198,7 +246,7 @@ struct InspectorView: View {
             get: { joint.axis },
             set: { workspace.setJointAxis(id: joint.id, to: $0) }
           ),
-          help: "Temporary scalar-joint control pending the typed mate/DOF contract."
+          help: "The axis of this first revolute degree of freedom."
         ) {
           Text("X").tag(JointAxis.x)
           Text("Y").tag(JointAxis.y)
@@ -207,6 +255,25 @@ struct InspectorView: View {
       } else {
         LabeledContent("Name", value: joint.displayName)
         LabeledContent("Axis", value: joint.axis.rawValue.uppercased())
+      }
+      LabeledContent("Parent", value: partName(joint.parentPartID) ?? "World")
+      LabeledContent("Child", value: partName(joint.childPartID) ?? "Unassigned")
+    }
+
+    Section("Limits") {
+      if workspace.activeWorkspace == .rig {
+        StudioNumberFieldRow(
+          title: "Minimum",
+          value: jointMinimumDegreesBinding(joint.id),
+          unit: "°",
+          help: "Minimum permitted revolute angle."
+        )
+        StudioNumberFieldRow(
+          title: "Maximum",
+          value: jointMaximumDegreesBinding(joint.id),
+          unit: "°",
+          help: "Maximum permitted revolute angle."
+        )
       }
       StudioReadoutRow(
         title: "Evaluated Angle",
@@ -240,6 +307,11 @@ struct InspectorView: View {
   private var selectedAsset: ProjectAsset? {
     guard case .asset(let selectedID) = workspace.primarySelection else { return nil }
     return workspace.project.assets.first { $0.id == selectedID }
+  }
+
+  private var selectedPart: RigPartDefinition? {
+    guard case .part(let selectedID) = workspace.primarySelection else { return nil }
+    return workspace.project.rig.parts.first { $0.id == selectedID }
   }
 
   private var selectedModelNode: ModelHierarchyNode? {
@@ -276,5 +348,63 @@ struct InspectorView: View {
 
   private var panelSystemImage: String {
     workspace.activeWorkspace.descriptor.systemImage
+  }
+
+  private func partPositionBinding(
+    _ id: PartID,
+    keyPath: WritableKeyPath<RigVector3, Double>
+  ) -> Binding<Double> {
+    Binding(
+      get: {
+        workspace.project.rig.parts.first { $0.id == id }?.positionMeters[keyPath: keyPath] ?? 0
+      },
+      set: { value in
+        guard
+          var position = workspace.project.rig.parts.first(where: { $0.id == id })?
+            .positionMeters
+        else { return }
+        position[keyPath: keyPath] = value
+        workspace.setPartPosition(id: id, to: position)
+      }
+    )
+  }
+
+  private func jointMinimumDegreesBinding(_ id: JointID) -> Binding<Double> {
+    Binding(
+      get: {
+        (workspace.project.rig.joints.first { $0.id == id }?.minimumRadians ?? 0)
+          * 180 / .pi
+      },
+      set: { degrees in
+        guard let joint = workspace.project.rig.joints.first(where: { $0.id == id }) else { return }
+        workspace.setJointRange(
+          id: id,
+          minimumRadians: degrees * .pi / 180,
+          maximumRadians: joint.maximumRadians
+        )
+      }
+    )
+  }
+
+  private func jointMaximumDegreesBinding(_ id: JointID) -> Binding<Double> {
+    Binding(
+      get: {
+        (workspace.project.rig.joints.first { $0.id == id }?.maximumRadians ?? 0)
+          * 180 / .pi
+      },
+      set: { degrees in
+        guard let joint = workspace.project.rig.joints.first(where: { $0.id == id }) else { return }
+        workspace.setJointRange(
+          id: id,
+          minimumRadians: joint.minimumRadians,
+          maximumRadians: degrees * .pi / 180
+        )
+      }
+    )
+  }
+
+  private func partName(_ id: PartID?) -> String? {
+    guard let id else { return nil }
+    return workspace.project.rig.parts.first { $0.id == id }?.displayName
   }
 }

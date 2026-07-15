@@ -9,10 +9,16 @@ struct StudioWorkspaceView: View {
 
   @State private var workspace = StudioWorkspaceModel()
   @State private var isImportingModel = false
+  @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
+    PreviewAppearance.midnight.rawValue
 
   var body: some View {
     VStack(spacing: 0) {
-      WorkspaceSwitcherBar(workspace: workspace, closeProject: closeProject)
+      WorkspaceSwitcherBar(
+        workspace: workspace,
+        viewportAppearance: viewportAppearanceBinding,
+        closeProject: closeProject
+      )
       Divider()
       WorkspaceToolBar(
         workspace: workspace,
@@ -118,6 +124,7 @@ struct StudioWorkspaceView: View {
     ZStack(alignment: .top) {
       RobotPreviewView(
         frame: workspace.evaluatedFrame,
+        rig: workspace.project.rig,
         modelURL: workspace.importedModelURL,
         showsGrid: workspace.showsPreviewGrid,
         projection: workspace.cameraProjection,
@@ -127,6 +134,7 @@ struct StudioWorkspaceView: View {
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
+        appearance: viewportAppearance,
         onSelectModelPath: { path in
           let modifiers = NSEvent.modifierFlags
           workspace.selectModelNode(
@@ -140,12 +148,26 @@ struct StudioWorkspaceView: View {
       viewportTitle
       cameraControls
 
+      if workspace.activeWorkspace == .rig && workspace.isRigEmpty {
+        EmptyRigWorkspaceView(showCreationTools: workspace.showCreationTools)
+      }
+
       if workspace.activeWorkspace == .rig {
         VStack {
           Spacer()
-          RigGuideOverlay(workspace: workspace)
-            .padding(.bottom, 16)
+          if workspace.showsCreationPalette {
+            CreationPaletteView(workspace: workspace)
+          } else if !workspace.project.rig.joints.isEmpty {
+            RigGuideOverlay(workspace: workspace)
+          }
         }
+        .padding(
+          .leading,
+          workspace.activePresentation.showsNavigator
+            ? StudioMetrics.navigatorWidth + 32 : 18
+        )
+        .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 18)
+        .padding(.bottom, 16)
       }
     }
   }
@@ -180,12 +202,23 @@ struct StudioWorkspaceView: View {
       true
     case .rig:
       switch workspace.primarySelection {
-      case .asset, .modelNode, .joint:
+      case .asset, .part, .modelNode, .joint:
         true
       case .project, .structure, .animation, nil:
         false
       }
     }
+  }
+
+  private var viewportAppearance: PreviewAppearance {
+    PreviewAppearance(rawValue: viewportAppearanceRawValue) ?? .midnight
+  }
+
+  private var viewportAppearanceBinding: Binding<PreviewAppearance> {
+    Binding(
+      get: { viewportAppearance },
+      set: { viewportAppearanceRawValue = $0.rawValue }
+    )
   }
 
   private static let modelContentTypes: [UTType] = [

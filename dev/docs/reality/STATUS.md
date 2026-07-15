@@ -22,12 +22,21 @@
   Canvas previews for the home, complete workspace, and animation timeline.
   `studio/Scripts/build-root-app.sh` assembles an ad-hoc-signed development app
   at the repository root for direct Finder launch. `AnimaCore` defines project
-  assets, joint rigs,
+  assets, stable semantic-part IDs, box/cylinder/sphere/locator rig proxies,
+  joint parent/child connections, joint rigs,
   clips, hold/linear keyframes, deterministic evaluation, neutral fallback,
   time clamping, joint-limit clamping, and Codable project round-tripping. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
   New Studio Project action and honestly disabled project-open/templates until
-  persistence ships. Its project window now has task-focused Assets, Rig,
+  persistence ships. A new project now opens as a genuinely empty Rig rather
+  than silently inserting the sample mechanism. Its Bottango-inspired **Add to
+  Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
+  proxy parts, then creates a first revolute joint for the selected unconnected
+  part. Part names and XYZ positions and joint names, axis, parent/child
+  connection, and angular limits are inspectable/editable in memory. Motors,
+  extra joint insertion, 3D Models & Media, and Events are present as clearly
+  disabled reference groups rather than fake working features. Its project
+  window now has task-focused Assets, Rig,
   Animate, Show, and Hardware workspaces with Command-1…5 switching, a stable
   global project/live bar, workspace-owned contextual tools, and independently
   restorable in-session navigator/inspector/bottom-panel visibility. Assets
@@ -41,7 +50,10 @@
   Show has a distinct multi-track
   character/audio/screen/event timeline scaffold; Hardware has structured
   connection, safety, mapping, and filterable-log surfaces that visibly remain
-  safely offline. The viewport now provides
+  safely offline. The gear settings menu stores a user-local viewport
+  appearance choice with Midnight, Graphite, CAD Light, and Blueprint presets;
+  each changes the RealityKit background and major/minor grid colors without
+  altering project data. The viewport now provides
   a readable grid, Home/front/right/top camera presets, perspective/orthographic
   projection switching, orbit controls, and framing of a selected imported
   model node. The Parts outline follows macOS file-browser selection conventions:
@@ -58,13 +70,13 @@
   new Studio windows visually consistent. The sample Rig viewport also renders
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
   optional reference plane, and a highlighted limit arc with independent layer
-  toggles. Project, asset, and joint names plus
-  a joint's rotation axis are editable in memory. Users can select a
+  toggles on every created joint. Project and asset names are also editable in
+  memory. Users can select a
   RealityKit-supported USD/Reality model; it loads asynchronously, is normalized
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Twenty-four tests pass with `cd studio && swift test`, including real
+  inspector. Thirty-one tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python
@@ -102,9 +114,9 @@
   semantic parts are not implemented. Source nodes are intentionally locked,
   and semantic-part drag reparenting waits for the persistent part/undo model.
   The mate guides currently visualize the
-  sample revolute joint but are not editable handles or attached to imported
-  parts; joint limits and keyframes are not yet
-  editable; project changes are not
+  created revolute joints but are not editable viewport handles or attached to
+  imported source nodes; typed prismatic/cylindrical/ball/planar/fastened joints
+  and keyframes are not yet editable; project changes are not
   persisted; imported security-scoped URLs
   last only for the current session. Project open/save, undo/redo, Home
   templates, and live hardware controls are intentionally visible but disabled.
