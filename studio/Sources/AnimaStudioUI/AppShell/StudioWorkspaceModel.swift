@@ -86,6 +86,11 @@ final class StudioWorkspaceModel {
     return path
   }
 
+  var selectedPartID: PartID? {
+    guard case .part(let id) = primarySelection else { return nil }
+    return id
+  }
+
   var canFrameSelection: Bool {
     switch primarySelection {
     case .modelNode, .part, .structure, .joint:
@@ -147,12 +152,7 @@ final class StudioWorkspaceModel {
     let sequence = project.rig.parts.count + 1
     let part = RigPartDefinition(
       displayName: "\(kind.displayName) \(sequence)",
-      primitiveKind: kind,
-      positionMeters: RigVector3(
-        x: Double((sequence - 1) % 4) * 0.8 - 0.8,
-        y: kind == .locator ? 0.15 : 0.35,
-        z: Double((sequence - 1) / 4) * -0.8
-      )
+      primitiveKind: kind
     )
     project.rig.parts.append(part)
     selection = [.part(part.id)]
@@ -242,6 +242,19 @@ final class StudioWorkspaceModel {
     }
   }
 
+  func selectPart(id: PartID, extendingSelection: Bool) {
+    let item = NavigatorItem.part(id)
+    if extendingSelection {
+      if selection.contains(item) {
+        selection.remove(item)
+      } else {
+        selection.insert(item)
+      }
+    } else {
+      selection = [item]
+    }
+  }
+
   func renameAsset(id: AssetID, to name: String) {
     guard let index = project.assets.firstIndex(where: { $0.id == id }) else { return }
     project.assets[index].name = name
@@ -257,6 +270,14 @@ final class StudioWorkspaceModel {
       let index = project.rig.parts.firstIndex(where: { $0.id == id })
     else { return }
     project.rig.parts[index].positionMeters = positionMeters
+  }
+
+  func setPartRotation(id: PartID, to rotationEulerRadians: RigVector3) {
+    guard rotationEulerRadians.x.isFinite, rotationEulerRadians.y.isFinite,
+      rotationEulerRadians.z.isFinite,
+      let index = project.rig.parts.firstIndex(where: { $0.id == id })
+    else { return }
+    project.rig.parts[index].rotationEulerRadians = rotationEulerRadians
   }
 
   func renameJoint(id: JointID, to name: String) {
@@ -289,7 +310,7 @@ final class StudioWorkspaceModel {
 
   func frameSelection() {
     guard canFrameSelection else { return }
-    setCameraViewpoint(selectedModelPath == nil ? .home : .selection)
+    setCameraViewpoint(.selection)
   }
 
   func togglePlayback() {

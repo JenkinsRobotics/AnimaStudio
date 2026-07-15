@@ -111,6 +111,55 @@ Materials remain authored in the source application and rendered from the
 imported asset; a future non-destructive Studio override layer must not pretend
 to be a shader editor or silently rewrite the source file.
 
+### CAD viewport interaction contract
+
+The default desktop navigation follows the common Onshape/SolidWorks family of
+controls while retaining native macOS trackpad gestures:
+
+- right-button drag orbits/tilts the camera around its target;
+- middle-button drag pans, with Control + right-button drag as an Onshape-style
+  alternative;
+- scroll and pinch zoom toward the pointer, and camera preset buttons provide
+  Home, Front, Right, and Top views;
+- primary-button click selects geometry, and primary-button drag is reserved
+  for a visible transform or DOF handle rather than camera navigation.
+
+The current RealityKit viewport uses a narrow AppKit input adapter over its
+RealityKit camera so the mapping is explicit and testable. Onshape is the
+default profile. A user-local setting can switch to SolidWorks behavior, where
+middle drag orbits, Control + middle drag pans, and Shift + middle drag zooms.
+Trackpad two-finger movement pans and pinch zooms in either profile. Navigation
+preferences never enter project data.
+
+Semantic-part selection is one identity shared by the viewport, Parts tree,
+and inspector. A selected proxy receives a high-contrast orange silhouette and
+a local XYZ transform gizmo. Dragging a translation arrow edits the part's rest
+position in metres; dragging a rotation ring edits its XYZ rest orientation in
+radians. Evaluated joint motion composes on top of that rest orientation.
+Imported source nodes remain selectable but read-only until they are explicitly
+mapped to semantic parts.
+
+Every semantic part owns a local origin. A newly created standalone part begins
+with that origin coincident with the workspace origin `(0, 0, 0)`; the user then
+places it with the transform gizmo or numeric inspector. Imported assemblies
+preserve each source node's authored local origin and relative transform when
+mapped, while the imported assembly root begins at the workspace origin. Studio
+must not silently recenter individual imported links because mate connectors,
+pivots, and animation all depend on those source-space origins.
+
+Selection granularity is staged deliberately:
+
+1. **Part** selection uses entity collision shapes and is the current authoring
+   mode.
+2. **Face** selection will use RealityKit triangle-hit metadata and preserve a
+   stable reference to the selected mesh part/primitive through reimport.
+3. **Edge** selection additionally requires mesh topology, adjacent-face
+   analysis, and a screen-space proximity threshold. It must not be simulated
+   by naming arbitrary triangles “edges.”
+
+Face and edge references are advisory geometry references for connector
+placement; durable rig meaning lives in explicit semantic connector transforms.
+
 Joint editing overlays—axes, limits, pivots, selection outlines, motion trails,
 and constraint warnings—belong to the viewport adapter. Joint definitions,
 limits, units, and animation values belong to `AnimaCore` and the `.anima`

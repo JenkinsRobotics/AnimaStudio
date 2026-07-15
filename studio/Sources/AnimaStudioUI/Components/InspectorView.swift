@@ -216,6 +216,24 @@ struct InspectorView: View {
       )
     }
 
+    Section("Rest Rotation") {
+      StudioNumberFieldRow(
+        title: "X",
+        value: partRotationDegreesBinding(part.id, keyPath: \.x),
+        unit: "°"
+      )
+      StudioNumberFieldRow(
+        title: "Y",
+        value: partRotationDegreesBinding(part.id, keyPath: \.y),
+        unit: "°"
+      )
+      StudioNumberFieldRow(
+        title: "Z",
+        value: partRotationDegreesBinding(part.id, keyPath: \.z),
+        unit: "°"
+      )
+    }
+
     Section("Workflow") {
       Text(
         "Use proxy structures to establish the rig and joints. Imported production geometry can be mapped to the same semantic part later."
@@ -365,6 +383,29 @@ struct InspectorView: View {
         else { return }
         position[keyPath: keyPath] = value
         workspace.setPartPosition(id: id, to: position)
+      }
+    )
+  }
+
+  private func partRotationDegreesBinding(
+    _ id: PartID,
+    keyPath: WritableKeyPath<RigVector3, Double>
+  ) -> Binding<Double> {
+    Binding(
+      get: {
+        guard let part = workspace.project.rig.parts.first(where: { $0.id == id }) else {
+          return 0
+        }
+        let radians = part.rotationEulerRadians[keyPath: keyPath]
+        return radians * 180 / .pi
+      },
+      set: { degrees in
+        guard
+          var rotation = workspace.project.rig.parts.first(where: { $0.id == id })?
+            .rotationEulerRadians
+        else { return }
+        rotation[keyPath: keyPath] = degrees * .pi / 180
+        workspace.setPartRotation(id: id, to: rotation)
       }
     )
   }

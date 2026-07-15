@@ -23,7 +23,8 @@
   `studio/Scripts/build-root-app.sh` assembles an ad-hoc-signed development app
   at the repository root for direct Finder launch. `AnimaCore` defines project
   assets, stable semantic-part IDs, box/cylinder/sphere/locator rig proxies,
-  joint parent/child connections, joint rigs,
+  metre positions, XYZ rest rotations in radians, backward-compatible Codable
+  rest transforms, joint parent/child connections, joint rigs,
   clips, hold/linear keyframes, deterministic evaluation, neutral fallback,
   time clamping, joint-limit clamping, and Codable project round-tripping. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
@@ -31,8 +32,9 @@
   persistence ships. A new project now opens as a genuinely empty Rig rather
   than silently inserting the sample mechanism. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
-  proxy parts, then creates a first revolute joint for the selected unconnected
-  part. Part names and XYZ positions and joint names, axis, parent/child
+  proxy parts with their local origin at the workspace origin, then creates a
+  first revolute joint for the selected unconnected part. Part names, XYZ
+  positions, XYZ rest rotations, and joint names, axis, parent/child
   connection, and angular limits are inspectable/editable in memory. Motors,
   extra joint insertion, 3D Models & Media, and Events are present as clearly
   disabled reference groups rather than fake working features. Its project
@@ -53,10 +55,19 @@
   safely offline. The gear settings menu stores a user-local viewport
   appearance choice with Midnight, Graphite, CAD Light, and Blueprint presets;
   each changes the RealityKit background and major/minor grid colors without
-  altering project data. The viewport now provides
-  a readable grid, Home/front/right/top camera presets, perspective/orthographic
-  projection switching, orbit controls, and framing of a selected imported
-  model node. The Parts outline follows macOS file-browser selection conventions:
+  altering project data. The viewport now provides a readable grid,
+  Home/front/right/top camera presets, perspective/orthographic projection
+  switching, selected-node/selected-part framing, trackpad pan/pinch, and
+  explicit persistent Onshape and SolidWorks mouse profiles. Onshape maps right
+  drag to orbit/tilt, middle drag and Control-right drag to pan; SolidWorks maps
+  middle drag to orbit/tilt, Control-middle drag to pan, and Shift-middle drag
+  to zoom. Wheel scrolling zooms in both profiles. Semantic proxy geometry is
+  directly selectable in the viewport and resolves to the same stable part ID
+  used by the Parts tree and inspector. The selected part receives an orange
+  silhouette highlight plus local XYZ translation arrows and rotation rings at
+  its origin; dragging them edits the core-backed rest transform, and animated
+  joint rotation composes on top. The Parts outline follows macOS file-browser
+  selection conventions:
   Command/Shift select multiple, one item opens its configuration, and Escape
   or the inspector close control clears selection. Imported geometry can also
   be selected directly in the viewport, with Command/Shift extending the same
@@ -76,7 +87,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Thirty-one tests pass with `cd studio && swift test`, including real
+  inspector. Thirty-eight tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python
@@ -113,9 +124,14 @@
   bookmarks, reimport reconciliation, collapse, and mapping to persistent
   semantic parts are not implemented. Source nodes are intentionally locked,
   and semantic-part drag reparenting waits for the persistent part/undo model.
-  The mate guides currently visualize the
-  created revolute joints but are not editable viewport handles or attached to
-  imported source nodes; typed prismatic/cylindrical/ball/planar/fastened joints
+  The mate guides currently visualize the created revolute joints but their
+  DOF/connector handles are not yet editable or attached to imported source
+  nodes; the shipped part transform gizmo edits only semantic-part rest
+  transforms. Part selection is entity-level; durable face selection still
+  needs triangle identity through reimport, and true edge selection still needs
+  topology/adjacency plus screen-space proximity. Transform gizmos are currently
+  world-scaled rather than screen-size-stable. Typed
+  prismatic/cylindrical/ball/planar/fastened joints
   and keyframes are not yet editable; project changes are not
   persisted; imported security-scoped URLs
   last only for the current session. Project open/save, undo/redo, Home

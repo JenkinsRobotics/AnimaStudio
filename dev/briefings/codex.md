@@ -63,6 +63,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — CAD viewport interaction complete:** The Rig viewport now has
+  explicit persistent Onshape and SolidWorks mouse profiles instead of relying
+  on undocumented RealityKit mappings. Semantic proxy clicks select the same
+  stable part ID as the tree/inspector, show an orange silhouette and local XYZ
+  move/rotate gizmo, and drag-edit the AnimaCore rest transform. Every created
+  part starts with its local origin at workspace `(0, 0, 0)`; imported source
+  origins remain a mapping-stage contract. Part rest rotations decode as zero
+  from older Swift project JSON. Face selection is staged on triangle identity;
+  edge selection remains topology/proximity work. Thirty-eight Swift tests,
+  claimed-file lint, Xcode build, strict signature check, rebuilt root app, and
+  launch pass. Python/firmware work remains untouched.
+
 - **2026-07-14 — empty-project creation slice complete:** New projects now open
   to an honest empty Rig with a Bottango-inspired Add to Rig palette. Box,
   cylinder, sphere, and empty-point actions create real AnimaCore semantic

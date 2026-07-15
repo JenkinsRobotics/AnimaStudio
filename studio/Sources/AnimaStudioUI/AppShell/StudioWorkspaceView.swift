@@ -11,6 +11,8 @@ struct StudioWorkspaceView: View {
   @State private var isImportingModel = false
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
+  @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
+    PreviewNavigationProfile.onshape.rawValue
 
   var body: some View {
     VStack(spacing: 0) {
@@ -130,7 +132,9 @@ struct StudioWorkspaceView: View {
         projection: workspace.cameraProjection,
         viewpoint: workspace.cameraViewpoint,
         cameraCommandRevision: workspace.cameraCommandRevision,
+        navigationProfile: viewportNavigationProfile,
         focusedModelPath: workspace.selectedModelPath,
+        focusedPartID: workspace.selectedPartID,
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
@@ -141,6 +145,19 @@ struct StudioWorkspaceView: View {
             at: path,
             extendingSelection: modifiers.contains(.command) || modifiers.contains(.shift)
           )
+        },
+        onSelectPartID: { id in
+          let modifiers = NSEvent.modifierFlags
+          workspace.selectPart(
+            id: id,
+            extendingSelection: modifiers.contains(.command) || modifiers.contains(.shift)
+          )
+        },
+        onSetPartPosition: { id, position in
+          workspace.setPartPosition(id: id, to: position)
+        },
+        onSetPartRotation: { id, rotation in
+          workspace.setPartRotation(id: id, to: rotation)
         }
       )
       .frame(minWidth: 520, minHeight: 420)
@@ -189,8 +206,11 @@ struct StudioWorkspaceView: View {
   private var cameraControls: some View {
     HStack {
       Spacer()
-      ViewportCameraControls(workspace: workspace)
-        .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
+      ViewportCameraControls(
+        workspace: workspace,
+        navigationProfile: viewportNavigationProfileBinding
+      )
+      .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
     .padding(.top, 10)
   }
@@ -218,6 +238,17 @@ struct StudioWorkspaceView: View {
     Binding(
       get: { viewportAppearance },
       set: { viewportAppearanceRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportNavigationProfile: PreviewNavigationProfile {
+    PreviewNavigationProfile(rawValue: viewportNavigationProfileRawValue) ?? .onshape
+  }
+
+  private var viewportNavigationProfileBinding: Binding<PreviewNavigationProfile> {
+    Binding(
+      get: { viewportNavigationProfile },
+      set: { viewportNavigationProfileRawValue = $0.rawValue }
     )
   }
 

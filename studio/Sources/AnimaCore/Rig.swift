@@ -30,17 +30,50 @@ public struct RigPartDefinition: Identifiable, Equatable, Codable, Sendable {
   public var displayName: String
   public var primitiveKind: RigPrimitiveKind
   public var positionMeters: RigVector3
+  public var rotationEulerRadians: RigVector3
 
   public init(
     id: PartID = PartID(),
     displayName: String,
     primitiveKind: RigPrimitiveKind,
-    positionMeters: RigVector3 = RigVector3()
+    positionMeters: RigVector3 = RigVector3(),
+    rotationEulerRadians: RigVector3 = RigVector3()
   ) {
     self.id = id
     self.displayName = displayName
     self.primitiveKind = primitiveKind
     self.positionMeters = positionMeters
+    self.rotationEulerRadians = rotationEulerRadians
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case displayName
+    case primitiveKind
+    case positionMeters
+    case rotationEulerRadians
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(PartID.self, forKey: .id)
+    displayName = try container.decode(String.self, forKey: .displayName)
+    primitiveKind = try container.decode(RigPrimitiveKind.self, forKey: .primitiveKind)
+    positionMeters =
+      try container.decodeIfPresent(RigVector3.self, forKey: .positionMeters)
+      ?? RigVector3()
+    rotationEulerRadians =
+      try container.decodeIfPresent(RigVector3.self, forKey: .rotationEulerRadians)
+      ?? RigVector3()
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try container.encode(displayName, forKey: .displayName)
+    try container.encode(primitiveKind, forKey: .primitiveKind)
+    try container.encode(positionMeters, forKey: .positionMeters)
+    try container.encode(rotationEulerRadians, forKey: .rotationEulerRadians)
   }
 }
 

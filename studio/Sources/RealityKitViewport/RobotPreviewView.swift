@@ -17,6 +17,10 @@ public enum PreviewCameraViewpoint: String, Sendable {
 }
 
 public struct RobotPreviewView: View {
+  @State private var transformDragState: TransformDragState?
+  @State private var navigationAction: CADNavigationAction?
+  @State private var navigationCommandRevision = 0
+
   private let frame: EvaluatedFrame
   private let rig: CharacterRig
   private let modelURL: URL?
@@ -24,9 +28,14 @@ public struct RobotPreviewView: View {
   private let projection: PreviewCameraProjection
   private let viewpoint: PreviewCameraViewpoint
   private let cameraCommandRevision: Int
+  private let navigationProfile: PreviewNavigationProfile
   private let focusedModelPath: ModelEntityPath?
+  private let focusedPartID: PartID?
   private let importedHierarchyRootPath: ModelEntityPath?
   private let onSelectModelPath: (ModelEntityPath) -> Void
+  private let onSelectPartID: (PartID) -> Void
+  private let onSetPartPosition: (PartID, RigVector3) -> Void
+  private let onSetPartRotation: (PartID, RigVector3) -> Void
   private let rigGuideVisibility: RigGuideVisibility
   private let appearance: PreviewAppearance
 
@@ -38,11 +47,16 @@ public struct RobotPreviewView: View {
     projection: PreviewCameraProjection = .perspective,
     viewpoint: PreviewCameraViewpoint = .home,
     cameraCommandRevision: Int = 0,
+    navigationProfile: PreviewNavigationProfile = .onshape,
     focusedModelPath: ModelEntityPath? = nil,
+    focusedPartID: PartID? = nil,
     importedHierarchyRootPath: ModelEntityPath? = nil,
     rigGuideVisibility: RigGuideVisibility = .hidden,
     appearance: PreviewAppearance = .midnight,
-    onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in }
+    onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in },
+    onSelectPartID: @escaping (PartID) -> Void = { _ in },
+    onSetPartPosition: @escaping (PartID, RigVector3) -> Void = { _, _ in },
+    onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in }
   ) {
     self.frame = frame
     self.rig = rig
@@ -51,17 +65,23 @@ public struct RobotPreviewView: View {
     self.projection = projection
     self.viewpoint = viewpoint
     self.cameraCommandRevision = cameraCommandRevision
+    self.navigationProfile = navigationProfile
     self.focusedModelPath = focusedModelPath
+    self.focusedPartID = focusedPartID
     self.importedHierarchyRootPath = importedHierarchyRootPath
     self.rigGuideVisibility = rigGuideVisibility
     self.appearance = appearance
     self.onSelectModelPath = onSelectModelPath
+    self.onSelectPartID = onSelectPartID
+    self.onSetPartPosition = onSetPartPosition
+    self.onSetPartRotation = onSetPartRotation
   }
 
   public var body: some View {
     RealityView { content in
       let root = Self.makeScene(rig: rig, appearance: appearance)
       content.add(root)
+      content.cameraTarget = root.findEntity(named: "previewCameraTarget")
 
       if let modelURL,
         let importedModel = try? await Entity(contentsOf: modelURL)
@@ -83,15 +103,29 @@ public struct RobotPreviewView: View {
         revision: cameraCommandRevision,
         viewpoint: viewpoint,
         focusedModelPath: focusedModelPath,
+        focusedPartID: focusedPartID,
         to: root
       )
       Self.applyRig(rig, frame: frame, to: root)
+      Self.applySelection(focusedPartID, rig: rig, to: root)
+      if let navigationAction {
+        Self.applyNavigation(
+          navigationAction,
+          revision: navigationCommandRevision,
+          to: root
+        )
+      }
     }
-    .realityViewCameraControls(.orbit)
+    .realityViewCameraControls(.none)
     .gesture(
       SpatialTapGesture()
         .targetedToAnyEntity()
         .onEnded { value in
+          if let partID = Self.partID(for: value.entity) {
+            onSelectPartID(partID)
+            return
+          }
+
           guard let importedHierarchyRootPath,
             let importedModel = Self.ancestor(named: "importedModel", from: value.entity),
             let path = Self.modelPath(
@@ -103,6 +137,72 @@ public struct RobotPreviewView: View {
           onSelectModelPath(path)
         }
     )
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 2)
+        .targetedToAnyEntity()
+        .onChanged { value in
+          guard let focusedPartID,
+            let handle = TransformGizmoFactory.handle(from: value.entity),
+            let part = rig.parts.first(where: { $0.id == focusedPartID }),
+            let partEntity = Self.semanticPartAncestor(from: value.entity)
+          else { return }
+
+          let dragState: TransformDragState
+          if let transformDragState,
+            transformDragState.partID == focusedPartID,
+            transformDragState.handle == handle
+          {
+            dragState = transformDragState
+          } else {
+            dragState = TransformDragState(
+              partID: focusedPartID,
+              handle: handle,
+              startPosition: part.positionMeters,
+              startRotation: part.rotationEulerRadians
+            )
+            transformDragState = dragState
+          }
+
+          switch handle {
+          case .translate(let axis):
+            guard
+              let start = value.unproject(value.startLocation, from: .local, to: .scene),
+              let current = value.unproject(value.location, from: .local, to: .scene)
+            else { return }
+            let worldAxis = simd_normalize(
+              partEntity.convert(direction: TransformGizmoFactory.vector(for: axis), to: nil)
+            )
+            let distance = simd_dot(current - start, worldAxis)
+            let startPosition = Self.simdPosition(dragState.startPosition)
+            onSetPartPosition(
+              focusedPartID,
+              Self.rigVector(startPosition + worldAxis * distance)
+            )
+          case .rotate(let axis):
+            let angle = Self.rotationAngle(
+              for: value.translation,
+              axis: axis
+            )
+            var rotation = dragState.startRotation
+            switch axis {
+            case .x: rotation.x += angle
+            case .y: rotation.y += angle
+            case .z: rotation.z += angle
+            }
+            onSetPartRotation(focusedPartID, rotation)
+          }
+        }
+        .onEnded { _ in
+          transformDragState = nil
+        }
+    )
+    .overlay {
+      CADNavigationCapture(profile: navigationProfile) { action in
+        navigationAction = action
+        navigationCommandRevision += 1
+      }
+      .allowsHitTesting(false)
+    }
     .background(appearance.backgroundColor.gradient)
     .id(sceneIdentity)
   }
@@ -138,6 +238,11 @@ public struct RobotPreviewView: View {
     camera.position = SIMD3<Float>(2.8, 1.8, 3.8)
     camera.look(at: SIMD3<Float>(0, 0.8, 0), from: camera.position, relativeTo: nil)
     root.addChild(camera)
+
+    let cameraTarget = Entity()
+    cameraTarget.name = "previewCameraTarget"
+    cameraTarget.position = SIMD3<Float>(0, 0.8, 0)
+    root.addChild(cameraTarget)
 
     let light = Entity(
       components: DirectionalLightComponent(color: .white, intensity: appearance.lightIntensity)
@@ -175,6 +280,8 @@ public struct RobotPreviewView: View {
     }
     entity.name = partEntityName(part.id)
     entity.position = simdPosition(part.positionMeters)
+    entity.orientation = orientation(part.rotationEulerRadians)
+    prepareForSelection(entity)
     return entity
   }
 
@@ -184,7 +291,9 @@ public struct RobotPreviewView: View {
     to root: Entity
   ) {
     for part in rig.parts {
-      root.findEntity(named: partEntityName(part.id))?.position = simdPosition(part.positionMeters)
+      guard let entity = root.findEntity(named: partEntityName(part.id)) else { continue }
+      entity.position = simdPosition(part.positionMeters)
+      entity.orientation = orientation(part.rotationEulerRadians)
     }
 
     for joint in rig.joints {
@@ -197,10 +306,39 @@ public struct RobotPreviewView: View {
         case .y: SIMD3<Float>(0, 1, 0)
         case .z: SIMD3<Float>(0, 0, 1)
         }
-      child.orientation = simd_quatf(
+      let animatedRotation = simd_quatf(
         angle: Float(frame.jointAnglesRadians[joint.id] ?? joint.neutralRadians),
         axis: axis
       )
+      let restRotation =
+        rig.parts.first { $0.id == childPartID }?
+        .rotationEulerRadians ?? RigVector3()
+      child.orientation = orientation(restRotation) * animatedRotation
+    }
+  }
+
+  private static func applySelection(
+    _ selectedPartID: PartID?,
+    rig: CharacterRig,
+    to root: Entity
+  ) {
+    for part in rig.parts {
+      guard let entity = root.findEntity(named: partEntityName(part.id)) else { continue }
+      let isSelected = part.id == selectedPartID
+      let highlight = entity.findEntity(named: TransformGizmoFactory.selectionHighlightName)
+      let gizmo = entity.findEntity(named: TransformGizmoFactory.gizmoName)
+
+      if isSelected {
+        if highlight == nil {
+          entity.addChild(TransformGizmoFactory.makeSelectionHighlight(for: part.primitiveKind))
+        }
+        if gizmo == nil {
+          entity.addChild(TransformGizmoFactory.make())
+        }
+      } else {
+        highlight?.removeFromParent()
+        gizmo?.removeFromParent()
+      }
     }
   }
 
@@ -210,6 +348,91 @@ public struct RobotPreviewView: View {
 
   private static func simdPosition(_ vector: RigVector3) -> SIMD3<Float> {
     SIMD3<Float>(Float(vector.x), Float(vector.y), Float(vector.z))
+  }
+
+  private static func rigVector(_ vector: SIMD3<Float>) -> RigVector3 {
+    RigVector3(x: Double(vector.x), y: Double(vector.y), z: Double(vector.z))
+  }
+
+  private static func orientation(_ eulerRadians: RigVector3) -> simd_quatf {
+    let x = simd_quatf(angle: Float(eulerRadians.x), axis: SIMD3<Float>(1, 0, 0))
+    let y = simd_quatf(angle: Float(eulerRadians.y), axis: SIMD3<Float>(0, 1, 0))
+    let z = simd_quatf(angle: Float(eulerRadians.z), axis: SIMD3<Float>(0, 0, 1))
+    return z * y * x
+  }
+
+  private static func rotationAngle(
+    for translation: CGSize,
+    axis: JointAxis
+  ) -> Double {
+    let pixels: CGFloat =
+      switch axis {
+      case .x: -translation.height
+      case .y: translation.width
+      case .z: translation.width - translation.height
+      }
+    return Double(pixels) * 0.01
+  }
+
+  private static func applyNavigation(
+    _ action: CADNavigationAction,
+    revision: Int,
+    to root: Entity
+  ) {
+    let markerName = "previewNavigationCommand-\(revision)"
+    guard root.findEntity(named: markerName) == nil,
+      let camera = root.findEntity(named: "previewCamera"),
+      let cameraTarget = root.findEntity(named: "previewCameraTarget")
+    else { return }
+
+    for child in Array(root.children)
+    where child.name.hasPrefix("previewNavigationCommand-") {
+      child.removeFromParent()
+    }
+
+    let target = cameraTarget.position
+    var offset = camera.position - target
+    let distance = max(simd_length(offset), 0.001)
+
+    switch action {
+    case .orbit(let deltaX, let deltaY):
+      let yaw = atan2(offset.x, offset.z) - Float(deltaX) * 0.008
+      let existingPitch = asin(max(min(offset.y / distance, 1), -1))
+      let pitch = max(
+        min(existingPitch + Float(deltaY) * 0.008, .pi / 2 - 0.02),
+        -.pi / 2 + 0.02
+      )
+      let horizontal = cos(pitch) * distance
+      offset = SIMD3<Float>(sin(yaw) * horizontal, sin(pitch) * distance, cos(yaw) * horizontal)
+      camera.position = target + offset
+    case .pan(let deltaX, let deltaY):
+      let forward = simd_normalize(target - camera.position)
+      var right = simd_cross(forward, SIMD3<Float>(0, 1, 0))
+      if simd_length_squared(right) < 0.0001 {
+        right = SIMD3<Float>(1, 0, 0)
+      } else {
+        right = simd_normalize(right)
+      }
+      let up = simd_normalize(simd_cross(right, forward))
+      let scale = max(distance, 0.2) * 0.002
+      let shift = (-right * Float(deltaX) + up * Float(deltaY)) * scale
+      camera.position += shift
+      cameraTarget.position += shift
+    case .zoom(let delta):
+      let factor = exp(-Float(delta) * 0.025)
+      if var orthographic = camera.components[OrthographicCameraComponent.self] {
+        orthographic.scale = min(max(orthographic.scale * factor, 0.05), 100)
+        camera.components.set(orthographic)
+      } else {
+        let newDistance = min(max(distance * factor, 0.15), 100)
+        camera.position = target + simd_normalize(offset) * newDistance
+      }
+    }
+
+    camera.look(at: cameraTarget.position, from: camera.position, relativeTo: nil)
+    let marker = Entity()
+    marker.name = markerName
+    root.addChild(marker)
   }
 
   private static func applyProjectionIfNeeded(
@@ -246,6 +469,7 @@ public struct RobotPreviewView: View {
     revision: Int,
     viewpoint: PreviewCameraViewpoint,
     focusedModelPath: ModelEntityPath?,
+    focusedPartID: PartID?,
     to root: Entity
   ) {
     let markerName = "previewCameraCommand-\(revision)"
@@ -262,15 +486,22 @@ public struct RobotPreviewView: View {
     var target = defaultTarget
     var distance: Float = 4.5
 
-    if viewpoint == .selection,
-      let focusedModelPath,
-      let importedModel = root.findEntity(named: "importedModel"),
-      let focusedEntity = entity(at: focusedModelPath, below: importedModel)
-    {
-      let bounds = focusedEntity.visualBounds(relativeTo: root)
-      target = bounds.center
-      distance = max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 2.5
-      distance = max(distance, 0.8)
+    if viewpoint == .selection {
+      let focusedEntity: Entity? = {
+        if let focusedPartID {
+          return root.findEntity(named: partEntityName(focusedPartID))
+        }
+        guard let focusedModelPath,
+          let importedModel = root.findEntity(named: "importedModel")
+        else { return nil }
+        return entity(at: focusedModelPath, below: importedModel)
+      }()
+      if let focusedEntity {
+        let bounds = focusedEntity.visualBounds(relativeTo: root)
+        target = bounds.center
+        distance = max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 2.5
+        distance = max(distance, 0.8)
+      }
     }
 
     switch viewpoint {
@@ -284,6 +515,7 @@ public struct RobotPreviewView: View {
       camera.position = target + SIMD3<Float>(0, distance, 0.001)
     }
     camera.look(at: target, from: camera.position, relativeTo: nil)
+    root.findEntity(named: "previewCameraTarget")?.position = target
 
     let marker = Entity()
     marker.name = markerName
@@ -349,6 +581,24 @@ public struct RobotPreviewView: View {
     return nil
   }
 
+  private static func semanticPartAncestor(from entity: Entity) -> Entity? {
+    var candidate: Entity? = entity
+    while let current = candidate {
+      if current.name.hasPrefix("semanticPart-") {
+        return current
+      }
+      candidate = current.parent
+    }
+    return nil
+  }
+
+  private static func partID(for entity: Entity) -> PartID? {
+    guard let partEntity = semanticPartAncestor(from: entity) else { return nil }
+    let rawValue = String(partEntity.name.dropFirst("semanticPart-".count))
+    guard let uuid = UUID(uuidString: rawValue) else { return nil }
+    return PartID(rawValue: uuid)
+  }
+
   private static func makeGrid(appearance: PreviewAppearance) -> Entity {
     let grid = Entity()
     grid.name = "previewGrid"
@@ -395,4 +645,11 @@ public struct RobotPreviewView: View {
       -bounds.center.z * scale
     )
   }
+}
+
+private struct TransformDragState {
+  let partID: PartID
+  let handle: TransformHandleKind
+  let startPosition: RigVector3
+  let startRotation: RigVector3
 }

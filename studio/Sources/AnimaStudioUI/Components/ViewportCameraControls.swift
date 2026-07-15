@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ViewportCameraControls: View {
   @Bindable var workspace: StudioWorkspaceModel
+  @Binding var navigationProfile: PreviewNavigationProfile
 
   var body: some View {
     HStack(spacing: 5) {
@@ -39,17 +40,32 @@ struct ViewportCameraControls: View {
       )
 
       Menu {
-        Section("Mouse and Trackpad") {
-          Text("Scroll — zoom")
-          Text("Right-drag — orbit")
-          Text("Middle-drag — pan")
+        Picker("Mouse Profile", selection: $navigationProfile) {
+          ForEach(PreviewNavigationProfile.allCases, id: \.self) { profile in
+            Text(profile.displayName).tag(profile)
+          }
         }
-        Section("Mac Alternatives") {
-          Text("Option + left-drag — orbit")
-          Text("Option + Command + left-drag — pan")
+
+        Section("CAD Navigation") {
+          if navigationProfile == .onshape {
+            Text("Right-drag — orbit / tilt")
+            Text("Middle-drag — pan")
+            Text("Control + right-drag — pan")
+          } else {
+            Text("Middle-drag — orbit / tilt")
+            Text("Control + middle-drag — pan")
+            Text("Shift + middle-drag — zoom")
+          }
+          Text("Scroll or pinch — zoom")
+        }
+        Section("Trackpad") {
+          Text("Two-finger drag — pan")
+          Text("Pinch — zoom")
         }
         Section("Selection") {
-          Text("Use Frame Selection in the toolbar")
+          Text("Click geometry — select part")
+          Text("Drag arrows — move from part origin")
+          Text("Drag rings — rotate around part origin")
           Text("Escape — clear selection")
         }
       } label: {

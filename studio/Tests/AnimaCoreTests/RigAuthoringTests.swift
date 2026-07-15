@@ -8,7 +8,8 @@ final class RigAuthoringTests: XCTestCase {
     let head = RigPartDefinition(
       displayName: "Head",
       primitiveKind: .sphere,
-      positionMeters: RigVector3(x: 0, y: 0.8, z: 0)
+      positionMeters: RigVector3(x: 0, y: 0.8, z: 0),
+      rotationEulerRadians: RigVector3(x: 0.1, y: 0.2, z: 0.3)
     )
     let joint = JointDefinition(
       id: "head_yaw",
@@ -31,6 +32,21 @@ final class RigAuthoringTests: XCTestCase {
     XCTAssertEqual(decoded, project)
     XCTAssertEqual(decoded.rig.joints.first?.parentPartID, base.id)
     XCTAssertEqual(decoded.rig.joints.first?.childPartID, head.id)
+    XCTAssertEqual(decoded.rig.parts[1].rotationEulerRadians, head.rotationEulerRadians)
+  }
+
+  func testLegacyPartWithoutRestTransformDecodesAtWorkspaceOrigin() throws {
+    let part = RigPartDefinition(displayName: "Legacy", primitiveKind: .box)
+    let data = try JSONEncoder().encode(part)
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    object.removeValue(forKey: "positionMeters")
+    object.removeValue(forKey: "rotationEulerRadians")
+
+    let legacyData = try JSONSerialization.data(withJSONObject: object)
+    let decoded = try JSONDecoder().decode(RigPartDefinition.self, from: legacyData)
+
+    XCTAssertEqual(decoded.positionMeters, RigVector3())
+    XCTAssertEqual(decoded.rotationEulerRadians, RigVector3())
   }
 
   func testEveryPrimitiveKindHasAStableRawValue() {
