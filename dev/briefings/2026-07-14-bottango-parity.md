@@ -84,6 +84,8 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | Viewport face/edge selection with view-cube-style hover (per Jonathan) | `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Sources/RealityKitViewport/MateConnectorMarkers.swift`, `studio/Sources/RealityKitViewport/CADNavigationCapture.swift`, `studio/Sources/RealityKitViewport/SubObjectSelection.swift` (new), `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift` (selection state only), `studio/Sources/AnimaStudioUI/Components/InspectorView.swift` (feature readout only), `studio/Tests/RealityKitViewportTests/SubObjectSelectionTests.swift` (new), `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/FeatureSelectionTests.swift` (new), `dev/docs/reality/STATUS.md` (two targeted edits) | 134 Swift tests (26 new; count includes Codex's concurrent in-flight suites) + claimed-file lint + `swift build` + Xcode app build all green; hover previews exact feature, click selects, empty click deselects, staged Escape | released 2026-07-15 |
 | Codex | UI Dev living design-system workspace + Agent utility window | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | shell-level UI Dev selector entry; focused ribbon gallery tools; reusable button/window/popup standards; real Agent utility window launcher with honest disconnected state; tests/lint; Xcode/root-app build, signature, launch; `git diff --check` | released 2026-07-15 |
 
+| Claude | Kinematics plan: DOF limits, manual drive, flip/align, relations (docs only) | `dev/docs/roadmap/Kinematics.md`, `dev/briefings/**` | plan review by Jonathan + Codex; `git diff --check` | released 2026-07-15 |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -129,6 +131,18 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, kinematics plan):** Per Jonathan (Onshape mate
+  dialog + relations as the reference), wrote
+  `dev/docs/roadmap/Kinematics.md`: per-DOF optional hard-stop limits
+  (Limits checkbox, min/max in operator units, unlimited = continuous,
+  bounded-actuator mapping requires a range), inspector + viewport
+  manual-drive handles per DOF, connector flip/reorient controls, and
+  Relations as one linear-coupling core type (gear / rack-and-pinion /
+  screw / linear; acyclic, one driver per driven DOF, warn-don't-clamp
+  on limit violations, no collision detection). Packet sequencing
+  K1–K7 with lane assignments and the cross-lane contract points is in
+  the doc. Awaiting Jonathan/Codex review before implementation.
 
 - **2026-07-15 (Codex, UI Dev + Agent utility panel):** Added UI Dev as a
   shell-level workspace so it cannot leak development-only presentation into

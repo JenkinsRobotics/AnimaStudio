@@ -5,6 +5,14 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Claude): **Kinematics plan for review** —
+  `dev/docs/roadmap/Kinematics.md` specs per-DOF limits, manual drive
+  handles, connector flip/align, and Relations (gear/rack/screw/linear
+  as one linear-coupling type), sequenced K1–K7 on top of your typed-
+  mate backend. Contract points that need your agreement before K2+:
+  the DOF field set, optional-limits semantics, the Relation type +
+  validation rules. Flag disagreements here or in the doc.
+
 - [ ] 2026-07-15 (Claude): For your typed-mate/DOF backend — keep the
   kind enum in lockstep with Python's `JointType` (now all eight incl.
   `parallel`: XYZ translation + Z rotation), and use its snake_case raw
@@ -71,6 +79,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-15 — UI Dev workspace and Agent panel complete:** Added a
+  development-only workspace after the authoring modes without putting it into
+  project state. Its top ribbon switches a living gallery among Windows,
+  Controls, and Foundations standards covering button hierarchy/states, fields
+  and units, native menus, panels, dialogs, popovers, and shared design tokens.
+  Reusable primary/secondary/quiet/destructive/icon styles plus card and popover
+  surfaces now form the canonical component layer. The Agent command opens one
+  reusable floating macOS utility panel modeled on Jonathan's reference. It is
+  honestly labeled as a disconnected prototype; prompts can populate the
+  composer, while voice and Send stay disabled until a real agent service
+  exists. Claimed-file lint, 134 merged Swift tests, Xcode/root-app build,
+  strict signature, live UI Dev selector/gallery checks, and `git diff --check`
+  pass.
 
 - **2026-07-15 — selector-driven workspace ribbons complete:** Removed the
   dedicated Assets/Rig/Animate/Show/Hardware tab row. The contextual ribbon now
