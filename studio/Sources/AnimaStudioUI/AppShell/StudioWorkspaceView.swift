@@ -13,6 +13,9 @@ struct StudioWorkspaceView: View {
     PreviewAppearance.midnight.rawValue
   @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
     PreviewNavigationProfile.onshape.rawValue
+  @AppStorage("viewportRenderStyle") private var viewportRenderStyleRawValue =
+    ViewportRenderStyle.shaded.rawValue
+  @AppStorage("viewportFieldOfViewDegrees") private var viewportFieldOfViewDegrees = 60.0
 
   var body: some View {
     VStack(spacing: 0) {
@@ -132,6 +135,7 @@ struct StudioWorkspaceView: View {
         projection: workspace.cameraProjection,
         viewpoint: workspace.cameraViewpoint,
         cameraCommandRevision: workspace.cameraCommandRevision,
+        cameraState: workspace.cameraState,
         navigationProfile: viewportNavigationProfile,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
@@ -139,6 +143,8 @@ struct StudioWorkspaceView: View {
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
         appearance: viewportAppearance,
+        renderStyle: viewportRenderStyle,
+        fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
         onSelectModelPath: { path in
           let modifiers = NSEvent.modifierFlags
           workspace.selectModelNode(
@@ -158,12 +164,15 @@ struct StudioWorkspaceView: View {
         },
         onSetPartRotation: { id, rotation in
           workspace.setPartRotation(id: id, to: rotation)
+        },
+        onCameraStateChange: { state in
+          workspace.reportCameraState(state)
         }
       )
       .frame(minWidth: 520, minHeight: 420)
 
       viewportTitle
-      cameraControls
+      cameraHUD
 
       if workspace.activeWorkspace == .rig && workspace.isRigEmpty {
         EmptyRigWorkspaceView(showCreationTools: workspace.showCreationTools)
@@ -203,13 +212,38 @@ struct StudioWorkspaceView: View {
     .padding(.top, 12)
   }
 
-  private var cameraControls: some View {
+  private var cameraHUD: some View {
     HStack {
       Spacer()
-      ViewportCameraControls(
-        workspace: workspace,
-        navigationProfile: viewportNavigationProfileBinding
-      )
+      VStack(alignment: .trailing, spacing: 7) {
+        ViewportViewCube(
+          orientation: workspace.cameraState.orientation,
+          onSelectDirection: workspace.setCameraDirection,
+          onNudge: { horizontalRadians, verticalRadians in
+            workspace.nudgeCamera(
+              horizontalRadians: horizontalRadians,
+              verticalRadians: verticalRadians
+            )
+          }
+        )
+
+        HStack(spacing: 7) {
+          ViewportCameraControls(
+            workspace: workspace,
+            navigationProfile: viewportNavigationProfile
+          )
+          ViewportRenderMenu(
+            projection: cameraProjectionBinding,
+            renderStyle: viewportRenderStyleBinding,
+            showsGrid: previewGridBinding,
+            appearance: viewportAppearanceBinding,
+            fieldOfViewDegrees: viewportFieldOfViewBinding,
+            navigationProfile: viewportNavigationProfileBinding,
+            canFrameSelection: workspace.canFrameSelection,
+            frameSelection: workspace.frameSelection
+          )
+        }
+      }
       .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
     .padding(.top, 10)
@@ -249,6 +283,38 @@ struct StudioWorkspaceView: View {
     Binding(
       get: { viewportNavigationProfile },
       set: { viewportNavigationProfileRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportRenderStyle: ViewportRenderStyle {
+    ViewportRenderStyle(rawValue: viewportRenderStyleRawValue) ?? .shaded
+  }
+
+  private var viewportRenderStyleBinding: Binding<ViewportRenderStyle> {
+    Binding(
+      get: { viewportRenderStyle },
+      set: { viewportRenderStyleRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportFieldOfViewBinding: Binding<Float> {
+    Binding(
+      get: { Float(viewportFieldOfViewDegrees) },
+      set: { viewportFieldOfViewDegrees = Double($0) }
+    )
+  }
+
+  private var cameraProjectionBinding: Binding<PreviewCameraProjection> {
+    Binding(
+      get: { workspace.cameraProjection },
+      set: { workspace.cameraProjection = $0 }
+    )
+  }
+
+  private var previewGridBinding: Binding<Bool> {
+    Binding(
+      get: { workspace.showsPreviewGrid },
+      set: { workspace.showsPreviewGrid = $0 }
     )
   }
 

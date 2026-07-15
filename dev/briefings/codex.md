@@ -63,6 +63,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — synchronized view cube + render HUD complete:** The Rig
+  viewport now has a dedicated SwiftUI view cube driven by the RealityKit
+  camera's actual orientation. Manual navigation updates the cube; clicking a
+  face, edge, or corner selects a principal, two-axis, or trimetric view; arrow
+  controls nudge by 15 degrees. A separate camera/render menu persists
+  projection, 30–90 degree field of view, four truthful render styles, grid,
+  viewport appearance, and mouse profile outside project data. Camera state,
+  render behavior, cube geometry, cube UI, and menu UI live in separate
+  focused files. Mesh-edge modes expose triangle lines honestly; hidden-line,
+  section, roll, and named-view work remains planned. Fifty Swift tests pass;
+  Python, firmware, and examples remain untouched.
+
 - **2026-07-14 — CAD viewport interaction complete:** The Rig viewport now has
   explicit persistent Onshape and SolidWorks mouse profiles instead of relying
   on undocumented RealityKit mappings. Semantic proxy clicks select the same

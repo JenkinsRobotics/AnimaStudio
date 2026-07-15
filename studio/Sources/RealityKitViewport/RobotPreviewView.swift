@@ -3,19 +3,6 @@ import Foundation
 import RealityKit
 import SwiftUI
 
-public enum PreviewCameraProjection: String, Sendable {
-  case perspective
-  case orthographic
-}
-
-public enum PreviewCameraViewpoint: String, Sendable {
-  case home
-  case front
-  case right
-  case top
-  case selection
-}
-
 public struct RobotPreviewView: View {
   @State private var transformDragState: TransformDragState?
   @State private var navigationAction: CADNavigationAction?
@@ -28,6 +15,7 @@ public struct RobotPreviewView: View {
   private let projection: PreviewCameraProjection
   private let viewpoint: PreviewCameraViewpoint
   private let cameraCommandRevision: Int
+  private let cameraState: PreviewCameraState
   private let navigationProfile: PreviewNavigationProfile
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
@@ -38,6 +26,9 @@ public struct RobotPreviewView: View {
   private let onSetPartRotation: (PartID, RigVector3) -> Void
   private let rigGuideVisibility: RigGuideVisibility
   private let appearance: PreviewAppearance
+  private let renderStyle: ViewportRenderStyle
+  private let fieldOfViewDegrees: Float
+  private let onCameraStateChange: (PreviewCameraState) -> Void
 
   public init(
     frame: EvaluatedFrame,
@@ -47,16 +38,20 @@ public struct RobotPreviewView: View {
     projection: PreviewCameraProjection = .perspective,
     viewpoint: PreviewCameraViewpoint = .home,
     cameraCommandRevision: Int = 0,
+    cameraState: PreviewCameraState = PreviewCameraState(),
     navigationProfile: PreviewNavigationProfile = .onshape,
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
     importedHierarchyRootPath: ModelEntityPath? = nil,
     rigGuideVisibility: RigGuideVisibility = .hidden,
     appearance: PreviewAppearance = .midnight,
+    renderStyle: ViewportRenderStyle = .shaded,
+    fieldOfViewDegrees: Float = 60,
     onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in },
     onSelectPartID: @escaping (PartID) -> Void = { _ in },
     onSetPartPosition: @escaping (PartID, RigVector3) -> Void = { _, _ in },
-    onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in }
+    onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in },
+    onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in }
   ) {
     self.frame = frame
     self.rig = rig
@@ -65,21 +60,25 @@ public struct RobotPreviewView: View {
     self.projection = projection
     self.viewpoint = viewpoint
     self.cameraCommandRevision = cameraCommandRevision
+    self.cameraState = cameraState
     self.navigationProfile = navigationProfile
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
     self.importedHierarchyRootPath = importedHierarchyRootPath
     self.rigGuideVisibility = rigGuideVisibility
     self.appearance = appearance
+    self.renderStyle = renderStyle
+    self.fieldOfViewDegrees = min(max(fieldOfViewDegrees, 20), 120)
     self.onSelectModelPath = onSelectModelPath
     self.onSelectPartID = onSelectPartID
     self.onSetPartPosition = onSetPartPosition
     self.onSetPartRotation = onSetPartRotation
+    self.onCameraStateChange = onCameraStateChange
   }
 
   public var body: some View {
     RealityView { content in
-      let root = Self.makeScene(rig: rig, appearance: appearance)
+      let root = Self.makeScene(rig: rig, appearance: appearance, renderStyle: renderStyle)
       content.add(root)
       content.cameraTarget = root.findEntity(named: "previewCameraTarget")
 
@@ -89,6 +88,7 @@ public struct RobotPreviewView: View {
         importedModel.name = "importedModel"
         Self.normalizeForPreview(importedModel)
         Self.prepareForSelection(importedModel)
+        ViewportRenderStyleApplier.apply(renderStyle, to: importedModel)
         root.addChild(importedModel)
       }
     } update: { content in
@@ -98,22 +98,29 @@ public struct RobotPreviewView: View {
 
       root.findEntity(named: "previewGrid")?.isEnabled = showsGrid
       RigGuideFactory.apply(rigGuideVisibility, to: root)
-      Self.applyProjectionIfNeeded(projection, to: root)
-      Self.applyCameraCommandIfNeeded(
+      Self.applyProjectionIfNeeded(projection, cameraState: cameraState, to: root)
+      Self.applyFieldOfViewIfNeeded(fieldOfViewDegrees, to: root)
+      if let updatedCameraState = Self.applyCameraCommandIfNeeded(
         revision: cameraCommandRevision,
         viewpoint: viewpoint,
+        cameraState: cameraState,
         focusedModelPath: focusedModelPath,
         focusedPartID: focusedPartID,
         to: root
-      )
+      ) {
+        reportCameraState(updatedCameraState)
+      }
       Self.applyRig(rig, frame: frame, to: root)
       Self.applySelection(focusedPartID, rig: rig, to: root)
       if let navigationAction {
-        Self.applyNavigation(
+        if let updatedCameraState = Self.applyNavigation(
           navigationAction,
           revision: navigationCommandRevision,
           to: root
-        )
+        ) {
+          reportCameraState(updatedCameraState)
+          consumeNavigationAction(revision: navigationCommandRevision)
+        }
       }
     }
     .realityViewCameraControls(.none)
@@ -210,12 +217,14 @@ public struct RobotPreviewView: View {
   private var sceneIdentity: String {
     let partIDs = rig.parts.map { $0.id.rawValue.uuidString }.joined(separator: ",")
     let jointIDs = rig.joints.map { $0.id.rawValue }.joined(separator: ",")
-    return "\(modelURL?.absoluteString ?? "none")|\(appearance.rawValue)|\(partIDs)|\(jointIDs)"
+    return
+      "\(modelURL?.absoluteString ?? "none")|\(appearance.rawValue)|\(renderStyle.rawValue)|\(partIDs)|\(jointIDs)"
   }
 
   private static func makeScene(
     rig: CharacterRig,
-    appearance: PreviewAppearance
+    appearance: PreviewAppearance,
+    renderStyle: ViewportRenderStyle
   ) -> Entity {
     let root = Entity()
     root.name = "animaPreviewRoot"
@@ -223,7 +232,7 @@ public struct RobotPreviewView: View {
     root.addChild(makeGrid(appearance: appearance))
 
     for part in rig.parts {
-      root.addChild(makePart(part))
+      root.addChild(makePart(part, renderStyle: renderStyle))
     }
 
     for joint in rig.joints {
@@ -233,7 +242,7 @@ public struct RobotPreviewView: View {
       child.addChild(RigGuideFactory.makeRevoluteGuide())
     }
 
-    let camera = Entity(components: PerspectiveCameraComponent())
+    let camera = Entity(components: PerspectiveCameraComponent(fieldOfViewInDegrees: 60))
     camera.name = "previewCamera"
     camera.position = SIMD3<Float>(2.8, 1.8, 3.8)
     camera.look(at: SIMD3<Float>(0, 0.8, 0), from: camera.position, relativeTo: nil)
@@ -253,8 +262,14 @@ public struct RobotPreviewView: View {
     return root
   }
 
-  private static func makePart(_ part: RigPartDefinition) -> Entity {
-    let material = SimpleMaterial(color: .systemTeal, isMetallic: false)
+  private static func makePart(
+    _ part: RigPartDefinition,
+    renderStyle: ViewportRenderStyle
+  ) -> Entity {
+    let material = ViewportRenderStyleApplier.partMaterial(
+      renderStyle,
+      baseColor: part.primitiveKind == .locator ? .systemYellow : .systemTeal
+    )
     let entity: ModelEntity
     switch part.primitiveKind {
     case .box:
@@ -275,14 +290,29 @@ public struct RobotPreviewView: View {
     case .locator:
       entity = ModelEntity(
         mesh: .generateSphere(radius: 0.08),
-        materials: [SimpleMaterial(color: .systemYellow, isMetallic: false)]
+        materials: [material]
       )
     }
     entity.name = partEntityName(part.id)
     entity.position = simdPosition(part.positionMeters)
     entity.orientation = orientation(part.rotationEulerRadians)
     prepareForSelection(entity)
+    ViewportRenderStyleApplier.addMeshEdgeOverlayIfNeeded(renderStyle, to: entity)
     return entity
+  }
+
+  private func reportCameraState(_ updatedState: PreviewCameraState) {
+    guard updatedState != cameraState else { return }
+    Task { @MainActor in
+      onCameraStateChange(updatedState)
+    }
+  }
+
+  private func consumeNavigationAction(revision: Int) {
+    Task { @MainActor in
+      guard navigationCommandRevision == revision else { return }
+      navigationAction = nil
+    }
   }
 
   private static func applyRig(
@@ -378,12 +408,12 @@ public struct RobotPreviewView: View {
     _ action: CADNavigationAction,
     revision: Int,
     to root: Entity
-  ) {
+  ) -> PreviewCameraState? {
     let markerName = "previewNavigationCommand-\(revision)"
     guard root.findEntity(named: markerName) == nil,
       let camera = root.findEntity(named: "previewCamera"),
       let cameraTarget = root.findEntity(named: "previewCameraTarget")
-    else { return }
+    else { return nil }
 
     for child in Array(root.children)
     where child.name.hasPrefix("previewNavigationCommand-") {
@@ -433,10 +463,12 @@ public struct RobotPreviewView: View {
     let marker = Entity()
     marker.name = markerName
     root.addChild(marker)
+    return captureCameraState(camera: camera, target: cameraTarget)
   }
 
   private static func applyProjectionIfNeeded(
     _ projection: PreviewCameraProjection,
+    cameraState: PreviewCameraState,
     to root: Entity
   ) {
     let markerName = "previewProjection-\(projection.rawValue)"
@@ -448,6 +480,10 @@ public struct RobotPreviewView: View {
     where child.name.hasPrefix("previewProjection-") {
       child.removeFromParent()
     }
+    for child in Array(root.children)
+    where child.name.hasPrefix("previewFieldOfView-") {
+      child.removeFromParent()
+    }
 
     switch projection {
     case .perspective:
@@ -456,9 +492,32 @@ public struct RobotPreviewView: View {
     case .orthographic:
       camera.components.remove(PerspectiveCameraComponent.self)
       var component = OrthographicCameraComponent()
-      component.scale = 2.8
+      component.scale = cameraState.orthographicScale
       camera.components.set(component)
     }
+
+    let marker = Entity()
+    marker.name = markerName
+    root.addChild(marker)
+  }
+
+  private static func applyFieldOfViewIfNeeded(
+    _ fieldOfViewDegrees: Float,
+    to root: Entity
+  ) {
+    let roundedFieldOfView = Int(fieldOfViewDegrees.rounded())
+    let markerName = "previewFieldOfView-\(roundedFieldOfView)"
+    guard root.findEntity(named: markerName) == nil,
+      let camera = root.findEntity(named: "previewCamera"),
+      var component = camera.components[PerspectiveCameraComponent.self]
+    else { return }
+
+    for child in Array(root.children)
+    where child.name.hasPrefix("previewFieldOfView-") {
+      child.removeFromParent()
+    }
+    component.fieldOfViewInDegrees = fieldOfViewDegrees
+    camera.components.set(component)
 
     let marker = Entity()
     marker.name = markerName
@@ -468,14 +527,15 @@ public struct RobotPreviewView: View {
   private static func applyCameraCommandIfNeeded(
     revision: Int,
     viewpoint: PreviewCameraViewpoint,
+    cameraState: PreviewCameraState,
     focusedModelPath: ModelEntityPath?,
     focusedPartID: PartID?,
     to root: Entity
-  ) {
+  ) -> PreviewCameraState? {
     let markerName = "previewCameraCommand-\(revision)"
     guard root.findEntity(named: markerName) == nil,
       let camera = root.findEntity(named: "previewCamera")
-    else { return }
+    else { return nil }
 
     for child in Array(root.children)
     where child.name.hasPrefix("previewCameraCommand-") {
@@ -513,6 +573,10 @@ public struct RobotPreviewView: View {
       camera.position = target + SIMD3<Float>(distance, 0, 0)
     case .top:
       camera.position = target + SIMD3<Float>(0, distance, 0.001)
+    case .custom:
+      target = cameraState.target.vector
+      distance = cameraState.distance
+      camera.position = target + cameraState.orientation.direction.vector * distance
     }
     camera.look(at: target, from: camera.position, relativeTo: nil)
     root.findEntity(named: "previewCameraTarget")?.position = target
@@ -520,6 +584,30 @@ public struct RobotPreviewView: View {
     let marker = Entity()
     marker.name = markerName
     root.addChild(marker)
+    guard let cameraTarget = root.findEntity(named: "previewCameraTarget") else { return nil }
+    return captureCameraState(camera: camera, target: cameraTarget)
+  }
+
+  private static func captureCameraState(
+    camera: Entity,
+    target: Entity
+  ) -> PreviewCameraState {
+    let offset = camera.position - target.position
+    let distance = max(simd_length(offset), 0.001)
+    let direction = offset / distance
+    let orthographicScale = camera.components[OrthographicCameraComponent.self]?.scale ?? 2.8
+    return PreviewCameraState(
+      orientation: PreviewCameraOrientation(
+        direction: PreviewCameraDirection(x: direction.x, y: direction.y, z: direction.z)
+      ),
+      target: PreviewCameraPoint(
+        x: target.position.x,
+        y: target.position.y,
+        z: target.position.z
+      ),
+      distance: distance,
+      orthographicScale: orthographicScale
+    )
   }
 
   private static func entity(

@@ -37,6 +37,7 @@ final class StudioWorkspaceModel {
   var showsPreviewGrid = true
   var cameraProjection: PreviewCameraProjection = .perspective
   var cameraViewpoint: PreviewCameraViewpoint = .home
+  var cameraState = PreviewCameraState()
   var cameraCommandRevision = 0
   var rigGuideVisibility = RigGuideVisibility()
   var showsCreationPalette = true
@@ -306,6 +307,27 @@ final class StudioWorkspaceModel {
   func setCameraViewpoint(_ viewpoint: PreviewCameraViewpoint) {
     cameraViewpoint = viewpoint
     cameraCommandRevision += 1
+  }
+
+  func setCameraDirection(_ direction: PreviewCameraDirection) {
+    cameraState.orientation.direction = direction
+    cameraViewpoint = .custom
+    cameraCommandRevision += 1
+  }
+
+  func nudgeCamera(horizontalRadians: Float = 0, verticalRadians: Float = 0) {
+    setCameraDirection(
+      cameraState.orientation.direction.nudged(
+        horizontalRadians: horizontalRadians,
+        verticalRadians: verticalRadians
+      )
+    )
+  }
+
+  func reportCameraState(_ state: PreviewCameraState) {
+    guard state != cameraState else { return }
+    cameraState = state
+    cameraViewpoint = .custom
   }
 
   func frameSelection() {

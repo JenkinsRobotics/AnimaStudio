@@ -55,9 +55,16 @@
   safely offline. The gear settings menu stores a user-local viewport
   appearance choice with Midnight, Graphite, CAD Light, and Blueprint presets;
   each changes the RealityKit background and major/minor grid colors without
-  altering project data. The viewport now provides a readable grid,
-  Home/front/right/top camera presets, perspective/orthographic projection
-  switching, selected-node/selected-part framing, trackpad pan/pinch, and
+  altering project data. The viewport now provides a readable grid and a live
+  view cube driven by the same camera state as RealityKit. It mirrors manual
+  orbit/pan/zoom changes; its faces, edges, and corners select principal,
+  two-axis, and trimetric views, while its surrounding arrows rotate the view
+  in 15-degree steps. A dedicated camera/render menu provides
+  perspective/orthographic projection, 30–90° perspective field-of-view
+  presets, selection framing, grid and appearance controls, and Shaded, Shaded
+  + Mesh Edges, Wireframe, and Translucent styles. These settings persist as
+  user-local presentation preferences and do not alter project data. The
+  viewport also provides Home/front/right/top presets, trackpad pan/pinch, and
   explicit persistent Onshape and SolidWorks mouse profiles. Onshape maps right
   drag to orbit/tilt, middle drag and Control-right drag to pan; SolidWorks maps
   middle drag to orbit/tilt, Control-middle drag to pan, and Shift-middle drag
@@ -87,7 +94,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Thirty-eight tests pass with `cd studio && swift test`, including real
+  inspector. Fifty tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python
@@ -130,7 +137,10 @@
   transforms. Part selection is entity-level; durable face selection still
   needs triangle identity through reimport, and true edge selection still needs
   topology/adjacency plus screen-space proximity. Transform gizmos are currently
-  world-scaled rather than screen-size-stable. Typed
+  world-scaled rather than screen-size-stable. The Shaded + Mesh Edges and
+  Wireframe modes display triangle mesh lines, not classified CAD feature
+  edges; hidden-line removal, section views, camera roll, and saved named views
+  are not implemented. Typed
   prismatic/cylindrical/ball/planar/fastened joints
   and keyframes are not yet editable; project changes are not
   persisted; imported security-scoped URLs

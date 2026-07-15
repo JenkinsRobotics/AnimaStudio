@@ -131,6 +131,35 @@ middle drag orbits, Control + middle drag pans, and Shift + middle drag zooms.
 Trackpad two-finger movement pans and pinch zooms in either profile. Navigation
 preferences never enter project data.
 
+The viewport camera is represented by one presentation-state contract:
+orientation, look-at target, perspective distance, orthographic scale, and
+projection. The RealityKit adapter reports that state after every orbit, pan,
+or zoom, so camera overlays never maintain a second approximation of the view.
+The view cube projects its labels from that same orientation and supports the
+standard CAD navigation vocabulary:
+
+- clicking a face selects one of the six principal plane views;
+- clicking an edge selects the corresponding two-axis view;
+- clicking a corner selects the corresponding trimetric view;
+- the surrounding arrows rotate the current view in 15-degree increments.
+
+Camera and render controls are intentionally split from the RealityKit scene
+implementation. `PreviewCameraState` owns renderer-facing camera data,
+`ViewCubeGeometry` owns projection and hit testing, `ViewportViewCube` owns the
+SwiftUI presentation, and `ViewportRenderMenu` owns user choices. This keeps
+the view cube independently testable and prevents the workspace shell from
+becoming a single monolithic UI file.
+
+The first render menu exposes Perspective/Orthographic projection, 30–90°
+perspective field-of-view presets, Frame Selection, grid visibility, viewport
+appearance, mouse profile, and four truthful render styles: Shaded, Shaded +
+Mesh Edges, Wireframe, and Translucent. “Mesh Edges” means RealityKit triangle
+mesh lines; it is not a promise of CAD feature-edge classification. Projection,
+render style, field of view, appearance, grid, and mouse profile are user-local
+presentation preferences and do not alter the project document. Hidden-line
+removal, section views, roll controls, and saved named views require dedicated
+geometry/camera contracts and remain future work rather than inert menu items.
+
 Semantic-part selection is one identity shared by the viewport, Parts tree,
 and inspector. A selected proxy receives a high-contrast orange silhouette and
 a local XYZ transform gizmo. Dragging a translation arrow edits the part's rest

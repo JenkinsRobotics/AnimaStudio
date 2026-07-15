@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ViewportCameraControls: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @Binding var navigationProfile: PreviewNavigationProfile
+  let navigationProfile: PreviewNavigationProfile
 
   var body: some View {
     HStack(spacing: 5) {
@@ -20,32 +20,7 @@ struct ViewportCameraControls: View {
         workspace.setCameraViewpoint(.top)
       }
 
-      Divider()
-        .frame(height: 22)
-
-      Button {
-        workspace.cameraProjection =
-          workspace.cameraProjection == .perspective ? .orthographic : .perspective
-      } label: {
-        Image(
-          systemName: workspace.cameraProjection == .perspective
-            ? "cube.transparent" : "square.grid.3x3"
-        )
-        .frame(width: 25, height: 25)
-      }
-      .buttonStyle(.plain)
-      .help(
-        workspace.cameraProjection == .perspective
-          ? "Switch to orthographic projection" : "Switch to perspective projection"
-      )
-
       Menu {
-        Picker("Mouse Profile", selection: $navigationProfile) {
-          ForEach(PreviewNavigationProfile.allCases, id: \.self) { profile in
-            Text(profile.displayName).tag(profile)
-          }
-        }
-
         Section("CAD Navigation") {
           if navigationProfile == .onshape {
             Text("Right-drag — orbit / tilt")
