@@ -4,6 +4,7 @@ import SwiftUI
 
 struct InspectorView: View {
   @Bindable var workspace: StudioWorkspaceModel
+  @State private var componentTab = ComponentInspectorTab.properties
 
   var body: some View {
     VStack(spacing: 0) {
@@ -101,9 +102,15 @@ struct InspectorView: View {
           }
         }
       }
-      featureReadout(for: selectedPart)
+      componentTabPicker
       Group {
-        partInspector(selectedPart)
+        switch componentTab {
+        case .properties:
+          featureReadout(for: selectedPart)
+          partInspector(selectedPart)
+        case .appearance:
+          ComponentAppearanceEditor(workspace: workspace, part: selectedPart)
+        }
       }
       .disabled(workspace.isComponentLocked(selectedPart.id))
     } else if let selectedModelNode {
@@ -129,6 +136,19 @@ struct InspectorView: View {
         Text("Select a component, model node, group, or mate to configure it.")
           .foregroundStyle(.secondary)
       }
+    }
+  }
+
+  private var componentTabPicker: some View {
+    Section {
+      Picker("Component Inspector", selection: $componentTab) {
+        ForEach(ComponentInspectorTab.allCases) { tab in
+          Label(tab.title, systemImage: tab.systemImage).tag(tab)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.segmented)
+      .accessibilityLabel("Component inspector tab")
     }
   }
 

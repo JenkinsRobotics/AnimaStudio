@@ -28,7 +28,11 @@ final class StudioWorkspaceModel {
     rig: CharacterRig(joints: []),
     clips: []
   )
-  var selection: Set<NavigatorItem> = []
+  var selection: Set<NavigatorItem> = [] {
+    didSet {
+      revealInspectorForInspectableSelection()
+    }
+  }
   var playheadSeconds = 0.0
   var isPlaying = false
   var loopsPreviewPlayback = true
@@ -49,6 +53,7 @@ final class StudioWorkspaceModel {
   var componentGroups: [NavigatorComponentGroup] = []
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
+  var componentAppearances: [PartID: PreviewPartAppearance] = [:]
   var matePlacement: MatePlacementSession?
   private var storedSelectedFeature: MateConnectorCandidate?
 
@@ -454,6 +459,29 @@ final class StudioWorkspaceModel {
       let index = project.rig.parts.firstIndex(where: { $0.id == id })
     else { return }
     project.rig.parts[index].rotationEulerRadians = rotationEulerRadians
+  }
+
+  func componentAppearance(for id: PartID) -> PreviewPartAppearance? {
+    guard let part = project.rig.parts.first(where: { $0.id == id }) else { return nil }
+    return componentAppearances[id] ?? .defaultAppearance(for: part.primitiveKind)
+  }
+
+  func setComponentAppearance(id: PartID, to appearance: PreviewPartAppearance) {
+    guard !isComponentLocked(id), project.rig.parts.contains(where: { $0.id == id }) else {
+      return
+    }
+    componentAppearances[id] = PreviewPartAppearance(
+      red: appearance.red,
+      green: appearance.green,
+      blue: appearance.blue,
+      opacity: appearance.opacity,
+      isVisible: appearance.isVisible
+    )
+  }
+
+  func resetComponentAppearance(id: PartID) {
+    guard !isComponentLocked(id) else { return }
+    componentAppearances.removeValue(forKey: id)
   }
 
   func renameJoint(id: JointID, to name: String) {
@@ -882,5 +910,18 @@ final class StudioWorkspaceModel {
     var presentation = activePresentation
     update(&presentation)
     workspacePresentations[activeWorkspace] = presentation
+  }
+
+  private func revealInspectorForInspectableSelection() {
+    let hasInspectableSelection = selection.contains { item in
+      switch item {
+      case .asset, .part, .componentGroup, .modelNode, .joint, .animation:
+        true
+      case .project, .structure:
+        false
+      }
+    }
+    guard hasInspectableSelection, !activePresentation.showsInspector else { return }
+    updateActivePresentation { $0.showsInspector = true }
   }
 }

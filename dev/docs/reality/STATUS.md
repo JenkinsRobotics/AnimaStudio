@@ -171,6 +171,16 @@
   an orange silhouette highlight plus local XYZ translation arrows and rotation
   rings at its origin; dragging them edits the core-backed rest transform, and
   connector-authored mate rotation composes through parent/child chains. During
+  any inspectable selection, Studio now restores the right-side Inspector if
+  the operator had hidden it. A selected semantic proxy component exposes
+  **Properties** and **Appearance** tabs. Appearance provides a 40-color
+  industrial palette, an RGB/ColorPicker mixer, editable six-digit hex color,
+  explicit RGB values, opacity, visibility, reset, and a truthful Automatic
+  tessellation readout. Color, opacity, and visibility update the actual
+  RealityKit proxy body immediately; locked components reject these edits.
+  Overrides are deliberately in-session presentation state until the durable
+  project document defines non-destructive material-override persistence, and
+  imported source-model materials remain source-owned and read-only. During
   mate placement, transform handles are suppressed so connector markers own the
   click target. Outside mate placement, the focused component shows the same
   inferred face-center/edge-midpoint/corner/axis/origin candidates as quiet

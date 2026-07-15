@@ -90,6 +90,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — selection-driven Inspector and Appearance editor complete:**
+  Selecting a component, model node, asset, group, mate, or animation now
+  restores the right-side Inspector if it was hidden. Semantic proxy components
+  expose Properties and Appearance tabs; Appearance includes a 40-color
+  palette, ColorPicker/RGB mixer, validated editable hex, RGB readout, opacity,
+  visibility, reset, and Automatic tessellation status. Edits update the real
+  RealityKit proxy body immediately and locks guard them. The override stays
+  renderer-facing and in-session until project persistence defines the saved
+  non-destructive material contract; source-model materials remain read-only.
+  Twelve focused tests and all 157 Swift tests, strict format lint, Xcode/root-
+  app build, signature verification, and `git diff --check` pass. macOS did not
+  expose the launched app window to accessibility automation in this session,
+  so the final visual review remains a normal human click-through.
+
 - **2026-07-15 — shared Onshape-style mate panel variants complete:** UI Dev's
   Mate Editor now uses one reusable panel for Fastened, Parallel, Slider,
   Revolute, Cylindrical, Pin Slot, Planar, and Ball. The icon strip and Type

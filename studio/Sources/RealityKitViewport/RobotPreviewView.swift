@@ -25,6 +25,7 @@ public struct RobotPreviewView: View {
   private let customNavigationMapping: CustomNavigationMapping
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
+  private let partAppearances: [PartID: PreviewPartAppearance]
   private let focusedPartIsLocked: Bool
   private let mateCandidatePartIDs: Set<PartID>
   private let selectedMateCandidate: MateConnectorCandidate?
@@ -58,6 +59,7 @@ public struct RobotPreviewView: View {
     customNavigationMapping: CustomNavigationMapping = CustomNavigationMapping(),
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
+    partAppearances: [PartID: PreviewPartAppearance] = [:],
     focusedPartIsLocked: Bool = false,
     mateCandidatePartIDs: Set<PartID> = [],
     selectedMateCandidate: MateConnectorCandidate? = nil,
@@ -90,6 +92,7 @@ public struct RobotPreviewView: View {
     self.customNavigationMapping = customNavigationMapping
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
+    self.partAppearances = partAppearances
     self.focusedPartIsLocked = focusedPartIsLocked
     self.mateCandidatePartIDs = mateCandidatePartIDs
     self.selectedMateCandidate = selectedMateCandidate
@@ -120,6 +123,7 @@ public struct RobotPreviewView: View {
         edgeDisplay: edgeDisplay,
         lightingPreset: lightingPreset,
         materialFinish: materialFinish,
+        partAppearances: partAppearances,
         reflectionMode: reflectionMode,
         showsShadows: showsShadows
       )
@@ -167,6 +171,13 @@ public struct RobotPreviewView: View {
         reportCameraState(updatedCameraState)
       }
       Self.applyRig(rig, frame: frame, to: root)
+      Self.applyPartAppearances(
+        partAppearances,
+        rig: rig,
+        renderStyle: renderStyle,
+        materialFinish: materialFinish,
+        to: root
+      )
       if isPlacementActive {
         MateConnectorMarkerFactory.apply(
           rig: rig,
@@ -365,6 +376,7 @@ public struct RobotPreviewView: View {
     edgeDisplay: ViewportEdgeDisplay,
     lightingPreset: ViewportLightingPreset,
     materialFinish: ViewportMaterialFinish,
+    partAppearances: [PartID: PreviewPartAppearance],
     reflectionMode: ViewportReflectionMode,
     showsShadows: Bool
   ) async -> Entity {
@@ -380,6 +392,7 @@ public struct RobotPreviewView: View {
           renderStyle: renderStyle,
           edgeDisplay: edgeDisplay,
           materialFinish: materialFinish,
+          appearance: partAppearances[part.id],
           showsShadows: showsShadows
         )
       )
@@ -432,12 +445,14 @@ public struct RobotPreviewView: View {
     renderStyle: ViewportRenderStyle,
     edgeDisplay: ViewportEdgeDisplay,
     materialFinish: ViewportMaterialFinish,
+    appearance: PreviewPartAppearance?,
     showsShadows: Bool
   ) -> Entity {
+    let appearance = appearance ?? .defaultAppearance(for: part.primitiveKind)
     let material = ViewportRenderStyleApplier.partMaterial(
       renderStyle,
       finish: materialFinish,
-      baseColor: part.primitiveKind == .locator ? .systemYellow : .systemTeal
+      baseColor: appearance.nsColor
     )
     let entity: ModelEntity
     switch part.primitiveKind {
@@ -471,8 +486,10 @@ public struct RobotPreviewView: View {
       )
     }
     entity.name = partEntityName(part.id)
+    entity.isEnabled = appearance.isVisible
     entity.position = simdPosition(part.positionMeters)
     entity.orientation = orientation(part.rotationEulerRadians)
+    entity.components.set(OpacityComponent(opacity: Float(appearance.opacity)))
     prepareForSelection(entity)
     entity.components.set(
       GroundingShadowComponent(
@@ -486,6 +503,32 @@ public struct RobotPreviewView: View {
       to: entity
     )
     return entity
+  }
+
+  private static func applyPartAppearances(
+    _ appearances: [PartID: PreviewPartAppearance],
+    rig: CharacterRig,
+    renderStyle: ViewportRenderStyle,
+    materialFinish: ViewportMaterialFinish,
+    to root: Entity
+  ) {
+    for part in rig.parts {
+      guard let entity = root.findEntity(named: partEntityName(part.id)),
+        var model = entity.components[ModelComponent.self]
+      else { continue }
+
+      let appearance = appearances[part.id] ?? .defaultAppearance(for: part.primitiveKind)
+      entity.isEnabled = appearance.isVisible
+      entity.components.set(OpacityComponent(opacity: Float(appearance.opacity)))
+      model.materials = [
+        ViewportRenderStyleApplier.partMaterial(
+          renderStyle,
+          finish: materialFinish,
+          baseColor: appearance.nsColor
+        )
+      ]
+      entity.components.set(model)
+    }
   }
 
   private func reportCameraState(_ updatedState: PreviewCameraState) {

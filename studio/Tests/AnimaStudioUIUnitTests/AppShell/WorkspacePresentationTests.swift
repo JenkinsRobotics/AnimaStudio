@@ -58,4 +58,16 @@ final class WorkspacePresentationTests: XCTestCase {
     model.toggleBottomEditor()
     XCTAssertFalse(model.activePresentation.showsBottomEditor)
   }
+
+  func testInspectableSelectionRevealsTheRightInspector() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let part = try XCTUnwrap(model.project.rig.parts.first)
+    model.toggleInspector()
+    XCTAssertFalse(model.activePresentation.showsInspector)
+
+    model.selectPart(id: part.id, extendingSelection: false)
+
+    XCTAssertTrue(model.activePresentation.showsInspector)
+  }
 }

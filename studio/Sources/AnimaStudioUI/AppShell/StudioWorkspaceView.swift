@@ -197,6 +197,7 @@ struct StudioWorkspaceView: View {
         customNavigationMapping: viewportCustomNavigationMapping,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
+        partAppearances: workspace.componentAppearances,
         focusedPartIsLocked: workspace.selectedPartID.map(workspace.isComponentLocked) ?? false,
         mateCandidatePartIDs: workspace.mateCandidatePartIDs,
         selectedMateCandidate: workspace.matePlacement?.sourceCandidate,
