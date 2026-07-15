@@ -61,7 +61,9 @@
   two-axis, and trimetric views, while its surrounding arrows rotate the view
   in 15-degree steps. A dedicated camera/render menu provides
   perspective/orthographic projection, 30–90° perspective field-of-view
-  presets and selection framing. Its adjacent Display dropdown independently
+  presets and selection framing. The lower camera toolbar now contains Home,
+  Display, and Help; Front, Right, and Top shortcuts are omitted because the
+  view cube owns principal, edge, and corner navigation. Display independently
   controls Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, grid,
   viewport appearance, and Balanced/Soft/Bright/High Contrast RealityKit
   lighting rigs. These settings persist as user-local presentation preferences
@@ -69,9 +71,9 @@
   their face centers, using one face-local orientation without readability flip
   correction, clipping, or scaling; its XYZ triad shares one origin and follows
   only the positive axis directions, and hovering previews the exact clickable
-  face, edge, or corner. The viewport also provides Home/front/right/top presets,
-  trackpad pan/pinch, and persistent Default, SolidWorks, Onshape, Fusion 360,
-  and Custom mouse profiles. Default and Onshape map right drag to orbit and
+  face, edge, or corner. The viewport also provides trackpad pan/pinch and
+  persistent Default, SolidWorks, Onshape, Fusion 360, and Custom mouse
+  profiles. Default and Onshape map right drag to orbit and
   middle drag to pan; SolidWorks maps middle drag to orbit and Control- or
   Shift-middle drag to pan; Fusion 360 maps Shift-middle drag to orbit and
   middle drag to pan. Custom exposes conflict-free rotate and pan bindings.

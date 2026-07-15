@@ -63,6 +63,13 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — compact camera/render toolbar complete:** Display now shares
+  the lower camera toolbar with Home and Help instead of occupying a separate
+  block beside the view cube. The redundant Front, Right, and Top buttons are
+  removed; the synchronized cube remains the direct navigator for all six
+  principal faces, edges, and corners. Display retains the same camera, render,
+  lighting, grid, appearance, and input settings. Sixty-four Swift tests pass.
+
 - **2026-07-14 — view-cube label stabilization complete:** Replaced the
   readability-adjusted face-label transform with one fixed-size decal anchored
   to each projected face center and oriented once in that face's local frame.

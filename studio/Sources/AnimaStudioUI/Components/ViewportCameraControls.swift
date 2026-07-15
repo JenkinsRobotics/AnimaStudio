@@ -1,25 +1,19 @@
 import RealityKitViewport
 import SwiftUI
 
-struct ViewportCameraControls: View {
+struct ViewportCameraControls<DisplayMenu: View>: View {
   @Bindable var workspace: StudioWorkspaceModel
   let navigationProfile: PreviewNavigationProfile
   let customNavigationMapping: CustomNavigationMapping
+  let displayMenu: DisplayMenu
 
   var body: some View {
     HStack(spacing: 5) {
       cameraButton("Home", systemImage: "house") {
         workspace.setCameraViewpoint(.home)
       }
-      cameraButton("Front", systemImage: "square") {
-        workspace.setCameraViewpoint(.front)
-      }
-      cameraButton("Right", systemImage: "square.split.2x1") {
-        workspace.setCameraViewpoint(.right)
-      }
-      cameraButton("Top", systemImage: "square.dashed") {
-        workspace.setCameraViewpoint(.top)
-      }
+
+      displayMenu
 
       Menu {
         Section("CAD Navigation") {

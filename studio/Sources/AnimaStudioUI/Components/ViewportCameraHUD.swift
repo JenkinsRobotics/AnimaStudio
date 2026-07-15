@@ -16,19 +16,25 @@ struct ViewportCameraHUD: View {
 
   var body: some View {
     VStack(alignment: .trailing, spacing: 7) {
-      HStack(alignment: .bottom, spacing: 7) {
-        ViewportViewCube(
-          orientation: workspace.cameraState.orientation,
-          onSelectDirection: workspace.setCameraDirection,
-          onNudge: { horizontalRadians, verticalRadians in
-            workspace.nudgeCamera(
-              horizontalRadians: horizontalRadians,
-              verticalRadians: verticalRadians
-            )
-          }
-        )
+      ViewportViewCube(
+        orientation: workspace.cameraState.orientation,
+        onSelectDirection: workspace.setCameraDirection,
+        onNudge: { horizontalRadians, verticalRadians in
+          workspace.nudgeCamera(
+            horizontalRadians: horizontalRadians,
+            verticalRadians: verticalRadians
+          )
+        }
+      )
 
-        ViewportRenderMenu(
+      ViewportCameraControls(
+        workspace: workspace,
+        navigationProfile: navigationProfile,
+        customNavigationMapping: CustomNavigationMapping(
+          rotateDrag: customRotateDrag,
+          panDrag: customPanDrag
+        ),
+        displayMenu: ViewportRenderMenu(
           projection: $projection,
           renderStyle: $renderStyle,
           edgeDisplay: $edgeDisplay,
@@ -41,15 +47,6 @@ struct ViewportCameraHUD: View {
           customPanDrag: $customPanDrag,
           canFrameSelection: workspace.canFrameSelection,
           frameSelection: workspace.frameSelection
-        )
-      }
-
-      ViewportCameraControls(
-        workspace: workspace,
-        navigationProfile: navigationProfile,
-        customNavigationMapping: CustomNavigationMapping(
-          rotateDrag: customRotateDrag,
-          panDrag: customPanDrag
         )
       )
     }

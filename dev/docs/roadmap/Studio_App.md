@@ -119,8 +119,8 @@ controls while retaining native macOS trackpad gestures:
 - right-button drag orbits/tilts the camera around its target;
 - middle-button drag pans, with Control + right-button drag as an Onshape-style
   alternative;
-- scroll and pinch zoom toward the pointer, and camera preset buttons provide
-  Home, Front, Right, and Top views;
+- scroll and pinch zoom toward the pointer; the compact camera toolbar retains
+  Home while the view cube owns all principal, edge, and corner views;
 - primary-button click selects geometry, and primary-button drag is reserved
   for a visible transform or DOF handle rather than camera navigation.
 
@@ -162,17 +162,19 @@ SwiftUI presentation, `ViewportRenderMenu` owns user choices,
 RealityKit light rigs. This keeps the view cube independently testable and
 prevents the workspace shell from becoming a single monolithic UI file.
 
-The direct Display menu beside the cube exposes Perspective/Orthographic
-projection, 30–90° perspective field-of-view presets, Frame Selection, grid
-visibility, viewport appearance, mouse profile, Shaded/Wireframe/Translucent
-surface modes, independent mesh-edge visibility, and Balanced/Soft/Bright/High
-Contrast two-light rigs. “Mesh Edges” means RealityKit triangle mesh lines; it
-is not a promise of CAD feature-edge classification. Projection, surface, edge,
-lighting, field of view, appearance, grid, mouse profile, and custom mouse
-bindings are user-local presentation preferences and do not alter the project
-document. Hidden-line removal, section views, roll controls, and saved named
-views require dedicated geometry/camera contracts and remain future work rather
-than inert menu items.
+The lower camera toolbar contains Home, Display, and Help. Display exposes
+Perspective/Orthographic projection, 30–90° perspective field-of-view presets,
+Frame Selection, grid visibility, viewport appearance, mouse profile,
+Shaded/Wireframe/Translucent surface modes, independent mesh-edge visibility,
+and Balanced/Soft/Bright/High Contrast two-light rigs. Front, Right, and Top
+toolbar shortcuts are intentionally omitted because the view cube provides all
+six principal views plus edge and corner views. “Mesh Edges” means RealityKit
+triangle mesh lines; it is not a promise of CAD feature-edge classification.
+Projection, surface, edge, lighting, field of view, appearance, grid, mouse
+profile, and custom mouse bindings are user-local presentation preferences and
+do not alter the project document. Hidden-line removal, section views, roll
+controls, and saved named views require dedicated geometry/camera contracts and
+remain future work rather than inert menu items.
 
 Semantic-part selection is one identity shared by the viewport, Parts tree,
 and inspector. A selected proxy receives a high-contrast orange silhouette and

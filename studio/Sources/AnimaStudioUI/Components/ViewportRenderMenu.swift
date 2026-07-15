@@ -109,11 +109,6 @@ struct ViewportRenderMenu: View {
       }
       .frame(width: 78, height: 25)
       .foregroundStyle(.white)
-      .background(StudioPalette.panel.opacity(0.9), in: RoundedRectangle(cornerRadius: 6))
-      .overlay {
-        RoundedRectangle(cornerRadius: 6)
-          .stroke(StudioPalette.border, lineWidth: 1)
-      }
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
