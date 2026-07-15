@@ -73,7 +73,7 @@ struct StudioHomeView: View {
 
       templateCard(
         title: "HARDWARE CHARACTER",
-        subtitle: "Rigid parts, joints, servos, and motion",
+        subtitle: "Rigid components, mates, servos, and motion",
         systemImage: "figure.wave"
       )
       templateCard(

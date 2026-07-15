@@ -7,7 +7,7 @@ enum CADNavigationAction: Equatable {
   case zoom(delta: CGFloat)
 }
 
-enum CADNavigationMouseButton {
+enum CADNavigationMouseButton: Equatable {
   case right
   case middle
   case scroll
@@ -93,6 +93,21 @@ enum CADNavigationMapping {
     case .scroll, .trackpadPan, .magnify:
       nil
     }
+  }
+}
+
+enum CADScrollInputClassifier {
+  static func button(
+    hasPreciseScrollingDeltas: Bool,
+    hasGesturePhase: Bool,
+    hasMomentumPhase: Bool,
+    deltaX: CGFloat
+  ) -> CADNavigationMouseButton {
+    guard hasPreciseScrollingDeltas else { return .scroll }
+    if hasGesturePhase || hasMomentumPhase || abs(deltaX) > 0.01 {
+      return .trackpadPan
+    }
+    return .scroll
   }
 }
 
@@ -187,7 +202,12 @@ struct CADNavigationCapture: NSViewRepresentable {
       case .otherMouseDragged where event.buttonNumber == 2:
         button = .middle
       case .scrollWheel:
-        button = event.hasPreciseScrollingDeltas ? .trackpadPan : .scroll
+        button = CADScrollInputClassifier.button(
+          hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas,
+          hasGesturePhase: event.phase != [],
+          hasMomentumPhase: event.momentumPhase != [],
+          deltaX: event.scrollingDeltaX
+        )
       case .magnify:
         button = .magnify
       default:

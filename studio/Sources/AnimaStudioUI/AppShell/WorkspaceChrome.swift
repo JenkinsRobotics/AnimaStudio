@@ -265,7 +265,7 @@ private struct WorkspaceContextualTools: View {
         .help("Move gizmos arrive with semantic parts")
       Button("Rotate", systemImage: "rotate.right") {}
         .disabled(true)
-        .help("Rotation gizmos arrive with typed joints and DOFs")
+        .help("Rotation gizmos arrive with typed mates and DOFs")
       Button("Scale", systemImage: "arrow.up.left.and.arrow.down.right") {}
         .disabled(true)
         .help("Scale gizmos arrive with semantic parts")

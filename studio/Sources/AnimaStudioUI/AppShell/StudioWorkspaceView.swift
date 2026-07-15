@@ -148,6 +148,7 @@ struct StudioWorkspaceView: View {
         customNavigationMapping: viewportCustomNavigationMapping,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
+        focusedPartIsLocked: workspace.selectedPartID.map(workspace.isComponentLocked) ?? false,
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
@@ -251,7 +252,7 @@ struct StudioWorkspaceView: View {
       true
     case .rig:
       switch workspace.primarySelection {
-      case .asset, .part, .modelNode, .joint:
+      case .asset, .part, .componentGroup, .modelNode, .joint:
         true
       case .project, .structure, .animation, nil:
         false

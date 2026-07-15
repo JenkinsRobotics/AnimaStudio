@@ -63,6 +63,7 @@ final class RigCreationTests: XCTestCase {
     model.createRevoluteJoint()
 
     let joint = try! XCTUnwrap(model.project.rig.joints.first)
+    XCTAssertEqual(joint.displayName, "Revolute Mate 1")
     XCTAssertEqual(joint.parentPartID, base.id)
     XCTAssertEqual(joint.childPartID, child.id)
     XCTAssertEqual(model.selection, [.joint(joint.id)])

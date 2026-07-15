@@ -50,7 +50,7 @@ struct RigGuideOverlay: View {
         axisKey("Y", color: .green)
         axisKey("Z", color: .blue)
         Spacer()
-        Text("Select a mapped joint to edit")
+        Text("Select a mapped mate to edit")
           .font(.system(size: 9))
           .foregroundStyle(.tertiary)
       }

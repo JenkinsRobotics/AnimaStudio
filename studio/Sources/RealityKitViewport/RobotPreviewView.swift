@@ -20,6 +20,7 @@ public struct RobotPreviewView: View {
   private let customNavigationMapping: CustomNavigationMapping
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
+  private let focusedPartIsLocked: Bool
   private let importedHierarchyRootPath: ModelEntityPath?
   private let onSelectModelPath: (ModelEntityPath) -> Void
   private let onSelectPartID: (PartID) -> Void
@@ -46,6 +47,7 @@ public struct RobotPreviewView: View {
     customNavigationMapping: CustomNavigationMapping = CustomNavigationMapping(),
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
+    focusedPartIsLocked: Bool = false,
     importedHierarchyRootPath: ModelEntityPath? = nil,
     rigGuideVisibility: RigGuideVisibility = .hidden,
     appearance: PreviewAppearance = .midnight,
@@ -71,6 +73,7 @@ public struct RobotPreviewView: View {
     self.customNavigationMapping = customNavigationMapping
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
+    self.focusedPartIsLocked = focusedPartIsLocked
     self.importedHierarchyRootPath = importedHierarchyRootPath
     self.rigGuideVisibility = rigGuideVisibility
     self.appearance = appearance
@@ -130,7 +133,12 @@ public struct RobotPreviewView: View {
         reportCameraState(updatedCameraState)
       }
       Self.applyRig(rig, frame: frame, to: root)
-      Self.applySelection(focusedPartID, rig: rig, to: root)
+      Self.applySelection(
+        focusedPartID,
+        isLocked: focusedPartIsLocked,
+        rig: rig,
+        to: root
+      )
       if let navigationAction {
         if let updatedCameraState = Self.applyNavigation(
           navigationAction,
@@ -167,7 +175,8 @@ public struct RobotPreviewView: View {
       DragGesture(minimumDistance: 2)
         .targetedToAnyEntity()
         .onChanged { value in
-          guard let focusedPartID,
+          guard !focusedPartIsLocked,
+            let focusedPartID,
             let handle = TransformGizmoFactory.handle(from: value.entity),
             let part = rig.parts.first(where: { $0.id == focusedPartID }),
             let partEntity = Self.semanticPartAncestor(from: value.entity)
@@ -381,6 +390,7 @@ public struct RobotPreviewView: View {
 
   private static func applySelection(
     _ selectedPartID: PartID?,
+    isLocked: Bool,
     rig: CharacterRig,
     to root: Entity
   ) {
@@ -394,7 +404,9 @@ public struct RobotPreviewView: View {
         if highlight == nil {
           entity.addChild(TransformGizmoFactory.makeSelectionHighlight(for: part.primitiveKind))
         }
-        if gizmo == nil {
+        if isLocked {
+          gizmo?.removeFromParent()
+        } else if gizmo == nil {
           entity.addChild(TransformGizmoFactory.make())
         }
       } else {

@@ -70,7 +70,7 @@ scrubbing, offline export, runtime playback, and physical output consistent.
   3D preview  face    preview     diagnostics
 ```
 
-### Models and joints
+### Models and mates
 
 For the first 3D viewport, Studio imports a USD/USDZ asset and builds a mapping
 from Anima joint IDs to the asset's skeleton joint names. RealityKit draws the
@@ -90,10 +90,22 @@ Studio deliberately presents two related hierarchies without conflating them:
    authoring tool. It is selectable and searchable, but its nodes, ordering,
    pivots, and materials are source-owned and read-only in Studio. Source rows
    use a blue model icon plus a lock label; color is not the only cue.
-2. The **semantic-rig hierarchy** contains Anima parts, typed mate connectors,
-   joints, and animatable DOFs. It is project-owned. This is the hierarchy that
-   Rig may rename, duplicate, drag to reparent, and edit with undo once durable
-   semantic parts ship. Parts and joints use distinct icon-plus-label roles.
+2. The **semantic-rig hierarchy** presents Anima components and typed mates;
+   each mate owns its valid animatable DOFs. It is project-owned. “Mate” is the
+   operator umbrella term, with Revolute, Prismatic, Cylindrical, Ball, Planar,
+   and Fastened as mate types. Internal runtime contracts may retain `Joint`
+   symbols while the typed-mate migration is in progress.
+
+The working Components/Mates navigator supports native disclosure groups,
+search, multi-selection, contextual rename, move up/down, moving components
+between groups, dissolving groups, and lock/unlock. A locked component or mate
+rejects name and configuration edits at the workspace-model boundary; a locked
+group also protects its members. Groups and locks are currently in-session
+Studio organization state. The P0 durable `.animastudio` document must persist
+them as editor metadata without leaking folders into the renderer-independent
+rig or runtime `.anima` contract. Reparenting physical component relationships,
+duplicate, delete, and undo/redo remain separate semantic operations and must
+not be faked by folder organization.
 
 Mapping bridges the two layers. A semantic part may collect multiple source
 nodes so a detailed imported subtree can behave as one rigid link; a source
@@ -131,7 +143,8 @@ uses the Onshape-style right-drag orbit, middle-drag pan, and wheel zoom.
 SolidWorks uses middle-drag orbit plus Control- or Shift-middle-drag pan;
 Fusion 360 uses Shift-middle-drag orbit plus middle-drag pan. Custom exposes
 separate rotate and pan drag bindings and prevents the two actions from owning
-the same chord. Trackpad two-finger movement pans and pinch zooms in every
+the same chord. Discrete mouse-wheel events are consumed by the viewport as
+zoom. Precise trackpad scroll phases remain pan input, and pinch zooms in every
 profile. Navigation preferences never enter project data.
 
 The viewport camera is represented by one presentation-state contract:

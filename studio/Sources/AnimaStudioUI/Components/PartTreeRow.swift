@@ -3,6 +3,7 @@ import SwiftUI
 enum NavigatorNodeRole {
   case sourceAssembly
   case sourceNode
+  case componentGroup
   case semanticPart
   case joint
   case hardwareOutput
@@ -11,8 +12,9 @@ enum NavigatorNodeRole {
     switch self {
     case .sourceAssembly: "Source assembly"
     case .sourceNode: "Source model node"
+    case .componentGroup: "Component group"
     case .semanticPart: "Semantic part"
-    case .joint: "Joint"
+    case .joint: "Mate"
     case .hardwareOutput: "Hardware output"
     }
   }
@@ -21,6 +23,7 @@ enum NavigatorNodeRole {
     switch self {
     case .sourceAssembly: "square.3.layers.3d"
     case .sourceNode: "cube"
+    case .componentGroup: "folder.fill"
     case .semanticPart: "shippingbox"
     case .joint: "rotate.3d"
     case .hardwareOutput: "powerplug"
@@ -30,6 +33,7 @@ enum NavigatorNodeRole {
   var tint: Color {
     switch self {
     case .sourceAssembly, .sourceNode: StudioPalette.sourceModel
+    case .componentGroup: StudioPalette.accent
     case .semanticPart: StudioPalette.semanticPart
     case .joint: StudioPalette.joint
     case .hardwareOutput: StudioPalette.hardware
@@ -41,7 +45,8 @@ struct PartTreeRow: View {
   let title: String
   let role: NavigatorNodeRole
   var detail: String?
-  var isSourceLocked = false
+  var isLocked = false
+  var lockHelp = "Locked items cannot be edited or reorganized."
 
   var body: some View {
     HStack(spacing: 7) {
@@ -56,17 +61,16 @@ struct PartTreeRow: View {
           .font(.caption2)
           .foregroundStyle(StudioPalette.muted)
       }
-      if isSourceLocked {
+      if isLocked {
         Image(systemName: "lock.fill")
           .font(.caption2)
           .foregroundStyle(StudioPalette.muted)
-          .help(
-            "Source-owned hierarchy. Map it into the semantic rig before editing relationships.")
+          .help(lockHelp)
       }
     }
-    .help(isSourceLocked ? "\(role.title), read-only source hierarchy" : role.title)
+    .help(isLocked ? "\(role.title), locked" : role.title)
     .accessibilityElement(children: .combine)
     .accessibilityLabel(title)
-    .accessibilityValue(isSourceLocked ? "\(role.title), read only" : role.title)
+    .accessibilityValue(isLocked ? "\(role.title), locked" : role.title)
   }
 }

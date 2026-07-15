@@ -32,9 +32,10 @@
   persistence ships. A new project now opens as a genuinely empty Rig rather
   than silently inserting the sample mechanism. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
-  proxy parts with their local origin at the workspace origin, then creates a
-  first revolute joint for the selected unconnected part. Part names, XYZ
-  positions, XYZ rest rotations, and joint names, axis, parent/child
+  proxy components with their local origin at the workspace origin, then
+  creates a first Revolute Mate for the selected unconnected component.
+  Component names, XYZ positions, XYZ rest rotations, and mate names, axis,
+  parent/child
   connection, and angular limits are inspectable/editable in memory. Motors,
   extra joint insertion, 3D Models & Media, and Events are present as clearly
   disabled reference groups rather than fake working features. Its project
@@ -42,13 +43,13 @@
   Animate, Show, and Hardware workspaces with Command-1…5 switching, a stable
   global project/live bar, workspace-owned contextual tools, and independently
   restorable in-session navigator/inspector/bottom-panel visibility. Assets
-  centers import and hierarchy inspection; Rig centers parts and joints;
+  centers import and hierarchy inspection; Rig centers components and mates;
   Animate owns the working timeline dock with transport, every clip motion
   track, clickable keyframes, click/drag scrubbing, adjacent-key and frame
   stepping, a real loop-preview toggle, horizontal zoom, and configurable
   24/25/30/60 fps timecode over continuous seconds. Its Dope Sheet includes
   honest empty Audio/Event capability lanes and switches to a read-only Graph
-  presentation of hold/linear curves; selecting joints isolates their curves.
+  presentation of hold/linear curves; selecting mates isolates their curves.
   Show has a distinct multi-track
   character/audio/screen/event timeline scaffold; Hardware has structured
   connection, safety, mapping, and filterable-log surfaces that visibly remain
@@ -77,33 +78,41 @@
   middle drag to pan; SolidWorks maps middle drag to orbit and Control- or
   Shift-middle drag to pan; Fusion 360 maps Shift-middle drag to orbit and
   middle drag to pan. Custom exposes conflict-free rotate and pan bindings.
-  Wheel scrolling zooms in every profile. Semantic proxy geometry is
+  Discrete mouse-wheel events are consumed as zoom in every profile instead of
+  scrolling vertically; precise trackpad scroll phases still pan, and pinch
+  still zooms. Semantic proxy geometry is
   directly selectable in the viewport and resolves to the same stable part ID
-  used by the Parts tree and inspector. The selected part receives an orange
-  silhouette highlight plus local XYZ translation arrows and rotation rings at
-  its origin; dragging them edits the core-backed rest transform, and animated
-  joint rotation composes on top. The Parts outline follows macOS file-browser
+  used by the Components tree and inspector. The selected component receives
+  an orange silhouette highlight plus local XYZ translation arrows and rotation
+  rings at its origin; dragging them edits the core-backed rest transform, and animated
+  mate rotation composes on top. The Components outline follows macOS file-browser
   selection conventions:
   Command/Shift select multiple, one item opens its configuration, and Escape
   or the inspector close control clears selection. Imported geometry can also
   be selected directly in the viewport, with Command/Shift extending the same
-  Parts-tree selection. Every navigator workspace now has a standardized
+  Components-tree selection. Every navigator workspace now has a standardized
   filter. Imported assemblies appear in a separate blue, locked **Source Model ·
   Read Only** tree; filtering preserves the ancestors of matching nodes. The
-  semantic mechanism and joints remain separate, editable-role rows in teal and
-  purple, and source-node inspection explains ownership, source appearance,
-  mapping, and reimport prerequisites. Shared theme metrics and
+  semantic Components and Mates remain separate editable-role rows in teal and
+  purple. Component disclosure groups support contextual rename, move up/down,
+  move-to-group, dissolve, and lock/unlock; Mates support contextual rename,
+  reorder, and lock/unlock. Locked items reject inspector and transform edits,
+  hide transform handles, and locked groups protect their members. Group and
+  lock organization is currently in-session pending the durable `.animastudio`
+  document layer.
+  Source-node inspection explains ownership, source appearance, mapping, and
+  reimport prerequisites. Shared theme metrics and
   reusable panel, text-field, picker, readout, and primary-button styles keep
   new Studio windows visually consistent. The sample Rig viewport also renders
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
   optional reference plane, and a highlighted limit arc with independent layer
-  toggles on every created joint. Project and asset names are also editable in
+  toggles on every created mate. Project and asset names are also editable in
   memory. Users can select a
   RealityKit-supported USD/Reality model; it loads asynchronously, is normalized
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Sixty-four tests pass with `cd studio && swift test`, including real
+  inspector. Seventy-one tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python

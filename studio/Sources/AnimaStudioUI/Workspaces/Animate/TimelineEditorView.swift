@@ -417,7 +417,7 @@ struct TimelineEditorView: View {
       }
 
       Divider()
-      Label("Select joints to isolate curves", systemImage: "cursorarrow.click.2")
+      Label("Select mates to isolate curves", systemImage: "cursorarrow.click.2")
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
       Label("Audio stays in the Dope Sheet", systemImage: "waveform.slash")

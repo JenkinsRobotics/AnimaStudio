@@ -63,6 +63,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — Components/Mates tree + wheel zoom complete:** Operator-facing
+  terminology now uses Mate as the umbrella, with Revolute Mate as the current
+  implemented type; internal `JointDefinition` stays transitional until the
+  shared typed-mate/DOF contract lands. The Components tree now supports
+  expandable groups, rename, move up/down, move-to-group, dissolve, and
+  lock/unlock. Mates support rename, reorder, and lock/unlock. Locks guard model
+  edits, mate attachment, inspector fields, and transform handles. Groups and
+  locks remain in-session until P0 document metadata persistence. Discrete mouse
+  wheels zoom; trackpad scroll phases pan; pinch zooms. Seventy-one Swift tests
+  pass.
+
 - **2026-07-14 — compact camera/render toolbar complete:** Display now shares
   the lower camera toolbar with Home and Help instead of occupying a separate
   block beside the view cube. The redundant Front, Right, and Top buttons are

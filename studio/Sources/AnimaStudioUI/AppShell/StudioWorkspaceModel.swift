@@ -7,6 +7,7 @@ enum NavigatorItem: Hashable {
   case project
   case asset(AssetID)
   case part(PartID)
+  case componentGroup(UUID)
   case structure
   case modelNode(ModelEntityPath)
   case joint(JointID)
@@ -45,6 +46,9 @@ final class StudioWorkspaceModel {
   var importedModelHierarchy: ModelHierarchyNode?
   var isLoadingModelHierarchy = false
   var importErrorMessage: String?
+  var componentGroups: [NavigatorComponentGroup] = []
+  var lockedComponentIDs: Set<PartID> = []
+  var lockedMateIDs: Set<JointID> = []
 
   private let evaluator = AnimationEvaluator()
 
@@ -96,7 +100,7 @@ final class StudioWorkspaceModel {
     switch primarySelection {
     case .modelNode, .part, .structure, .joint:
       true
-    case .project, .asset, .animation, nil:
+    case .project, .asset, .componentGroup, .animation, nil:
       false
     }
   }
@@ -107,7 +111,9 @@ final class StudioWorkspaceModel {
 
   var canCreateRevoluteJoint: Bool {
     let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
-    return project.rig.parts.contains { !connectedChildren.contains($0.id) }
+    return project.rig.parts.contains {
+      !connectedChildren.contains($0.id) && !isComponentLocked($0.id)
+    }
   }
 
   func importModel(from url: URL) async {
@@ -168,17 +174,23 @@ final class StudioWorkspaceModel {
     let child =
       project.rig.parts.first {
         $0.id == selectedPartID && !connectedChildren.contains($0.id)
-      } ?? project.rig.parts.first { !connectedChildren.contains($0.id) }
+          && !isComponentLocked($0.id)
+      }
+      ?? project.rig.parts.first {
+        !connectedChildren.contains($0.id) && !isComponentLocked($0.id)
+      }
     guard let child else { return }
 
-    let parentID = project.rig.parts.first { $0.id != child.id }?.id
+    let parentID = project.rig.parts.first {
+      $0.id != child.id && !isComponentLocked($0.id)
+    }?.id
     var sequence = project.rig.joints.count + 1
     while project.rig.joints.contains(where: { $0.id.rawValue == "joint_\(sequence)" }) {
       sequence += 1
     }
     let joint = JointDefinition(
       id: JointID(rawValue: "joint_\(sequence)"),
-      displayName: "Joint \(sequence)",
+      displayName: "Revolute Mate \(sequence)",
       axis: .y,
       minimumRadians: -.pi / 2,
       maximumRadians: .pi / 2,
@@ -262,19 +274,24 @@ final class StudioWorkspaceModel {
   }
 
   func renamePart(id: PartID, to name: String) {
+    guard !isComponentLocked(id) else { return }
     guard let index = project.rig.parts.firstIndex(where: { $0.id == id }) else { return }
-    project.rig.parts[index].displayName = name
+    let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedName.isEmpty else { return }
+    project.rig.parts[index].displayName = trimmedName
   }
 
   func setPartPosition(id: PartID, to positionMeters: RigVector3) {
-    guard positionMeters.x.isFinite, positionMeters.y.isFinite, positionMeters.z.isFinite,
+    guard !isComponentLocked(id),
+      positionMeters.x.isFinite, positionMeters.y.isFinite, positionMeters.z.isFinite,
       let index = project.rig.parts.firstIndex(where: { $0.id == id })
     else { return }
     project.rig.parts[index].positionMeters = positionMeters
   }
 
   func setPartRotation(id: PartID, to rotationEulerRadians: RigVector3) {
-    guard rotationEulerRadians.x.isFinite, rotationEulerRadians.y.isFinite,
+    guard !isComponentLocked(id),
+      rotationEulerRadians.x.isFinite, rotationEulerRadians.y.isFinite,
       rotationEulerRadians.z.isFinite,
       let index = project.rig.parts.firstIndex(where: { $0.id == id })
     else { return }
@@ -282,17 +299,22 @@ final class StudioWorkspaceModel {
   }
 
   func renameJoint(id: JointID, to name: String) {
+    guard !isMateLocked(id) else { return }
     guard let index = project.rig.joints.firstIndex(where: { $0.id == id }) else { return }
-    project.rig.joints[index].displayName = name
+    let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedName.isEmpty else { return }
+    project.rig.joints[index].displayName = trimmedName
   }
 
   func setJointAxis(id: JointID, to axis: JointAxis) {
+    guard !isMateLocked(id) else { return }
     guard let index = project.rig.joints.firstIndex(where: { $0.id == id }) else { return }
     project.rig.joints[index].axis = axis
   }
 
   func setJointRange(id: JointID, minimumRadians: Double, maximumRadians: Double) {
-    guard minimumRadians.isFinite, maximumRadians.isFinite,
+    guard !isMateLocked(id),
+      minimumRadians.isFinite, maximumRadians.isFinite,
       minimumRadians <= maximumRadians,
       let index = project.rig.joints.firstIndex(where: { $0.id == id })
     else { return }
@@ -302,6 +324,149 @@ final class StudioWorkspaceModel {
       max(project.rig.joints[index].neutralRadians, minimumRadians),
       maximumRadians
     )
+  }
+
+  @discardableResult
+  func createComponentGroup(named name: String? = nil) -> UUID {
+    let selectedIDs = project.rig.parts.compactMap { part in
+      selection.contains(.part(part.id)) && !isComponentLocked(part.id) ? part.id : nil
+    }
+    for componentID in selectedIDs {
+      removeComponentFromGroups(componentID)
+    }
+
+    let sequence = componentGroups.count + 1
+    let group = NavigatorComponentGroup(
+      displayName: name ?? "Group \(sequence)",
+      componentIDs: selectedIDs
+    )
+    componentGroups.append(group)
+    selection = [.componentGroup(group.id)]
+    return group.id
+  }
+
+  func renameComponentGroup(id: UUID, to name: String) {
+    guard let index = componentGroups.firstIndex(where: { $0.id == id }),
+      !componentGroups[index].isLocked
+    else { return }
+    let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedName.isEmpty else { return }
+    componentGroups[index].displayName = trimmedName
+  }
+
+  func dissolveComponentGroup(id: UUID) {
+    guard let index = componentGroups.firstIndex(where: { $0.id == id }),
+      !componentGroups[index].isLocked
+    else { return }
+    componentGroups.remove(at: index)
+    selection.remove(.componentGroup(id))
+  }
+
+  func moveComponent(_ id: PartID, direction: NavigatorMoveDirection) {
+    guard !isComponentLocked(id) else { return }
+    if let groupIndex = componentGroups.firstIndex(where: { $0.componentIDs.contains(id) }) {
+      guard !componentGroups[groupIndex].isLocked else { return }
+      componentGroups[groupIndex].componentIDs = NavigatorOrdering.moved(
+        componentGroups[groupIndex].componentIDs,
+        value: id,
+        direction: direction
+      )
+      return
+    }
+
+    let rootIDs = project.rig.parts.compactMap { part in
+      componentGroup(containing: part.id) == nil ? part.id : nil
+    }
+    guard let siblingIndex = rootIDs.firstIndex(of: id) else { return }
+    let destinationSiblingIndex =
+      switch direction {
+      case .up: siblingIndex - 1
+      case .down: siblingIndex + 1
+      }
+    guard rootIDs.indices.contains(destinationSiblingIndex) else { return }
+    let destinationID = rootIDs[destinationSiblingIndex]
+    guard
+      let sourceIndex = project.rig.parts.firstIndex(where: { $0.id == id }),
+      let destinationIndex = project.rig.parts.firstIndex(where: { $0.id == destinationID })
+    else { return }
+    project.rig.parts.swapAt(sourceIndex, destinationIndex)
+  }
+
+  func moveComponentGroup(_ id: UUID, direction: NavigatorMoveDirection) {
+    guard let group = componentGroups.first(where: { $0.id == id }), !group.isLocked else { return }
+    componentGroups = NavigatorOrdering.moved(componentGroups, value: group, direction: direction)
+  }
+
+  func moveMate(_ id: JointID, direction: NavigatorMoveDirection) {
+    guard !isMateLocked(id),
+      let mate = project.rig.joints.first(where: { $0.id == id })
+    else { return }
+    project.rig.joints = NavigatorOrdering.moved(
+      project.rig.joints,
+      value: mate,
+      direction: direction
+    )
+  }
+
+  func moveComponent(_ id: PartID, toGroup groupID: UUID?) {
+    guard !isComponentLocked(id) else { return }
+    if let sourceGroup = componentGroup(containing: id), sourceGroup.isLocked { return }
+    if let groupID {
+      guard let destinationIndex = componentGroups.firstIndex(where: { $0.id == groupID }),
+        !componentGroups[destinationIndex].isLocked
+      else { return }
+      removeComponentFromGroups(id)
+      componentGroups[destinationIndex].componentIDs.append(id)
+    } else {
+      removeComponentFromGroups(id)
+    }
+  }
+
+  func toggleComponentLock(_ id: PartID) {
+    if lockedComponentIDs.contains(id) {
+      lockedComponentIDs.remove(id)
+    } else {
+      lockedComponentIDs.insert(id)
+    }
+  }
+
+  func toggleMateLock(_ id: JointID) {
+    if lockedMateIDs.contains(id) {
+      lockedMateIDs.remove(id)
+    } else {
+      lockedMateIDs.insert(id)
+    }
+  }
+
+  func toggleComponentGroupLock(_ id: UUID) {
+    guard let index = componentGroups.firstIndex(where: { $0.id == id }) else { return }
+    componentGroups[index].isLocked.toggle()
+  }
+
+  func isComponentLocked(_ id: PartID) -> Bool {
+    lockedComponentIDs.contains(id) || componentGroup(containing: id)?.isLocked == true
+  }
+
+  func isComponentIndividuallyLocked(_ id: PartID) -> Bool {
+    lockedComponentIDs.contains(id)
+  }
+
+  func isComponentLockedByGroup(_ id: PartID) -> Bool {
+    componentGroup(containing: id)?.isLocked == true
+  }
+
+  func isMateLocked(_ id: JointID) -> Bool {
+    lockedMateIDs.contains(id)
+  }
+
+  func componentGroup(containing id: PartID) -> NavigatorComponentGroup? {
+    componentGroups.first { $0.componentIDs.contains(id) }
+  }
+
+  private func removeComponentFromGroups(_ id: PartID) {
+    for index in componentGroups.indices {
+      componentGroups[index].componentIDs.removeAll { $0 == id }
+    }
   }
 
   func setCameraViewpoint(_ viewpoint: PreviewCameraViewpoint) {

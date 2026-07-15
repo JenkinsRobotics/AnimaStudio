@@ -29,7 +29,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
         id: self,
         title: "Rig",
         systemImage: "point.3.connected.trianglepath.dotted",
-        purpose: "Define parts, joints, DOFs, and limits",
+        purpose: "Define components, mates, DOFs, and limits",
         viewportLabel: "RIG VIEW",
         defaultPresentation: WorkspacePresentation(
           showsNavigator: true,

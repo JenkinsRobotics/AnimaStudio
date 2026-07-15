@@ -85,12 +85,38 @@ struct InspectorView: View {
       animationInspector(selectedAnimation)
     } else if let selectedAsset {
       assetInspector(selectedAsset)
+    } else if let selectedComponentGroup {
+      componentGroupInspector(selectedComponentGroup)
     } else if let selectedPart {
-      partInspector(selectedPart)
+      if workspace.isComponentLocked(selectedPart.id) {
+        if let lockedGroup = workspace.componentGroup(containing: selectedPart.id),
+          lockedGroup.isLocked
+        {
+          lockedEditingSection(unlockTitle: "Unlock Group") {
+            workspace.toggleComponentGroupLock(lockedGroup.id)
+          }
+        } else {
+          lockedEditingSection(unlockTitle: "Unlock Component") {
+            workspace.toggleComponentLock(selectedPart.id)
+          }
+        }
+      }
+      Group {
+        partInspector(selectedPart)
+      }
+      .disabled(workspace.isComponentLocked(selectedPart.id))
     } else if let selectedModelNode {
       modelNodeInspector(selectedModelNode)
     } else if let selectedJoint {
-      jointInspector(selectedJoint)
+      if workspace.isMateLocked(selectedJoint.id) {
+        lockedEditingSection(unlockTitle: "Unlock Mate") {
+          workspace.toggleMateLock(selectedJoint.id)
+        }
+      }
+      Group {
+        jointInspector(selectedJoint)
+      }
+      .disabled(workspace.isMateLocked(selectedJoint.id))
     } else if workspace.selectionCount > 1 {
       Section("Multiple Selection") {
         LabeledContent("Selected", value: "\(workspace.selectionCount) items")
@@ -99,7 +125,7 @@ struct InspectorView: View {
       }
     } else if workspace.activeWorkspace == .rig || workspace.activeWorkspace == .assets {
       Section("Selection") {
-        Text("Select a part, model node, or joint to configure it.")
+        Text("Select a component, model node, group, or mate to configure it.")
           .foregroundStyle(.secondary)
       }
     }
@@ -183,7 +209,7 @@ struct InspectorView: View {
 
   @ViewBuilder
   private func partInspector(_ part: RigPartDefinition) -> some View {
-    Section("Semantic Part") {
+    Section("Component") {
       StudioTextFieldRow(
         title: "Name",
         text: Binding(
@@ -236,7 +262,7 @@ struct InspectorView: View {
 
     Section("Workflow") {
       Text(
-        "Use proxy structures to establish the rig and joints. Imported production geometry can be mapped to the same semantic part later."
+        "Use proxy components to establish the rig and mates. Imported production geometry can be mapped to the same semantic component later."
       )
       .font(.caption)
       .foregroundStyle(.secondary)
@@ -245,8 +271,8 @@ struct InspectorView: View {
 
   @ViewBuilder
   private func jointInspector(_ joint: JointDefinition) -> some View {
-    Section("Joint") {
-      LabeledContent("Type", value: "Revolute")
+    Section("Mate") {
+      LabeledContent("Type", value: "Revolute Mate")
       LabeledContent("Degrees of Freedom", value: "1 rotational")
       if workspace.activeWorkspace == .rig {
         StudioTextFieldRow(
@@ -255,8 +281,8 @@ struct InspectorView: View {
             get: { joint.displayName },
             set: { workspace.renameJoint(id: joint.id, to: $0) }
           ),
-          placeholder: "Joint name",
-          help: "The readable name shown throughout the rig and timeline."
+          placeholder: "Mate name",
+          help: "The readable mate name shown throughout the rig and timeline."
         )
         StudioPickerRow(
           title: "Rotation Axis",
@@ -309,6 +335,48 @@ struct InspectorView: View {
     }
   }
 
+  @ViewBuilder
+  private func componentGroupInspector(_ group: NavigatorComponentGroup) -> some View {
+    Section("Component Group") {
+      StudioTextFieldRow(
+        title: "Name",
+        text: Binding(
+          get: { group.displayName },
+          set: { workspace.renameComponentGroup(id: group.id, to: $0) }
+        ),
+        placeholder: "Group name",
+        help: "A navigator group organizes related components without changing mate behavior."
+      )
+      .disabled(group.isLocked)
+      LabeledContent("Components", value: "\(group.componentIDs.count)")
+      LabeledContent("State", value: group.isLocked ? "Locked" : "Editable")
+    }
+
+    Section("Group Actions") {
+      Button(
+        group.isLocked ? "Unlock Group" : "Lock Group",
+        systemImage: group.isLocked ? "lock.open" : "lock"
+      ) {
+        workspace.toggleComponentGroupLock(group.id)
+      }
+      Button("Dissolve Group", systemImage: "folder.badge.minus") {
+        workspace.dissolveComponentGroup(id: group.id)
+      }
+      .disabled(group.isLocked)
+    }
+  }
+
+  private func lockedEditingSection(
+    unlockTitle: String,
+    unlock: @escaping () -> Void
+  ) -> some View {
+    Section("Editing Locked") {
+      Label("Transforms and configuration are protected.", systemImage: "lock.fill")
+        .foregroundStyle(StudioPalette.muted)
+      Button(unlockTitle, systemImage: "lock.open", action: unlock)
+    }
+  }
+
   private func animationInspector(_ clip: AnimationClip) -> some View {
     Section("Active Animation") {
       LabeledContent("Name", value: clip.name)
@@ -330,6 +398,11 @@ struct InspectorView: View {
   private var selectedPart: RigPartDefinition? {
     guard case .part(let selectedID) = workspace.primarySelection else { return nil }
     return workspace.project.rig.parts.first { $0.id == selectedID }
+  }
+
+  private var selectedComponentGroup: NavigatorComponentGroup? {
+    guard case .componentGroup(let selectedID) = workspace.primarySelection else { return nil }
+    return workspace.componentGroups.first { $0.id == selectedID }
   }
 
   private var selectedModelNode: ModelHierarchyNode? {

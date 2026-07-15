@@ -103,6 +103,48 @@ final class CADNavigationTests: XCTestCase {
     }
   }
 
+  func testDiscreteMouseWheelIsClassifiedAsZoomInput() {
+    XCTAssertEqual(
+      CADScrollInputClassifier.button(
+        hasPreciseScrollingDeltas: false,
+        hasGesturePhase: false,
+        hasMomentumPhase: false,
+        deltaX: 0
+      ),
+      .scroll
+    )
+    XCTAssertEqual(
+      CADScrollInputClassifier.button(
+        hasPreciseScrollingDeltas: true,
+        hasGesturePhase: false,
+        hasMomentumPhase: false,
+        deltaX: 0
+      ),
+      .scroll
+    )
+  }
+
+  func testTrackpadScrollPhasesRemainPanInput() {
+    XCTAssertEqual(
+      CADScrollInputClassifier.button(
+        hasPreciseScrollingDeltas: true,
+        hasGesturePhase: true,
+        hasMomentumPhase: false,
+        deltaX: 0
+      ),
+      .trackpadPan
+    )
+    XCTAssertEqual(
+      CADScrollInputClassifier.button(
+        hasPreciseScrollingDeltas: true,
+        hasGesturePhase: false,
+        hasMomentumPhase: true,
+        deltaX: 0
+      ),
+      .trackpadPan
+    )
+  }
+
   private func action(
     button: CADNavigationMouseButton,
     control: Bool = false,

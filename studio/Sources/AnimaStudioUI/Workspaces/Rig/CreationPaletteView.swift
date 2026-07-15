@@ -47,7 +47,7 @@ struct CreationPaletteView: View {
       ScrollView(.horizontal) {
         HStack(alignment: .top, spacing: 10) {
           structuresGroup
-          jointsGroup
+          matesGroup
           futureGroup(
             title: "Motors",
             systemImage: "gearshape.2.fill",
@@ -111,29 +111,29 @@ struct CreationPaletteView: View {
     }
   }
 
-  private var jointsGroup: some View {
+  private var matesGroup: some View {
     CreationToolGroup(
-      title: "Joints",
+      title: "Mates",
       systemImage: "rotate.3d",
       tint: StudioPalette.joint
     ) {
       CreationToolButton(
-        title: "New Joint",
+        title: "Revolute Mate",
         systemImage: "rotate.3d",
         tint: StudioPalette.joint,
         isEnabled: workspace.canCreateRevoluteJoint,
         help: workspace.canCreateRevoluteJoint
-          ? "Create a revolute joint for the selected or next unconnected part"
-          : "Add an unconnected structure before creating a joint"
+          ? "Create a revolute mate for the selected or next unconnected component"
+          : "Add an unconnected component before creating a mate"
       ) {
         workspace.createRevoluteJoint()
       }
       CreationToolButton(
-        title: "Insert Joint",
+        title: "Insert Mate",
         systemImage: "arrow.triangle.branch",
         tint: StudioPalette.joint,
         isEnabled: false,
-        help: "Inserting joints between two existing parts is planned"
+        help: "Inserting mates between two existing components is planned"
       ) {}
     }
   }
@@ -235,7 +235,7 @@ struct EmptyRigWorkspaceView: View {
         .foregroundStyle(StudioPalette.semanticPart)
       Text("Start an Empty Rig")
         .font(.title2.weight(.semibold))
-      Text("Add a simple proxy structure, then select it and create a joint.")
+      Text("Add a simple proxy component, then select it and create a mate.")
         .font(.callout)
         .foregroundStyle(StudioPalette.muted)
       Button("Add First Part", systemImage: "plus") {
