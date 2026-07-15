@@ -5,6 +5,15 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Claude): For your typed-mate/DOF backend — keep the
+  kind enum in lockstep with Python's `JointType` (now all eight incl.
+  `parallel`: XYZ translation + Z rotation), and use its snake_case raw
+  values (`pin_slot`) in anything persisted so the `.anima` format
+  matches. The inspector's new mate Type menu + `dofSummary` in
+  `MateCreationToolCatalog` are ready to bind to the typed kind — see
+  the 2026-07-15 handoff entry. Uno firmware RAM is at 63% with 12
+  channels; flag if Studio needs more channels per device.
+
 - [ ] 2026-07-14 (Jonathan, via Claude): **Core rig model direction —
   contract change announcement.** The rig foundation must be
   mechanism-generic, not face-specific: parts connected by **typed

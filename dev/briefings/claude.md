@@ -19,13 +19,17 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
   runtime evaluation (B10 backend foundation) — **done**, claim
   released in the briefing (144 tests; see OUT and the handoff log).
 
-- [~] 2026-07-14 (Jonathan): **DOF refactor** — generalize the rig to
-  parts + typed joints where each DOF is the animated channel (Onshape
-  mate model); de-center blend shapes. In progress via background
-  agent (rig.py, loader.py, example, Character_Format.md structure).
-- [ ] 2026-07-14 (self, backend queue): next packets — the
-  Arduino/ESP32 firmware sketch (B05/B08) and the serial transport
-  for real hardware; `.scene.anima` execution after that.
+- [x] 2026-07-14 (Jonathan): **DOF refactor** — done (214 tests;
+  completed after a session-limit interruption, claim released
+  2026-07-15).
+- [x] 2026-07-14 (self, backend queue): firmware v0 — done, both
+  boards compile clean (claim released 2026-07-15).
+- [x] 2026-07-15 (Jonathan): mate family completeness — done: Python
+  `parallel` joint type + inspector Onshape-style mate Type menu
+  (commit d526e8e).
+- [ ] 2026-07-15 (self, backend queue): serial transport for real
+  hardware (pyserial bridge) and `.scene.anima` execution; hardware
+  smoke test once Jonathan provides a board + servo.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
