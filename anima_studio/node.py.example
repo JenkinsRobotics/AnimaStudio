@@ -19,8 +19,8 @@ it back-pressures every other subscriber on every other topic. Slow work
 queue, not in a subscriber callback — see kokoro_tts's TTSNode in
 JaegerOS for the reference implementation of this pattern.
 
-Copy to node.py (drop the .example suffix), rename {{PackageName}}Node and
-make_{{package_name}}_node to match your module, and wire it to whatever
+Copy to node.py (drop the .example suffix), rename AnimaStudioNode and
+make_anima_studio_node to match your module, and wire it to whatever
 engine/adapter this module actually drives.
 """
 
@@ -50,7 +50,7 @@ class Engine(Protocol):
         ...
 
 
-class {{PackageName}}Node:  # (bases: Node — see the commented import above)
+class AnimaStudioNode:  # (bases: Node — see the commented import above)
     """SUB <consumes topics> -> do the work -> PUB <produces topics>.
 
     The engine is dependency-injected so tests can substitute a mock
@@ -64,7 +64,7 @@ class {{PackageName}}Node:  # (bases: Node — see the commented import above)
         *,
         bus: Any,
         engine: Engine,
-        name: str = "{{package_name}}",
+        name: str = "anima_studio",
         queue_maxsize: int = 32,
         install_signal_handlers: bool = False,
     ) -> None:
@@ -127,23 +127,23 @@ class {{PackageName}}Node:  # (bases: Node — see the commented import above)
     def _publish_result(
         self, request: Any, *, ok: bool, reason: str | None = None,
     ) -> None:
-        # self.bus.publish(topics.Sense{{PackageName}}Result(
+        # self.bus.publish(topics.SenseAnimaStudioResult(
         #     ok=ok, reason=reason, node_id=self.name,
         # ))
         pass
 
 
-def make_{{package_name}}_node(bus: Any, config: dict) -> "{{PackageName}}Node":
+def make_anima_studio_node(bus: Any, config: dict) -> "AnimaStudioNode":
     """The module.yaml `factory:` entrypoint. Builds a live node wired to
     a real (but not-yet-warmed) engine — no model load, no hardware I/O
     at construction time; that's what setup()/first tick() are for."""
     engine = _build_engine(config)
-    return {{PackageName}}Node(bus=bus, engine=engine)
+    return AnimaStudioNode(bus=bus, engine=engine)
 
 
 def _build_engine(config: dict) -> Engine:
     """Replace with real engine construction, reading from
-    {{PackageName}}Config (config.py.example) as needed."""
+    AnimaStudioConfig (config.py.example) as needed."""
     raise NotImplementedError(
         "wire this to the module's real engine before shipping"
     )

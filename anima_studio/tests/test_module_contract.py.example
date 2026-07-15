@@ -1,11 +1,11 @@
-"""Module-contract smoke test for {{package_name}}.
+"""Module-contract smoke test for anima_studio.
 
 Not part of a host project's main test suite by default (mirrors
 jaeger_os/nodes/kokoro_tts/tests/test_module_contract.py, which is
 excluded from JaegerOS's own testpaths and run directly). Run with:
 
-    pytest src/{{package_name}}/tests
-    python -m {{package_name}}.tests.test_module_contract
+    pytest src/anima_studio/tests
+    python -m anima_studio.tests.test_module_contract
 
 Three things a module must get right, proven here without touching real
 hardware, models, or a running JaegerOS bus:
@@ -43,13 +43,13 @@ def test_module_yaml_validates() -> None:
 def test_factory_builds_a_live_node_on_a_fake_bus() -> None:
     """The factory constructs a real node wired to a real (but
     not-yet-warmed) engine — no model load, no hardware I/O, no network."""
-    # from {{package_name}} import make_{{package_name}}_node
+    # from anima_studio import make_anima_studio_node
     #
     # class _FakeBus:
     #     def subscribe(self, *a, **kw): ...
     #     def publish(self, *a, **kw): ...
     #
-    # node = make_{{package_name}}_node(_FakeBus(), {})
+    # node = make_anima_studio_node(_FakeBus(), {})
     # assert node.bus is not None
     # assert node.engine is not None
     pass  # replace with the real assertions above once node.py is real
@@ -68,13 +68,13 @@ def test_command_round_trip_with_a_fake_engine() -> None:
         def shutdown(self):
             pass
 
-    # from {{package_name}}.node import {{PackageName}}Node
+    # from anima_studio.node import AnimaStudioNode
     #
     # class _FakeBus:
     #     def subscribe(self, *a, **kw): ...
     #     def publish(self, *a, **kw): ...
     #
-    # node = {{PackageName}}Node(bus=_FakeBus(), engine=_FakeEngine())
+    # node = AnimaStudioNode(bus=_FakeBus(), engine=_FakeEngine())
     # node.setup()
     # node._on_command({"payload": "smoke"})
     # node.tick()
@@ -86,4 +86,4 @@ if __name__ == "__main__":
     test_module_yaml_validates()
     test_factory_builds_a_live_node_on_a_fake_bus()
     test_command_round_trip_with_a_fake_engine()
-    print("{{package_name}} module contract smoke: OK")
+    print("anima_studio module contract smoke: OK")

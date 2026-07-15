@@ -6,6 +6,15 @@ on:
   pull_request:
 
 jobs:
+  swift-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test Anima Studio
+        working-directory: studio
+        run: swift test
+
   test:
     runs-on: macos-14
     steps:
@@ -37,7 +46,7 @@ jobs:
         run: |
           # Drop the `.example` suffixes (see README checklist) before
           # this actually collects anything — pytest ignores *.example.
-          pytest {{package_name}}/tests -v || true
+          pytest anima_studio/tests -v || true
 
       # ── NERVOUS-SYSTEM CHECK (placeholder) ──────────────────────────
       # For repos that carry BOTH a runtime/hardware layer and an
@@ -52,14 +61,14 @@ jobs:
       #   run: |
       #     set -euo pipefail
       #     # runtime/hardware/ never imports agent/
-      #     if grep -rlE '^\s*(import|from)\s+{{package_name}}\.agent' \
-      #         {{package_name}}/runtime {{package_name}}/hardware 2>/dev/null; then
+      #     if grep -rlE '^\s*(import|from)\s+anima_studio\.agent' \
+      #         anima_studio/runtime anima_studio/hardware 2>/dev/null; then
       #       echo "::error::runtime/hardware code imports the agent layer — nervous-system rule violated"
       #       exit 1
       #     fi
       #     # contract/ imports nothing project-local
-      #     if grep -rlE '^\s*(import|from)\s+{{package_name}}\.' \
-      #         {{package_name}}/contract 2>/dev/null; then
+      #     if grep -rlE '^\s*(import|from)\s+anima_studio\.' \
+      #         anima_studio/contract 2>/dev/null; then
       #       echo "::error::contract/ imports project code — it must depend on nothing"
       #       exit 1
       #     fi

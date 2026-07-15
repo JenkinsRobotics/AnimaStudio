@@ -1,0 +1,36 @@
+# AnimaStudio — packaging + dev-tooling config.
+# Tracked for real (unlike the template convention) — this repo is a
+# product, not a template instance. pyproject.toml.example is kept only
+# as the upstream template reference.
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anima-studio"
+description = "Open-source animation, motion-authoring, and show-control system for AI characters and audio-animatronic robots."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dynamic = ["version"]
+dependencies = [
+    "pyyaml>=6",
+    # "jaeger-os>=0.9,<0.10",  # pin once JaegerOS integration lands
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff"]
+
+[tool.setuptools.dynamic]
+version = {attr = "anima_studio.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["anima_studio*"]
+
+[tool.pytest.ini_options]
+testpaths = ["anima_studio/tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
