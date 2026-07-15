@@ -89,16 +89,18 @@ struct StudioDocumentBar: View {
 
 struct WorkspaceRibbonSelector: View {
   @Bindable var workspace: StudioWorkspaceModel
+  @Binding var isUIDevWorkspace: Bool
 
   var body: some View {
     Menu {
       ForEach(StudioWorkspaceKind.allCases) { kind in
         Button {
+          isUIDevWorkspace = false
           workspace.switchWorkspace(to: kind)
         } label: {
           Label(
             kind.descriptor.title,
-            systemImage: workspace.activeWorkspace == kind
+            systemImage: !isUIDevWorkspace && workspace.activeWorkspace == kind
               ? "checkmark.circle.fill" : kind.descriptor.systemImage
           )
         }
@@ -107,16 +109,27 @@ struct WorkspaceRibbonSelector: View {
           modifiers: .command
         )
       }
+      Divider()
+      Button {
+        isUIDevWorkspace = true
+      } label: {
+        Label(
+          UIDevWorkspaceDescriptor.title,
+          systemImage: isUIDevWorkspace
+            ? "checkmark.circle.fill" : UIDevWorkspaceDescriptor.systemImage
+        )
+      }
+      .keyboardShortcut("6", modifiers: .command)
     } label: {
       HStack(spacing: 9) {
-        Image(systemName: workspace.activeWorkspace.descriptor.systemImage)
+        Image(systemName: activeSystemImage)
           .font(.title2)
           .foregroundStyle(StudioPalette.accent)
           .frame(width: 28)
         VStack(alignment: .leading, spacing: 3) {
-          Text(workspace.activeWorkspace.descriptor.title.uppercased())
+          Text(activeTitle.uppercased())
             .font(.callout.weight(.bold))
-          Text(workspace.activeWorkspace.descriptor.purpose)
+          Text(activePurpose)
             .font(.system(size: 9))
             .foregroundStyle(StudioPalette.muted)
             .lineLimit(2)
@@ -132,7 +145,21 @@ struct WorkspaceRibbonSelector: View {
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
-    .help("Switch task-focused workspace (⌘1–5)")
+    .help("Switch task-focused workspace (⌘1–6)")
+  }
+
+  private var activeTitle: String {
+    isUIDevWorkspace ? UIDevWorkspaceDescriptor.title : workspace.activeWorkspace.descriptor.title
+  }
+
+  private var activeSystemImage: String {
+    isUIDevWorkspace
+      ? UIDevWorkspaceDescriptor.systemImage : workspace.activeWorkspace.descriptor.systemImage
+  }
+
+  private var activePurpose: String {
+    isUIDevWorkspace
+      ? UIDevWorkspaceDescriptor.purpose : workspace.activeWorkspace.descriptor.purpose
   }
 }
 
@@ -254,27 +281,43 @@ enum WorkspaceRibbonPresentation: Equatable {
 struct WorkspaceToolBar: View {
   @Bindable var workspace: StudioWorkspaceModel
   @Binding var viewportAppearance: PreviewAppearance
+  @Binding var isUIDevWorkspace: Bool
+  @Binding var uiDevSection: UIDevSection
   let importModel: () -> Void
+  let openAgentWindow: () -> Void
 
   var body: some View {
-    let presentation = WorkspaceRibbonPresentation.resolve(
-      workspace: workspace.activeWorkspace,
-      showsRigCreationTools: workspace.showsCreationPalette
-    )
+    let presentation =
+      isUIDevWorkspace
+      ? WorkspaceRibbonPresentation.workspaceTools
+      : WorkspaceRibbonPresentation.resolve(
+        workspace: workspace.activeWorkspace,
+        showsRigCreationTools: workspace.showsCreationPalette
+      )
     HStack(spacing: 0) {
-      WorkspaceRibbonSelector(workspace: workspace)
+      WorkspaceRibbonSelector(
+        workspace: workspace,
+        isUIDevWorkspace: $isUIDevWorkspace
+      )
 
       Divider()
         .padding(.vertical, 10)
 
       Group {
-        switch presentation {
-        case .compactRig:
-          compactRibbon
-        case .rigCreation:
-          CreationPaletteView(workspace: workspace)
-        case .workspaceTools:
-          WorkspaceRibbonCatalogView(workspace: workspace, importModel: importModel)
+        if isUIDevWorkspace {
+          UIDevRibbonView(
+            selectedSection: $uiDevSection,
+            openAgentWindow: openAgentWindow
+          )
+        } else {
+          switch presentation {
+          case .compactRig:
+            compactRibbon
+          case .rigCreation:
+            CreationPaletteView(workspace: workspace)
+          case .workspaceTools:
+            WorkspaceRibbonCatalogView(workspace: workspace, importModel: importModel)
+          }
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -282,11 +325,15 @@ struct WorkspaceToolBar: View {
       Divider()
         .padding(.vertical, 10)
 
-      WorkspaceRibbonControls(
-        workspace: workspace,
-        viewportAppearance: $viewportAppearance,
-        isCompact: presentation == .compactRig
-      )
+      if isUIDevWorkspace {
+        UIDevRibbonTrailingControls(selectedSection: $uiDevSection)
+      } else {
+        WorkspaceRibbonControls(
+          workspace: workspace,
+          viewportAppearance: $viewportAppearance,
+          isCompact: presentation == .compactRig
+        )
+      }
     }
     .frame(height: presentation.height)
     .background(StudioPalette.ribbonChrome)
@@ -308,6 +355,29 @@ struct WorkspaceToolBar: View {
     }
     .buttonStyle(.borderless)
     .padding(.horizontal, 12)
+  }
+}
+
+private struct UIDevRibbonTrailingControls: View {
+  @Binding var selectedSection: UIDevSection
+
+  var body: some View {
+    VStack(spacing: 7) {
+      Button("Overview", systemImage: "house") {
+        selectedSection = .overview
+      }
+      .labelStyle(.iconOnly)
+      .buttonStyle(StudioIconButtonStyle(isSelected: selectedSection == .overview))
+      .help("Return to the UI standards overview")
+
+      Button("Reset UI gallery", systemImage: "arrow.counterclockwise") {
+        selectedSection = .overview
+      }
+      .labelStyle(.iconOnly)
+      .buttonStyle(StudioIconButtonStyle())
+      .help("Reset the UI Dev gallery")
+    }
+    .frame(width: 42)
   }
 }
 

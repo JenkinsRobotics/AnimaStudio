@@ -9,6 +9,8 @@ struct StudioWorkspaceView: View {
 
   @State private var workspace = StudioWorkspaceModel()
   @State private var isImportingModel = false
+  @State private var isUIDevWorkspace = false
+  @State private var uiDevSection = UIDevSection.overview
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
@@ -40,7 +42,10 @@ struct StudioWorkspaceView: View {
       WorkspaceToolBar(
         workspace: workspace,
         viewportAppearance: viewportAppearanceBinding,
-        importModel: { isImportingModel = true }
+        isUIDevWorkspace: $isUIDevWorkspace,
+        uiDevSection: $uiDevSection,
+        importModel: { isImportingModel = true },
+        openAgentWindow: StudioAgentPanel.show
       )
       Divider()
 
@@ -96,7 +101,7 @@ struct StudioWorkspaceView: View {
 
   @ViewBuilder
   private var bottomEditor: some View {
-    if workspace.activePresentation.showsBottomEditor {
+    if !isUIDevWorkspace && workspace.activePresentation.showsBottomEditor {
       switch workspace.activeWorkspace {
       case .animate:
         Divider()
@@ -112,7 +117,19 @@ struct StudioWorkspaceView: View {
     }
   }
 
+  @ViewBuilder
   private var workspaceCanvas: some View {
+    if isUIDevWorkspace {
+      UIDevWorkspaceView(
+        selectedSection: $uiDevSection,
+        openAgentWindow: StudioAgentPanel.show
+      )
+    } else {
+      authoringWorkspaceCanvas
+    }
+  }
+
+  private var authoringWorkspaceCanvas: some View {
     ZStack {
       if workspace.activeWorkspace == .hardware {
         HardwareWorkspaceView()

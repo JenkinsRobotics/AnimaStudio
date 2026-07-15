@@ -167,21 +167,6 @@ struct StudioFieldLabel: View {
   }
 }
 
-struct StudioPrimaryButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .font(.callout.weight(.semibold))
-      .frame(maxWidth: .infinity)
-      .padding(.horizontal, 12)
-      .frame(minHeight: 32)
-      .foregroundStyle(.white)
-      .background(
-        StudioPalette.accent.opacity(configuration.isPressed ? 0.72 : 1),
-        in: RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
-      )
-  }
-}
-
 struct StudioSearchField: View {
   let prompt: String
   @Binding var text: String
