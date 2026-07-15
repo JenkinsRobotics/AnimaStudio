@@ -90,6 +90,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — shared Onshape-style mate panel variants complete:** UI Dev's
+  Mate Editor now uses one reusable panel for Fastened, Parallel, Slider,
+  Revolute, Cylindrical, Pin Slot, Planar, and Ball. The icon strip and Type
+  dropdown select the same state; Offset axes and minimum/maximum Limits rows
+  update from the selected mate's permitted DOF with explicit mm/degree units.
+  Slider exposes Z translation limits, compound mates expose each freedom, and
+  Fastened exposes no false motion fields. This is deliberately a tested UI
+  projection only: Revolute remains the sole live authoring type until the
+  typed AnimaCore backend lands. Nine focused tests and all 149 Swift tests,
+  strict format lint, Xcode/root-app build, signature verification, and
+  `git diff --check` pass. Automated accessibility navigation became unreliable
+  after launch, so Jonathan should perform the final visual-density review in
+  UI Dev → Mate Editor.
+
 - **2026-07-15 — live UI Kit and app-wide design profile complete:** UI Dev now
   opens on a resizable Design Inspector beside a comprehensive production UI
   catalog. Operators can tune shared Studio surface and semantic colors,

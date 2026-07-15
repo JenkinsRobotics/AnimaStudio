@@ -102,15 +102,22 @@
   and copy-as-JSON are live. The adjacent kit lays out the docked window map,
   all canonical button states, production fields, menus, popovers, panel
   chrome, and direct links to the real embedded surface previews.
-  Its Mate Editor interaction lab provides a live compact/expanded panel for
-  mate-kind selection, connector picking, offset XYZ/rotation fields,
-  simulation-connection disclosure, accept/cancel, flip/reorient, preview, and
-  solve affordances. Its Triad Manipulator lab provides a code-drawn,
+  Its Mate Editor interaction lab uses one shared Onshape-style panel for the
+  complete eight-mate family. A stable icon strip and full-width Type dropdown
+  both switch that panel; the title, degrees-of-freedom readout, constrained
+  translation/rotation Offset controls, and optional minimum/maximum Limits
+  rows update from the selected kind. Slider exposes Z translation limits,
+  Revolute exposes Z rotation limits, compound mates expose every permitted
+  freedom with mm/degree units, and Fastened explicitly has no motion limits.
+  Connector picking, simulation-connection disclosure, accept/cancel,
+  flip/reorient, preview, and solve affordances remain shared rather than
+  duplicated per mate. Its Triad Manipulator lab provides a code-drawn,
   hoverable/drag-responsive center ball, XYZ translation arrows, rotation
   rings, plane pads, ghosted restricted motion, live units, and controls for
   handle scale and stroke weight. Both are explicitly design prototypes for
   refining operator readability and interaction; they do not claim the planned
-  typed-mate/DriveTarget backend is shipped.
+  typed-mate/DriveTarget backend is shipped; only Revolute remains a live Rig
+  creation action until that AnimaCore contract lands.
   Rig preserves Structures and the complete Mate family and adds focused
   Connectors, Assemble, and Inspect groups before the planned Motors, 3D Models
   & Media, and Events groups. Its creation families stay docked in the ribbon

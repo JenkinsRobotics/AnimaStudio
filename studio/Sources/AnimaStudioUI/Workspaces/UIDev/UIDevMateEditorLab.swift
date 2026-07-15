@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct UIDevMateEditorLab: View {
-  @State private var selectedKind = MateCreationToolKind.fastened
+  @State private var selectedKind = MateCreationToolKind.slider
   @State private var showsOffset = true
+  @State private var showsLimits = true
   @State private var isSimulationConnection = false
   @State private var offsetXMillimeters = 0.0
   @State private var offsetYMillimeters = 0.0
@@ -34,6 +35,7 @@ struct UIDevMateEditorLab: View {
       UIDevMateEditorPanel(
         selectedKind: $selectedKind,
         showsOffset: $showsOffset,
+        showsLimits: $showsLimits,
         isSimulationConnection: $isSimulationConnection,
         offsetXMillimeters: $offsetXMillimeters,
         offsetYMillimeters: $offsetYMillimeters,
@@ -65,6 +67,8 @@ struct UIDevMateEditorLab: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       Toggle("Show Offset controls", isOn: $showsOffset)
+      Toggle("Show Limits controls", isOn: $showsLimits)
+        .disabled(!selectedKind.supportsLimits)
       Toggle("Simulation connection", isOn: $isSimulationConnection)
       StudioReadoutRow(title: "Degrees of Freedom", value: selectedKind.dofSummary)
       Text(selectedKind.motionSummary)
@@ -84,6 +88,7 @@ struct UIDevMateEditorLab: View {
       Divider()
       rule("One primary decision row", "Accept and Cancel remain fixed in the header.")
       rule("Progressive disclosure", "Offset fields exist only while Offset is enabled.")
+      rule("Type-owned motion", "Limits expose only the freedoms allowed by the selected mate.")
       rule("Connector first", "The connector picker is the initial focused control.")
       rule("Explicit units", "Distance uses mm and rotation uses degrees in the operator UI.")
     }
@@ -108,6 +113,7 @@ struct UIDevMateEditorLab: View {
 private struct UIDevMateEditorPanel: View {
   @Binding var selectedKind: MateCreationToolKind
   @Binding var showsOffset: Bool
+  @Binding var showsLimits: Bool
   @Binding var isSimulationConnection: Bool
   @Binding var offsetXMillimeters: Double
   @Binding var offsetYMillimeters: Double
@@ -115,6 +121,9 @@ private struct UIDevMateEditorPanel: View {
   @Binding var rotationAngleDegrees: Double
 
   @State private var facesToConnect = ""
+  @State private var offsetRotationAxis = MateEditorAxis.x
+  @State private var minimumLimits: [MateEditorDegreeOfFreedom: String] = [:]
+  @State private var maximumLimits: [MateEditorDegreeOfFreedom: String] = [:]
 
   var body: some View {
     VStack(spacing: 0) {
@@ -130,6 +139,7 @@ private struct UIDevMateEditorPanel: View {
         if showsOffset {
           offsetControls
         }
+        limitsControls
         Toggle("Simulation connection", isOn: $isSimulationConnection)
           .toggleStyle(.checkbox)
         if isSimulationConnection {
@@ -147,6 +157,13 @@ private struct UIDevMateEditorPanel: View {
         .stroke(StudioPalette.border, lineWidth: 1)
     }
     .shadow(color: .black.opacity(0.32), radius: 10, y: 4)
+    .onChange(of: selectedKind) { _, kind in
+      if let firstAxis = kind.offsetRotationAxes.first,
+        !kind.offsetRotationAxes.contains(offsetRotationAxis)
+      {
+        offsetRotationAxis = firstAxis
+      }
+    }
   }
 
   private var kindStrip: some View {
@@ -159,6 +176,7 @@ private struct UIDevMateEditorPanel: View {
           .labelStyle(.iconOnly)
           .buttonStyle(StudioIconButtonStyle(isSelected: selectedKind == kind))
           .help(kind.title)
+          .accessibilityLabel("\(kind.title) mate")
         }
       }
       .padding(7)
@@ -169,7 +187,7 @@ private struct UIDevMateEditorPanel: View {
 
   private var decisionHeader: some View {
     HStack(spacing: 8) {
-      Text("\(selectedKind.title) 30")
+      Text("\(selectedKind.title) 1")
         .font(.callout.weight(.bold))
         .foregroundStyle(StudioPalette.joint)
       Spacer()
@@ -190,14 +208,39 @@ private struct UIDevMateEditorPanel: View {
   }
 
   private var typePicker: some View {
-    Picker("Mate type", selection: $selectedKind) {
+    Menu {
       ForEach(MateCreationToolKind.allCases) { kind in
-        Text(kind.title).tag(kind)
+        Button {
+          selectedKind = kind
+        } label: {
+          if selectedKind == kind {
+            Label(kind.title, systemImage: "checkmark")
+          } else {
+            Text(kind.title)
+          }
+        }
+      }
+    } label: {
+      HStack(spacing: 7) {
+        Image(systemName: selectedKind.systemImage)
+          .foregroundStyle(StudioPalette.joint)
+        Text(selectedKind.title)
+        Spacer(minLength: 8)
+        Image(systemName: "chevron.down")
+          .font(.caption2)
+          .foregroundStyle(StudioPalette.muted)
+      }
+      .padding(.horizontal, 9)
+      .frame(height: StudioMetrics.fieldHeight)
+      .background(StudioPalette.field)
+      .overlay {
+        RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+          .stroke(StudioPalette.border, lineWidth: 1)
       }
     }
-    .labelsHidden()
-    .pickerStyle(.menu)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .buttonStyle(.plain)
+    .accessibilityLabel("Mate type")
+    .accessibilityValue(selectedKind.title)
   }
 
   private var connectorPicker: some View {
@@ -223,24 +266,83 @@ private struct UIDevMateEditorPanel: View {
 
   private var offsetControls: some View {
     VStack(spacing: 7) {
-      MateAxisValueRow(axis: "X", color: .red, value: $offsetXMillimeters, unit: "mm")
-      MateAxisValueRow(axis: "Y", color: .green, value: $offsetYMillimeters, unit: "mm")
-      MateAxisValueRow(axis: "Z", color: .blue, value: $offsetZMillimeters, unit: "mm")
-      Picker("Rotation axis", selection: .constant("X")) {
-        Text("Rotate about X").tag("X")
-        Text("Rotate about Y").tag("Y")
-        Text("Rotate about Z").tag("Z")
+      ForEach(selectedKind.offsetTranslationAxes) { axis in
+        MateAxisValueRow(
+          axis: axis.rawValue,
+          color: axis.color,
+          value: offsetBinding(for: axis),
+          unit: "mm"
+        )
       }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      MateAxisValueRow(
-        axis: "∠",
-        color: StudioPalette.joint,
-        value: $rotationAngleDegrees,
-        unit: "deg"
-      )
+      if !selectedKind.offsetRotationAxes.isEmpty {
+        Picker("Rotation axis", selection: $offsetRotationAxis) {
+          ForEach(selectedKind.offsetRotationAxes) { axis in
+            Text("Rotate about \(axis.rawValue)").tag(axis)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        MateAxisValueRow(
+          axis: "∠",
+          color: StudioPalette.joint,
+          value: $rotationAngleDegrees,
+          unit: "deg"
+        )
+      }
     }
     .padding(.leading, 2)
+  }
+
+  @ViewBuilder
+  private var limitsControls: some View {
+    if selectedKind.supportsLimits {
+      Toggle("Limits", isOn: $showsLimits)
+        .toggleStyle(.checkbox)
+      if showsLimits {
+        VStack(spacing: 7) {
+          ForEach(selectedKind.editorDegreesOfFreedom) { freedom in
+            MateLimitValueRow(
+              freedom: freedom,
+              bound: .minimum,
+              value: limitBinding(for: freedom, values: $minimumLimits)
+            )
+            MateLimitValueRow(
+              freedom: freedom,
+              bound: .maximum,
+              value: limitBinding(for: freedom, values: $maximumLimits)
+            )
+          }
+        }
+        .padding(.leading, 2)
+      }
+    } else {
+      HStack(spacing: 7) {
+        Image(systemName: "lock.fill")
+          .foregroundStyle(StudioPalette.joint)
+        Text("Fastened removes all motion; there are no limits to configure.")
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+      }
+      .padding(.vertical, 3)
+    }
+  }
+
+  private func offsetBinding(for axis: MateEditorAxis) -> Binding<Double> {
+    switch axis {
+    case .x: $offsetXMillimeters
+    case .y: $offsetYMillimeters
+    case .z: $offsetZMillimeters
+    }
+  }
+
+  private func limitBinding(
+    for freedom: MateEditorDegreeOfFreedom,
+    values: Binding<[MateEditorDegreeOfFreedom: String]>
+  ) -> Binding<String> {
+    Binding(
+      get: { values.wrappedValue[freedom, default: ""] },
+      set: { values.wrappedValue[freedom] = $0 }
+    )
   }
 
   private var actionFooter: some View {
@@ -264,6 +366,68 @@ private struct UIDevMateEditorPanel: View {
       .labelStyle(.iconOnly)
       .buttonStyle(StudioIconButtonStyle())
       .help(title)
+  }
+}
+
+private enum MateLimitBound {
+  case minimum
+  case maximum
+
+  var placeholder: String {
+    switch self {
+    case .minimum: "No minimum"
+    case .maximum: "No maximum"
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .minimum: "greaterthanorequalto"
+    case .maximum: "lessthanorequalto"
+    }
+  }
+}
+
+private struct MateLimitValueRow: View {
+  let freedom: MateEditorDegreeOfFreedom
+  let bound: MateLimitBound
+  @Binding var value: String
+
+  var body: some View {
+    HStack(spacing: 5) {
+      Text(freedom.axis.rawValue)
+        .font(.caption.weight(.bold))
+        .foregroundStyle(freedom.axis.color)
+      Image(systemName: bound.symbol)
+        .font(.caption2)
+        .foregroundStyle(freedom.axis.color)
+        .frame(width: 11)
+      TextField(bound.placeholder, text: $value)
+        .textFieldStyle(.plain)
+        .font(.system(.caption, design: .monospaced))
+        .multilineTextAlignment(.trailing)
+      Text(freedom.unitLabel)
+        .font(.caption2)
+        .foregroundStyle(StudioPalette.muted)
+        .frame(width: 28, alignment: .trailing)
+    }
+    .padding(.horizontal, 5)
+    .frame(height: 26)
+    .overlay(alignment: .bottom) {
+      Divider()
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(freedom.title) \(bound.placeholder.lowercased())")
+  }
+}
+
+extension MateEditorAxis {
+  fileprivate var color: Color {
+    switch self {
+    case .x: .red
+    case .y: .green
+    case .z: .blue
+    }
   }
 }
 

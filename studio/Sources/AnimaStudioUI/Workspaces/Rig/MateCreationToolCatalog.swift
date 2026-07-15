@@ -66,16 +66,7 @@ enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
 
   /// Compact degrees-of-freedom readout for inspector rows.
   var dofSummary: String {
-    switch self {
-    case .fastened: "0 — fully bonded"
-    case .parallel: "3 translational + 1 rotational"
-    case .slider: "1 translational"
-    case .revolute: "1 rotational"
-    case .cylindrical: "1 rotational + 1 translational"
-    case .pinSlot: "1 rotational + 1 translational"
-    case .planar: "2 translational + 1 rotational"
-    case .ball: "3 rotational"
-    }
+    editorDofSummary
   }
 
   var isImplemented: Bool {
