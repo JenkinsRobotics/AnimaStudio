@@ -269,11 +269,73 @@ struct InspectorView: View {
     }
   }
 
+  /// Onshape-style mate type selector. Every mate kind in the family is
+  /// listed; only kinds with landed motion logic are selectable, so the
+  /// menu never lies about capability. Binds to the joint's typed kind
+  /// once the typed-mate backend lands — today every mate is revolute.
+  private var mateTypeRow: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      StudioFieldLabel(
+        title: "Type",
+        help: "The mate kind defines which degrees of freedom this mate allows."
+      )
+      Menu {
+        ForEach(MateCreationToolKind.allCases) { kind in
+          Button {
+            // Only the implemented kind is selectable; it is already
+            // the current kind, so selection is a no-op until the
+            // typed-mate backend adds kind switching.
+          } label: {
+            if kind == .revolute {
+              Label(kind.title, systemImage: "checkmark")
+            } else {
+              Text(kind.title)
+            }
+          }
+          .disabled(!kind.isImplemented)
+          .help(kind.motionSummary)
+        }
+      } label: {
+        HStack(spacing: 7) {
+          Image(systemName: MateCreationToolKind.revolute.systemImage)
+          Text(MateCreationToolKind.revolute.title)
+          Spacer(minLength: 8)
+          Image(systemName: "chevron.up.chevron.down")
+            .font(.caption2)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .padding(.horizontal, 9)
+        .frame(
+          maxWidth: .infinity, minHeight: StudioMetrics.fieldHeight,
+          alignment: .leading
+        )
+        .background(
+          StudioPalette.panelInset,
+          in: RoundedRectangle(cornerRadius: 7)
+        )
+        .overlay {
+          RoundedRectangle(cornerRadius: 7)
+            .stroke(StudioPalette.border, lineWidth: 1)
+        }
+      }
+      .menuStyle(.borderlessButton)
+      .accessibilityLabel("Mate type")
+      Text("Other mate types unlock with the typed-mate backend.")
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+    }
+  }
+
   @ViewBuilder
   private func jointInspector(_ joint: JointDefinition) -> some View {
     Section("Mate") {
-      LabeledContent("Type", value: "Revolute Mate")
-      LabeledContent("Degrees of Freedom", value: "1 rotational")
+      if workspace.activeWorkspace == .rig {
+        mateTypeRow
+      } else {
+        LabeledContent("Type", value: "\(MateCreationToolKind.revolute.title) Mate")
+      }
+      LabeledContent(
+        "Degrees of Freedom", value: MateCreationToolKind.revolute.dofSummary)
       if workspace.activeWorkspace == .rig {
         StudioTextFieldRow(
           title: "Name",

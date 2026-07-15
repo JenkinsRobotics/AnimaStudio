@@ -49,7 +49,13 @@
   Planar, and Ball mate families in a stable operator-facing catalog. Revolute
   is the only live creation action until the typed-mate/DOF backend lands; the
   other seven remain clearly disabled with motion summaries instead of writing
-  incorrect scalar-joint data. Motors, 3D Models & Media, and Events are also
+  incorrect scalar-joint data. The mate inspector's Type row is an
+  Onshape-style menu listing the full eight-mate family with per-kind DOF
+  summaries — only implemented kinds are selectable, and it binds to the
+  joint's typed kind once the typed-mate backend lands. The Python rig model
+  carries the same eight-type family (`JointType`, including `parallel`:
+  XYZ translation + Z rotation) with per-type DOF templates; 214 Python
+  tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style three-level header: a compact global

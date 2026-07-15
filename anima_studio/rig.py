@@ -36,6 +36,7 @@ class JointType(StrEnum):
     """Typed mates, modeled on Onshape mate connectors."""
 
     FASTENED = "fastened"
+    PARALLEL = "parallel"
     REVOLUTE = "revolute"
     PRISMATIC = "prismatic"
     CYLINDRICAL = "cylindrical"
@@ -49,6 +50,14 @@ class JointType(StrEnum):
 # cannot add, drop, or re-kind one.
 JOINT_TYPE_DOF_TEMPLATES: dict[JointType, tuple[tuple[str, DofKind], ...]] = {
     JointType.FASTENED: (),
+    # Parallel keeps the connector axes parallel: free XYZ translation
+    # plus rotation about the shared Z axis — no tilting.
+    JointType.PARALLEL: (
+        ("translation_x", DofKind.TRANSLATION),
+        ("translation_y", DofKind.TRANSLATION),
+        ("translation_z", DofKind.TRANSLATION),
+        ("rotation", DofKind.ROTATION),
+    ),
     JointType.REVOLUTE: (("rotation", DofKind.ROTATION),),
     JointType.PRISMATIC: (("translation", DofKind.TRANSLATION),),
     JointType.CYLINDRICAL: (

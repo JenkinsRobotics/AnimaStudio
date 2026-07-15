@@ -150,6 +150,15 @@ class TestJointTypeDofSets:
             kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[joint_type]]
             assert kinds == [DofKind.ROTATION, DofKind.TRANSLATION]
 
+    def test_parallel_is_three_translations_one_rotation(self):
+        template = JOINT_TYPE_DOF_TEMPLATES[JointType.PARALLEL]
+        assert [(n, k) for n, k in template] == [
+            ("translation_x", DofKind.TRANSLATION),
+            ("translation_y", DofKind.TRANSLATION),
+            ("translation_z", DofKind.TRANSLATION),
+            ("rotation", DofKind.ROTATION),
+        ]
+
     def test_planar_is_two_translations_one_rotation(self):
         kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[JointType.PLANAR]]
         assert kinds == [
