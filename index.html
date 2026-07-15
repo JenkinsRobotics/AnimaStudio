@@ -294,7 +294,7 @@
     <div class="dot e"></div>
   </div>
   <div class="wrap">
-    <div class="badge"><span class="dot"></span> v0.1.0 · planning phase · Apache-2.0</div>
+    <div class="badge"><span class="dot"></span> v0.1.0 · working foundation · Apache-2.0</div>
 
     <div class="hero-logo" aria-hidden="true">
       <img class="hero-mark" src="https://jenkinsrobotics.com/wp-content/uploads/2021/04/cropped-cropped-Jenkins-logo-transparent-1.png"
@@ -363,27 +363,27 @@
   <div class="wrap">
     <div class="center">
       <div class="eyebrow">// capabilities</div>
-      <h2 class="h">What's specced today.</h2>
-      <p class="sub">Anima Studio is in the planning phase — the format and architecture specs are written; the code is next. Everything below is a drafted specification, honestly labeled.</p>
+      <h2 class="h">What works today.</h2>
+      <p class="sub">A working foundation, honestly labeled: the mechanism-rig runtime, the native authoring app, and the open device firmware are real code with green test suites. Live hardware output and show playback are in active development.</p>
     </div>
 
     <div class="feature-grid">
       <div class="feature">
-        <h3>The <code class="inline">.anima</code> format</h3>
-        <p>An open, human-readable YAML format: <code class="inline">.character.anima</code> defines the rig once — ARKit's 52 blend shapes, bones, expression presets, clips, lip-sync visemes, Live2D and servo mappings. <code class="inline">.scene.anima</code> defines performances.</p>
-        <span class="pill">spec drafted</span>
+        <h3>Mechanism rig runtime</h3>
+        <p>The Python runtime loads <code class="inline">.character.anima</code> files into a typed parts/joints/DOF rig (Onshape-mate model: revolute, slider, cylindrical, ball, planar, pin-slot, parallel, fastened), evaluates clips with hard-stop limits, and couples motion through gear, rack-and-pinion, screw, and linear relations.</p>
+        <span class="pill">working · tested</span>
       </div>
 
       <div class="feature">
-        <h3>Unified rig — digital + physical</h3>
-        <p>The same blend-shape values drive a Live2D/VRM face on screen and map to servo angles on a robot body, simultaneously. One animation authored once, the way Disney's show control splits one rig into screen faces and joint targets.</p>
-        <span class="pill">spec drafted</span>
+        <h3>Anima Studio for macOS</h3>
+        <p>Native SwiftUI authoring app: CAD-style workspaces, model import, proxy components, two-click connector-authored mates with hover snap points, face/edge selection, PBR viewport, view cube, and a timeline with scrubbing and looping playback.</p>
+        <span class="pill">working foundation</span>
       </div>
 
       <div class="feature">
-        <h3>Show control with logic gates</h3>
-        <p>Scenes are self-contained show files: speak, expressions, clips, parallel tracks, loops, and gates like <code class="inline">wait_for: user_speech_start</code> — interactive performances, not just playback, executable on the robot with no desktop tether.</p>
-        <span class="pill">spec drafted</span>
+        <h3>Open wire protocol + firmware</h3>
+        <p>A documented serial protocol (handshake, servo config, interpolated frames, e-stop, heartbeat failsafe) with a Python reference host, a simulated device for tests, and open Arduino/ESP32 firmware — no proprietary control boards, ever.</p>
+        <span class="pill">working · compiles both boards</span>
       </div>
     </div>
 
@@ -392,8 +392,20 @@
 
     <div class="feature-grid">
       <div class="feature dev">
-        <h3>Anima Runtime</h3>
-        <p>The Python runtime that parses and executes <code class="inline">.anima</code> files — standalone first so any Jaeger can read scene files natively, then as a JaegerOS module filling the <code class="inline">animation</code> slot.</p>
+        <h3>Live hardware loop</h3>
+        <p>Scrub the timeline, watch real servos move: Studio's serial output speaking the wire protocol to the firmware, with explicit arming and safety-first failsafes.</p>
+        <span class="pill dev">in development</span>
+      </div>
+
+      <div class="feature dev">
+        <h3>Kinematics authoring</h3>
+        <p>Per-DOF limits in the mate dialog, manual drive handles, a mate-aware triad manipulator, and gear/rack relation tools — Onshape-grade mechanism authoring for animatronics.</p>
+        <span class="pill dev">in development</span>
+      </div>
+
+      <div class="feature dev">
+        <h3>Community extensions</h3>
+        <p>Open extension packages — custom output adapters, actuators, and parametric features with everything packed in one manifest-described bundle, in the spirit of Onshape custom features.</p>
         <span class="pill dev">planned</span>
       </div>
     </div>
@@ -468,20 +480,20 @@
     <div class="roadmap">
       <div class="milestone done">
         <h4>0.1 — Shipped</h4>
-        <h3>Planning &amp; format specs</h3>
-        <p>Whitepaper, architecture, and complete <code class="inline">.character.anima</code> / <code class="inline">.scene.anima</code> format specifications, including a full JP01 character example.</p>
+        <h3>Working foundation</h3>
+        <p>Typed mechanism-rig runtime (parts, eight mate types, DOF limits, gear/rack/screw/linear relations) with 287 tests, the native macOS authoring app (workspaces, connector mates, face/edge selection, timeline), the wire protocol with simulator, and Arduino/ESP32 firmware.</p>
       </div>
 
       <div class="milestone next">
         <h4>0.2 — Next</h4>
-        <h3>Anima Runtime MVP</h3>
-        <p><code class="inline">.anima</code> parser and standalone scene playback in Python — characters, expressions, clips, and logic gates executing without any authoring app.</p>
+        <h3>The live hardware loop</h3>
+        <p>Project persistence, the typed-mate backend in Studio, per-DOF limit dialogs and drive handles, and serial output to real servos — author on the timeline, watch the mechanism move.</p>
       </div>
 
       <div class="milestone">
         <h4>Later</h4>
-        <h3>Anima Studio app + JaegerOS module</h3>
-        <p>The macOS authoring app (timeline, audio sync, digital and physical preview) and the <code class="inline">jaeger_anima</code> module filling the JaegerOS <code class="inline">animation</code> slot.</p>
+        <h3>Shows, screens, and community extensions</h3>
+        <p><code class="inline">.scene.anima</code> show playback with logic gates, audio sync, digital faces, the JaegerOS <code class="inline">animation</code> slot — and an open extension ecosystem for community-built adapters and features.</p>
       </div>
     </div>
   </div>
