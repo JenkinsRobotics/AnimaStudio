@@ -55,4 +55,60 @@ final class RigAuthoringTests: XCTestCase {
       ["box", "cylinder", "sphere", "locator"]
     )
   }
+
+  func testConnectorSnapMovesChildFaceToParentFaceWithOpposingNormals() {
+    let parent = RigPartDefinition(
+      displayName: "Base",
+      primitiveKind: .box,
+      positionMeters: RigVector3(x: 1, y: 0, z: 0)
+    )
+    let child = RigPartDefinition(displayName: "Arm", primitiveKind: .box)
+    let parentConnector = MateConnectorDefinition(
+      originMeters: RigVector3(x: 0.25, y: 0, z: 0),
+      primaryAxis: RigVector3(x: 1, y: 0, z: 0),
+      secondaryAxis: RigVector3(x: 0, y: 0, z: 1)
+    )
+    let childConnector = MateConnectorDefinition(
+      originMeters: RigVector3(x: -0.25, y: 0, z: 0),
+      primaryAxis: RigVector3(x: -1, y: 0, z: 0),
+      secondaryAxis: RigVector3(x: 0, y: 0, z: 1)
+    )
+
+    let result = MateConnectorMath.snappedChildTransform(
+      childPart: child,
+      childConnector: childConnector,
+      parentPart: parent,
+      parentConnector: parentConnector
+    )
+
+    XCTAssertEqual(result.positionMeters.x, 1.5, accuracy: 1e-9)
+    XCTAssertEqual(result.positionMeters.y, 0, accuracy: 1e-9)
+    XCTAssertEqual(result.positionMeters.z, 0, accuracy: 1e-9)
+    XCTAssertEqual(result.rotationEulerRadians.x, 0, accuracy: 1e-9)
+    XCTAssertEqual(result.rotationEulerRadians.y, 0, accuracy: 1e-9)
+    XCTAssertEqual(result.rotationEulerRadians.z, 0, accuracy: 1e-9)
+  }
+
+  func testJointConnectorFramesRoundTripAndRemainOptional() throws {
+    let connector = MateConnectorDefinition(
+      originMeters: RigVector3(x: 0.1, y: 0.2, z: 0.3),
+      primaryAxis: RigVector3(x: 0, y: 1, z: 0),
+      secondaryAxis: RigVector3(x: 1, y: 0, z: 0)
+    )
+    let joint = JointDefinition(
+      id: "connector_joint",
+      displayName: "Connector Joint",
+      axis: .z,
+      minimumRadians: -1,
+      maximumRadians: 1,
+      parentConnector: connector,
+      childConnector: connector
+    )
+
+    let encoded = try JSONEncoder().encode(joint)
+    let decoded = try JSONDecoder().decode(JointDefinition.self, from: encoded)
+
+    XCTAssertEqual(decoded.parentConnector, connector)
+    XCTAssertEqual(decoded.childConnector, connector)
+  }
 }

@@ -23,6 +23,11 @@ struct StudioWorkspaceView: View {
     ViewportEdgeDisplay.mesh.rawValue
   @AppStorage("viewportLightingPreset") private var viewportLightingPresetRawValue =
     ViewportLightingPreset.balanced.rawValue
+  @AppStorage("viewportMaterialFinish") private var viewportMaterialFinishRawValue =
+    ViewportMaterialFinish.satin.rawValue
+  @AppStorage("viewportReflectionMode") private var viewportReflectionModeRawValue =
+    ViewportReflectionMode.subtle.rawValue
+  @AppStorage("viewportShowsShadows") private var viewportShowsShadows = true
   @AppStorage("viewportFieldOfViewDegrees") private var viewportFieldOfViewDegrees = 60.0
 
   var body: some View {
@@ -46,7 +51,11 @@ struct StudioWorkspaceView: View {
     .background(StudioPalette.canvas)
     .preferredColorScheme(.dark)
     .onExitCommand {
-      workspace.clearSelection()
+      if workspace.matePlacement != nil {
+        workspace.cancelMatePlacement()
+      } else {
+        workspace.clearSelection()
+      }
     }
     .fileImporter(
       isPresented: $isImportingModel,
@@ -149,6 +158,8 @@ struct StudioWorkspaceView: View {
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
         focusedPartIsLocked: workspace.selectedPartID.map(workspace.isComponentLocked) ?? false,
+        mateCandidatePartIDs: workspace.mateCandidatePartIDs,
+        selectedMateCandidate: workspace.matePlacement?.sourceCandidate,
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
@@ -156,6 +167,9 @@ struct StudioWorkspaceView: View {
         renderStyle: viewportRenderStyle,
         edgeDisplay: viewportEdgeDisplay,
         lightingPreset: viewportLightingPreset,
+        materialFinish: viewportMaterialFinish,
+        reflectionMode: viewportReflectionMode,
+        showsShadows: viewportShowsShadows,
         fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
         onSelectModelPath: { path in
           let modifiers = NSEvent.modifierFlags
@@ -177,6 +191,9 @@ struct StudioWorkspaceView: View {
         onSetPartRotation: { id, rotation in
           workspace.setPartRotation(id: id, to: rotation)
         },
+        onSelectMateCandidate: { candidate in
+          workspace.selectMateConnector(candidate)
+        },
         onCameraStateChange: { state in
           workspace.reportCameraState(state)
         }
@@ -185,6 +202,14 @@ struct StudioWorkspaceView: View {
 
       viewportTitle
       cameraHUD
+
+      if let matePlacement = workspace.matePlacement {
+        MatePlacementOverlay(
+          session: matePlacement,
+          cancel: workspace.cancelMatePlacement
+        )
+        .padding(.top, 50)
+      }
 
       if workspace.activeWorkspace == .rig && workspace.isRigEmpty {
         EmptyRigWorkspaceView(showCreationTools: workspace.showCreationTools)
@@ -233,6 +258,9 @@ struct StudioWorkspaceView: View {
         renderStyle: viewportRenderStyleBinding,
         edgeDisplay: viewportEdgeDisplayBinding,
         lightingPreset: viewportLightingPresetBinding,
+        materialFinish: viewportMaterialFinishBinding,
+        reflectionMode: viewportReflectionModeBinding,
+        showsShadows: $viewportShowsShadows,
         showsGrid: previewGridBinding,
         appearance: viewportAppearanceBinding,
         fieldOfViewDegrees: viewportFieldOfViewBinding,
@@ -353,6 +381,28 @@ struct StudioWorkspaceView: View {
     Binding(
       get: { viewportLightingPreset },
       set: { viewportLightingPresetRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportMaterialFinish: ViewportMaterialFinish {
+    ViewportMaterialFinish(rawValue: viewportMaterialFinishRawValue) ?? .satin
+  }
+
+  private var viewportMaterialFinishBinding: Binding<ViewportMaterialFinish> {
+    Binding(
+      get: { viewportMaterialFinish },
+      set: { viewportMaterialFinishRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportReflectionMode: ViewportReflectionMode {
+    ViewportReflectionMode(rawValue: viewportReflectionModeRawValue) ?? .subtle
+  }
+
+  private var viewportReflectionModeBinding: Binding<ViewportReflectionMode> {
+    Binding(
+      get: { viewportReflectionMode },
+      set: { viewportReflectionModeRawValue = $0.rawValue }
     )
   }
 

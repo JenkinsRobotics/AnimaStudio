@@ -63,6 +63,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — connector mates + render-quality pass complete:** Revolute
+  Mate is now a two-click connector workflow: choose the moving component's
+  inferred proxy feature, then the fixed component's feature. Studio stores
+  explicit part-local frames, snaps face-to-face, prevents attachment cycles,
+  and resolves connector-pivoted parent/child motion in a dedicated pose
+  resolver. Hoverable markers cover proxy faces, edges, corners, axes, and
+  origins; imported topology/hole inference remains a stable-topology follow-up.
+  Display now exposes PBR Matte/Satin/Glossy/Metallic finishes, generated
+  softbox IBL reflections, and real key-light shadows. Ninety-two Swift tests,
+  claimed-file format lint, Xcode build, strict signature verification,
+  rebuilt root app, launch, and `git diff --check` pass.
+
 - **2026-07-14 — drop feedback/group creation correction complete:** Replaced
   whole-row ambiguous drops with a dedicated interaction module. Component-row
   edges render insertion lines and reorder before/after; the center renders a

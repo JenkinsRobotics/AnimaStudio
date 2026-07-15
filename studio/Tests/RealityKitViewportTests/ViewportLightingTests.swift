@@ -42,4 +42,32 @@ final class ViewportLightingTests: XCTestCase {
 
     XCTAssertEqual(totals.max(by: { $0.value < $1.value })?.key, .bright)
   }
+
+  func testShadowToggleControlsTheKeyLightShadowComponent() {
+    let shadowed = ViewportLightingFactory.makeLights(
+      preset: .balanced,
+      baseIntensity: 10_000,
+      showsShadows: true
+    )
+    let unshadowed = ViewportLightingFactory.makeLights(
+      preset: .balanced,
+      baseIntensity: 10_000,
+      showsShadows: false
+    )
+
+    XCTAssertNotNil(shadowed[0].components[DirectionalLightComponent.Shadow.self])
+    XCTAssertNil(shadowed[1].components[DirectionalLightComponent.Shadow.self])
+    XCTAssertNil(unshadowed[0].components[DirectionalLightComponent.Shadow.self])
+  }
+
+  func testReflectionModesRemainStableAndStudioIsBrighterThanSubtle() {
+    XCTAssertEqual(
+      ViewportReflectionMode.allCases.map(\.rawValue),
+      ["off", "subtle", "studio"]
+    )
+    XCTAssertGreaterThan(
+      ViewportReflectionMode.studio.intensityExponent,
+      ViewportReflectionMode.subtle.intensityExponent
+    )
+  }
 }

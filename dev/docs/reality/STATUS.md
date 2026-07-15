@@ -4,7 +4,7 @@
 > this file in the same commit — see `CONVENTIONS.md` → "STATUS stays
 > truthful."
 
-## Current state — 2026-07-14
+## Current state — 2026-07-15
 
 - **Repo:** `AnimaStudio` — open-source unified character animation
   system for AI robots (digital avatars + physical animatronics from
@@ -24,7 +24,9 @@
   at the repository root for direct Finder launch. `AnimaCore` defines project
   assets, stable semantic-part IDs, box/cylinder/sphere/locator rig proxies,
   metre positions, XYZ rest rotations in radians, backward-compatible Codable
-  rest transforms, joint parent/child connections, joint rigs,
+  rest transforms, joint parent/child connections, optional part-local mate
+  connector frames (origin plus primary/secondary axes), connector alignment,
+  joint rigs,
   clips, hold/linear keyframes, deterministic evaluation, neutral fallback,
   time clamping, joint-limit clamping, and Codable project round-tripping. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
@@ -33,7 +35,13 @@
   than silently inserting the sample mechanism. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
   proxy components with their local origin at the workspace origin, then
-  creates a first Revolute Mate for the selected unconnected component.
+  creates a Revolute Mate through an explicit two-step placement flow. Orange,
+  hover-reactive connector markers expose proxy face centers, edge midpoints,
+  corners, cylinder axes/circular centers, sphere cardinal points, and component
+  origins. The first selection is the moving component; the second is fixed.
+  Studio aligns the two origins with opposing primary axes, moves the first
+  component into place, stores both local connector frames, and evaluates
+  revolute motion about that connector rather than the component origin.
   Component names, XYZ positions, XYZ rest rotations, and mate names, axis,
   parent/child
   connection, and angular limits are inspectable/editable in memory. Motors,
@@ -67,7 +75,10 @@
   view cube owns principal, edge, and corner navigation. Display independently
   controls Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, grid,
   viewport appearance, and Balanced/Soft/Bright/High Contrast RealityKit
-  lighting rigs. These settings persist as user-local presentation preferences
+  lighting rigs. Shaded proxies use physically based materials with
+  Matte/Satin/Glossy/Metallic finishes; Subtle/Studio reflection modes use a
+  generated softbox image-based-light environment, and directional shadow
+  casting can be toggled directly. These settings persist as user-local presentation preferences
   and do not alter project data. Cube face names behave as fixed-size decals at
   their face centers, using one face-local orientation without readability flip
   correction, clipping, or scaling; its XYZ triad shares one origin and follows
@@ -84,8 +95,10 @@
   directly selectable in the viewport and resolves to the same stable part ID
   used by the Components tree and inspector. The selected component receives
   an orange silhouette highlight plus local XYZ translation arrows and rotation
-  rings at its origin; dragging them edits the core-backed rest transform, and animated
-  mate rotation composes on top. The Components outline follows macOS file-browser
+  rings at its origin; dragging them edits the core-backed rest transform, and
+  connector-authored mate rotation composes through parent/child chains. During
+  mate placement, transform handles are suppressed so connector markers own the
+  click target. The Components outline follows macOS file-browser
   selection conventions:
   Command/Shift select multiple, one item opens its configuration, and Escape
   or the inspector close control clears selection. Imported geometry can also
@@ -118,7 +131,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Seventy-one tests pass with `cd studio && swift test`, including real
+  inspector. Ninety-two tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python
@@ -155,10 +168,13 @@
   bookmarks, reimport reconciliation, collapse, and mapping to persistent
   semantic parts are not implemented. Source nodes are intentionally locked,
   and semantic-part drag reparenting waits for the persistent part/undo model.
-  The mate guides currently visualize the created revolute joints but their
-  DOF/connector handles are not yet editable or attached to imported source
-  nodes; the shipped part transform gizmo edits only semantic-part rest
-  transforms. Part selection is entity-level; durable face selection still
+  Proxy connector inference and two-click Revolute Mate placement are live,
+  but connector orientation flip/reorientation controls, persistent custom
+  connectors, and attachment to imported source nodes are not yet implemented.
+  Automatic imported-hole centers require durable mesh/topology references;
+  current hole-like snapping is available on cylinder proxy axes and circular
+  face centers. The shipped part transform gizmo edits semantic-part rest
+  transforms outside mate placement. Part selection is entity-level; durable face selection still
   needs triangle identity through reimport, and true edge selection still needs
   topology/adjacency plus screen-space proximity. Transform gizmos are currently
   world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display

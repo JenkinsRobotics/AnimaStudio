@@ -12,6 +12,10 @@ final class ViewportRenderStyleTests: XCTestCase {
       ["shaded", "wireframe", "translucent"]
     )
     XCTAssertEqual(ViewportEdgeDisplay.allCases.map(\.rawValue), ["hidden", "mesh"])
+    XCTAssertEqual(
+      ViewportMaterialFinish.allCases.map(\.rawValue),
+      ["matte", "satin", "glossy", "metallic"]
+    )
   }
 
   func testShadedWithEdgesAddsANoninteractiveMeshOverlay() {
@@ -61,5 +65,18 @@ final class ViewportRenderStyleTests: XCTestCase {
     ViewportRenderStyleApplier.apply(.shaded, edgeDisplay: .hidden, to: entity)
 
     XCTAssertNil(entity.findEntity(named: ViewportRenderStyleApplier.meshEdgeOverlayName))
+  }
+
+  func testShadedProxyUsesPBRFinishParameters() throws {
+    let material = ViewportRenderStyleApplier.partMaterial(
+      .shaded,
+      finish: .metallic,
+      baseColor: .systemTeal
+    )
+
+    let pbr = try XCTUnwrap(material as? PhysicallyBasedMaterial)
+    XCTAssertEqual(pbr.metallic.scale, 0.92)
+    XCTAssertEqual(pbr.roughness.scale, 0.24)
+    XCTAssertEqual(pbr.clearcoat.scale, 0.08)
   }
 }

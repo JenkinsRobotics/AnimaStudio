@@ -49,6 +49,7 @@ final class StudioWorkspaceModel {
   var componentGroups: [NavigatorComponentGroup] = []
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
+  var matePlacement: MatePlacementSession?
 
   private let evaluator = AnimationEvaluator()
 
@@ -121,9 +122,41 @@ final class StudioWorkspaceModel {
 
   var canCreateRevoluteJoint: Bool {
     let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
-    return project.rig.parts.contains {
+    let eligibleChildren = project.rig.parts.filter {
       !connectedChildren.contains($0.id) && !isComponentLocked($0.id)
     }
+    return eligibleChildren.contains { child in
+      project.rig.parts.contains { parent in
+        parent.id != child.id
+          && !isComponentLocked(parent.id)
+          && !wouldCreateMateCycle(childID: child.id, parentID: parent.id)
+      }
+    }
+  }
+
+  var mateCandidatePartIDs: Set<PartID> {
+    guard let matePlacement else { return [] }
+    if let source = matePlacement.sourceCandidate {
+      return Set(
+        project.rig.parts.compactMap { part in
+          part.id != source.partID
+            && !isComponentLocked(part.id)
+            && !wouldCreateMateCycle(childID: source.partID, parentID: part.id)
+            ? part.id : nil
+        }
+      )
+    }
+
+    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+    let eligible = project.rig.parts.filter {
+      !connectedChildren.contains($0.id) && !isComponentLocked($0.id)
+    }
+    if let preferredPartID = matePlacement.preferredPartID,
+      eligible.contains(where: { $0.id == preferredPartID })
+    {
+      return [preferredPartID]
+    }
+    return Set(eligible.map(\.id))
   }
 
   func importModel(from url: URL) async {
@@ -209,6 +242,80 @@ final class StudioWorkspaceModel {
     )
     project.rig.joints.append(joint)
     selection = [.joint(joint.id)]
+  }
+
+  func beginRevoluteMatePlacement() {
+    guard canCreateRevoluteJoint else { return }
+    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+    let preferredPartID = selectedPartID.flatMap { partID in
+      !connectedChildren.contains(partID) && !isComponentLocked(partID) ? partID : nil
+    }
+    matePlacement = MatePlacementSession(preferredPartID: preferredPartID)
+    isPlaying = false
+    showsCreationPalette = false
+  }
+
+  func cancelMatePlacement() {
+    matePlacement = nil
+  }
+
+  func selectMateConnector(_ candidate: MateConnectorCandidate) {
+    guard var placement = matePlacement,
+      !isComponentLocked(candidate.partID)
+    else { return }
+
+    if placement.sourceCandidate == nil {
+      guard mateCandidatePartIDs.contains(candidate.partID) else { return }
+      placement.sourceCandidate = candidate
+      matePlacement = placement
+      selection = [.part(candidate.partID)]
+      return
+    }
+
+    guard let source = placement.sourceCandidate,
+      source.partID != candidate.partID,
+      mateCandidatePartIDs.contains(candidate.partID),
+      let childIndex = project.rig.parts.firstIndex(where: { $0.id == source.partID }),
+      let parent = project.rig.parts.first(where: { $0.id == candidate.partID })
+    else { return }
+
+    let snappedTransform = MateConnectorMath.snappedChildTransform(
+      childPart: project.rig.parts[childIndex],
+      childConnector: source.connector,
+      parentPart: parent,
+      parentConnector: candidate.connector
+    )
+    project.rig.parts[childIndex].positionMeters = snappedTransform.positionMeters
+    project.rig.parts[childIndex].rotationEulerRadians = snappedTransform.rotationEulerRadians
+
+    var sequence = project.rig.joints.count + 1
+    while project.rig.joints.contains(where: { $0.id.rawValue == "joint_\(sequence)" }) {
+      sequence += 1
+    }
+    let joint = JointDefinition(
+      id: JointID(rawValue: "joint_\(sequence)"),
+      displayName: "Revolute Mate \(sequence)",
+      axis: .z,
+      minimumRadians: -.pi / 2,
+      maximumRadians: .pi / 2,
+      parentPartID: parent.id,
+      childPartID: source.partID,
+      parentConnector: candidate.connector,
+      childConnector: source.connector
+    )
+    project.rig.joints.append(joint)
+    matePlacement = nil
+    selection = [.joint(joint.id)]
+  }
+
+  private func wouldCreateMateCycle(childID: PartID, parentID: PartID) -> Bool {
+    var currentID: PartID? = parentID
+    var visited: Set<PartID> = []
+    while let current = currentID, visited.insert(current).inserted {
+      if current == childID { return true }
+      currentID = project.rig.joints.first { $0.childPartID == current }?.parentPartID
+    }
+    return false
   }
 
   func switchWorkspace(to workspace: StudioWorkspaceKind) {

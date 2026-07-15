@@ -284,17 +284,21 @@ struct InspectorView: View {
           placeholder: "Mate name",
           help: "The readable mate name shown throughout the rig and timeline."
         )
-        StudioPickerRow(
-          title: "Rotation Axis",
-          selection: Binding(
-            get: { joint.axis },
-            set: { workspace.setJointAxis(id: joint.id, to: $0) }
-          ),
-          help: "The axis of this first revolute degree of freedom."
-        ) {
-          Text("X").tag(JointAxis.x)
-          Text("Y").tag(JointAxis.y)
-          Text("Z").tag(JointAxis.z)
+        if joint.parentConnector != nil, joint.childConnector != nil {
+          LabeledContent("Rotation Axis", value: "Connector Z")
+        } else {
+          StudioPickerRow(
+            title: "Rotation Axis",
+            selection: Binding(
+              get: { joint.axis },
+              set: { workspace.setJointAxis(id: joint.id, to: $0) }
+            ),
+            help: "The axis of this first revolute degree of freedom."
+          ) {
+            Text("X").tag(JointAxis.x)
+            Text("Y").tag(JointAxis.y)
+            Text("Z").tag(JointAxis.z)
+          }
         }
       } else {
         LabeledContent("Name", value: joint.displayName)
@@ -302,6 +306,21 @@ struct InspectorView: View {
       }
       LabeledContent("Parent", value: partName(joint.parentPartID) ?? "World")
       LabeledContent("Child", value: partName(joint.childPartID) ?? "Unassigned")
+    }
+
+    if let parentConnector = joint.parentConnector,
+      let childConnector = joint.childConnector
+    {
+      Section("Attachment") {
+        LabeledContent("Parent Local Origin", value: connectorOrigin(parentConnector))
+        LabeledContent("Child Local Origin", value: connectorOrigin(childConnector))
+        LabeledContent("Alignment", value: "Primary axes opposed")
+        Text(
+          "The connector origins stay coincident. Revolute motion occurs about the connector's primary Z axis, not the component origin."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
     }
 
     Section("Limits") {
@@ -520,5 +539,12 @@ struct InspectorView: View {
   private func partName(_ id: PartID?) -> String? {
     guard let id else { return nil }
     return workspace.project.rig.parts.first { $0.id == id }?.displayName
+  }
+
+  private func connectorOrigin(_ connector: MateConnectorDefinition) -> String {
+    let origin = connector.originMeters
+    return [origin.x, origin.y, origin.z]
+      .map { $0.formatted(.number.precision(.fractionLength(3))) }
+      .joined(separator: ", ") + " m"
   }
 }

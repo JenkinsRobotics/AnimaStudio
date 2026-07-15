@@ -7,6 +7,9 @@ struct ViewportCameraHUD: View {
   @Binding var renderStyle: ViewportRenderStyle
   @Binding var edgeDisplay: ViewportEdgeDisplay
   @Binding var lightingPreset: ViewportLightingPreset
+  @Binding var materialFinish: ViewportMaterialFinish
+  @Binding var reflectionMode: ViewportReflectionMode
+  @Binding var showsShadows: Bool
   @Binding var showsGrid: Bool
   @Binding var appearance: PreviewAppearance
   @Binding var fieldOfViewDegrees: Float
@@ -39,6 +42,9 @@ struct ViewportCameraHUD: View {
           renderStyle: $renderStyle,
           edgeDisplay: $edgeDisplay,
           lightingPreset: $lightingPreset,
+          materialFinish: $materialFinish,
+          reflectionMode: $reflectionMode,
+          showsShadows: $showsShadows,
           showsGrid: $showsGrid,
           appearance: $appearance,
           fieldOfViewDegrees: $fieldOfViewDegrees,

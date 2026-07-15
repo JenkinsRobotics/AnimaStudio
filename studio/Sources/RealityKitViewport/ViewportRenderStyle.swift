@@ -54,17 +54,55 @@ public enum ViewportEdgeDisplay: String, CaseIterable, Identifiable, Sendable {
   }
 }
 
+public enum ViewportMaterialFinish: String, CaseIterable, Identifiable, Sendable {
+  case matte
+  case satin
+  case glossy
+  case metallic
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .matte: "Matte"
+    case .satin: "Satin"
+    case .glossy: "Glossy"
+    case .metallic: "Metallic"
+    }
+  }
+
+  var roughness: Float {
+    switch self {
+    case .matte: 0.82
+    case .satin: 0.48
+    case .glossy: 0.18
+    case .metallic: 0.24
+    }
+  }
+
+  var metallicScale: Float { self == .metallic ? 0.92 : 0.02 }
+  var clearcoatScale: Float { self == .glossy ? 0.72 : 0.08 }
+}
+
 @MainActor
 enum ViewportRenderStyleApplier {
   static let meshEdgeOverlayName = "viewportMeshEdgeOverlay"
 
   static func partMaterial(
     _ style: ViewportRenderStyle,
+    finish: ViewportMaterialFinish = .satin,
     baseColor: NSColor
   ) -> any Material {
     switch style {
     case .shaded:
-      return SimpleMaterial(color: baseColor, isMetallic: false)
+      var material = PhysicallyBasedMaterial()
+      material.baseColor = .init(tint: baseColor)
+      material.roughness = .init(floatLiteral: finish.roughness)
+      material.metallic = .init(floatLiteral: finish.metallicScale)
+      material.specular = .init(floatLiteral: 0.55)
+      material.clearcoat = .init(floatLiteral: finish.clearcoatScale)
+      material.clearcoatRoughness = .init(floatLiteral: min(finish.roughness + 0.08, 1))
+      return material
     case .wireframe:
       return lineMaterial(color: baseColor)
     case .translucent:

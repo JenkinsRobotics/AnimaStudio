@@ -86,6 +86,8 @@ public struct JointDefinition: Equatable, Codable, Sendable {
   public var neutralRadians: Double
   public var parentPartID: PartID?
   public var childPartID: PartID?
+  public var parentConnector: MateConnectorDefinition?
+  public var childConnector: MateConnectorDefinition?
 
   public init(
     id: JointID,
@@ -95,7 +97,9 @@ public struct JointDefinition: Equatable, Codable, Sendable {
     maximumRadians: Double,
     neutralRadians: Double = 0,
     parentPartID: PartID? = nil,
-    childPartID: PartID? = nil
+    childPartID: PartID? = nil,
+    parentConnector: MateConnectorDefinition? = nil,
+    childConnector: MateConnectorDefinition? = nil
   ) {
     precondition(minimumRadians <= maximumRadians)
     precondition((minimumRadians...maximumRadians).contains(neutralRadians))
@@ -108,6 +112,8 @@ public struct JointDefinition: Equatable, Codable, Sendable {
     self.neutralRadians = neutralRadians
     self.parentPartID = parentPartID
     self.childPartID = childPartID
+    self.parentConnector = parentConnector
+    self.childConnector = childConnector
   }
 
   public func clamped(_ radians: Double) -> Double {

@@ -1,4 +1,5 @@
 import AnimaCore
+import RealityKitViewport
 import XCTest
 
 @testable import AnimaStudioUI
@@ -27,7 +28,7 @@ final class RigCreationTests: XCTestCase {
     XCTAssertEqual(part.positionMeters, RigVector3())
     XCTAssertEqual(part.rotationEulerRadians, RigVector3())
     XCTAssertEqual(model.selection, [.part(part.id)])
-    XCTAssertTrue(model.canCreateRevoluteJoint)
+    XCTAssertFalse(model.canCreateRevoluteJoint)
   }
 
   func testViewportStylePartSelectionAndTransformEditSharedCoreState() {
@@ -73,5 +74,56 @@ final class RigCreationTests: XCTestCase {
     XCTAssertEqual(model.project.rig.joints[0].axis, .z)
     XCTAssertEqual(model.project.rig.joints[0].minimumRadians, -0.5)
     XCTAssertEqual(model.project.rig.joints[0].maximumRadians, 0.75)
+  }
+
+  func testTwoClickMatePlacementMovesFirstComponentAndStoresConnectors() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let base = model.project.rig.parts[0]
+    model.setPartPosition(id: base.id, to: RigVector3(x: 1, y: 0, z: 0))
+    model.addPart(kind: .box)
+    let moving = model.project.rig.parts[1]
+
+    model.beginRevoluteMatePlacement()
+    let source = try XCTUnwrap(
+      MateConnectorInference.candidates(for: moving).first { $0.id == "face-left" }
+    )
+    model.selectMateConnector(source)
+    XCTAssertEqual(model.matePlacement?.sourceCandidate, source)
+    XCTAssertEqual(model.mateCandidatePartIDs, [base.id])
+
+    let target = try XCTUnwrap(
+      MateConnectorInference.candidates(for: base).first { $0.id == "face-right" }
+    )
+    model.selectMateConnector(target)
+
+    let mate = try XCTUnwrap(model.project.rig.joints.first)
+    let movedPart = try XCTUnwrap(model.project.rig.parts.first { $0.id == moving.id })
+    XCTAssertNil(model.matePlacement)
+    XCTAssertEqual(mate.parentPartID, base.id)
+    XCTAssertEqual(mate.childPartID, moving.id)
+    XCTAssertEqual(mate.parentConnector, target.connector)
+    XCTAssertEqual(mate.childConnector, source.connector)
+    XCTAssertEqual(movedPart.positionMeters.x, 1.55, accuracy: 1e-9)
+    XCTAssertEqual(model.selection, [.joint(mate.id)])
+  }
+
+  func testMatePlacementDoesNotOfferADescendantAsItsOwnParent() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let root = model.project.rig.parts[0]
+    model.addPart(kind: .box)
+    let child = model.project.rig.parts[1]
+    model.createRevoluteJoint()
+    model.addPart(kind: .box)
+    let independent = model.project.rig.parts[2]
+    model.selectPart(id: root.id, extendingSelection: false)
+
+    model.beginRevoluteMatePlacement()
+    let source = try XCTUnwrap(MateConnectorInference.candidates(for: root).first)
+    model.selectMateConnector(source)
+
+    XCTAssertFalse(model.mateCandidatePartIDs.contains(child.id))
+    XCTAssertTrue(model.mateCandidatePartIDs.contains(independent.id))
   }
 }

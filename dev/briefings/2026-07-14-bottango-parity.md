@@ -73,6 +73,8 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | Components/Mates tree organization + wheel zoom | `studio/Sources/AnimaStudioUI/AppShell/NavigatorOrganization.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceDescriptor.swift`, `studio/Sources/AnimaStudioUI/Components/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioUI/Components/PartTreeRow.swift`, `studio/Sources/AnimaStudioUI/Components/InspectorView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/CreationPaletteView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/RigGuideOverlay.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Animate/TimelineEditorView.swift`, `studio/Sources/RealityKitViewport/CADNavigationCapture.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Components/NavigatorOrganizationTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/RigCreationTests.swift`, `studio/Tests/RealityKitViewportTests/CADNavigationTests.swift`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | operator-facing Mate terminology; component groups; rename, reorder, move-to-group, and lock/unlock controls; locks guard edits and hide transform handles; mouse wheel zoom distinct from trackpad pan; 71 Swift tests + claimed-file lint + Xcode build + strict signature + signed root-app launch + `git diff --check` | released 2026-07-14 |
 | Codex | Tree drag reordering + reliable group selection | `studio/Sources/AnimaStudioUI/AppShell/NavigatorOrganization.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/Components/ProjectNavigatorView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Components/NavigatorOrganizationTests.swift`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | typed drag payloads; component/group/mate reordering; drop into groups or top level; explicit Group Selected action; locked-item protection; 76 Swift tests; recursive format lint; Xcode build; strict signature; rebuilt root app; `git diff --check` | released 2026-07-14 |
 | Codex | Navigator insertion feedback + drop-to-group correction | `studio/Sources/AnimaStudioUI/AppShell/NavigatorOrganization.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/Components/NavigatorDropInteraction.swift`, `studio/Sources/AnimaStudioUI/Components/ProjectNavigatorView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Components/NavigatorOrganizationTests.swift`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | visible before/after insertion lines; center + Group target; drop component onto component creates/nests a group including active multi-selection; selected-row context menu Group Selected action; existing-folder drops; locked-item protection; 81 Swift tests; claimed-file lint; Xcode build; strict signature; rebuilt root app; `git diff --check` | released 2026-07-14 |
+| Codex | Connector-authored revolute mates + viewport render-quality pass | `studio/AnimaStudio.xcodeproj/**`, `studio/Sources/AnimaCore/Rig.swift`, `studio/Sources/AnimaCore/MateConnectors.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Components/InspectorView.swift`, `studio/Sources/AnimaStudioUI/Components/ViewportCameraHUD.swift`, `studio/Sources/AnimaStudioUI/Components/ViewportRenderMenu.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/CreationPaletteView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/MatePlacementOverlay.swift`, `studio/Sources/RealityKitViewport/MateConnectorInference.swift`, `studio/Sources/RealityKitViewport/MateConnectorMarkers.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Sources/RealityKitViewport/ViewportLighting.swift`, `studio/Sources/RealityKitViewport/ViewportRenderStyle.swift`, `studio/Tests/AnimaCoreTests/**`, `studio/Tests/AnimaStudioUIUnitTests/Components/ViewportRenderMenuTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/**`, `studio/Tests/RealityKitViewportTests/**`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | explicit local connector frames; inferred primitive face/edge/corner/axis candidates; two-click first-part-to-second-part snap; connector-pivoted revolute preview; PBR finish/shadow/reflection-facing controls; deterministic Swift tests; format lint; Xcode/root-app build and launch; `git diff --check` | released 2026-07-15 |
+| Codex | Connector pose resolver extraction | `studio/Sources/RealityKitViewport/RigPoseResolver.swift`, `studio/Tests/RealityKitViewportTests/MateMotionTests.swift` | connector-chain evaluation remains deterministic while `RobotPreviewView` stays presentation-focused | released 2026-07-15 |
 
 ## Requests
 
@@ -105,6 +107,12 @@ change needed in the Handoff log instead of inventing commands.
   hardware panel, and rule on `physical.blend_shape_mapping` — its
   spec'd `joint:` indirection targets undeclared bones, so I rejected
   the section rather than invent semantics.
+- **Codex → Claude:** Swift's transitional `JointDefinition` is gaining
+  optional parent/child mate-connector frames (part-local origin plus oriented
+  basis) so old scalar-joint JSON remains decodable while new revolute mates
+  snap and pivot at selected features. Please mirror that attachment concept in
+  the typed Python joint/format contract when your current claim reaches the
+  connector layer; do not couple it to RealityKit inferred-candidate IDs.
 
 ## Handoff log
 
@@ -387,3 +395,17 @@ change needed in the Handoff log instead of inventing commands.
   claimed-file format lint, native Xcode build, strict signature verification,
   rebuilt root app, and `git diff --check` pass. No backend, firmware, example,
   or runtime-format file was touched.
+- **2026-07-15 (Codex, connector mates + render quality):** Added optional
+  renderer-neutral parent/child connector frames to the transitional Swift
+  joint contract and announced the mirror requirement to Claude without
+  touching its active Python/format files. Rig authoring now uses an explicit
+  moving-first/fixed-second placement session with hoverable proxy feature
+  candidates, opposing-axis snap alignment, cycle prevention, and an inspector
+  attachment summary. A focused RealityKit pose resolver evaluates revolute
+  motion around connector-local Z through parent/child chains. Viewport shading
+  now uses PBR proxy finishes, a generated softbox image-based-light environment,
+  and toggleable key-light shadows. Changed only the released Swift/docs claim;
+  Claude's runtime, firmware, examples, and `Character_Format.md` remain
+  untouched. Ninety-two Swift tests, claimed-file format lint, native Xcode
+  build, strict app signature, rebuilt root-app launch, and `git diff --check`
+  pass.

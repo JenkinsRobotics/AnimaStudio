@@ -123,10 +123,10 @@ struct CreationPaletteView: View {
         tint: StudioPalette.joint,
         isEnabled: workspace.canCreateRevoluteJoint,
         help: workspace.canCreateRevoluteJoint
-          ? "Create a revolute mate for the selected or next unconnected component"
-          : "Add an unconnected component before creating a mate"
+          ? "Choose a connector on the moving component, then one on the fixed component"
+          : "Add two unlocked components before creating a mate"
       ) {
-        workspace.createRevoluteJoint()
+        workspace.beginRevoluteMatePlacement()
       }
       CreationToolButton(
         title: "Insert Mate",

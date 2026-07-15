@@ -6,6 +6,9 @@ struct ViewportRenderMenu: View {
   @Binding var renderStyle: ViewportRenderStyle
   @Binding var edgeDisplay: ViewportEdgeDisplay
   @Binding var lightingPreset: ViewportLightingPreset
+  @Binding var materialFinish: ViewportMaterialFinish
+  @Binding var reflectionMode: ViewportReflectionMode
+  @Binding var showsShadows: Bool
   @Binding var showsGrid: Bool
   @Binding var appearance: PreviewAppearance
   @Binding var fieldOfViewDegrees: Float
@@ -51,6 +54,22 @@ struct ViewportRenderMenu: View {
               .tag(style)
           }
         }
+
+        Picker("Material Finish", selection: $materialFinish) {
+          ForEach(ViewportMaterialFinish.allCases) { finish in
+            Text(finish.title).tag(finish)
+          }
+        }
+        .disabled(renderStyle != .shaded)
+
+        Picker("Reflections", selection: $reflectionMode) {
+          ForEach(ViewportReflectionMode.allCases) { mode in
+            Text(mode.title).tag(mode)
+          }
+        }
+        .disabled(renderStyle != .shaded)
+
+        Toggle("Cast Shadows", systemImage: "shadow", isOn: $showsShadows)
 
         Picker("Edges", selection: $edgeDisplay) {
           ForEach(ViewportEdgeDisplay.allCases) { display in

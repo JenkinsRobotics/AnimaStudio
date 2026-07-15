@@ -199,6 +199,13 @@ do not alter the project document. Hidden-line removal, section views, roll
 controls, and saved named views require dedicated geometry/camera contracts and
 remain future work rather than inert menu items.
 
+The current shaded proxy path uses RealityKit physically based materials, with
+user-local Matte, Satin, Glossy, and Metallic finish presets. A procedural
+softbox equirectangular environment supplies truthful image-based reflections
+at Subtle or Studio strength, and the key light owns an explicit shadow-map
+toggle. These are inspection settings, not source-material edits; imported
+materials remain source-owned.
+
 Semantic-part selection is one identity shared by the viewport, Parts tree,
 and inspector. A selected proxy receives a high-contrast orange silhouette and
 a local XYZ transform gizmo. Dragging a translation arrow edits the part's rest
@@ -242,6 +249,23 @@ orientation; the mate type determines which degrees of freedom remain
 interactive. RealityKit draws and hit-tests these guides, while AnimaCore owns
 the connector transforms, mate type, DOFs, units, neutral values, and limits.
 
+The first implemented authoring slice uses a two-click CAD convention: select a
+connector on the component that should move, then a connector on the component
+that should stay fixed. The connector origins coincide, their outward primary
+axes oppose, and the first component receives the solved rest transform. Proxy
+boxes expose face centers, edge midpoints, and corners; cylinders expose their
+axis and circular face centers; spheres expose their center and cardinal surface
+points; locators expose their origin. Hoverable viewport markers are only an
+inference presentation—the saved joint owns explicit part-local connector
+frames and never depends on a marker ID. Revolute preview composes a chain from
+those frames and rotates about connector-local Z.
+
+Imported meshes will use the same explicit connector result, but inference from
+faces, vertices, edge midpoints, arc/cylinder axes, and hole centers must wait
+for stable topology identity through reimport. Orientation flip/reorientation,
+custom connector persistence, and non-revolute mate types remain subsequent
+typed-DOF work.
+
 | Mate type | Viewport visualization |
 |---|---|
 | Fastened | Connector frame only; all six relative DOFs locked |
@@ -271,10 +295,11 @@ Visual rules:
 - A virtual “exercise DOF” preview is always safe and never drives hardware.
   Physical mirroring still requires a separately connected and armed output.
 
-The current sample rig implements the first visual foundation: a local XYZ
-connector, revolute ring, optional reference plane, and limit arc with
-independent visibility toggles. Editable handles and imported-part attachment
-follow the shared typed-joint/DOF contract.
+The current Rig workspace implements that first visual foundation plus live
+proxy connector picking and connector-authored revolute motion. The DOF ring,
+optional reference plane, and limit arc retain independent visibility toggles.
+Editable connector orientation handles and imported-part attachment follow the
+shared typed-joint/DOF contract.
 
 ### Why not SceneKit, Unity, or Unreal?
 
