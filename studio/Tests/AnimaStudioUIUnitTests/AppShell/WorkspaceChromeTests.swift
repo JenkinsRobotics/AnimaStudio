@@ -19,7 +19,7 @@ final class WorkspaceChromeTests: XCTestCase {
         workspace: .rig,
         showsRigCreationTools: false
       ),
-      .compact
+      .compactRig
     )
 
     for workspace in StudioWorkspaceKind.allCases where workspace != .rig {
@@ -28,8 +28,23 @@ final class WorkspaceChromeTests: XCTestCase {
           workspace: workspace,
           showsRigCreationTools: true
         ),
-        .compact
+        .workspaceTools
       )
     }
+  }
+
+  func testExpandedWorkspaceRibbonsUseTheFullHeight() {
+    XCTAssertEqual(
+      WorkspaceRibbonPresentation.rigCreation.height,
+      StudioMetrics.rigCreationRibbonHeight
+    )
+    XCTAssertEqual(
+      WorkspaceRibbonPresentation.workspaceTools.height,
+      StudioMetrics.rigCreationRibbonHeight
+    )
+    XCTAssertEqual(
+      WorkspaceRibbonPresentation.compactRig.height,
+      StudioMetrics.compactRibbonHeight
+    )
   }
 }

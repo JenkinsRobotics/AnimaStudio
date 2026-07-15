@@ -87,39 +87,20 @@ struct StudioDocumentBar: View {
   }
 }
 
-struct WorkspaceTabBar: View {
+struct WorkspaceRibbonSelector: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @Binding var viewportAppearance: PreviewAppearance
 
   var body: some View {
-    HStack(alignment: .bottom, spacing: 4) {
-      workspaceSelector
-
-      Divider()
-        .frame(height: 34)
-        .padding(.horizontal, 4)
-
-      ForEach(StudioWorkspaceKind.allCases) { kind in
-        workspaceTab(for: kind)
-      }
-
-      Spacer(minLength: 20)
-
-      settingsMenu
-      workspaceLayoutMenu
-    }
-    .padding(.horizontal, 10)
-    .frame(height: StudioMetrics.workspaceTabBarHeight)
-    .background(StudioPalette.chrome)
-  }
-
-  private var workspaceSelector: some View {
     Menu {
       ForEach(StudioWorkspaceKind.allCases) { kind in
         Button {
           workspace.switchWorkspace(to: kind)
         } label: {
-          Label(kind.descriptor.title, systemImage: kind.descriptor.systemImage)
+          Label(
+            kind.descriptor.title,
+            systemImage: workspace.activeWorkspace == kind
+              ? "checkmark.circle.fill" : kind.descriptor.systemImage
+          )
         }
         .keyboardShortcut(
           KeyEquivalent(Character(String(kind.shortcutNumber))),
@@ -129,57 +110,52 @@ struct WorkspaceTabBar: View {
     } label: {
       HStack(spacing: 9) {
         Image(systemName: workspace.activeWorkspace.descriptor.systemImage)
-          .font(.title3)
+          .font(.title2)
           .foregroundStyle(StudioPalette.accent)
-          .frame(width: 24)
-        VStack(alignment: .leading, spacing: 1) {
+          .frame(width: 28)
+        VStack(alignment: .leading, spacing: 3) {
           Text(workspace.activeWorkspace.descriptor.title.uppercased())
-            .font(.caption.weight(.bold))
-          Text("WORKSPACE")
-            .font(.system(size: 8, weight: .medium))
+            .font(.callout.weight(.bold))
+          Text(workspace.activeWorkspace.descriptor.purpose)
+            .font(.system(size: 9))
             .foregroundStyle(StudioPalette.muted)
+            .lineLimit(2)
         }
         Image(systemName: "chevron.down")
-          .font(.system(size: 8, weight: .bold))
+          .font(.caption2.weight(.bold))
           .foregroundStyle(StudioPalette.muted)
       }
-      .padding(.horizontal, 10)
-      .frame(width: 150, height: 38, alignment: .leading)
-      .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 6))
-      .overlay {
-        RoundedRectangle(cornerRadius: 6)
-          .stroke(StudioPalette.border, lineWidth: 1)
-      }
+      .padding(.horizontal, 12)
+      .frame(width: 190, alignment: .leading)
+      .frame(maxHeight: .infinity)
+      .contentShape(Rectangle())
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
-    .help("Choose a task-focused workspace")
+    .help("Switch task-focused workspace (⌘1–5)")
   }
+}
 
-  private func workspaceTab(for kind: StudioWorkspaceKind) -> some View {
-    let descriptor = kind.descriptor
-    let isActive = workspace.activeWorkspace == kind
-    return Button {
-      workspace.switchWorkspace(to: kind)
-    } label: {
-      VStack(spacing: 7) {
-        Label(descriptor.title.uppercased(), systemImage: descriptor.systemImage)
-          .labelStyle(.titleAndIcon)
-          .font(.system(size: 10, weight: isActive ? .bold : .medium))
-          .foregroundStyle(isActive ? Color.white : StudioPalette.muted)
-        Rectangle()
-          .fill(isActive ? StudioPalette.accent : Color.clear)
-          .frame(height: 2)
+struct WorkspaceRibbonControls: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  @Binding var viewportAppearance: PreviewAppearance
+  let isCompact: Bool
+
+  var body: some View {
+    Group {
+      if isCompact {
+        HStack(spacing: 4) {
+          settingsMenu
+          workspaceLayoutMenu
+        }
+      } else {
+        VStack(spacing: 7) {
+          settingsMenu
+          workspaceLayoutMenu
+        }
       }
-      .padding(.horizontal, 12)
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .keyboardShortcut(
-      KeyEquivalent(Character(String(kind.shortcutNumber))),
-      modifiers: .command
-    )
-    .help("\(descriptor.purpose) (⌘\(kind.shortcutNumber))")
+    .frame(width: isCompact ? 72 : 42)
   }
 
   private var settingsMenu: some View {
@@ -255,40 +231,69 @@ struct WorkspaceTabBar: View {
 }
 
 enum WorkspaceRibbonPresentation: Equatable {
-  case compact
+  case compactRig
   case rigCreation
+  case workspaceTools
 
   static func resolve(
     workspace: StudioWorkspaceKind,
     showsRigCreationTools: Bool
   ) -> Self {
-    workspace == .rig && showsRigCreationTools ? .rigCreation : .compact
+    guard workspace == .rig else { return .workspaceTools }
+    return showsRigCreationTools ? .rigCreation : .compactRig
+  }
+
+  var height: CGFloat {
+    switch self {
+    case .compactRig: StudioMetrics.compactRibbonHeight
+    case .rigCreation, .workspaceTools: StudioMetrics.rigCreationRibbonHeight
+    }
   }
 }
 
 struct WorkspaceToolBar: View {
   @Bindable var workspace: StudioWorkspaceModel
+  @Binding var viewportAppearance: PreviewAppearance
   let importModel: () -> Void
 
   var body: some View {
-    switch WorkspaceRibbonPresentation.resolve(
+    let presentation = WorkspaceRibbonPresentation.resolve(
       workspace: workspace.activeWorkspace,
       showsRigCreationTools: workspace.showsCreationPalette
-    ) {
-    case .rigCreation:
-      CreationPaletteView(workspace: workspace)
-    case .compact:
-      compactRibbon
+    )
+    HStack(spacing: 0) {
+      WorkspaceRibbonSelector(workspace: workspace)
+
+      Divider()
+        .padding(.vertical, 10)
+
+      Group {
+        switch presentation {
+        case .compactRig:
+          compactRibbon
+        case .rigCreation:
+          CreationPaletteView(workspace: workspace)
+        case .workspaceTools:
+          WorkspaceRibbonCatalogView(workspace: workspace, importModel: importModel)
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      Divider()
+        .padding(.vertical, 10)
+
+      WorkspaceRibbonControls(
+        workspace: workspace,
+        viewportAppearance: $viewportAppearance,
+        isCompact: presentation == .compactRig
+      )
     }
+    .frame(height: presentation.height)
+    .background(StudioPalette.ribbonChrome)
   }
 
   private var compactRibbon: some View {
     HStack(spacing: 12) {
-      workspaceIdentity
-
-      Divider()
-        .frame(height: 32)
-
       WorkspaceContextualTools(workspace: workspace, importModel: importModel)
 
       Spacer(minLength: 12)
@@ -302,25 +307,7 @@ struct WorkspaceToolBar: View {
       }
     }
     .buttonStyle(.borderless)
-    .padding(.horizontal, 14)
-    .frame(height: StudioMetrics.compactRibbonHeight)
-    .background(StudioPalette.ribbonChrome)
-  }
-
-  private var workspaceIdentity: some View {
-    let descriptor = workspace.activeWorkspace.descriptor
-    return VStack(alignment: .leading, spacing: 2) {
-      Label(descriptor.title.uppercased(), systemImage: descriptor.systemImage)
-        .font(.caption2.weight(.bold))
-        .tracking(0.8)
-        .foregroundStyle(StudioPalette.accent)
-      Text(descriptor.purpose)
-        .font(.system(size: 9))
-        .foregroundStyle(StudioPalette.muted)
-        .lineLimit(1)
-    }
-    .frame(width: 190, alignment: .leading)
-    .help(descriptor.purpose)
+    .padding(.horizontal, 12)
   }
 }
 

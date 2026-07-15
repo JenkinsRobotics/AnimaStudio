@@ -26,15 +26,45 @@ struct CreationPaletteView: View {
 
   var body: some View {
     HStack(spacing: 0) {
-      ribbonIdentity
-
-      Divider()
-        .padding(.vertical, 10)
-
       ScrollView(.horizontal) {
         HStack(alignment: .center, spacing: 0) {
           structuresGroup
           matesGroup
+          futureGroup(
+            title: "Connectors",
+            systemImage: "scope",
+            tools: [
+              ("Custom", "plus.circle"),
+              ("Move", "arrow.up.and.down.and.arrow.left.and.right"),
+              ("Rotate", "rotate.3d"),
+              ("Flip Axis", "arrow.triangle.2.circlepath"),
+              ("Offset", "arrow.up.right"),
+              ("Planes", "square.3.layers.3d"),
+            ]
+          )
+          futureGroup(
+            title: "Assemble",
+            systemImage: "wrench.and.screwdriver",
+            tools: [
+              ("Move", "arrow.up.and.down.and.arrow.left.and.right"),
+              ("Rotate", "rotate.right"),
+              ("Snap", "dot.scope"),
+              ("Align", "align.horizontal.left"),
+              ("Measure", "ruler"),
+              ("Explode", "arrow.up.left.and.arrow.down.right"),
+            ]
+          )
+          futureGroup(
+            title: "Inspect",
+            systemImage: "checkmark.magnifyingglass",
+            tools: [
+              ("DOF Limits", "gauge.with.dots.needle.50percent"),
+              ("Neutral", "scope"),
+              ("Test Motion", "play.square"),
+              ("Validate", "checkmark.shield"),
+              ("Conflicts", "exclamationmark.triangle"),
+            ]
+          )
           futureGroup(
             title: "Motors",
             systemImage: "gearshape.2.fill",
@@ -78,26 +108,8 @@ struct CreationPaletteView: View {
     }
     .frame(maxWidth: .infinity)
     .frame(height: StudioMetrics.rigCreationRibbonHeight)
-    .background(StudioPalette.ribbonChrome)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Rig creation tools")
-  }
-
-  private var ribbonIdentity: some View {
-    VStack(alignment: .leading, spacing: 7) {
-      Label("RIG", systemImage: "point.3.connected.trianglepath.dotted")
-        .font(.caption.weight(.bold))
-        .tracking(0.8)
-        .foregroundStyle(StudioPalette.accent)
-      Text("ADD COMPONENTS")
-        .font(.system(size: 9, weight: .semibold))
-        .foregroundStyle(.white)
-      Text("Build the semantic rig")
-        .font(.system(size: 9))
-        .foregroundStyle(StudioPalette.muted)
-    }
-    .padding(.horizontal, 14)
-    .frame(width: 164, alignment: .leading)
   }
 
   private var structuresGroup: some View {
@@ -181,7 +193,7 @@ struct CreationPaletteView: View {
   }
 }
 
-private struct CreationToolGroup<Content: View>: View {
+struct CreationToolGroup<Content: View>: View {
   let title: String
   let systemImage: String
   let tint: Color
@@ -215,11 +227,12 @@ private struct CreationToolGroup<Content: View>: View {
   }
 }
 
-private struct CreationToolButton: View {
+struct CreationToolButton: View {
   let title: String
   let systemImage: String
   let tint: Color
   var isEnabled = true
+  var isSelected = false
   let help: String
   let action: () -> Void
 
@@ -235,6 +248,10 @@ private struct CreationToolButton: View {
       }
       .foregroundStyle(tint)
       .frame(width: 68, height: 57)
+      .background(
+        isSelected ? tint.opacity(0.14) : Color.clear,
+        in: RoundedRectangle(cornerRadius: 7)
+      )
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)

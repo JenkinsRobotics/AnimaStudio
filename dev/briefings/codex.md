@@ -72,6 +72,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — selector-driven workspace ribbons complete:** Removed the
+  dedicated Assets/Rig/Animate/Show/Hardware tab row. The contextual ribbon now
+  owns a fixed far-left workspace dropdown (including Command-1…5 shortcuts),
+  followed by workspace-specific grouped tools. Rig preserves Structures and
+  the full Mate family while adding connector, assembly, and inspection
+  sections; Assets, Animate, Show, and Hardware now expose their extended tool
+  catalogs with real existing actions enabled and future/backend-dependent
+  commands honestly disabled. The signed root app launched and switched live
+  from Assets to Rig through the new selector. Claimed-file format lint, 105
+  Swift tests, Xcode/root-app build, strict signature, accessibility checks,
+  and `git diff --check` pass.
+
 - **2026-07-15 — complete mate-family ribbon catalog:** Added Fastened,
   Parallel, Slider, Revolute, Cylindrical, Pin Slot, Planar, and Ball to the Rig
   ribbon in a dedicated, tested UI catalog. Every option has its own icon and

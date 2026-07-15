@@ -58,12 +58,20 @@
   tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
-  window now uses a CAD-style three-level header: a compact global
-  document/live row, a dedicated workspace selector plus Assets, Rig, Animate,
-  Show, and Hardware tabs with Command-1…5 switching, and a workspace-owned
-  command ribbon. Rig's Structures, Mates, Motors, 3D Models & Media, and Events
-  creation families are docked in that top ribbon rather than floating over the
-  viewport; collapsing them restores a compact Rig tool row. Panel visibility
+  window now uses a CAD-style two-level header: a compact global document/live
+  row followed by one full-width contextual command ribbon. A fixed far-left
+  dropdown switches Assets, Rig, Animate, Show, and Hardware with Command-1…5;
+  the former workspace-tab row has been removed. Each workspace replaces the
+  ribbon with focused, grouped tools. Assets exposes Import, Manage, and
+  Prepare; Animate exposes Transport, Keyframes, Curves, Tracks, and Reference;
+  Show exposes Sequence, Clips, Events, and Sync; Hardware exposes Connection,
+  Outputs, Mapping, Calibration, Safety, and Monitor. Implemented commands are
+  live, while backend-dependent commands remain visibly disabled as planned.
+  Rig preserves Structures and the complete Mate family and adds focused
+  Connectors, Assemble, and Inspect groups before the planned Motors, 3D Models
+  & Media, and Events groups. Its creation families stay docked in the ribbon
+  rather than floating over the viewport; collapsing them restores a compact
+  Rig tool row. Panel visibility
   remains independently restorable in-session for the navigator, inspector,
   and bottom editor. Assets
   centers import and hierarchy inspection; Rig centers components and mates;

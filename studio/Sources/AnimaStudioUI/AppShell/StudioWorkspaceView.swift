@@ -37,13 +37,9 @@ struct StudioWorkspaceView: View {
         closeProject: closeProject
       )
       Divider()
-      WorkspaceTabBar(
-        workspace: workspace,
-        viewportAppearance: viewportAppearanceBinding
-      )
-      Divider()
       WorkspaceToolBar(
         workspace: workspace,
+        viewportAppearance: viewportAppearanceBinding,
         importModel: { isImportingModel = true }
       )
       Divider()
