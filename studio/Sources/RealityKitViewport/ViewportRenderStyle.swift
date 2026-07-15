@@ -3,7 +3,6 @@ import RealityKit
 
 public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   case shaded
-  case shadedWithMeshEdges
   case wireframe
   case translucent
 
@@ -12,7 +11,6 @@ public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   public var title: String {
     switch self {
     case .shaded: "Shaded"
-    case .shadedWithMeshEdges: "Shaded + Mesh Edges"
     case .wireframe: "Wireframe"
     case .translucent: "Translucent"
     }
@@ -21,7 +19,6 @@ public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   public var systemImage: String {
     switch self {
     case .shaded: "cube.fill"
-    case .shadedWithMeshEdges: "cube"
     case .wireframe: "square.grid.3x3"
     case .translucent: "cube.transparent"
     }
@@ -30,9 +27,29 @@ public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   public var detail: String {
     switch self {
     case .shaded: "Source materials and normal lighting"
-    case .shadedWithMeshEdges: "Shaded surfaces with triangle mesh edges"
     case .wireframe: "Triangle mesh lines without filled surfaces"
     case .translucent: "Shaded surfaces at reduced opacity"
+    }
+  }
+}
+
+public enum ViewportEdgeDisplay: String, CaseIterable, Identifiable, Sendable {
+  case hidden
+  case mesh
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .hidden: "Edges Hidden"
+    case .mesh: "Mesh Edges Visible"
+    }
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .hidden: "square"
+    case .mesh: "square.grid.3x3"
     }
   }
 }
@@ -46,7 +63,7 @@ enum ViewportRenderStyleApplier {
     baseColor: NSColor
   ) -> any Material {
     switch style {
-    case .shaded, .shadedWithMeshEdges:
+    case .shaded:
       return SimpleMaterial(color: baseColor, isMetallic: false)
     case .wireframe:
       return lineMaterial(color: baseColor)
@@ -58,10 +75,14 @@ enum ViewportRenderStyleApplier {
     }
   }
 
-  static func apply(_ style: ViewportRenderStyle, to root: Entity) {
+  static func apply(
+    _ style: ViewportRenderStyle,
+    edgeDisplay: ViewportEdgeDisplay,
+    to root: Entity
+  ) {
     switch style {
     case .shaded:
-      return
+      break
     case .translucent:
       root.components.set(OpacityComponent(opacity: 0.38))
     case .wireframe:
@@ -74,18 +95,21 @@ enum ViewportRenderStyleApplier {
         )
         entity.components.set(model)
       }
-    case .shadedWithMeshEdges:
-      for entity in modelEntities(below: root) {
-        addMeshEdgeOverlayIfNeeded(style, to: entity)
-      }
+    }
+
+    guard edgeDisplay == .mesh, style != .wireframe else { return }
+    for entity in modelEntities(below: root) {
+      addMeshEdgeOverlayIfNeeded(edgeDisplay, renderStyle: style, to: entity)
     }
   }
 
   static func addMeshEdgeOverlayIfNeeded(
-    _ style: ViewportRenderStyle,
+    _ edgeDisplay: ViewportEdgeDisplay,
+    renderStyle: ViewportRenderStyle,
     to entity: Entity
   ) {
-    guard style == .shadedWithMeshEdges,
+    guard edgeDisplay == .mesh,
+      renderStyle != .wireframe,
       entity.findEntity(named: meshEdgeOverlayName) == nil,
       let model = entity.components[ModelComponent.self]
     else { return }

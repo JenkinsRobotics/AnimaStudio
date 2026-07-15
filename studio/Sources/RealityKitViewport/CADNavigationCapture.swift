@@ -1,18 +1,6 @@
 import AppKit
 import SwiftUI
 
-public enum PreviewNavigationProfile: String, CaseIterable, Hashable, Sendable {
-  case onshape
-  case solidWorks
-
-  public var displayName: String {
-    switch self {
-    case .onshape: "Onshape"
-    case .solidWorks: "SolidWorks"
-    }
-  }
-}
-
 enum CADNavigationAction: Equatable {
   case orbit(deltaX: CGFloat, deltaY: CGFloat)
   case pan(deltaX: CGFloat, deltaY: CGFloat)
@@ -38,7 +26,8 @@ struct CADNavigationInput {
 enum CADNavigationMapping {
   static func action(
     for input: CADNavigationInput,
-    profile: PreviewNavigationProfile
+    profile: PreviewNavigationProfile,
+    customMapping: CustomNavigationMapping = CustomNavigationMapping()
   ) -> CADNavigationAction? {
     switch input.button {
     case .scroll, .magnify:
@@ -46,33 +35,84 @@ enum CADNavigationMapping {
     case .trackpadPan:
       return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
     case .right:
-      guard profile == .onshape else { return nil }
-      return input.isControlDown
-        ? .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-        : .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
+      switch profile {
+      case .default, .onshape:
+        return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
+      case .custom:
+        return customAction(for: input, mapping: customMapping)
+      case .solidWorks, .fusion360:
+        return nil
+      }
     case .middle:
       switch profile {
-      case .onshape:
+      case .default, .onshape:
         return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
       case .solidWorks:
-        if input.isShiftDown {
-          return .zoom(delta: input.deltaY)
-        }
-        if input.isControlDown {
+        if input.isControlDown || input.isShiftDown {
           return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
         }
         return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
+      case .fusion360:
+        return input.isShiftDown
+          ? .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
+          : .pan(deltaX: input.deltaX, deltaY: input.deltaY)
+      case .custom:
+        return customAction(for: input, mapping: customMapping)
       }
+    }
+  }
+
+  private static func customAction(
+    for input: CADNavigationInput,
+    mapping: CustomNavigationMapping
+  ) -> CADNavigationAction? {
+    guard let binding = dragBinding(for: input) else { return nil }
+    if binding == mapping.rotateDrag {
+      return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
+    }
+    if binding == mapping.panDrag {
+      return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
+    }
+    return nil
+  }
+
+  private static func dragBinding(
+    for input: CADNavigationInput
+  ) -> NavigationDragBinding? {
+    switch input.button {
+    case .right where input.isControlDown:
+      .controlRightMouse
+    case .right:
+      .rightMouse
+    case .middle where input.isControlDown:
+      .controlMiddleMouse
+    case .middle where input.isShiftDown:
+      .shiftMiddleMouse
+    case .middle:
+      .middleMouse
+    case .scroll, .trackpadPan, .magnify:
+      nil
     }
   }
 }
 
 struct CADNavigationCapture: NSViewRepresentable {
   let profile: PreviewNavigationProfile
+  let customMapping: CustomNavigationMapping
   let onAction: (CADNavigationAction) -> Void
 
+  init(
+    profile: PreviewNavigationProfile,
+    customMapping: CustomNavigationMapping = CustomNavigationMapping(),
+    onAction: @escaping (CADNavigationAction) -> Void
+  ) {
+    self.profile = profile
+    self.customMapping = customMapping
+    self.onAction = onAction
+  }
+
   func makeCoordinator() -> Coordinator {
-    Coordinator(profile: profile, onAction: onAction)
+    Coordinator(profile: profile, customMapping: customMapping, onAction: onAction)
   }
 
   func makeNSView(context: Context) -> NSView {
@@ -84,6 +124,7 @@ struct CADNavigationCapture: NSViewRepresentable {
 
   func updateNSView(_ nsView: NSView, context: Context) {
     context.coordinator.profile = profile
+    context.coordinator.customMapping = customMapping
     context.coordinator.onAction = onAction
   }
 
@@ -95,14 +136,17 @@ struct CADNavigationCapture: NSViewRepresentable {
   final class Coordinator {
     weak var observedView: NSView?
     var profile: PreviewNavigationProfile
+    var customMapping: CustomNavigationMapping
     var onAction: (CADNavigationAction) -> Void
     private var eventMonitor: Any?
 
     init(
       profile: PreviewNavigationProfile,
+      customMapping: CustomNavigationMapping,
       onAction: @escaping (CADNavigationAction) -> Void
     ) {
       self.profile = profile
+      self.customMapping = customMapping
       self.onAction = onAction
     }
 
@@ -116,7 +160,11 @@ struct CADNavigationCapture: NSViewRepresentable {
           event.window === observedView.window,
           observedView.bounds.contains(observedView.convert(event.locationInWindow, from: nil)),
           let input = self.input(from: event),
-          let action = CADNavigationMapping.action(for: input, profile: self.profile)
+          let action = CADNavigationMapping.action(
+            for: input,
+            profile: self.profile,
+            customMapping: self.customMapping
+          )
         else { return event }
 
         self.onAction(action)

@@ -2,6 +2,8 @@ import RealityKitViewport
 import SwiftUI
 
 struct ViewportViewCube: View {
+  @State private var hoverLocation: CGPoint?
+
   let orientation: PreviewCameraOrientation
   let onSelectDirection: (PreviewCameraDirection) -> Void
   let onNudge: (_ horizontalRadians: Float, _ verticalRadians: Float) -> Void
@@ -42,8 +44,6 @@ struct ViewportViewCube: View {
         horizontalRadians: 0,
         verticalRadians: -incrementRadians
       )
-
-      axisLegend
     }
     .padding(7)
     .background(StudioPalette.panel.opacity(0.88), in: RoundedRectangle(cornerRadius: 10))
@@ -60,55 +60,136 @@ struct ViewportViewCube: View {
     Canvas { context, size in
       let faces = ViewCubeGeometry.projectedFaces(in: size, orientation: orientation)
       for face in faces {
-        var path = Path()
-        if let first = face.points.first {
-          path.move(to: first)
-          for point in face.points.dropFirst() {
-            path.addLine(to: point)
-          }
-          path.closeSubpath()
-        }
+        let path = polygonPath(face.points)
 
         context.fill(path, with: .color(fillColor(for: face.face)))
         context.stroke(path, with: .color(.white.opacity(0.58)), lineWidth: 1)
 
+        var labelContext = context
+        labelContext.clip(to: path)
+        labelContext.translateBy(x: face.center.x, y: face.center.y)
+        labelContext.rotate(
+          by: .radians(Double(ViewCubeGeometry.labelAngleRadians(for: face)))
+        )
         let label = Text(face.face.title)
           .font(.system(size: 8, weight: .bold, design: .rounded))
           .foregroundStyle(.white)
-        context.draw(label, at: face.center)
+        labelContext.draw(label, at: .zero)
       }
+
+      if let hoverLocation,
+        let target = ViewCubeGeometry.hitTarget(
+          at: hoverLocation,
+          in: size,
+          orientation: orientation
+        )
+      {
+        drawHighlight(target.highlight, in: &context)
+      }
+
+      drawAxes(in: &context, size: size)
     }
-    .frame(width: 82, height: 82)
+    .frame(width: Self.cubeSize.width, height: Self.cubeSize.height)
     .contentShape(Rectangle())
     .gesture(
       SpatialTapGesture()
         .onEnded { value in
           guard
-            let direction = ViewCubeGeometry.hitDirection(
+            let target = ViewCubeGeometry.hitTarget(
               at: value.location,
-              in: CGSize(width: 82, height: 82),
+              in: Self.cubeSize,
               orientation: orientation
             )
           else { return }
-          onSelectDirection(direction)
+          onSelectDirection(target.direction)
         }
     )
+    .onContinuousHover { phase in
+      switch phase {
+      case .active(let location): hoverLocation = location
+      case .ended: hoverLocation = nil
+      }
+    }
     .help("Click a face, edge, or corner to orient the camera")
   }
 
-  private var axisLegend: some View {
-    HStack(spacing: 8) {
-      axisLabel("X", color: .red)
-      axisLabel("Y", color: .green)
-      axisLabel("Z", color: .blue)
+  private func drawAxes(
+    in context: inout GraphicsContext,
+    size: CGSize
+  ) {
+    let axes = ViewCubeGeometry.projectedAxes(in: size, orientation: orientation)
+    guard let origin = axes.first?.origin else { return }
+
+    for axis in axes {
+      var path = Path()
+      path.move(to: axis.origin)
+      path.addLine(to: axis.endpoint)
+      let color = axisColor(axis.axis)
+      context.stroke(path, with: .color(color), lineWidth: 1.6)
+
+      let label = Text(axis.axis.title)
+        .font(.system(size: 10, weight: .heavy, design: .rounded))
+        .foregroundStyle(color)
+      context.draw(label, at: axisLabelPosition(for: axis))
     }
-    .font(.caption2.bold())
+
+    let originMarker = Path(
+      ellipseIn: CGRect(x: origin.x - 2, y: origin.y - 2, width: 4, height: 4)
+    )
+    context.fill(originMarker, with: .color(.white.opacity(0.9)))
   }
 
-  private func axisLabel(_ title: String, color: Color) -> some View {
-    Text(title)
-      .foregroundStyle(color)
-      .accessibilityLabel("\(title) axis")
+  private func drawHighlight(
+    _ highlight: ViewCubeHighlight,
+    in context: inout GraphicsContext
+  ) {
+    let accent = Color.cyan
+    switch highlight {
+    case .face(let points):
+      let path = polygonPath(points)
+      context.fill(path, with: .color(accent.opacity(0.34)))
+      context.stroke(path, with: .color(accent), lineWidth: 2)
+    case .edge(let start, let end):
+      var path = Path()
+      path.move(to: start)
+      path.addLine(to: end)
+      context.stroke(path, with: .color(accent), lineWidth: 4)
+    case .corner(let point):
+      let path = Path(
+        ellipseIn: CGRect(x: point.x - 5, y: point.y - 5, width: 10, height: 10)
+      )
+      context.fill(path, with: .color(accent.opacity(0.8)))
+      context.stroke(path, with: .color(.white), lineWidth: 1)
+    }
+  }
+
+  private func polygonPath(_ points: [CGPoint]) -> Path {
+    var path = Path()
+    guard let first = points.first else { return path }
+    path.move(to: first)
+    for point in points.dropFirst() {
+      path.addLine(to: point)
+    }
+    path.closeSubpath()
+    return path
+  }
+
+  private func axisColor(_ axis: ViewCubeAxis) -> Color {
+    switch axis {
+    case .x: .red
+    case .y: .green
+    case .z: .blue
+    }
+  }
+
+  private func axisLabelPosition(for axis: ProjectedViewCubeAxis) -> CGPoint {
+    let deltaX = axis.endpoint.x - axis.origin.x
+    let deltaY = axis.endpoint.y - axis.origin.y
+    let length = max(hypot(deltaX, deltaY), 0.001)
+    return CGPoint(
+      x: axis.endpoint.x + deltaX / length * 6,
+      y: axis.endpoint.y + deltaY / length * 6
+    )
   }
 
   private func nudgeButton(
@@ -141,4 +222,6 @@ struct ViewportViewCube: View {
   }
 
   private var incrementRadians: Float { .pi / 12 }
+
+  private static let cubeSize = CGSize(width: 92, height: 92)
 }

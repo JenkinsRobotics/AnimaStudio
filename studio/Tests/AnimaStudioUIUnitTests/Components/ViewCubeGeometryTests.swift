@@ -20,6 +20,14 @@ final class ViewCubeGeometryTests: XCTestCase {
       ),
       .front
     )
+    XCTAssertEqual(
+      ViewCubeGeometry.hitTarget(
+        at: CGPoint(x: 50, y: 50),
+        in: size,
+        orientation: orientation
+      )?.kind,
+      .face(.front)
+    )
   }
 
   func testHomeOrientationShowsPositiveAxisFaces() {
@@ -47,6 +55,14 @@ final class ViewCubeGeometryTests: XCTestCase {
     XCTAssertEqual(direction.x, 1 / sqrt(3), accuracy: 0.0001)
     XCTAssertEqual(direction.y, 1 / sqrt(3), accuracy: 0.0001)
     XCTAssertEqual(direction.z, 1 / sqrt(3), accuracy: 0.0001)
+    XCTAssertEqual(
+      ViewCubeGeometry.hitTarget(
+        at: face.points[2],
+        in: size,
+        orientation: orientation
+      )?.kind,
+      .corner
+    )
   }
 
   func testProjectedEdgeSelectsTwoAxisDirection() throws {
@@ -65,6 +81,45 @@ final class ViewCubeGeometryTests: XCTestCase {
     XCTAssertEqual(direction.x, 0, accuracy: 0.0001)
     XCTAssertEqual(direction.y, -1 / sqrt(2), accuracy: 0.0001)
     XCTAssertEqual(direction.z, 1 / sqrt(2), accuracy: 0.0001)
+    XCTAssertEqual(
+      ViewCubeGeometry.hitTarget(
+        at: midpoint,
+        in: size,
+        orientation: orientation
+      )?.kind,
+      .edge
+    )
+  }
+
+  func testProjectedAxesShareOneOriginAndPointAlongPositiveWorldAxes() throws {
+    let axes = ViewCubeGeometry.projectedAxes(
+      in: size,
+      orientation: PreviewCameraOrientation(direction: .home)
+    )
+    let origin = try XCTUnwrap(axes.first?.origin)
+
+    XCTAssertEqual(axes.count, 3)
+    XCTAssertTrue(axes.allSatisfy { $0.origin == origin })
+    XCTAssertEqual(axes.map(\.axis), [.x, .y, .z])
+    XCTAssertEqual(
+      axes.map { $0.axis.direction },
+      [
+        SIMD3<Float>(1, 0, 0),
+        SIMD3<Float>(0, 1, 0),
+        SIMD3<Float>(0, 0, 1),
+      ])
+    XCTAssertTrue(axes.allSatisfy { $0.endpoint != origin })
+  }
+
+  func testSideLabelRotationFollowsItsProjectedPlane() throws {
+    let face = try XCTUnwrap(
+      ViewCubeGeometry.projectedFaces(
+        in: size,
+        orientation: PreviewCameraOrientation(direction: .home)
+      ).first(where: { $0.face == .right })
+    )
+
+    XCTAssertNotEqual(ViewCubeGeometry.labelAngleRadians(for: face), 0, accuracy: 0.001)
   }
 
   @MainActor

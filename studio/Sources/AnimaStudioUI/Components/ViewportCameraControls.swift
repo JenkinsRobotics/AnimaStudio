@@ -4,6 +4,7 @@ import SwiftUI
 struct ViewportCameraControls: View {
   @Bindable var workspace: StudioWorkspaceModel
   let navigationProfile: PreviewNavigationProfile
+  let customNavigationMapping: CustomNavigationMapping
 
   var body: some View {
     HStack(spacing: 5) {
@@ -22,14 +23,8 @@ struct ViewportCameraControls: View {
 
       Menu {
         Section("CAD Navigation") {
-          if navigationProfile == .onshape {
-            Text("Right-drag — orbit / tilt")
-            Text("Middle-drag — pan")
-            Text("Control + right-drag — pan")
-          } else {
-            Text("Middle-drag — orbit / tilt")
-            Text("Control + middle-drag — pan")
-            Text("Shift + middle-drag — zoom")
+          ForEach(navigationInstructions, id: \.self) { instruction in
+            Text(instruction)
           }
           Text("Scroll or pinch — zoom")
         }
@@ -59,6 +54,25 @@ struct ViewportCameraControls: View {
         .stroke(StudioPalette.border, lineWidth: 1)
     }
     .shadow(color: .black.opacity(0.3), radius: 7, y: 3)
+  }
+
+  private var navigationInstructions: [String] {
+    switch navigationProfile {
+    case .default, .onshape:
+      ["Right-drag — orbit / tilt", "Middle-drag — pan"]
+    case .solidWorks:
+      [
+        "Middle-drag — orbit / tilt",
+        "Control or Shift + middle-drag — pan",
+      ]
+    case .fusion360:
+      ["Shift + middle-drag — orbit / tilt", "Middle-drag — pan"]
+    case .custom:
+      [
+        "\(customNavigationMapping.rotateDrag.title) — orbit / tilt",
+        "\(customNavigationMapping.panDrag.title) — pan",
+      ]
+    }
   }
 
   private func cameraButton(

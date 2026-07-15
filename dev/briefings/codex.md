@@ -63,6 +63,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — direct viewport display/navigation controls complete:** The
+  cube now has an adjacent labeled Display menu with independent
+  Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, four real
+  RealityKit lighting rigs, camera/projection/FOV, grid, appearance, and input
+  settings. Its plane labels rotate and clip with projected faces; a shared
+  origin emits projected positive X/Y/Z axes; hover highlights the exact face,
+  edge, or corner before selection. Mouse profiles now include Default,
+  SolidWorks, Onshape, Fusion 360, and a genuinely editable conflict-free
+  Custom mapping. HUD composition, lighting, render behavior, navigation
+  settings, cube geometry, and UI remain focused files. Sixty-three Swift tests
+  pass; hidden-line/section/feature-edge rendering remains honestly deferred.
+
 - **2026-07-14 — synchronized view cube + render HUD complete:** The Rig
   viewport now has a dedicated SwiftUI view cube driven by the RealityKit
   camera's actual orientation. Manual navigation updates the cube; clicking a

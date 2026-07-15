@@ -14,6 +14,17 @@ final class CADNavigationTests: XCTestCase {
     )
     XCTAssertEqual(
       action(button: .right, control: true, profile: .onshape),
+      .orbit(deltaX: 3, deltaY: -2)
+    )
+  }
+
+  func testDefaultProfileUsesTheOnshapeStyleMapping() {
+    XCTAssertEqual(
+      action(button: .right, profile: .default),
+      .orbit(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, profile: .default),
       .pan(deltaX: 3, deltaY: -2)
     )
   }
@@ -29,9 +40,50 @@ final class CADNavigationTests: XCTestCase {
     )
     XCTAssertEqual(
       action(button: .middle, shift: true, profile: .solidWorks),
-      .zoom(delta: -2)
+      .pan(deltaX: 3, deltaY: -2)
     )
     XCTAssertNil(action(button: .right, profile: .solidWorks))
+  }
+
+  func testFusion360UsesShiftMiddleOrbitAndMiddlePan() {
+    XCTAssertEqual(
+      action(button: .middle, shift: true, profile: .fusion360),
+      .orbit(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, profile: .fusion360),
+      .pan(deltaX: 3, deltaY: -2)
+    )
+  }
+
+  func testCustomProfileUsesEditableConflictFreeBindings() {
+    let mapping = CustomNavigationMapping(
+      rotateDrag: .controlRightMouse,
+      panDrag: .shiftMiddleMouse
+    )
+
+    XCTAssertEqual(
+      action(button: .right, control: true, profile: .custom, customMapping: mapping),
+      .orbit(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, shift: true, profile: .custom, customMapping: mapping),
+      .pan(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertNil(action(button: .middle, profile: .custom, customMapping: mapping))
+
+    let conflict = CustomNavigationMapping(
+      rotateDrag: .middleMouse,
+      panDrag: .middleMouse
+    )
+    XCTAssertNotEqual(conflict.rotateDrag, conflict.panDrag)
+  }
+
+  func testNavigationProfileMenuOrderIsStable() {
+    XCTAssertEqual(
+      PreviewNavigationProfile.allCases.map(\.rawValue),
+      ["default", "solidWorks", "onshape", "fusion360", "custom"]
+    )
   }
 
   func testTrackpadPanAndZoomAreProfileIndependent() {
@@ -55,7 +107,8 @@ final class CADNavigationTests: XCTestCase {
     button: CADNavigationMouseButton,
     control: Bool = false,
     shift: Bool = false,
-    profile: PreviewNavigationProfile
+    profile: PreviewNavigationProfile,
+    customMapping: CustomNavigationMapping = CustomNavigationMapping()
   ) -> CADNavigationAction? {
     CADNavigationMapping.action(
       for: CADNavigationInput(
@@ -65,7 +118,8 @@ final class CADNavigationTests: XCTestCase {
         isControlDown: control,
         isShiftDown: shift
       ),
-      profile: profile
+      profile: profile,
+      customMapping: customMapping
     )
   }
 }

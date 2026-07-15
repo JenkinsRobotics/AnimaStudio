@@ -12,9 +12,17 @@ struct StudioWorkspaceView: View {
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
-    PreviewNavigationProfile.onshape.rawValue
+    PreviewNavigationProfile.default.rawValue
+  @AppStorage("viewportCustomRotateDrag") private var viewportCustomRotateDragRawValue =
+    NavigationDragBinding.rightMouse.rawValue
+  @AppStorage("viewportCustomPanDrag") private var viewportCustomPanDragRawValue =
+    NavigationDragBinding.middleMouse.rawValue
   @AppStorage("viewportRenderStyle") private var viewportRenderStyleRawValue =
     ViewportRenderStyle.shaded.rawValue
+  @AppStorage("viewportEdgeDisplay") private var viewportEdgeDisplayRawValue =
+    ViewportEdgeDisplay.mesh.rawValue
+  @AppStorage("viewportLightingPreset") private var viewportLightingPresetRawValue =
+    ViewportLightingPreset.balanced.rawValue
   @AppStorage("viewportFieldOfViewDegrees") private var viewportFieldOfViewDegrees = 60.0
 
   var body: some View {
@@ -137,6 +145,7 @@ struct StudioWorkspaceView: View {
         cameraCommandRevision: workspace.cameraCommandRevision,
         cameraState: workspace.cameraState,
         navigationProfile: viewportNavigationProfile,
+        customNavigationMapping: viewportCustomNavigationMapping,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
@@ -144,6 +153,8 @@ struct StudioWorkspaceView: View {
           ? workspace.rigGuideVisibility : .hidden,
         appearance: viewportAppearance,
         renderStyle: viewportRenderStyle,
+        edgeDisplay: viewportEdgeDisplay,
+        lightingPreset: viewportLightingPreset,
         fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
         onSelectModelPath: { path in
           let modifiers = NSEvent.modifierFlags
@@ -215,35 +226,19 @@ struct StudioWorkspaceView: View {
   private var cameraHUD: some View {
     HStack {
       Spacer()
-      VStack(alignment: .trailing, spacing: 7) {
-        ViewportViewCube(
-          orientation: workspace.cameraState.orientation,
-          onSelectDirection: workspace.setCameraDirection,
-          onNudge: { horizontalRadians, verticalRadians in
-            workspace.nudgeCamera(
-              horizontalRadians: horizontalRadians,
-              verticalRadians: verticalRadians
-            )
-          }
-        )
-
-        HStack(spacing: 7) {
-          ViewportCameraControls(
-            workspace: workspace,
-            navigationProfile: viewportNavigationProfile
-          )
-          ViewportRenderMenu(
-            projection: cameraProjectionBinding,
-            renderStyle: viewportRenderStyleBinding,
-            showsGrid: previewGridBinding,
-            appearance: viewportAppearanceBinding,
-            fieldOfViewDegrees: viewportFieldOfViewBinding,
-            navigationProfile: viewportNavigationProfileBinding,
-            canFrameSelection: workspace.canFrameSelection,
-            frameSelection: workspace.frameSelection
-          )
-        }
-      }
+      ViewportCameraHUD(
+        workspace: workspace,
+        projection: cameraProjectionBinding,
+        renderStyle: viewportRenderStyleBinding,
+        edgeDisplay: viewportEdgeDisplayBinding,
+        lightingPreset: viewportLightingPresetBinding,
+        showsGrid: previewGridBinding,
+        appearance: viewportAppearanceBinding,
+        fieldOfViewDegrees: viewportFieldOfViewBinding,
+        navigationProfile: viewportNavigationProfileBinding,
+        customRotateDrag: viewportCustomRotateDragBinding,
+        customPanDrag: viewportCustomPanDragBinding
+      )
       .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
     .padding(.top, 10)
@@ -276,13 +271,54 @@ struct StudioWorkspaceView: View {
   }
 
   private var viewportNavigationProfile: PreviewNavigationProfile {
-    PreviewNavigationProfile(rawValue: viewportNavigationProfileRawValue) ?? .onshape
+    PreviewNavigationProfile(rawValue: viewportNavigationProfileRawValue) ?? .default
   }
 
   private var viewportNavigationProfileBinding: Binding<PreviewNavigationProfile> {
     Binding(
       get: { viewportNavigationProfile },
       set: { viewportNavigationProfileRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportCustomRotateDrag: NavigationDragBinding {
+    NavigationDragBinding(rawValue: viewportCustomRotateDragRawValue) ?? .rightMouse
+  }
+
+  private var viewportCustomPanDrag: NavigationDragBinding {
+    NavigationDragBinding(rawValue: viewportCustomPanDragRawValue) ?? .middleMouse
+  }
+
+  private var viewportCustomNavigationMapping: CustomNavigationMapping {
+    CustomNavigationMapping(
+      rotateDrag: viewportCustomRotateDrag,
+      panDrag: viewportCustomPanDrag
+    )
+  }
+
+  private var viewportCustomRotateDragBinding: Binding<NavigationDragBinding> {
+    Binding(
+      get: { viewportCustomRotateDrag },
+      set: { newValue in
+        let previousValue = viewportCustomRotateDrag
+        if newValue == viewportCustomPanDrag {
+          viewportCustomPanDragRawValue = previousValue.rawValue
+        }
+        viewportCustomRotateDragRawValue = newValue.rawValue
+      }
+    )
+  }
+
+  private var viewportCustomPanDragBinding: Binding<NavigationDragBinding> {
+    Binding(
+      get: { viewportCustomPanDrag },
+      set: { newValue in
+        let previousValue = viewportCustomPanDrag
+        if newValue == viewportCustomRotateDrag {
+          viewportCustomRotateDragRawValue = previousValue.rawValue
+        }
+        viewportCustomPanDragRawValue = newValue.rawValue
+      }
     )
   }
 
@@ -294,6 +330,28 @@ struct StudioWorkspaceView: View {
     Binding(
       get: { viewportRenderStyle },
       set: { viewportRenderStyleRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportEdgeDisplay: ViewportEdgeDisplay {
+    ViewportEdgeDisplay(rawValue: viewportEdgeDisplayRawValue) ?? .mesh
+  }
+
+  private var viewportEdgeDisplayBinding: Binding<ViewportEdgeDisplay> {
+    Binding(
+      get: { viewportEdgeDisplay },
+      set: { viewportEdgeDisplayRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportLightingPreset: ViewportLightingPreset {
+    ViewportLightingPreset(rawValue: viewportLightingPresetRawValue) ?? .balanced
+  }
+
+  private var viewportLightingPresetBinding: Binding<ViewportLightingPreset> {
+    Binding(
+      get: { viewportLightingPreset },
+      set: { viewportLightingPresetRawValue = $0.rawValue }
     )
   }
 

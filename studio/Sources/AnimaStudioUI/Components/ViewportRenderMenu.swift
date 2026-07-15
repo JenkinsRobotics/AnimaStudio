@@ -4,10 +4,14 @@ import SwiftUI
 struct ViewportRenderMenu: View {
   @Binding var projection: PreviewCameraProjection
   @Binding var renderStyle: ViewportRenderStyle
+  @Binding var edgeDisplay: ViewportEdgeDisplay
+  @Binding var lightingPreset: ViewportLightingPreset
   @Binding var showsGrid: Bool
   @Binding var appearance: PreviewAppearance
   @Binding var fieldOfViewDegrees: Float
   @Binding var navigationProfile: PreviewNavigationProfile
+  @Binding var customRotateDrag: NavigationDragBinding
+  @Binding var customPanDrag: NavigationDragBinding
   let canFrameSelection: Bool
   let frameSelection: () -> Void
 
@@ -33,13 +37,28 @@ struct ViewportRenderMenu: View {
           .disabled(!canFrameSelection)
       }
 
-      Section("Render Style") {
-        Picker("Render Style", selection: $renderStyle) {
+      Section("Viewport Display") {
+        Picker("Lighting", selection: $lightingPreset) {
+          ForEach(ViewportLightingPreset.allCases) { preset in
+            Label(preset.title, systemImage: preset.systemImage)
+              .tag(preset)
+          }
+        }
+
+        Picker("Surface", selection: $renderStyle) {
           ForEach(ViewportRenderStyle.allCases) { style in
             Label(style.title, systemImage: style.systemImage)
               .tag(style)
           }
         }
+
+        Picker("Edges", selection: $edgeDisplay) {
+          ForEach(ViewportEdgeDisplay.allCases) { display in
+            Label(display.title, systemImage: display.systemImage)
+              .tag(display)
+          }
+        }
+        .disabled(renderStyle == .wireframe)
 
         Toggle("Show Grid", systemImage: "grid", isOn: $showsGrid)
       }
@@ -54,18 +73,41 @@ struct ViewportRenderMenu: View {
 
       Section("Input") {
         Picker("Mouse Profile", selection: $navigationProfile) {
-          ForEach(PreviewNavigationProfile.allCases, id: \.self) { profile in
+          ForEach(PreviewNavigationProfile.allCases) { profile in
             Text(profile.displayName).tag(profile)
           }
         }
+
+        if navigationProfile == .custom {
+          Picker("Rotate", selection: $customRotateDrag) {
+            ForEach(NavigationDragBinding.allCases) { binding in
+              Text(binding.title).tag(binding)
+            }
+          }
+
+          Picker("Pan", selection: $customPanDrag) {
+            ForEach(NavigationDragBinding.allCases) { binding in
+              Text(binding.title).tag(binding)
+            }
+          }
+        }
+
+        Label("Zoom · Scroll Wheel", systemImage: "computermouse")
       }
     } label: {
       HStack(spacing: 5) {
-        Image(systemName: renderStyle.systemImage)
+        Image(
+          systemName: ViewportRenderMenuPresentation.icon(
+            renderStyle: renderStyle,
+            edgeDisplay: edgeDisplay
+          )
+        )
+        Text("Display")
+          .font(.caption2.weight(.semibold))
         Image(systemName: "chevron.down")
           .font(.system(size: 8, weight: .bold))
       }
-      .frame(width: 44, height: 23)
+      .frame(width: 78, height: 25)
       .foregroundStyle(.white)
       .background(StudioPalette.panel.opacity(0.9), in: RoundedRectangle(cornerRadius: 6))
       .overlay {
@@ -80,4 +122,14 @@ struct ViewportRenderMenu: View {
   }
 
   private static let fieldOfViewPresets: [Float] = [30, 45, 60, 75, 90]
+}
+
+enum ViewportRenderMenuPresentation {
+  static func icon(
+    renderStyle: ViewportRenderStyle,
+    edgeDisplay: ViewportEdgeDisplay
+  ) -> String {
+    guard renderStyle == .shaded else { return renderStyle.systemImage }
+    return edgeDisplay == .mesh ? "cube" : renderStyle.systemImage
+  }
 }

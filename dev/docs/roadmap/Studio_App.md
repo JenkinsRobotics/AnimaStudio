@@ -125,11 +125,14 @@ controls while retaining native macOS trackpad gestures:
   for a visible transform or DOF handle rather than camera navigation.
 
 The current RealityKit viewport uses a narrow AppKit input adapter over its
-RealityKit camera so the mapping is explicit and testable. Onshape is the
-default profile. A user-local setting can switch to SolidWorks behavior, where
-middle drag orbits, Control + middle drag pans, and Shift + middle drag zooms.
-Trackpad two-finger movement pans and pinch zooms in either profile. Navigation
-preferences never enter project data.
+RealityKit camera so the mapping is explicit and testable. The user-local mouse
+profile offers Default, SolidWorks, Onshape, Fusion 360, and Custom. Default
+uses the Onshape-style right-drag orbit, middle-drag pan, and wheel zoom.
+SolidWorks uses middle-drag orbit plus Control- or Shift-middle-drag pan;
+Fusion 360 uses Shift-middle-drag orbit plus middle-drag pan. Custom exposes
+separate rotate and pan drag bindings and prevents the two actions from owning
+the same chord. Trackpad two-finger movement pans and pinch zooms in every
+profile. Navigation preferences never enter project data.
 
 The viewport camera is represented by one presentation-state contract:
 orientation, look-at target, perspective distance, orthographic scale, and
@@ -143,22 +146,31 @@ standard CAD navigation vocabulary:
 - clicking a corner selects the corresponding trimetric view;
 - the surrounding arrows rotate the current view in 15-degree increments.
 
+Visible face names rotate and clip with their projected planes. Pointer hover
+previews the exact face, edge, or corner that a click will select. The embedded
+XYZ triad shares one visible origin and projects only the positive X, Y, and Z
+directions through the same camera basis, so its directions remain synchronized
+with the cube rather than acting as a static legend.
+
 Camera and render controls are intentionally split from the RealityKit scene
 implementation. `PreviewCameraState` owns renderer-facing camera data,
 `ViewCubeGeometry` owns projection and hit testing, `ViewportViewCube` owns the
-SwiftUI presentation, and `ViewportRenderMenu` owns user choices. This keeps
-the view cube independently testable and prevents the workspace shell from
-becoming a single monolithic UI file.
+SwiftUI presentation, `ViewportRenderMenu` owns user choices,
+`ViewportCameraHUD` composes those controls, and `ViewportLighting` owns the
+RealityKit light rigs. This keeps the view cube independently testable and
+prevents the workspace shell from becoming a single monolithic UI file.
 
-The first render menu exposes Perspective/Orthographic projection, 30–90°
-perspective field-of-view presets, Frame Selection, grid visibility, viewport
-appearance, mouse profile, and four truthful render styles: Shaded, Shaded +
-Mesh Edges, Wireframe, and Translucent. “Mesh Edges” means RealityKit triangle
-mesh lines; it is not a promise of CAD feature-edge classification. Projection,
-render style, field of view, appearance, grid, and mouse profile are user-local
-presentation preferences and do not alter the project document. Hidden-line
-removal, section views, roll controls, and saved named views require dedicated
-geometry/camera contracts and remain future work rather than inert menu items.
+The direct Display menu beside the cube exposes Perspective/Orthographic
+projection, 30–90° perspective field-of-view presets, Frame Selection, grid
+visibility, viewport appearance, mouse profile, Shaded/Wireframe/Translucent
+surface modes, independent mesh-edge visibility, and Balanced/Soft/Bright/High
+Contrast two-light rigs. “Mesh Edges” means RealityKit triangle mesh lines; it
+is not a promise of CAD feature-edge classification. Projection, surface, edge,
+lighting, field of view, appearance, grid, mouse profile, and custom mouse
+bindings are user-local presentation preferences and do not alter the project
+document. Hidden-line removal, section views, roll controls, and saved named
+views require dedicated geometry/camera contracts and remain future work rather
+than inert menu items.
 
 Semantic-part selection is one identity shared by the viewport, Parts tree,
 and inspector. A selected proxy receives a high-contrast orange silhouette and

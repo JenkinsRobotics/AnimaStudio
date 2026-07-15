@@ -9,8 +9,9 @@ final class ViewportRenderStyleTests: XCTestCase {
   func testRenderStyleIdentifiersRemainStable() {
     XCTAssertEqual(
       ViewportRenderStyle.allCases.map(\.rawValue),
-      ["shaded", "shadedWithMeshEdges", "wireframe", "translucent"]
+      ["shaded", "wireframe", "translucent"]
     )
+    XCTAssertEqual(ViewportEdgeDisplay.allCases.map(\.rawValue), ["hidden", "mesh"])
   }
 
   func testShadedWithEdgesAddsANoninteractiveMeshOverlay() {
@@ -20,7 +21,8 @@ final class ViewportRenderStyleTests: XCTestCase {
     )
 
     ViewportRenderStyleApplier.addMeshEdgeOverlayIfNeeded(
-      .shadedWithMeshEdges,
+      .mesh,
+      renderStyle: .shaded,
       to: entity
     )
 
@@ -35,7 +37,7 @@ final class ViewportRenderStyleTests: XCTestCase {
       materials: [SimpleMaterial(color: .systemTeal, isMetallic: false)]
     )
 
-    ViewportRenderStyleApplier.apply(.wireframe, to: entity)
+    ViewportRenderStyleApplier.apply(.wireframe, edgeDisplay: .mesh, to: entity)
 
     let model = try XCTUnwrap(entity.components[ModelComponent.self])
     let material = try XCTUnwrap(model.materials.first as? UnlitMaterial)
@@ -45,8 +47,19 @@ final class ViewportRenderStyleTests: XCTestCase {
   func testTranslucentAppliesOpacityAtTheRenderRoot() {
     let entity = Entity()
 
-    ViewportRenderStyleApplier.apply(.translucent, to: entity)
+    ViewportRenderStyleApplier.apply(.translucent, edgeDisplay: .hidden, to: entity)
 
     XCTAssertEqual(entity.components[OpacityComponent.self]?.opacity, 0.38)
+  }
+
+  func testHiddenEdgesDoNotAddAnOverlay() {
+    let entity = ModelEntity(
+      mesh: .generateBox(size: 1),
+      materials: [SimpleMaterial(color: .systemTeal, isMetallic: false)]
+    )
+
+    ViewportRenderStyleApplier.apply(.shaded, edgeDisplay: .hidden, to: entity)
+
+    XCTAssertNil(entity.findEntity(named: ViewportRenderStyleApplier.meshEdgeOverlayName))
   }
 }

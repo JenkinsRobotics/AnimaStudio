@@ -17,6 +17,7 @@ public struct RobotPreviewView: View {
   private let cameraCommandRevision: Int
   private let cameraState: PreviewCameraState
   private let navigationProfile: PreviewNavigationProfile
+  private let customNavigationMapping: CustomNavigationMapping
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
   private let importedHierarchyRootPath: ModelEntityPath?
@@ -27,6 +28,8 @@ public struct RobotPreviewView: View {
   private let rigGuideVisibility: RigGuideVisibility
   private let appearance: PreviewAppearance
   private let renderStyle: ViewportRenderStyle
+  private let edgeDisplay: ViewportEdgeDisplay
+  private let lightingPreset: ViewportLightingPreset
   private let fieldOfViewDegrees: Float
   private let onCameraStateChange: (PreviewCameraState) -> Void
 
@@ -39,13 +42,16 @@ public struct RobotPreviewView: View {
     viewpoint: PreviewCameraViewpoint = .home,
     cameraCommandRevision: Int = 0,
     cameraState: PreviewCameraState = PreviewCameraState(),
-    navigationProfile: PreviewNavigationProfile = .onshape,
+    navigationProfile: PreviewNavigationProfile = .default,
+    customNavigationMapping: CustomNavigationMapping = CustomNavigationMapping(),
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
     importedHierarchyRootPath: ModelEntityPath? = nil,
     rigGuideVisibility: RigGuideVisibility = .hidden,
     appearance: PreviewAppearance = .midnight,
     renderStyle: ViewportRenderStyle = .shaded,
+    edgeDisplay: ViewportEdgeDisplay = .mesh,
+    lightingPreset: ViewportLightingPreset = .balanced,
     fieldOfViewDegrees: Float = 60,
     onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in },
     onSelectPartID: @escaping (PartID) -> Void = { _ in },
@@ -62,12 +68,15 @@ public struct RobotPreviewView: View {
     self.cameraCommandRevision = cameraCommandRevision
     self.cameraState = cameraState
     self.navigationProfile = navigationProfile
+    self.customNavigationMapping = customNavigationMapping
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
     self.importedHierarchyRootPath = importedHierarchyRootPath
     self.rigGuideVisibility = rigGuideVisibility
     self.appearance = appearance
     self.renderStyle = renderStyle
+    self.edgeDisplay = edgeDisplay
+    self.lightingPreset = lightingPreset
     self.fieldOfViewDegrees = min(max(fieldOfViewDegrees, 20), 120)
     self.onSelectModelPath = onSelectModelPath
     self.onSelectPartID = onSelectPartID
@@ -78,7 +87,13 @@ public struct RobotPreviewView: View {
 
   public var body: some View {
     RealityView { content in
-      let root = Self.makeScene(rig: rig, appearance: appearance, renderStyle: renderStyle)
+      let root = Self.makeScene(
+        rig: rig,
+        appearance: appearance,
+        renderStyle: renderStyle,
+        edgeDisplay: edgeDisplay,
+        lightingPreset: lightingPreset
+      )
       content.add(root)
       content.cameraTarget = root.findEntity(named: "previewCameraTarget")
 
@@ -88,7 +103,11 @@ public struct RobotPreviewView: View {
         importedModel.name = "importedModel"
         Self.normalizeForPreview(importedModel)
         Self.prepareForSelection(importedModel)
-        ViewportRenderStyleApplier.apply(renderStyle, to: importedModel)
+        ViewportRenderStyleApplier.apply(
+          renderStyle,
+          edgeDisplay: edgeDisplay,
+          to: importedModel
+        )
         root.addChild(importedModel)
       }
     } update: { content in
@@ -204,7 +223,10 @@ public struct RobotPreviewView: View {
         }
     )
     .overlay {
-      CADNavigationCapture(profile: navigationProfile) { action in
+      CADNavigationCapture(
+        profile: navigationProfile,
+        customMapping: customNavigationMapping
+      ) { action in
         navigationAction = action
         navigationCommandRevision += 1
       }
@@ -218,13 +240,15 @@ public struct RobotPreviewView: View {
     let partIDs = rig.parts.map { $0.id.rawValue.uuidString }.joined(separator: ",")
     let jointIDs = rig.joints.map { $0.id.rawValue }.joined(separator: ",")
     return
-      "\(modelURL?.absoluteString ?? "none")|\(appearance.rawValue)|\(renderStyle.rawValue)|\(partIDs)|\(jointIDs)"
+      "\(modelURL?.absoluteString ?? "none")|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(partIDs)|\(jointIDs)"
   }
 
   private static func makeScene(
     rig: CharacterRig,
     appearance: PreviewAppearance,
-    renderStyle: ViewportRenderStyle
+    renderStyle: ViewportRenderStyle,
+    edgeDisplay: ViewportEdgeDisplay,
+    lightingPreset: ViewportLightingPreset
   ) -> Entity {
     let root = Entity()
     root.name = "animaPreviewRoot"
@@ -232,7 +256,9 @@ public struct RobotPreviewView: View {
     root.addChild(makeGrid(appearance: appearance))
 
     for part in rig.parts {
-      root.addChild(makePart(part, renderStyle: renderStyle))
+      root.addChild(
+        makePart(part, renderStyle: renderStyle, edgeDisplay: edgeDisplay)
+      )
     }
 
     for joint in rig.joints {
@@ -253,18 +279,20 @@ public struct RobotPreviewView: View {
     cameraTarget.position = SIMD3<Float>(0, 0.8, 0)
     root.addChild(cameraTarget)
 
-    let light = Entity(
-      components: DirectionalLightComponent(color: .white, intensity: appearance.lightIntensity)
-    )
-    light.orientation = simd_quatf(angle: -.pi / 4, axis: SIMD3<Float>(1, 0, 0))
-    root.addChild(light)
+    for light in ViewportLightingFactory.makeLights(
+      preset: lightingPreset,
+      baseIntensity: appearance.lightIntensity
+    ) {
+      root.addChild(light)
+    }
 
     return root
   }
 
   private static func makePart(
     _ part: RigPartDefinition,
-    renderStyle: ViewportRenderStyle
+    renderStyle: ViewportRenderStyle,
+    edgeDisplay: ViewportEdgeDisplay
   ) -> Entity {
     let material = ViewportRenderStyleApplier.partMaterial(
       renderStyle,
@@ -297,7 +325,11 @@ public struct RobotPreviewView: View {
     entity.position = simdPosition(part.positionMeters)
     entity.orientation = orientation(part.rotationEulerRadians)
     prepareForSelection(entity)
-    ViewportRenderStyleApplier.addMeshEdgeOverlayIfNeeded(renderStyle, to: entity)
+    ViewportRenderStyleApplier.addMeshEdgeOverlayIfNeeded(
+      edgeDisplay,
+      renderStyle: renderStyle,
+      to: entity
+    )
     return entity
   }
 

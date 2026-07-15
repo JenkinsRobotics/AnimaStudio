@@ -61,14 +61,20 @@
   two-axis, and trimetric views, while its surrounding arrows rotate the view
   in 15-degree steps. A dedicated camera/render menu provides
   perspective/orthographic projection, 30–90° perspective field-of-view
-  presets, selection framing, grid and appearance controls, and Shaded, Shaded
-  + Mesh Edges, Wireframe, and Translucent styles. These settings persist as
-  user-local presentation preferences and do not alter project data. The
-  viewport also provides Home/front/right/top presets, trackpad pan/pinch, and
-  explicit persistent Onshape and SolidWorks mouse profiles. Onshape maps right
-  drag to orbit/tilt, middle drag and Control-right drag to pan; SolidWorks maps
-  middle drag to orbit/tilt, Control-middle drag to pan, and Shift-middle drag
-  to zoom. Wheel scrolling zooms in both profiles. Semantic proxy geometry is
+  presets and selection framing. Its adjacent Display dropdown independently
+  controls Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, grid,
+  viewport appearance, and Balanced/Soft/Bright/High Contrast RealityKit
+  lighting rigs. These settings persist as user-local presentation preferences
+  and do not alter project data. Cube face names rotate and clip with their
+  projected planes, its XYZ triad shares one origin and follows only the
+  positive axis directions, and hovering previews the exact clickable face,
+  edge, or corner. The viewport also provides Home/front/right/top presets,
+  trackpad pan/pinch, and persistent Default, SolidWorks, Onshape, Fusion 360,
+  and Custom mouse profiles. Default and Onshape map right drag to orbit and
+  middle drag to pan; SolidWorks maps middle drag to orbit and Control- or
+  Shift-middle drag to pan; Fusion 360 maps Shift-middle drag to orbit and
+  middle drag to pan. Custom exposes conflict-free rotate and pan bindings.
+  Wheel scrolling zooms in every profile. Semantic proxy geometry is
   directly selectable in the viewport and resolves to the same stable part ID
   used by the Parts tree and inspector. The selected part receives an orange
   silhouette highlight plus local XYZ translation arrows and rotation rings at
@@ -94,7 +100,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Fifty tests pass with `cd studio && swift test`, including real
+  inspector. Sixty-three tests pass with `cd studio && swift test`, including real
   USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
   identity coverage, hierarchy filtering/ancestor retention, frame timecode and
   stepping, adjacent-key navigation, and loop/non-loop playback. The Python
@@ -137,10 +143,9 @@
   transforms. Part selection is entity-level; durable face selection still
   needs triangle identity through reimport, and true edge selection still needs
   topology/adjacency plus screen-space proximity. Transform gizmos are currently
-  world-scaled rather than screen-size-stable. The Shaded + Mesh Edges and
-  Wireframe modes display triangle mesh lines, not classified CAD feature
-  edges; hidden-line removal, section views, camera roll, and saved named views
-  are not implemented. Typed
+  world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display
+  triangle mesh lines, not classified CAD feature edges; hidden-line removal,
+  section views, camera roll, and saved named views are not implemented. Typed
   prismatic/cylindrical/ball/planar/fastened joints
   and keyframes are not yet editable; project changes are not
   persisted; imported security-scoped URLs

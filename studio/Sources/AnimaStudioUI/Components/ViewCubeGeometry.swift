@@ -59,6 +59,52 @@ struct ProjectedViewCubeFace {
   }
 }
 
+enum ViewCubeAxis: CaseIterable {
+  case x
+  case y
+  case z
+
+  var title: String {
+    switch self {
+    case .x: "X"
+    case .y: "Y"
+    case .z: "Z"
+    }
+  }
+
+  var direction: SIMD3<Float> {
+    switch self {
+    case .x: SIMD3<Float>(1, 0, 0)
+    case .y: SIMD3<Float>(0, 1, 0)
+    case .z: SIMD3<Float>(0, 0, 1)
+    }
+  }
+}
+
+struct ProjectedViewCubeAxis {
+  let axis: ViewCubeAxis
+  let origin: CGPoint
+  let endpoint: CGPoint
+}
+
+enum ViewCubeHitKind: Equatable {
+  case face(ViewCubeFace)
+  case edge
+  case corner
+}
+
+enum ViewCubeHighlight {
+  case face([CGPoint])
+  case edge(start: CGPoint, end: CGPoint)
+  case corner(CGPoint)
+}
+
+struct ViewCubeHitTarget {
+  let direction: PreviewCameraDirection
+  let kind: ViewCubeHitKind
+  let highlight: ViewCubeHighlight
+}
+
 enum ViewCubeGeometry {
   static func projectedFaces(
     in size: CGSize,
@@ -66,16 +112,12 @@ enum ViewCubeGeometry {
   ) -> [ProjectedViewCubeFace] {
     let basis = cameraBasis(for: orientation.direction.vector)
     let scale = min(size.width, size.height) * 0.28
-    let center = CGPoint(x: size.width / 2, y: size.height / 2)
 
     return ViewCubeFace.allCases
       .filter { simd_dot($0.normal, orientation.direction.vector) > 0.001 }
       .map { face in
         let projected = face.vertices.map { vertex in
-          CGPoint(
-            x: center.x + CGFloat(simd_dot(vertex, basis.right)) * scale,
-            y: center.y - CGFloat(simd_dot(vertex, basis.up)) * scale
-          )
+          project(vertex, in: size, basis: basis, scale: scale)
         }
         let depth =
           face.vertices
@@ -91,18 +133,54 @@ enum ViewCubeGeometry {
       .sorted { $0.depth < $1.depth }
   }
 
+  static func projectedAxes(
+    in size: CGSize,
+    orientation: PreviewCameraOrientation
+  ) -> [ProjectedViewCubeAxis] {
+    let basis = cameraBasis(for: orientation.direction.vector)
+    let scale = min(size.width, size.height) * 0.28
+    let worldOrigin = SIMD3<Float>(repeating: -1.15)
+    let axisLength: Float = 2.35
+    let origin = project(worldOrigin, in: size, basis: basis, scale: scale)
+
+    return ViewCubeAxis.allCases.map { axis in
+      ProjectedViewCubeAxis(
+        axis: axis,
+        origin: origin,
+        endpoint: project(
+          worldOrigin + axis.direction * axisLength,
+          in: size,
+          basis: basis,
+          scale: scale
+        )
+      )
+    }
+  }
+
   static func hitDirection(
     at location: CGPoint,
     in size: CGSize,
     orientation: PreviewCameraOrientation
   ) -> PreviewCameraDirection? {
+    hitTarget(at: location, in: size, orientation: orientation)?.direction
+  }
+
+  static func hitTarget(
+    at location: CGPoint,
+    in size: CGSize,
+    orientation: PreviewCameraOrientation
+  ) -> ViewCubeHitTarget? {
     let faces = projectedFaces(in: size, orientation: orientation)
     let vertices = uniqueVertices(from: faces)
 
     if let closestVertex = vertices.min(by: {
       distanceSquared(location, $0.point) < distanceSquared(location, $1.point)
     }), distanceSquared(location, closestVertex.point) <= 100 {
-      return direction(for: closestVertex.world)
+      return ViewCubeHitTarget(
+        direction: direction(for: closestVertex.world),
+        kind: .corner,
+        highlight: .corner(closestVertex.point)
+      )
     }
 
     let edges = uniqueEdges(from: faces)
@@ -110,13 +188,34 @@ enum ViewCubeGeometry {
       distanceSquared(location, toSegmentFrom: $0.start, to: $0.end)
         < distanceSquared(location, toSegmentFrom: $1.start, to: $1.end)
     }), distanceSquared(location, toSegmentFrom: closestEdge.start, to: closestEdge.end) <= 49 {
-      return direction(for: closestEdge.worldMidpoint)
+      return ViewCubeHitTarget(
+        direction: direction(for: closestEdge.worldMidpoint),
+        kind: .edge,
+        highlight: .edge(start: closestEdge.start, end: closestEdge.end)
+      )
     }
 
     for face in faces.reversed() where contains(location, polygon: face.points) {
-      return direction(for: face.face.normal)
+      return ViewCubeHitTarget(
+        direction: direction(for: face.face.normal),
+        kind: .face(face.face),
+        highlight: .face(face.points)
+      )
     }
     return nil
+  }
+
+  static func labelAngleRadians(for face: ProjectedViewCubeFace) -> CGFloat {
+    guard face.points.count >= 2 else { return 0 }
+    let start = face.points[0]
+    let end = face.points[1]
+    var radians = atan2(end.y - start.y, end.x - start.x)
+    if radians > .pi / 2 {
+      radians -= .pi
+    } else if radians < -.pi / 2 {
+      radians += .pi
+    }
+    return radians
   }
 
   private static func cameraBasis(
@@ -134,6 +233,19 @@ enum ViewCubeGeometry {
 
   private static func direction(for vector: SIMD3<Float>) -> PreviewCameraDirection {
     PreviewCameraDirection(x: vector.x, y: vector.y, z: vector.z)
+  }
+
+  private static func project(
+    _ point: SIMD3<Float>,
+    in size: CGSize,
+    basis: (right: SIMD3<Float>, up: SIMD3<Float>),
+    scale: CGFloat
+  ) -> CGPoint {
+    let center = CGPoint(x: size.width / 2, y: size.height / 2)
+    return CGPoint(
+      x: center.x + CGFloat(simd_dot(point, basis.right)) * scale,
+      y: center.y - CGFloat(simd_dot(point, basis.up)) * scale
+    )
   }
 
   private static func uniqueVertices(
