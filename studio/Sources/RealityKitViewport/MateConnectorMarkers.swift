@@ -3,6 +3,48 @@ import AppKit
 import RealityKit
 import simd
 
+/// How connector-candidate markers present in the viewport.
+///
+/// `placement` is the mate-placement flow (orange commit targets).
+/// `standingSelection` is the persistent sub-object selection preview: the
+/// same inferred candidates, drawn quietly until hover reveals the exact
+/// clickable feature — the view-cube interaction generalized to components.
+enum MateConnectorMarkerStyle: String, CaseIterable, Sendable {
+  case placement
+  case standingSelection
+
+  struct Appearance: Equatable {
+    let tint: NSColor
+    /// Base opacity for the marker sphere; nil renders fully opaque.
+    let opacity: Float?
+    let radiusMeters: Float
+    let hoverColor: NSColor
+    let hoverStrength: Float
+    let showsAxisStem: Bool
+  }
+
+  func appearance(isSelected: Bool) -> Appearance {
+    switch (self, isSelected) {
+    case (.placement, false):
+      Appearance(
+        tint: .systemOrange, opacity: nil, radiusMeters: 0.031,
+        hoverColor: .systemYellow, hoverStrength: 1.45, showsAxisStem: true)
+    case (.placement, true):
+      Appearance(
+        tint: .systemPurple, opacity: nil, radiusMeters: 0.042,
+        hoverColor: .systemYellow, hoverStrength: 1.45, showsAxisStem: true)
+    case (.standingSelection, false):
+      Appearance(
+        tint: .systemCyan, opacity: 0.34, radiusMeters: 0.024,
+        hoverColor: .systemCyan, hoverStrength: 2.2, showsAxisStem: false)
+    case (.standingSelection, true):
+      Appearance(
+        tint: .systemCyan, opacity: nil, radiusMeters: 0.038,
+        hoverColor: .systemCyan, hoverStrength: 2.2, showsAxisStem: true)
+    }
+  }
+}
+
 @MainActor
 enum MateConnectorMarkerFactory {
   static let layerName = "mateCandidateLayer"
@@ -13,11 +55,13 @@ enum MateConnectorMarkerFactory {
     rig: CharacterRig,
     visiblePartIDs: Set<PartID>,
     selectedCandidate: MateConnectorCandidate?,
+    style: MateConnectorMarkerStyle = .placement,
     to root: Entity
   ) {
     let signature = makeSignature(
       visiblePartIDs: visiblePartIDs,
-      selectedCandidate: selectedCandidate
+      selectedCandidate: selectedCandidate,
+      style: style
     )
     if root.findEntity(named: signature) != nil { return }
 
@@ -29,7 +73,10 @@ enum MateConnectorMarkerFactory {
       let layer = Entity()
       layer.name = layerName
       for candidate in MateConnectorInference.candidates(for: part) {
-        layer.addChild(makeMarker(candidate, isSelected: false, acceptsInput: true))
+        let isSelected =
+          selectedCandidate?.partID == candidate.partID && selectedCandidate?.id == candidate.id
+        layer.addChild(
+          makeMarker(candidate, isSelected: isSelected, acceptsInput: true, style: style))
       }
       partEntity.addChild(layer)
     }
@@ -42,7 +89,8 @@ enum MateConnectorMarkerFactory {
     {
       let layer = Entity()
       layer.name = layerName
-      layer.addChild(makeMarker(selectedCandidate, isSelected: true, acceptsInput: false))
+      layer.addChild(
+        makeMarker(selectedCandidate, isSelected: true, acceptsInput: false, style: style))
       partEntity.addChild(layer)
     }
 
@@ -80,34 +128,40 @@ enum MateConnectorMarkerFactory {
   private static func makeMarker(
     _ candidate: MateConnectorCandidate,
     isSelected: Bool,
-    acceptsInput: Bool
+    acceptsInput: Bool,
+    style: MateConnectorMarkerStyle
   ) -> ModelEntity {
-    let tint = isSelected ? NSColor.systemPurple : NSColor.systemOrange
-    let radius: Float = isSelected ? 0.042 : 0.031
+    let appearance = style.appearance(isSelected: isSelected)
+    var material = UnlitMaterial(color: appearance.tint)
+    if let opacity = appearance.opacity {
+      material.blending = .transparent(opacity: .init(floatLiteral: opacity))
+    }
     let marker = ModelEntity(
-      mesh: .generateSphere(radius: radius),
-      materials: [UnlitMaterial(color: tint)]
+      mesh: .generateSphere(radius: appearance.radiusMeters),
+      materials: [material]
     )
     marker.name = "\(markerPrefix)\(candidate.partID.rawValue.uuidString)|\(candidate.id)"
     marker.position = vector(candidate.connector.originMeters)
     marker.orientation = orientation(candidate.connector)
 
-    let primaryAxis = ModelEntity(
-      mesh: .generateCylinder(height: 0.105, radius: 0.007),
-      materials: [UnlitMaterial(color: tint.withAlphaComponent(0.92))]
-    )
-    primaryAxis.position.z = 0.0525
-    primaryAxis.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(1, 0, 0))
-    marker.addChild(primaryAxis)
+    if appearance.showsAxisStem {
+      let primaryAxis = ModelEntity(
+        mesh: .generateCylinder(height: 0.105, radius: 0.007),
+        materials: [UnlitMaterial(color: appearance.tint.withAlphaComponent(0.92))]
+      )
+      primaryAxis.position.z = 0.0525
+      primaryAxis.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(1, 0, 0))
+      marker.addChild(primaryAxis)
+    }
 
     if acceptsInput {
       marker.components.set(InputTargetComponent(allowedInputTypes: .indirect))
       marker.components.set(
-        CollisionComponent(shapes: [.generateSphere(radius: radius * 1.8)])
+        CollisionComponent(shapes: [.generateSphere(radius: appearance.radiusMeters * 1.8)])
       )
       marker.components.set(
         HoverEffectComponent(
-          .highlight(.init(color: .systemYellow, strength: 1.45))
+          .highlight(.init(color: appearance.hoverColor, strength: appearance.hoverStrength))
         )
       )
     }
@@ -126,14 +180,15 @@ enum MateConnectorMarkerFactory {
 
   private static func makeSignature(
     visiblePartIDs: Set<PartID>,
-    selectedCandidate: MateConnectorCandidate?
+    selectedCandidate: MateConnectorCandidate?,
+    style: MateConnectorMarkerStyle
   ) -> String {
     let visible = visiblePartIDs.map { $0.rawValue.uuidString }.sorted().joined(separator: ",")
     let selected =
       selectedCandidate.map {
         "\($0.partID.rawValue.uuidString):\($0.id)"
       } ?? "none"
-    return "\(signaturePrefix)\(visible)|\(selected)"
+    return "\(signaturePrefix)\(style.rawValue)|\(visible)|\(selected)"
   }
 
   private static func removeLayers(from root: Entity) {

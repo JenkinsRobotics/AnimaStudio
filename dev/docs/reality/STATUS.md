@@ -67,6 +67,17 @@
   Show exposes Sequence, Clips, Events, and Sync; Hardware exposes Connection,
   Outputs, Mapping, Calibration, Safety, and Monitor. Implemented commands are
   live, while backend-dependent commands remain visibly disabled as planned.
+  A shell-level **UI Dev** workspace follows the five project-authoring
+  workspaces in the selector without becoming saved character data. Its ribbon
+  opens Windows, Controls, and Foundations galleries for the living Studio UI
+  standard: action hierarchy and states, labeled/unit-aware inputs, native
+  menus, reusable panel chrome, blocking dialogs, contextual popovers, and
+  semantic color/geometry tokens. Canonical reusable styles now cover primary,
+  secondary, quiet, destructive, selected-icon, card, and popover treatments.
+  UI Dev's Agent command opens one reusable floating macOS utility panel with
+  voice/chat/docs/ideas presentation, prompt starters, and a composer. It is
+  explicitly labeled as a UI prototype; microphone and Send remain disabled
+  until an agent service is connected.
   Rig preserves Structures and the complete Mate family and adds focused
   Connectors, Assemble, and Inspect groups before the planned Motors, 3D Models
   & Media, and Events groups. Its creation families stay docked in the ribbon
@@ -121,7 +132,17 @@
   rings at its origin; dragging them edits the core-backed rest transform, and
   connector-authored mate rotation composes through parent/child chains. During
   mate placement, transform handles are suppressed so connector markers own the
-  click target. The Components outline follows macOS file-browser
+  click target. Outside mate placement, the focused component shows the same
+  inferred face-center/edge-midpoint/corner/axis/origin candidates as quiet
+  cyan markers with view-cube-style hover: pointing at one highlights the
+  exact clickable feature before commit-click. Clicking a marker selects that
+  feature persistently (stronger cyan treatment) and keeps the owning
+  component selected; the inspector shows a read-only Feature section with
+  the owning component, feature kind, and part-local origin. Clicking empty
+  viewport space now deselects the feature and all components; Escape clears
+  the feature first, then component selection, and feature inspection is
+  allowed on locked components while locks keep guarding every edit. The
+  Components outline follows macOS file-browser
   selection conventions:
   Command/Shift select multiple, one item opens its configuration, and Escape
   or the inspector close control clears selection. Imported geometry can also
@@ -197,8 +218,10 @@
   Automatic imported-hole centers require durable mesh/topology references;
   current hole-like snapping is available on cylinder proxy axes and circular
   face centers. The shipped part transform gizmo edits semantic-part rest
-  transforms outside mate placement. Part selection is entity-level; durable face selection still
-  needs triangle identity through reimport, and true edge selection still needs
+  transforms outside mate placement. Sub-object selection covers the inferred
+  proxy feature candidates (face centers, edge midpoints, corners, axes,
+  origins); imported-mesh face selection still
+  needs triangle identity through reimport, and full edge-curve selection still needs
   topology/adjacency plus screen-space proximity. Transform gizmos are currently
   world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display
   triangle mesh lines, not classified CAD feature edges; hidden-line removal,

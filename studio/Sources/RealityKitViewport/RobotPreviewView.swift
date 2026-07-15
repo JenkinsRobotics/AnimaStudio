@@ -7,6 +7,11 @@ public struct RobotPreviewView: View {
   @State private var transformDragState: TransformDragState?
   @State private var navigationAction: CADNavigationAction?
   @State private var navigationCommandRevision = 0
+  /// Standing sub-object selection shown in the viewport. The workspace
+  /// model mirrors it through `onSelectMateCandidate` events and remains
+  /// authoritative for the inspector; this local copy only drives the
+  /// persistent marker treatment.
+  @State private var standingFeature: MateConnectorCandidate?
 
   private let frame: EvaluatedFrame
   private let rig: CharacterRig
@@ -28,7 +33,7 @@ public struct RobotPreviewView: View {
   private let onSelectPartID: (PartID) -> Void
   private let onSetPartPosition: (PartID, RigVector3) -> Void
   private let onSetPartRotation: (PartID, RigVector3) -> Void
-  private let onSelectMateCandidate: (MateConnectorCandidate) -> Void
+  private let onSelectMateCandidate: (ViewportPickEvent) -> Void
   private let rigGuideVisibility: RigGuideVisibility
   private let appearance: PreviewAppearance
   private let renderStyle: ViewportRenderStyle
@@ -70,7 +75,7 @@ public struct RobotPreviewView: View {
     onSelectPartID: @escaping (PartID) -> Void = { _ in },
     onSetPartPosition: @escaping (PartID, RigVector3) -> Void = { _, _ in },
     onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in },
-    onSelectMateCandidate: @escaping (MateConnectorCandidate) -> Void = { _ in },
+    onSelectMateCandidate: @escaping (ViewportPickEvent) -> Void = { _ in },
     onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in }
   ) {
     self.frame = frame
@@ -162,20 +167,31 @@ public struct RobotPreviewView: View {
         reportCameraState(updatedCameraState)
       }
       Self.applyRig(rig, frame: frame, to: root)
-      if mateCandidatePartIDs.isEmpty, selectedMateCandidate == nil {
-        MateConnectorMarkerFactory.remove(from: root)
-      } else {
+      if isPlacementActive {
         MateConnectorMarkerFactory.apply(
           rig: rig,
           visiblePartIDs: mateCandidatePartIDs,
           selectedCandidate: selectedMateCandidate,
+          style: .placement,
           to: root
         )
+      } else if let focusedPartID,
+        rig.parts.contains(where: { $0.id == focusedPartID })
+      {
+        MateConnectorMarkerFactory.apply(
+          rig: rig,
+          visiblePartIDs: [focusedPartID],
+          selectedCandidate: standingFeature,
+          style: .standingSelection,
+          to: root
+        )
+      } else {
+        MateConnectorMarkerFactory.remove(from: root)
       }
       Self.applySelection(
         focusedPartID,
         isLocked: focusedPartIsLocked,
-        allowsTransformGizmo: mateCandidatePartIDs.isEmpty && selectedMateCandidate == nil,
+        allowsTransformGizmo: !isPlacementActive,
         rig: rig,
         to: root
       )
@@ -195,27 +211,35 @@ public struct RobotPreviewView: View {
       SpatialTapGesture()
         .targetedToAnyEntity()
         .onEnded { value in
-          if let candidate = MateConnectorMarkerFactory.candidate(
-            from: value.entity,
-            rig: rig
+          switch SubObjectSelection.outcome(
+            forTapOn: Self.tapTarget(for: value.entity, rig: rig),
+            isPlacementActive: isPlacementActive
           ) {
-            onSelectMateCandidate(candidate)
-            return
-          }
-          if let partID = Self.partID(for: value.entity) {
+          case .selectFeature(let candidate):
+            standingFeature = candidate
+            onSelectMateCandidate(.feature(candidate))
+          case .forwardToPlacement(let candidate):
+            onSelectMateCandidate(.feature(candidate))
+          case .selectComponent(let partID):
+            standingFeature = nil
             onSelectPartID(partID)
-            return
+          case .selectImportedNode:
+            standingFeature = nil
+            guard let importedHierarchyRootPath,
+              let importedModel = Self.ancestor(named: "importedModel", from: value.entity),
+              let path = Self.modelPath(
+                for: value.entity,
+                below: importedModel,
+                hierarchyRootPath: importedHierarchyRootPath
+              )
+            else { return }
+            onSelectModelPath(path)
+          case .clearAll:
+            standingFeature = nil
+            onSelectMateCandidate(.clearAll)
+          case .ignore:
+            break
           }
-
-          guard let importedHierarchyRootPath,
-            let importedModel = Self.ancestor(named: "importedModel", from: value.entity),
-            let path = Self.modelPath(
-              for: value.entity,
-              below: importedModel,
-              hierarchyRootPath: importedHierarchyRootPath
-            )
-          else { return }
-          onSelectModelPath(path)
         }
     )
     .simultaneousGesture(
@@ -288,8 +312,43 @@ public struct RobotPreviewView: View {
       }
       .allowsHitTesting(false)
     }
+    .overlay {
+      ViewportEscapeCapture { isTextInputActive in
+        guard
+          SubObjectSelection.shouldConsumeEscape(
+            hasFeatureSelection: standingFeature != nil,
+            isPlacementActive: isPlacementActive,
+            isTextInputActive: isTextInputActive
+          )
+        else { return false }
+        standingFeature = nil
+        onSelectMateCandidate(.clearFeature)
+        return true
+      }
+      .allowsHitTesting(false)
+    }
+    .onChange(of: focusedPartID) { _, newFocusedPartID in
+      if !SubObjectSelection.featureSurvivesFocusChange(
+        standingFeature,
+        focusedPartID: newFocusedPartID
+      ) {
+        standingFeature = nil
+      }
+    }
+    .onChange(of: isPlacementActive) { _, placementActive in
+      if placementActive {
+        standingFeature = nil
+      }
+    }
     .background(appearance.backgroundColor.gradient)
     .id(sceneIdentity)
+  }
+
+  /// Mate placement owns the candidate markers whenever the workspace
+  /// publishes placement candidates; standing sub-object selection stays
+  /// out of the way so the placement flow is never double-handled.
+  private var isPlacementActive: Bool {
+    !mateCandidatePartIDs.isEmpty || selectedMateCandidate != nil
   }
 
   private var sceneIdentity: String {
@@ -342,6 +401,7 @@ public struct RobotPreviewView: View {
     camera.name = "previewCamera"
     camera.position = SIMD3<Float>(2.8, 1.8, 3.8)
     camera.look(at: SIMD3<Float>(0, 0.8, 0), from: camera.position, relativeTo: nil)
+    camera.addChild(makeEmptyClickCatcher())
     root.addChild(camera)
 
     let cameraTarget = Entity()
@@ -487,6 +547,43 @@ public struct RobotPreviewView: View {
 
   static func partEntityName(_ id: PartID) -> String {
     "semanticPart-\(id.rawValue.uuidString)"
+  }
+
+  static let emptyClickCatcherName = "viewportEmptyClickCatcher"
+
+  /// An invisible camera-locked collision plane far behind the scene so
+  /// clicks that hit no geometry resolve as deliberate empty clicks
+  /// (deselection) instead of being silently dropped. It sits well beyond
+  /// the maximum zoom-out distance, so it never occludes real content.
+  private static func makeEmptyClickCatcher() -> Entity {
+    let catcher = Entity()
+    catcher.name = emptyClickCatcherName
+    catcher.position = SIMD3<Float>(0, 0, -250)
+    catcher.components.set(InputTargetComponent(allowedInputTypes: .indirect))
+    catcher.components.set(
+      CollisionComponent(shapes: [.generateBox(width: 1600, height: 1600, depth: 0.1)])
+    )
+    return catcher
+  }
+
+  /// Classifies what a viewport tap landed on, in priority order: the
+  /// empty-click catcher, a feature candidate marker, semantic part
+  /// geometry, then the imported source model. Anything unrecognized is
+  /// treated as empty so deselection stays consistent.
+  static func tapTarget(for entity: Entity, rig: CharacterRig) -> SubObjectTapTarget {
+    if ancestor(named: emptyClickCatcherName, from: entity) != nil {
+      return .empty
+    }
+    if let candidate = MateConnectorMarkerFactory.candidate(from: entity, rig: rig) {
+      return .feature(candidate)
+    }
+    if let partID = partID(for: entity) {
+      return .component(partID)
+    }
+    if ancestor(named: "importedModel", from: entity) != nil {
+      return .importedNode
+    }
+    return .empty
   }
 
   private static func simdPosition(_ vector: RigVector3) -> SIMD3<Float> {

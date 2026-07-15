@@ -50,6 +50,7 @@ final class StudioWorkspaceModel {
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
   var matePlacement: MatePlacementSession?
+  private var storedSelectedFeature: MateConnectorCandidate?
 
   private let evaluator = AnimationEvaluator()
 
@@ -105,6 +106,18 @@ final class StudioWorkspaceModel {
   var selectedPartID: PartID? {
     guard case .part(let id) = primarySelection else { return nil }
     return id
+  }
+
+  /// The standing sub-object (face/edge/corner/axis/origin) selection made
+  /// in the viewport. Valid only while its owning component remains the
+  /// focused component and no mate placement is running, so it can never
+  /// dangle after navigator or placement interactions.
+  var selectedFeature: MateConnectorCandidate? {
+    guard matePlacement == nil,
+      let feature = storedSelectedFeature,
+      selectedPartID == feature.partID
+    else { return nil }
+    return feature
   }
 
   var canFrameSelection: Bool {
@@ -191,6 +204,7 @@ final class StudioWorkspaceModel {
   }
 
   func clearSelection() {
+    storedSelectedFeature = nil
     selection.removeAll()
   }
 
@@ -250,6 +264,7 @@ final class StudioWorkspaceModel {
     let preferredPartID = selectedPartID.flatMap { partID in
       !connectedChildren.contains(partID) && !isComponentLocked(partID) ? partID : nil
     }
+    storedSelectedFeature = nil
     matePlacement = MatePlacementSession(preferredPartID: preferredPartID)
     isPlaying = false
     showsCreationPalette = false
@@ -257,6 +272,29 @@ final class StudioWorkspaceModel {
 
   func cancelMatePlacement() {
     matePlacement = nil
+  }
+
+  /// Handles feature-pick events from the standing viewport interaction.
+  /// During mate placement, feature picks forward to the placement flow
+  /// unchanged and empty clicks are ignored, so placement keeps its
+  /// existing two-click semantics. Feature selection is allowed on locked
+  /// components: locks guard edits, and inspecting a feature edits nothing.
+  func selectMateConnector(_ event: ViewportPickEvent) {
+    switch event {
+    case .feature(let candidate):
+      if matePlacement != nil {
+        selectMateConnector(candidate)
+        return
+      }
+      guard project.rig.parts.contains(where: { $0.id == candidate.partID }) else { return }
+      storedSelectedFeature = candidate
+      selection = [.part(candidate.partID)]
+    case .clearFeature:
+      storedSelectedFeature = nil
+    case .clearAll:
+      guard matePlacement == nil else { return }
+      clearSelection()
+    }
   }
 
   func selectMateConnector(_ candidate: MateConnectorCandidate) {
@@ -373,6 +411,9 @@ final class StudioWorkspaceModel {
   }
 
   func selectPart(id: PartID, extendingSelection: Bool) {
+    // Plain component selection (viewport geometry click away from any
+    // feature marker) always drops the standing feature selection.
+    storedSelectedFeature = nil
     let item = NavigatorItem.part(id)
     if extendingSelection {
       if selection.contains(item) {

@@ -111,6 +111,71 @@ enum CADScrollInputClassifier {
   }
 }
 
+/// Captures Escape ahead of the window's default cancel handling so a
+/// selected sub-object feature clears before component selection does
+/// (staged Escape, matching the workspace's existing conventions). The
+/// event is consumed only when `shouldConsume` returns true; otherwise it
+/// flows to the regular `onExitCommand`/cancel-action handling untouched.
+struct ViewportEscapeCapture: NSViewRepresentable {
+  /// Called with whether a text control is currently editing; returns
+  /// true when the Escape press was handled and must not propagate.
+  let shouldConsume: (_ isTextInputActive: Bool) -> Bool
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(shouldConsume: shouldConsume)
+  }
+
+  func makeNSView(context: Context) -> NSView {
+    let view = NSView()
+    context.coordinator.observedView = view
+    context.coordinator.installMonitor()
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    context.coordinator.shouldConsume = shouldConsume
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    coordinator.removeMonitor()
+  }
+
+  @MainActor
+  final class Coordinator {
+    private static let escapeKeyCode: UInt16 = 53
+
+    weak var observedView: NSView?
+    var shouldConsume: (_ isTextInputActive: Bool) -> Bool
+    private var eventMonitor: Any?
+
+    init(shouldConsume: @escaping (_ isTextInputActive: Bool) -> Bool) {
+      self.shouldConsume = shouldConsume
+    }
+
+    func installMonitor() {
+      guard eventMonitor == nil else { return }
+      eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) {
+        [weak self] event in
+        guard let self,
+          let observedView,
+          event.keyCode == Self.escapeKeyCode,
+          event.window === observedView.window
+        else { return event }
+
+        let isTextInputActive = observedView.window?.firstResponder is NSText
+        return self.shouldConsume(isTextInputActive) ? nil : event
+      }
+    }
+
+    func removeMonitor() {
+      if let eventMonitor {
+        NSEvent.removeMonitor(eventMonitor)
+        self.eventMonitor = nil
+      }
+    }
+  }
+}
+
 struct CADNavigationCapture: NSViewRepresentable {
   let profile: PreviewNavigationProfile
   let customMapping: CustomNavigationMapping

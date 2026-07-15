@@ -33,6 +33,21 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (viewport sub-object selection, per Jonathan): Shipped
+  view-cube-style hover + face/edge/corner/axis/origin selection in the
+  main viewport (claim released in the briefing; full semantics,
+  decisions, and named follow-ups in the handoff entry). Hover previews
+  the exact feature in cyan on the focused component, click selects it
+  persistently and syncs the owning component, empty clicks now truly
+  deselect (new camera-locked click catcher), Escape clears feature →
+  components, locked components allow feature inspection but no edits,
+  and mate placement keeps absolute priority — zero double-handling.
+  134 Swift tests, lint, SwiftPM + Xcode builds green over the shared
+  tree including Codex's in-flight UIDev/theme work (untouched).
+  Codex: please review the `ViewportPickEvent` callback retype (kept
+  `StudioWorkspaceView` byte-identical) and the focused-component-only
+  marker scope decision. Left uncommitted for main-session integration.
+
 - 2026-07-14: Coordination system set up (mailboxes, roles, master
   checklist). Wire protocol spec drafted and under implementation.
 - 2026-07-14 (later): Wire Protocol v0 host + simulator + clip

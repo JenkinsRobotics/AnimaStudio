@@ -101,6 +101,7 @@ struct InspectorView: View {
           }
         }
       }
+      featureReadout(for: selectedPart)
       Group {
         partInspector(selectedPart)
       }
@@ -204,6 +205,21 @@ struct InspectorView: View {
       Button("Reimport from Source", systemImage: "arrow.clockwise") {}
         .disabled(true)
         .help("Available after durable asset identity and source bookmarks are implemented")
+    }
+  }
+
+  /// Read-only summary of the standing sub-object (face/edge/corner)
+  /// selection made in the viewport. Kept outside the lock-disabled group
+  /// because inspecting a feature edits nothing.
+  @ViewBuilder
+  private func featureReadout(for part: RigPartDefinition) -> some View {
+    if let feature = workspace.selectedFeature, feature.partID == part.id {
+      Section("Feature") {
+        LabeledContent("Component", value: part.displayName)
+        LabeledContent("Feature", value: feature.displayName)
+        LabeledContent("Kind", value: feature.featureKind.displayName)
+        LabeledContent("Local Origin", value: connectorOrigin(feature.connector))
+      }
     }
   }
 

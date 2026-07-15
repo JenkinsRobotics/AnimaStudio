@@ -81,6 +81,9 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | Connector-authored revolute mates + viewport render-quality pass | `studio/AnimaStudio.xcodeproj/**`, `studio/Sources/AnimaCore/Rig.swift`, `studio/Sources/AnimaCore/MateConnectors.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Components/InspectorView.swift`, `studio/Sources/AnimaStudioUI/Components/ViewportCameraHUD.swift`, `studio/Sources/AnimaStudioUI/Components/ViewportRenderMenu.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/CreationPaletteView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/MatePlacementOverlay.swift`, `studio/Sources/RealityKitViewport/MateConnectorInference.swift`, `studio/Sources/RealityKitViewport/MateConnectorMarkers.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Sources/RealityKitViewport/ViewportLighting.swift`, `studio/Sources/RealityKitViewport/ViewportRenderStyle.swift`, `studio/Tests/AnimaCoreTests/**`, `studio/Tests/AnimaStudioUIUnitTests/Components/ViewportRenderMenuTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/**`, `studio/Tests/RealityKitViewportTests/**`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | explicit local connector frames; inferred primitive face/edge/corner/axis candidates; two-click first-part-to-second-part snap; connector-pivoted revolute preview; PBR finish/shadow/reflection-facing controls; deterministic Swift tests; format lint; Xcode/root-app build and launch; `git diff --check` | released 2026-07-15 |
 | Codex | Connector pose resolver extraction | `studio/Sources/RealityKitViewport/RigPoseResolver.swift`, `studio/Tests/RealityKitViewportTests/MateMotionTests.swift` | connector-chain evaluation remains deterministic while `RobotPreviewView` stays presentation-focused | released 2026-07-15 |
 
+| Claude | Viewport face/edge selection with view-cube-style hover (per Jonathan) | `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Sources/RealityKitViewport/MateConnectorMarkers.swift`, `studio/Sources/RealityKitViewport/CADNavigationCapture.swift`, `studio/Sources/RealityKitViewport/SubObjectSelection.swift` (new), `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift` (selection state only), `studio/Sources/AnimaStudioUI/Components/InspectorView.swift` (feature readout only), `studio/Tests/RealityKitViewportTests/SubObjectSelectionTests.swift` (new), `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/FeatureSelectionTests.swift` (new), `dev/docs/reality/STATUS.md` (two targeted edits) | 134 Swift tests (26 new; count includes Codex's concurrent in-flight suites) + claimed-file lint + `swift build` + Xcode app build all green; hover previews exact feature, click selects, empty click deselects, staged Escape | released 2026-07-15 |
+| Codex | UI Dev living design-system workspace + Agent utility window | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | shell-level UI Dev selector entry; focused ribbon gallery tools; reusable button/window/popup standards; real Agent utility window launcher with honest disconnected state; tests/lint; Xcode/root-app build, signature, launch; `git diff --check` | released 2026-07-15 |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -126,6 +129,67 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Codex, UI Dev + Agent utility panel):** Added UI Dev as a
+  shell-level workspace so it cannot leak development-only presentation into
+  character project state. Its contextual ribbon opens Windows, Controls, and
+  Foundations galleries; the canvas is a living standard for button roles and
+  states, labeled/unit-aware inputs, native menus, reusable panel chrome,
+  blocking dialogs, contextual popovers, semantic colors, and shared geometry.
+  Moved the existing primary-button call sites onto the new canonical
+  `StudioButtonStyle` family and added shared icon/card/popover treatments. The
+  Agent tool opens one reusable AppKit utility panel rather than a document
+  window; prompt starters fill its composer, while voice and Send are visibly
+  disabled under an explicit “agent service not connected” status. Verified
+  claimed-file lint, 134 Swift tests in the merged tree (including a real
+  one-panel reuse test), Xcode/root-app build, strict signature, live UI Dev
+  selector/gallery accessibility labels, and `git diff --check`.
+
+- **2026-07-15 (Claude, viewport sub-object selection):** Jonathan's
+  view-cube hover interaction now works on components in the main viewport.
+  Outside mate placement, the focused component shows its inferred
+  face/edge/corner/axis/origin candidates as quiet cyan markers; hover
+  highlights the exact clickable feature (view-cube cyan language,
+  distinguishable from orange placement markers), click selects it
+  persistently and keeps the owning component selected for
+  navigator/inspector sync, and the inspector gains a read-only Feature
+  section (component, kind, part-local origin). Empty viewport clicks —
+  previously silently dropped because taps only targeted entities — now
+  deselect feature and components via an invisible camera-locked collision
+  backdrop 250 m behind the scene. Escape is staged: feature first (a
+  window-scoped key monitor in `RealityKitViewport` that defers to text
+  editing and to mate placement), then existing `onExitCommand`
+  component/placement clearing. **Key decisions for Codex review:** (1) the
+  untouchable `StudioWorkspaceView` wiring is preserved by retyping the
+  existing `onSelectMateCandidate` callback to a new
+  `ViewportPickEvent` enum (`.feature/.clearFeature/.clearAll`) with a
+  matching `selectMateConnector(_:)` model overload — the old
+  candidate-typed method and the whole placement flow are unchanged and
+  placement always wins (feature taps forward, empty clicks ignored);
+  (2) standing markers appear on the focused component only (select
+  component first, then pick its feature) to avoid scene-wide marker
+  clutter — true pre-selection scene-wide hover is a named follow-up;
+  (3) feature selection is allowed on locked components (inspection only —
+  locks keep guarding all edits, consistent with locked components being
+  selectable in the navigator); (4) the model's `selectedFeature` is
+  computed against the focused part and placement state so it can never
+  dangle; the viewport keeps a display-only mirror that self-clears on
+  focus change/placement (known cosmetic edge: a render-settings change
+  rebuilds the scene and drops the marker while the inspector row remains
+  until the next click). **Named follow-ups:** imported-topology features
+  (triangle identity through reimport), full edge-curve/midline
+  highlighting (extend `MateConnectorInference` in place), scene-wide
+  hover preview without idle dots, gizmo-arrow/face-marker overlap
+  polish. New files: `RealityKitViewport/SubObjectSelection.swift` (pure
+  hit/transition/Escape rules), `SubObjectSelectionTests.swift` (14),
+  `FeatureSelectionTests.swift` (12 model-level). MateConnectorInference
+  needed no changes (single candidate source preserved).
+  Verified: 134 Swift tests green (includes Codex's concurrent in-flight
+  work in the shared tree), claimed-file `swift format lint` clean,
+  `swift build` + `xcodegen generate` + unsigned Xcode app build green.
+  Not committed per packet instructions; GUI walk not performed
+  (headless session) — the empty-click backdrop and hover-on-marker feel
+  deserve one manual viewport pass.
 
 - **2026-07-15 (Codex):** Replaced the separate workspace-tab row with one
   selector-driven ribbon. A fixed far-left menu switches Assets, Rig, Animate,
