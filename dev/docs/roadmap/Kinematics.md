@@ -8,6 +8,30 @@
 > AGENTS.md. Nothing below is implemented until its packet lands and
 > STATUS.md says so.
 
+## 0. The three rules (Onshape's model, ours too)
+
+1. **One mate aligns two connectors.** A mate connector is a part-local
+   coordinate frame (origin + XYZ). A single mate feature fully
+   positions the pair — never a stack of constraints.
+2. **The mate kind decides the DOF.** Of the six physical freedoms
+   (3 translational, 3 rotational), the kind defines exactly which
+   remain (§1).
+3. **Flip, reorient, offset.** The primary axis can be flipped, the
+   secondary axis reoriented in 90° steps, and exact offset distances
+   applied — all without remaking the mate (§4).
+
+A mate's kind is also **switchable in the dialog after creation**
+(the inspector Type menu already anticipates this): switching kinds
+keeps both connectors and remaps the DOF set; if animation exists on a
+DOF the new kind removes, the switch prompts with the consequence —
+never a silent track deletion.
+
+**Deferred kind — Tangent:** Onshape's tangent mate maintains
+surface-to-surface contact and does not use standard connectors. It
+needs contact geometry math we get no animatronics value from yet;
+the loader rejects `tangent` loudly rather than the enum carrying an
+unimplementable case.
+
 ## 1. Foundation: every mate exposes its DOF (contract recap)
 
 A mate's kind defines its DOF set — the eight-kind family is already
@@ -85,12 +109,19 @@ operations in the mate dialog:
   motion direction inverts. One button per connector row (matches
   Onshape's flip affordance).
 - **Reorient / align:** cycle which stored frame axis serves as
-  primary Z (X→Z, Y→Z, Z→Z) for a connector, or realign the secondary
-  axis for pin-slot's X translation. Presented as a small axis picker
-  on the connector row; the stored part-local frame is rewritten —
-  animation values keep their meaning relative to the new axis, so
-  reorientation while clips exist raises a confirm-with-consequences
-  prompt (no silent retarget).
+  primary Z (X→Z, Y→Z, Z→Z) for a connector, and rotate the secondary
+  axis in 90° increments (pin-slot's X translation direction).
+  Presented as a small axis picker on the connector row; the stored
+  part-local frame is rewritten — animation values keep their meaning
+  relative to the new axis, so reorientation while clips exist raises
+  a confirm-with-consequences prompt (no silent retarget).
+- **Offsets:** exact as-mated offsets applied between the two aligned
+  connector frames, stored per mate and applied before DOF values:
+  translational offset along Z (plus X/Y where the kind's geometry
+  makes it meaningful) and a rotational offset about Z. Dialog fields
+  in operator units with an enable checkbox, exactly like the Onshape
+  dialog's Offset section. Offsets shift the zero pose; they do not
+  consume or restrict DOF.
 
 ## 5. Relations: coupling DOF across mates (advanced kinematics)
 
@@ -142,7 +173,46 @@ project mapped DOF to channels. Deterministic, still no dynamics.
 display fields). Python loader/rig/evaluator mirror the exact
 semantics with fixture parity tests against AnimaCore.
 
-## 6. Packet sequencing
+## 6. Triad manipulator (select an object → move/tilt it)
+
+The classic triad — center ball, three axis arrows, three rotation
+rings, three plane pads — shown on component selection. The viewport
+already ships a basic form (`TransformGizmo`: per-axis arrows + rings
+on free components); this packet upgrades it to Onshape grade and,
+critically, wires it to the mate system.
+
+**UI surface (the visible tool):**
+
+- Center ball: screen-plane free drag. Axis arrows: single-axis
+  translate. Rings: single-axis rotate. Plane pads (XY/YZ/XZ): planar
+  translate. Live numeric readout while dragging (distance in mm,
+  angle in degrees) with optional step snapping (1 mm / 5°, key-held).
+- Handles use the existing gizmo visual language; disallowed motions
+  are ghosted, not hidden-by-surprise (see modes below). Locked
+  components keep today's rule: no handles at all.
+
+**Backend contract (the important part):**
+
+One drive abstraction serves every manual-motion surface — the triad,
+the inspector jog rows (§3), the connector handles (§3), and later
+puppeteering input (B09). A drag resolves to a `DriveTarget`:
+
+- **Free component** (no mate constrains it): the triad edits the
+  component's **rest transform** (build-time positioning). All six
+  handles live.
+- **Mated component:** the drag is decomposed onto the DOF its mate
+  chain still permits and routed through the same per-DOF drive API as
+  the jog rows — dragging a hinged door's ring about the hinge Z
+  drives `mate.rotation` (clamped by limits, propagated through
+  relations); handles for removed DOF render ghosted and inert. No
+  separate "triad math" ever writes part transforms directly on a
+  mated component — one motion path, one clamp, one warning system.
+- Mixed selections and multi-mate chains resolve against the nearest
+  governing mate (the same parent/child chain the pose resolver walks);
+  ambiguous cases fall back to ghosted-with-explanation rather than
+  guessing.
+
+## 7. Packet sequencing
 
 | # | Packet | Depends on | Lane |
 |---|---|---|---|
@@ -152,7 +222,9 @@ semantics with fixture parity tests against AnimaCore.
 | K4 | Flip / align connector controls | K1 | Codex |
 | K5 | Relation core type + resolver coupling + validation | K1 | Codex core; Claude math/parity review |
 | K6 | Relations authoring UI (ribbon tools, DOF picker, ratio dialog) | K5 | Codex |
-| K7 | `.anima` format + Python runtime parity (limits, relations, drive-neutral round-trip) | tracks K2/K5 | Claude |
+| K7 | `.anima` format + Python runtime parity (limits, offsets, relations, drive-neutral round-trip) | tracks K2/K5 | Claude |
+| K8 | Triad manipulator: Onshape-grade handles + mate-aware `DriveTarget` routing | K1, K3 (free-component upgrade can start on today's `TransformGizmo`) | UI Codex; drive-routing contract shared |
+| K9 | Mate offsets: stored per mate, dialog Offset section, zero-pose shift | K1 | Codex core/UI; Claude format mirror |
 
 Cross-lane contract points (announce in the briefing before editing):
 the DOF field set (§1), optional-limits semantics (§2), the Relation

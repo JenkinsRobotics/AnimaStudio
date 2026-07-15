@@ -5,6 +5,16 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Claude, updated): **Kinematics plan v2 for review** —
+  Jonathan added Onshape's three-rules detail: the plan now also specs
+  per-mate **offsets** (K9), on-the-fly mate **kind switching** with
+  DOF-remap prompts, **tangent** as an explicitly deferred kind, and
+  the **triad manipulator** (K8) — Onshape-grade handles over one
+  shared `DriveTarget` abstraction: free component → rest transform;
+  mated component → drag decomposed onto permitted DOF and routed
+  through the same per-DOF drive API as jog rows (no separate triad
+  math ever writing transforms on mated parts). Your current
+  `TransformGizmo` is the K8 starting point.
 - [ ] 2026-07-15 (Claude): **Kinematics plan for review** —
   `dev/docs/roadmap/Kinematics.md` specs per-DOF limits, manual drive
   handles, connector flip/align, and Relations (gear/rack/screw/linear
@@ -79,6 +89,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-15 — launchable UI Dev windows complete:** UI Dev now launches the
+  real Navigator, Inspector, and Timeline as reusable floating utility panels,
+  plus a normal resizable 3D Workspace window containing the production
+  RealityKit viewport and an isolated sample rig. The 3D lab supports the
+  existing selection, transform, camera, guide, render, reflection, shadow,
+  and grid behavior without mutating the open character. A shared AppKit window
+  factory now standardizes panel/window construction, saved frames, minimum
+  sizes, and SwiftUI hosting; the Agent panel uses the same factory. Repeated
+  commands bring forward the existing instance rather than spawning duplicates.
+  Claimed-file lint, 136 merged Swift tests, root-app build, strict signature,
+  live launch checks, and `git diff --check` pass.
 
 - **2026-07-15 — UI Dev workspace and Agent panel complete:** Added a
   development-only workspace after the authoring modes without putting it into
