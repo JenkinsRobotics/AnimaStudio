@@ -91,6 +91,17 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
+  UI Dev opens on a **Live UI Kit** with a resizable Design Inspector beside a
+  production-component catalog. The inspector edits the shared Studio surface
+  and semantic colors, muted/border strength, chrome and ribbon heights, panel
+  radius/padding, field and control geometry, and Navigator/Inspector/Agent
+  widths. Changes are range-validated, applied immediately through the same
+  `StudioPalette`/`StudioMetrics` source used by the rest of the app, and saved
+  automatically as a versioned user design profile. Standard, Compact, and
+  High Contrast presets, destructive reset confirmation, JSON import/export,
+  and copy-as-JSON are live. The adjacent kit lays out the docked window map,
+  all canonical button states, production fields, menus, popovers, panel
+  chrome, and direct links to the real embedded surface previews.
   Its Mate Editor interaction lab provides a live compact/expanded panel for
   mate-kind selection, connector picking, offset XYZ/rotation fields,
   simulation-connection disclosure, accept/cancel, flip/reorient, preview, and

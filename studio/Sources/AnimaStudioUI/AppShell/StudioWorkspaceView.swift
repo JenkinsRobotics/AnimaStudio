@@ -6,11 +6,12 @@ import UniformTypeIdentifiers
 
 struct StudioWorkspaceView: View {
   let closeProject: () -> Void
+  @Binding var designProfile: StudioDesignProfile
 
   @State private var workspace = StudioWorkspaceModel()
   @State private var isImportingModel = false
   @State private var isUIDevWorkspace = false
-  @State private var uiDevSection = UIDevSection.overview
+  @State private var uiDevSection = UIDevSection.designKit
   @State private var showsUIDevAgentPanel = false
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
@@ -32,6 +33,14 @@ struct StudioWorkspaceView: View {
     ViewportReflectionMode.subtle.rawValue
   @AppStorage("viewportShowsShadows") private var viewportShowsShadows = true
   @AppStorage("viewportFieldOfViewDegrees") private var viewportFieldOfViewDegrees = 60.0
+
+  init(
+    designProfile: Binding<StudioDesignProfile> = .constant(.standard),
+    closeProject: @escaping () -> Void
+  ) {
+    _designProfile = designProfile
+    self.closeProject = closeProject
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -124,6 +133,7 @@ struct StudioWorkspaceView: View {
       HStack(spacing: 0) {
         UIDevWorkspaceView(
           selectedSection: $uiDevSection,
+          designProfile: $designProfile,
           showAgentPanel: { showsUIDevAgentPanel = true }
         )
 

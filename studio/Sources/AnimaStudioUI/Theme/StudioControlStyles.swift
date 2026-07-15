@@ -181,18 +181,24 @@ extension StudioPanelHeader where Trailing == EmptyView {
 extension View {
   func studioCardSurface() -> some View {
     padding(StudioMetrics.panelPadding)
-      .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 12))
+      .background(
+        StudioPalette.panel,
+        in: RoundedRectangle(cornerRadius: StudioMetrics.panelCornerRadius)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: StudioMetrics.panelCornerRadius)
           .stroke(StudioPalette.border, lineWidth: 1)
       }
   }
 
   func studioPopupSurface() -> some View {
     padding(12)
-      .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 11))
+      .background(
+        StudioPalette.panel,
+        in: RoundedRectangle(cornerRadius: StudioMetrics.panelCornerRadius)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 11)
+        RoundedRectangle(cornerRadius: StudioMetrics.panelCornerRadius)
           .stroke(StudioPalette.border, lineWidth: 1)
       }
       .shadow(color: .black.opacity(0.4), radius: 14, y: 6)

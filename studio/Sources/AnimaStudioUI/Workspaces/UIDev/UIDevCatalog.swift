@@ -2,6 +2,7 @@ import Foundation
 
 enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case overview
+  case designKit
   case navigator
   case inspector
   case timeline
@@ -21,6 +22,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .overview: "Overview"
+    case .designKit: "Live UI Kit"
     case .navigator: "Navigator Preview"
     case .inspector: "Inspector Preview"
     case .timeline: "Timeline Preview"
@@ -40,6 +42,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .overview: "square.grid.2x2"
+    case .designKit: "paintbrush.pointed.fill"
     case .navigator: "sidebar.left"
     case .inspector: "sidebar.right"
     case .timeline: "rectangle.bottomthird.inset.filled"
@@ -59,6 +62,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var purpose: String {
     switch self {
     case .overview: "The shared interaction and visual rules for every Studio surface."
+    case .designKit: "Edit the shared visual tokens and review every production UI family live."
     case .navigator: "Review the real Navigator docked at the left of the production viewport."
     case .inspector: "Review the real Inspector docked at the right of the production viewport."
     case .timeline: "Review the real Timeline docked below the production viewport."
@@ -79,7 +83,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .navigator, .inspector, .timeline, .workspace3D:
       true
-    case .overview, .buttons, .inputs, .menus, .panels, .mateEditor,
+    case .overview, .designKit, .buttons, .inputs, .menus, .panels, .mateEditor,
       .triadManipulator, .dialogs, .popovers, .tokens:
       false
     }
@@ -95,6 +99,6 @@ enum UIDevWorkspaceDescriptor {
 
 enum UIDevAgentPanelDescriptor {
   static let title = "Anima Agent"
-  static let width: CGFloat = 360
+  static var width: CGFloat { StudioMetrics.agentWidth }
   static let isDocked = true
 }

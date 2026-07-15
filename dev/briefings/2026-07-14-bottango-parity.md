@@ -91,6 +91,7 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | UI Dev Mate/triad labs + docked Agent | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Agent constrained to UI Dev canvas; explicit floating-panel template; interactive Mate editor and triad-manipulator design labs; focused/full tests, lint, root-app build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 | Codex | Integrated workspace selector sizing/menu | `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceSelector.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | non-squishing minimum selector width; anchored custom popover visually continuous with button; selected row, icons, purposes, shortcuts; focused/full tests, lint, root-app build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev embedded production-surface previews | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevDetachedWindow.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevEmbeddedWorkspacePreview.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevUtilityWindowTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/StudioAgentPresentationTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Navigator/Inspector/Timeline/3D preview in their real in-app dock regions; Agent remains right app sidebar; only explicit Detached Window uses NSPanel; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
+| Codex | Live UI Kit editor + app-wide design profile | `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioDesignProfile.swift`, `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevDesignKitView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Theme/StudioDesignProfileTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | editable centralized colors/metrics; live app-wide application; automatic persistence; default/compact/high-contrast presets; reset/import/export/copy JSON; production windows/menus/controls catalog; deterministic tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 
 ## Requests
 
@@ -644,3 +645,16 @@ change needed in the Handoff log instead of inventing commands.
   opening Detached Window alone increases the window count to two. Claimed-file
   lint, six focused tests, the complete 140-test suite, Xcode/root-app build,
   strict signature, and `git diff --check` pass.
+- **2026-07-15 (Codex, live UI Kit + shared design profile):** UI Dev now opens
+  on a resizable Live UI Kit instead of a disconnected specimen page. Its
+  Design Inspector edits the centralized Studio colors, semantic colors,
+  opacity, chrome/ribbon sizes, panel geometry, control geometry, and dock
+  widths used by the production app. Changes apply immediately and persist as
+  one versioned profile; Standard, Compact, and High Contrast presets plus
+  reset, import, export, and copy-JSON workflows make final operator review
+  repeatable. The catalog lays out docked windows, the production viewport,
+  buttons and states, fields, menus/popovers, and panel chrome using the real
+  shared styles. Four profile tests, six focused UI Dev tests, all 144 Swift
+  tests, strict claimed-file format lint, Xcode/root-app build, strict
+  signature verification, live preset/restoration walkthrough, and
+  `git diff --check` pass. The root app remains open on the Standard UI Kit.

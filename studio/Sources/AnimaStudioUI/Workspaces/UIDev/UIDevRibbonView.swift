@@ -75,8 +75,9 @@ struct UIDevRibbonView: View {
           title: "Foundations",
           systemImage: "paintpalette",
           tint: StudioPalette.joint,
-          detail: "Shared source of truth"
+          detail: "Edit · apply · save"
         ) {
+          sectionButton(.designKit, title: "UI Kit", systemImage: "paintbrush.pointed.fill")
           sectionButton(.overview, title: "Overview", systemImage: "square.grid.2x2")
           sectionButton(.tokens, title: "Tokens", systemImage: "swatchpalette")
         }
@@ -110,7 +111,7 @@ struct UIDevRibbonView: View {
       StudioPalette.accent
     case .workspace3D: StudioPalette.semanticPart
     case .buttons, .inputs, .menus: StudioPalette.semanticPart
-    case .mateEditor, .triadManipulator, .tokens: StudioPalette.joint
+    case .designKit, .mateEditor, .triadManipulator, .tokens: StudioPalette.joint
     }
   }
 }

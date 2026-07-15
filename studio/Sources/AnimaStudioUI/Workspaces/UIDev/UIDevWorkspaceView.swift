@@ -2,6 +2,7 @@ import SwiftUI
 
 struct UIDevWorkspaceView: View {
   @Binding var selectedSection: UIDevSection
+  @Binding var designProfile: StudioDesignProfile
   let showAgentPanel: () -> Void
 
   @State private var sampleName = "Head Pan"
@@ -39,7 +40,13 @@ struct UIDevWorkspaceView: View {
 
   @ViewBuilder
   private var workspaceContent: some View {
-    if selectedSection.isEmbeddedWorkspacePreview {
+    if selectedSection == .designKit {
+      UIDevDesignKitView(
+        profile: $designProfile,
+        selectSurface: { selectedSection = $0 },
+        showAgentPanel: showAgentPanel
+      )
+    } else if selectedSection.isEmbeddedWorkspacePreview {
       UIDevEmbeddedWorkspacePreview(surface: selectedSection) {
         selectedSection = .overview
       }
@@ -89,6 +96,7 @@ struct UIDevWorkspaceView: View {
   @ViewBuilder
   private var sectionContent: some View {
     switch selectedSection {
+    case .designKit: EmptyView()
     case .navigator, .inspector, .timeline, .workspace3D: EmptyView()
     case .overview: overviewGallery
     case .buttons: buttonGallery

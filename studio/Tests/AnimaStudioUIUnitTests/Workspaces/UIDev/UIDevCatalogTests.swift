@@ -7,8 +7,9 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(
       UIDevSection.allCases,
       [
-        .overview, .navigator, .inspector, .timeline, .workspace3D, .buttons, .inputs,
-        .menus, .panels, .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens,
+        .overview, .designKit, .navigator, .inspector, .timeline, .workspace3D, .buttons,
+        .inputs, .menus, .panels, .mateEditor, .triadManipulator, .dialogs, .popovers,
+        .tokens,
       ]
     )
 
@@ -23,6 +24,7 @@ final class UIDevCatalogTests: XCTestCase {
     let embedded: [UIDevSection] = [.navigator, .inspector, .timeline, .workspace3D]
     XCTAssertTrue(embedded.allSatisfy(\.isEmbeddedWorkspacePreview))
     XCTAssertFalse(UIDevSection.overview.isEmbeddedWorkspacePreview)
+    XCTAssertFalse(UIDevSection.designKit.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.panels.isEmbeddedWorkspacePreview)
   }
 

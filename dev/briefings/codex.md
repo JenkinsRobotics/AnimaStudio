@@ -90,6 +90,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — live UI Kit and app-wide design profile complete:** UI Dev now
+  opens on a resizable Design Inspector beside a comprehensive production UI
+  catalog. Operators can tune shared Studio surface and semantic colors,
+  opacity, chrome/ribbon sizes, panel and control geometry, and dock widths;
+  every edit updates the real app immediately and is automatically stored in a
+  single versioned profile. Standard, Compact, and High Contrast presets plus
+  reset, import, export, and copy-JSON controls support visual review and design
+  handoff. The gallery uses the real docked-window layouts, viewport, controls,
+  fields, menus/popovers, and panel styles rather than floating substitutes.
+  Four profile tests, six focused UI Dev tests, all 144 Swift tests, strict
+  format lint, Xcode/root-app build, signature verification, live Compact-to-
+  Standard walkthrough, and `git diff --check` pass.
+
 - **2026-07-15 — UI Dev surfaces restored to the app layout:** Navigator,
   Inspector, Timeline, and 3D View no longer launch AppKit windows. Their UI Dev
   ribbon commands show the production surfaces inside the main canvas at left,

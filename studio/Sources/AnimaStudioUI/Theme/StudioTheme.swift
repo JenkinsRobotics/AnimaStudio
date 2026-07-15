@@ -1,34 +1,39 @@
 import SwiftUI
 
 enum StudioPalette {
-  static let canvas = Color(red: 0.105, green: 0.105, blue: 0.125)
-  static let documentChrome = Color(red: 0.115, green: 0.115, blue: 0.135)
-  static let chrome = Color(red: 0.15, green: 0.15, blue: 0.18)
-  static let ribbonChrome = Color(red: 0.18, green: 0.185, blue: 0.21)
-  static let panel = Color(red: 0.22, green: 0.23, blue: 0.26)
-  static let panelInset = Color(red: 0.16, green: 0.17, blue: 0.19)
-  static let field = Color(red: 0.12, green: 0.13, blue: 0.15)
-  static let accent = Color(red: 0.12, green: 0.58, blue: 0.90)
-  static let sourceModel = Color(red: 0.25, green: 0.62, blue: 0.96)
-  static let semanticPart = Color(red: 0.23, green: 0.76, blue: 0.68)
-  static let joint = Color(red: 0.72, green: 0.45, blue: 0.96)
-  static let hardware = Color(red: 0.96, green: 0.58, blue: 0.24)
-  static let muted = Color.white.opacity(0.62)
-  static let border = Color.white.opacity(0.10)
+  private static var profile: StudioDesignProfile { StudioDesignRuntime.shared.profile }
+
+  static var canvas: Color { profile.canvas.color }
+  static var documentChrome: Color { profile.documentChrome.color }
+  static var chrome: Color { profile.chrome.color }
+  static var ribbonChrome: Color { profile.ribbonChrome.color }
+  static var panel: Color { profile.panel.color }
+  static var panelInset: Color { profile.panelInset.color }
+  static var field: Color { profile.field.color }
+  static var accent: Color { profile.accent.color }
+  static var sourceModel: Color { profile.sourceModel.color }
+  static var semanticPart: Color { profile.semanticPart.color }
+  static var joint: Color { profile.joint.color }
+  static var hardware: Color { profile.hardware.color }
+  static var muted: Color { Color.white.opacity(profile.mutedOpacity) }
+  static var border: Color { Color.white.opacity(profile.borderOpacity) }
 }
 
 enum StudioMetrics {
-  static let documentBarHeight: CGFloat = 34
+  private static var profile: StudioDesignProfile { StudioDesignRuntime.shared.profile }
+
+  static var documentBarHeight: CGFloat { profile.documentBarHeight }
   static let workspaceTabBarHeight: CGFloat = 51
-  static let compactRibbonHeight: CGFloat = 53
-  static let rigCreationRibbonHeight: CGFloat = 112
-  static let panelHeaderHeight: CGFloat = 38
-  static let panelCornerRadius: CGFloat = 16
-  static let panelPadding: CGFloat = 14
-  static let fieldHeight: CGFloat = 30
-  static let controlCornerRadius: CGFloat = 7
-  static let navigatorWidth: CGFloat = 290
-  static let inspectorWidth: CGFloat = 320
+  static var compactRibbonHeight: CGFloat { profile.compactRibbonHeight }
+  static var rigCreationRibbonHeight: CGFloat { profile.fullRibbonHeight }
+  static var panelHeaderHeight: CGFloat { profile.panelHeaderHeight }
+  static var panelCornerRadius: CGFloat { profile.panelCornerRadius }
+  static var panelPadding: CGFloat { profile.panelPadding }
+  static var fieldHeight: CGFloat { profile.fieldHeight }
+  static var controlCornerRadius: CGFloat { profile.controlCornerRadius }
+  static var navigatorWidth: CGFloat { profile.navigatorWidth }
+  static var inspectorWidth: CGFloat { profile.inspectorWidth }
+  static var agentWidth: CGFloat { profile.agentWidth }
 }
 
 extension View {
@@ -56,7 +61,10 @@ struct StudioTextFieldRow: View {
         .textFieldStyle(.plain)
         .padding(.horizontal, 9)
         .frame(height: StudioMetrics.fieldHeight)
-        .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+        .background(
+          StudioPalette.field,
+          in: RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+        )
         .overlay {
           RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
             .stroke(StudioPalette.border, lineWidth: 1)
@@ -105,7 +113,10 @@ struct StudioReadoutRow: View {
       }
       .padding(.horizontal, 9)
       .frame(maxWidth: .infinity, minHeight: StudioMetrics.fieldHeight, alignment: .leading)
-      .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 7))
+      .background(
+        StudioPalette.panelInset,
+        in: RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+      )
       .overlay {
         RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
           .stroke(StudioPalette.border, lineWidth: 1)
@@ -138,7 +149,10 @@ struct StudioNumberFieldRow: View {
       }
       .padding(.horizontal, 9)
       .frame(height: StudioMetrics.fieldHeight)
-      .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+      .background(
+        StudioPalette.field,
+        in: RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+      )
       .overlay {
         RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
           .stroke(StudioPalette.border, lineWidth: 1)
@@ -188,7 +202,10 @@ struct StudioSearchField: View {
     }
     .padding(.horizontal, 9)
     .frame(height: StudioMetrics.fieldHeight)
-    .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+    .background(
+      StudioPalette.field,
+      in: RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+    )
     .overlay {
       RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
         .stroke(StudioPalette.border, lineWidth: 1)
