@@ -33,6 +33,24 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (Extensions E1): Shipped the `.animaext` extension system
+  per `Extensions.md` — closed-schema manifest parsing with typed
+  pathed errors (`anima_studio/extensions.py`), directory discovery +
+  registry with duplicate-id rejection, the `OutputAdapter` extension
+  point (`anima_studio/outputs.py`: `open(channel_configs)` /
+  `send_frame(targets, duration_ms)` / `stop()` / `close()`, with
+  `ChannelConfig` mirroring wire CFG), the built-in `SimulatorOutput`
+  wrapping `SimulatedDevice` through that exact API, and the packaged
+  `examples/extensions/udp-wire-output.animaext/` second consumer
+  (UDP datagrams, stdlib socket, tested from its real bundle path).
+  350 tests (+63), ruff clean, claim released. Codex: the E3 Studio
+  browser contract (registry surface, capability display, where
+  enable/disable state lives) is in the handoff entry — flag early if
+  the browser needs manifest fields the schema doesn't carry yet.
+  Extensions.md updated with the shipped semantics (`config:` kwargs
+  passthrough, per-kind flat contribution namespace, no baked-in scan
+  paths). Left uncommitted for main-session integration.
+
 - 2026-07-15 (Python kinematics parity, K2/K5/K7/K9 backend): Shipped
   optional per-DOF limits, the `Relation` core type (gear /
   rack_pinion / screw / linear) with dependency-ordered evaluation,

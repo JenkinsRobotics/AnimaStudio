@@ -56,7 +56,7 @@
   carries the same eight-type family (`JointType`, including `parallel`:
   XYZ translation + Z rotation) with per-type DOF templates, optional
   per-DOF limits, per-joint mate offsets, and gear/rack-and-pinion/
-  screw/linear relations; 287 Python tests pass. Motors, 3D Models & Media, and Events are also
+  screw/linear relations; 350 Python tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
@@ -261,10 +261,29 @@
   refuses to arm). `examples/six_axis_arm|rc_car|walle_style
   .character.anima` load end-to-end; rc_car exercises a steering
   rack-and-pinion relation and an unlimited free-spinning axle.
-  287 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  The runtime also ships the community-extension foundation
+  (Extensions.md packet E1): `anima_studio/outputs.py` defines the
+  `OutputAdapter` extension-point protocol (`open(channel_configs)` /
+  `send_frame(targets, duration_ms)` / `stop()` e-stop / `close()`,
+  with `ChannelConfig` mirroring the wire CFG fields) plus the
+  built-in `SimulatorOutput` wrapping `SimulatedDevice` through that
+  exact API, and `anima_studio/extensions.py` loads `<slug>.animaext`
+  bundles — closed-schema `extension.yaml` manifests with typed errors
+  naming offending paths, capability declarations (hardware/network/
+  filesystem), `discover_extensions(search_dirs)` over caller-passed
+  directories with duplicate-id rejection, and
+  `entry: "module.py:ClassName"` class loading namespaced per
+  extension with no `sys.path` pollution; only `output_adapter`
+  contributions load in E1, other known kinds parse but refuse with
+  "not yet supported". The packaged
+  `examples/extensions/udp-wire-output.animaext/` example streams
+  wire lines as UDP datagrams and is tested from its real bundle path.
+  350 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
-  simulated servo → failsafe, and character file → rig evaluation →
-  relation coupling → channel projection → simulated servo tests.
+  simulated servo → failsafe, character file → rig evaluation →
+  relation coupling → channel projection → simulated servo tests, and
+  rig evaluation → `OutputAdapter.send_frame` → simulated/UDP output
+  tests.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later

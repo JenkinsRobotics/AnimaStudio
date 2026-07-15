@@ -94,10 +94,11 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | Live UI Kit editor + app-wide design profile | `studio/Sources/AnimaStudioUI/Theme/StudioTheme.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioDesignProfile.swift`, `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevDesignKitView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Theme/StudioDesignProfileTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | editable centralized colors/metrics; live app-wide application; automatic persistence; default/compact/high-contrast presets; reset/import/export/copy JSON; production windows/menus/controls catalog; deterministic tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 | Codex | Shared Onshape-style mate panel variants (Swift UI only) | `studio/Sources/AnimaStudioUI/Workspaces/Rig/MateCreationToolCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/Rig/MateEditorPresentation.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevMateEditorLab.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/MateCreationToolCatalogTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/MateEditorPresentationTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | one shared panel and one type dropdown for all eight mates; stable icon strip; per-kind DOF/limit rows and units; Fastened no-motion state; UI-only and honestly unbound until typed AnimaCore mate backend; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 | Codex | Selection-driven Inspector + component Appearance editor | `studio/Sources/RealityKitViewport/PreviewPartAppearance.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Components/InspectorView.swift`, `studio/Sources/AnimaStudioUI/Components/ComponentAppearanceEditor.swift`, `studio/Tests/RealityKitViewportTests/PreviewPartAppearanceTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/WorkspacePresentationTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/ComponentAppearanceTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | inspectable selection reopens the right Inspector; Properties/Appearance tabs; palette + mixer + hex/RGB/opacity/visibility; real semantic-proxy viewport update; locked component protection; explicit in-session persistence boundary; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
+| Codex | Selected-component viewport context menu | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/ComponentContextActions.swift`, `studio/Sources/AnimaStudioUI/Components/InspectorView.swift`, `studio/Sources/AnimaStudioUI/Components/ComponentViewportContextMenu.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Rig/ComponentViewportContextMenuTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | right-click menu for the selected semantic body; Properties/Appearance, frame, show/hide, lock/unlock, reset transform, clear selection; model-owned lock enforcement; tests/lint/build/signature/live walkthrough; `git diff --check` | in progress |
 
 | Claude | Repo organization cleanup: Jaeger-template cruft removal, README repo map, CI/CONVENTIONS refresh (root level only, no studio/ source moves) | `workspace/**` (delete), `pyproject.toml.example` (delete), `TAXONOMY.md` (delete), `VERSION` (delete), `examples/*.md`, `examples/README.md`, `CONVENTIONS.md`, `README.md`, `.github/workflows/ci.yml`, `dev/docs/reality/STATUS.md`, `dev/briefings/**` | 287 pytest + 144 swift test green post-cleanup; `git diff --check` | released 2026-07-15 |
 
-| Claude | Extensions E1: manifest + discovery + output_adapter point + example extension (per Extensions.md) | `anima_studio/extensions.py`, `anima_studio/outputs.py`, `anima_studio/tests/test_extensions.py`, `anima_studio/tests/test_outputs.py`, `examples/extensions/**`, `dev/docs/roadmap/Extensions.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Claude | Extensions E1: manifest + discovery + output_adapter point + example extension (per Extensions.md) | `anima_studio/extensions.py`, `anima_studio/outputs.py`, `anima_studio/tests/test_extensions.py`, `anima_studio/tests/test_outputs.py`, `examples/extensions/**`, `dev/docs/roadmap/Extensions.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (350 passed) | released 2026-07-15 |
 
 ## Requests
 
@@ -144,6 +145,54 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, Extensions E1 — manifest + discovery +
+  output_adapter point + packaged example):** Shipped per
+  `Extensions.md` (350 tests, +63; ruff clean; claim released above).
+  **The adapter API (`anima_studio/outputs.py`) — the contract E3's
+  browser and future transports consume:** `OutputAdapter` is a
+  `runtime_checkable` Protocol with `open(channel_configs:
+  Sequence[ChannelConfig])` (configure + arm), `send_frame(targets:
+  Mapping[int, float], duration_ms: int)` (normalized 0..1, exactly
+  `project_channels` output), `stop()` (e-stop, idempotent), and
+  `close()` (release transport; close is NOT stop — a device losing
+  its host is the failsafe's job). `ChannelConfig` mirrors wire CFG
+  fields exactly (channel/pin/min_us/max_us/invert/neutral/
+  failsafe_ms); validation stays in `wire.encode_cfg` (one truth).
+  Constructor kwargs carry transport config; a manifest `config:`
+  mapping passes through as those kwargs. Two consumers on day one
+  (law 1): `SimulatorOutput` wraps — never reimplements —
+  `SimulatedDevice` (encodes via `wire`, feeds `receive_line`, raises
+  `WireError` on ERR replies, exposes `.device` for assertions), and
+  `examples/extensions/udp-wire-output.animaext/` streams wire lines
+  as one-datagram-per-line UDP (stdlib socket; tested end-to-end from
+  its real bundle path against a loopback socket, exact-line
+  assertions, no sleeps). **Manifest decisions (Extensions.md updated
+  in-packet):** (1) `provides[]` entries gained an optional `config:`
+  mapping (identifier keys → constructor kwargs) — adapters need
+  per-install transport config and the manifest is the bundle's one
+  truth; (2) ids are lowercase slugs `[a-z0-9_-]`; (3) contribution
+  ids are unique per kind across the registry (flat v1 namespace —
+  `load_output_adapter("udp_wire")` needs no extension qualifier;
+  relax later if the ecosystem collides); (4) known kinds =
+  output_adapter/parametric_feature/scene_action/motor_backend; the
+  latter three parse but raise "not yet supported" on load;
+  `studio_panel` and anything else are manifest errors; (5)
+  `discover_extensions(search_dirs)` bakes in no default paths —
+  callers pass dirs (conventional user/project dirs documented in the
+  docstring); nonexistent search dirs skip silently, but a broken
+  `*.animaext` (file, missing manifest, invalid manifest) fails
+  loudly; (6) entry modules import via `importlib.util` under an
+  extension-namespaced module name — no `sys.path` pollution, and an
+  entry path escaping the bundle is rejected. **For E3 (Codex):** the
+  registry surface for the Studio browser is
+  `ExtensionRegistry.extensions` (id → `Extension(manifest,
+  bundle_dir)`; manifest carries name/version/author/license/
+  description/capabilities for the installed list + capability
+  display) and `contributions(kind)`; enable/disable state is NOT in
+  the registry — it's Studio-side persistence, decide where it lives.
+  Swift never loads adapter code; it lists/inspects bundles and the
+  Python runtime executes them. Not committed per packet instructions.
 
 - **2026-07-15 (Claude, repo cleanup):** Per Jonathan, removed the
   Jaeger-template cruft the repo was cloned with: `workspace/` (robot

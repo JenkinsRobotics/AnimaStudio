@@ -1,4 +1,4 @@
-# Community extensions (planned)
+# Community extensions (E1 shipped; later packets planned)
 
 > The open ecosystem layer (Jonathan, 2026-07-15): users expand Anima
 > Studio the way Onshape users build
@@ -31,6 +31,9 @@ provides:
   - kind: output_adapter        # the extension point (see table)
     id: "udp_wire"
     entry: "adapter.py:UdpWireOutput"
+    config:                     # optional; passed as constructor kwargs
+      host: "127.0.0.1"
+      port: 9600
 assets: []                      # bundled files (models, curves, docs)
 ```
 
@@ -39,6 +42,18 @@ errors naming paths — same loader discipline as `.anima` files). All
 code/assets live inside the bundle; an extension never reaches into
 another extension or the app's internals beyond its extension point's
 API. `capabilities` is surfaced to the user at install time.
+
+Shipped manifest semantics (E1, `anima_studio/extensions.py`):
+`id` and `provides[].id` are lowercase slugs (`[a-z0-9_-]`); an
+`output_adapter` entry must be `"<module>.py:<ClassName>"` and is
+imported from inside the bundle under an extension-namespaced module
+name (no `sys.path` pollution), then checked against the
+`anima_studio.outputs.OutputAdapter` protocol; the optional per-
+contribution `config:` mapping (identifier keys) passes through as the
+adapter's constructor keyword arguments; contribution ids are unique
+per kind across the whole registry (v1 keeps one flat namespace per
+extension point). The other known kinds parse but raise "not yet
+supported" when loaded; unknown kinds are manifest errors.
 
 ## Extension points — access to all the layers
 
@@ -62,7 +77,11 @@ the standard evaluated-channel frame. Core contracts stay small.
   project-local (`<project>/extensions/`, shipping with the project).
 - The runtime scans for `*.animaext/extension.yaml`, validates, and
   registers contributions; conflicts (duplicate `id`) are load errors.
-  No pip requirement — everything packed in.
+  No pip requirement — everything packed in. Shipped as
+  `extensions.discover_extensions(search_dirs)`: no default paths are
+  baked in — callers pass the directories (Studio will pass the two
+  conventional ones above). A `*.animaext` entry that is not a valid
+  bundle fails loudly with a typed error, never silently skips.
 - Distribution starts as git repos + zips; a community index
   (registry repo + site gallery) is a later packet, not a launch
   requirement.
@@ -71,7 +90,7 @@ the standard evaluated-channel frame. Core contracts stay small.
 
 | # | Packet | Depends on | Lane |
 |---|---|---|---|
-| E1 | Manifest schema + discovery/registry + `output_adapter` point + built-in simulator adapter behind the same API + one real packaged example extension | — | Claude (Python) |
+| E1 | Manifest schema + discovery/registry + `output_adapter` point + built-in simulator adapter behind the same API + one real packaged example extension — **shipped 2026-07-15** (`anima_studio/extensions.py`, `anima_studio/outputs.py`, `examples/extensions/udp-wire-output.animaext/`; see STATUS.md) | — | Claude (Python) |
 | E2 | `parametric_feature`: declarative template schema (params → parts/joints/relations), loader + expansion into the standard rig | format 2.0 | Claude format/runtime; Codex Studio rendering |
 | E3 | Studio: Extensions browser (installed list, capabilities display, enable/disable), parametric features appearing in the Rig ribbon like built-ins | E1/E2 | Codex |
 | E4 | `scene_action` point | `.scene.anima` execution | Claude |
@@ -81,4 +100,7 @@ the standard evaluated-channel frame. Core contracts stay small.
 First real consumer rule (CONVENTIONS law 1): E1 ships with the
 simulator rewired through the same adapter API plus one genuine
 example extension — the extension point is proven by two consumers on
-day one, or it doesn't merge.
+day one, or it doesn't merge. **Satisfied:** `outputs.SimulatorOutput`
+wraps (never reimplements) `sim.SimulatedDevice` behind the
+`OutputAdapter` protocol, and the packaged `udp-wire-output` example
+is the second consumer, loaded from its real bundle in tests.
