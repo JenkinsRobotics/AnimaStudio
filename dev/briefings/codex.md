@@ -90,6 +90,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev surfaces restored to the app layout:** Navigator,
+  Inspector, Timeline, and 3D View no longer launch AppKit windows. Their UI Dev
+  ribbon commands show the production surfaces inside the main canvas at left,
+  right, bottom, and center, using an isolated sample rig. Agent remains the
+  constrained 360-point right sidebar with its normal close control. Exactly
+  one command, **Detached Window**, opens a reusable floating `NSPanel` and is
+  isolated in `UIDevDetachedWindow.swift`. Live accessibility checks confirmed
+  every docked preview and Agent keep the app at one window; only Detached
+  Window changes the count to two. Six focused tests and all 140 Swift tests,
+  claimed-file lint, Xcode/root-app build, strict signature, and
+  `git diff --check` pass.
+
 - **2026-07-15 — integrated workspace selector complete:** The far-left
   selector now keeps a tested 228-point minimum width (260 by 72 points in the
   live app) and opens a custom anchored 280-point workspace menu. Large icon

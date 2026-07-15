@@ -7,8 +7,8 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(
       UIDevSection.allCases,
       [
-        .overview, .buttons, .inputs, .menus, .panels, .mateEditor, .triadManipulator,
-        .dialogs, .popovers, .tokens,
+        .overview, .navigator, .inspector, .timeline, .workspace3D, .buttons, .inputs,
+        .menus, .panels, .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens,
       ]
     )
 
@@ -17,6 +17,13 @@ final class UIDevCatalogTests: XCTestCase {
       XCTAssertFalse(section.systemImage.isEmpty)
       XCTAssertFalse(section.purpose.isEmpty)
     }
+  }
+
+  func testProductionSurfacePreviewsStayEmbeddedInUIDev() {
+    let embedded: [UIDevSection] = [.navigator, .inspector, .timeline, .workspace3D]
+    XCTAssertTrue(embedded.allSatisfy(\.isEmbeddedWorkspacePreview))
+    XCTAssertFalse(UIDevSection.overview.isEmbeddedWorkspacePreview)
+    XCTAssertFalse(UIDevSection.panels.isEmbeddedWorkspacePreview)
   }
 
   func testUIDevIsAnExplicitShellWorkspace() {

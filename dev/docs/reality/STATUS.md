@@ -82,18 +82,15 @@
   UI Dev's Agent command toggles a right-side panel constrained inside the main
   app canvas, with voice/chat/docs/ideas presentation, prompt starters, a
   composer, and an explicit close affordance. It is labeled as a UI prototype;
-  microphone and Send remain disabled until an agent service is connected. A
-  separate Floating Template demonstrates the always-above-workspace AppKit
-  utility-panel behavior for the few compact tools that genuinely require it.
-  UI Dev can also launch the real
-  Navigator, Inspector, and Timeline surfaces as reusable floating utility
-  panels for focused design review. Its 3D Workspace command opens a normal
-  resizable workspace window—not a floating palette—with the production
-  RealityKit viewport, an isolated sample rig, selection, transform editing,
-  camera controls, guides, shading, edges, reflections, shadows, and grid
-  controls. Each surface has one reusable window instance, restores its saved
-  frame, and enforces a readable minimum size through the shared Studio window
-  factory.
+  microphone and Send remain disabled until an agent service is connected.
+  Navigator, Inspector, Timeline, and 3D View commands now render the real
+  production surfaces inside the UI Dev canvas in their operator-facing dock
+  regions: Navigator on the left, Inspector on the right, Timeline below the
+  viewport, and the 3D view in the center. They use an isolated sample rig and
+  never create auxiliary AppKit windows. The Agent likewise remains a real
+  right-side app panel. One explicitly labeled **Detached Window** is the sole
+  floating UI Dev surface; it demonstrates the always-above-workspace utility
+  panel pattern for compact temporary tools and reuses one saved panel instance.
   Its Mate Editor interaction lab provides a live compact/expanded panel for
   mate-kind selection, connector picking, offset XYZ/rotation fields,
   simulation-connection disclosure, accept/cancel, flip/reorient, preview, and

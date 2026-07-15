@@ -7,13 +7,11 @@ final class StudioAgentPresentationTests: XCTestCase {
     XCTAssertEqual(UIDevAgentPanelDescriptor.title, "Anima Agent")
     XCTAssertEqual(UIDevAgentPanelDescriptor.width, 360)
     XCTAssertTrue(UIDevAgentPanelDescriptor.isDocked)
-    XCTAssertFalse(
-      UIDevUtilityWindowKind.allCases.contains { $0.title == UIDevAgentPanelDescriptor.title }
-    )
+    XCTAssertNotEqual(UIDevAgentPanelDescriptor.title, UIDevDetachedWindowDescriptor.title)
   }
 
   func testFloatingToolsHaveAnExplicitSeparateTemplate() {
-    XCTAssertTrue(UIDevUtilityWindowKind.floatingTemplate.isUtilityPanel)
-    XCTAssertEqual(UIDevUtilityWindowKind.floatingTemplate.title, "Floating Template")
+    XCTAssertEqual(UIDevDetachedWindowDescriptor.title, "Detached Window")
+    XCTAssertGreaterThan(UIDevDetachedWindowDescriptor.minimumSize.width, 0)
   }
 }

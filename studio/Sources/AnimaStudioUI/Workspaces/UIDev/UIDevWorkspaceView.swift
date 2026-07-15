@@ -17,19 +17,7 @@ struct UIDevWorkspaceView: View {
     VStack(spacing: 0) {
       workspaceHeader
       Divider()
-      ScrollView {
-        VStack(alignment: .leading, spacing: 18) {
-          StudioSectionHeader(
-            title: selectedSection.title,
-            detail: selectedSection.purpose,
-            systemImage: selectedSection.systemImage
-          )
-          sectionContent
-        }
-        .frame(maxWidth: 1_080, alignment: .leading)
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .top)
-      }
+      workspaceContent
     }
     .background(StudioPalette.canvas)
     .alert("Standard Studio Alert", isPresented: $showsAlert) {
@@ -46,6 +34,29 @@ struct UIDevWorkspaceView: View {
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("Destructive decisions name the object and provide a safe Cancel action.")
+    }
+  }
+
+  @ViewBuilder
+  private var workspaceContent: some View {
+    if selectedSection.isEmbeddedWorkspacePreview {
+      UIDevEmbeddedWorkspacePreview(surface: selectedSection) {
+        selectedSection = .overview
+      }
+    } else {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 18) {
+          StudioSectionHeader(
+            title: selectedSection.title,
+            detail: selectedSection.purpose,
+            systemImage: selectedSection.systemImage
+          )
+          sectionContent
+        }
+        .frame(maxWidth: 1_080, alignment: .leading)
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .top)
+      }
     }
   }
 
@@ -78,6 +89,7 @@ struct UIDevWorkspaceView: View {
   @ViewBuilder
   private var sectionContent: some View {
     switch selectedSection {
+    case .navigator, .inspector, .timeline, .workspace3D: EmptyView()
     case .overview: overviewGallery
     case .buttons: buttonGallery
     case .inputs: inputGallery
@@ -213,8 +225,8 @@ struct UIDevWorkspaceView: View {
   private var panelGallery: some View {
     LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 16) {
       sampleCard(
-        title: "Launch real surfaces",
-        detail: "The Agent docks in this app; floating tools and full workspaces are explicit."
+        title: "Review real surfaces",
+        detail: "App surfaces stay docked in UI Dev; only the detached template floats."
       ) {
         VStack(spacing: 9) {
           Button("Show Docked Agent", systemImage: "sparkles") {
@@ -222,9 +234,11 @@ struct UIDevWorkspaceView: View {
           }
           .buttonStyle(StudioButtonStyle(role: .primary, expandsHorizontally: true))
 
-          ForEach(UIDevUtilityWindowKind.allCases) { kind in
-            Button("Open \(kind.title)", systemImage: kind.systemImage) {
-              UIDevUtilityWindowRegistry.show(kind)
+          ForEach(
+            [UIDevSection.navigator, .inspector, .timeline, .workspace3D]
+          ) { section in
+            Button("Show \(section.title)", systemImage: section.systemImage) {
+              selectedSection = section
             }
             .buttonStyle(
               StudioButtonStyle(
@@ -233,6 +247,14 @@ struct UIDevWorkspaceView: View {
               )
             )
           }
+
+          Button(
+            "Open \(UIDevDetachedWindowDescriptor.title)",
+            systemImage: UIDevDetachedWindowDescriptor.systemImage
+          ) {
+            UIDevDetachedWindowRegistry.show()
+          }
+          .buttonStyle(StudioButtonStyle(role: .secondary, expandsHorizontally: true))
         }
       }
       UIDevSamplePanel(

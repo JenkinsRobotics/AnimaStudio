@@ -2,6 +2,10 @@ import Foundation
 
 enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case overview
+  case navigator
+  case inspector
+  case timeline
+  case workspace3D
   case buttons
   case inputs
   case menus
@@ -17,6 +21,10 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .overview: "Overview"
+    case .navigator: "Navigator Preview"
+    case .inspector: "Inspector Preview"
+    case .timeline: "Timeline Preview"
+    case .workspace3D: "3D Workspace Preview"
     case .buttons: "Buttons"
     case .inputs: "Inputs"
     case .menus: "Menus"
@@ -32,6 +40,10 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .overview: "square.grid.2x2"
+    case .navigator: "sidebar.left"
+    case .inspector: "sidebar.right"
+    case .timeline: "rectangle.bottomthird.inset.filled"
+    case .workspace3D: "view.3d"
     case .buttons: "button.programmable"
     case .inputs: "character.cursor.ibeam"
     case .menus: "filemenu.and.selection"
@@ -47,6 +59,10 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var purpose: String {
     switch self {
     case .overview: "The shared interaction and visual rules for every Studio surface."
+    case .navigator: "Review the real Navigator docked at the left of the production viewport."
+    case .inspector: "Review the real Inspector docked at the right of the production viewport."
+    case .timeline: "Review the real Timeline docked below the production viewport."
+    case .workspace3D: "Review the production 3D viewport inside the UI Dev workspace canvas."
     case .buttons: "Primary, secondary, quiet, destructive, selected, and disabled actions."
     case .inputs: "Text, number, picker, search, toggle, unit, and read-only fields."
     case .menus: "System-native command menus with consistent labels and hierarchy."
@@ -56,6 +72,16 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .dialogs: "Alerts and confirmation flows reserved for blocking decisions."
     case .popovers: "Lightweight contextual help and settings without leaving the task."
     case .tokens: "One source of truth for color, spacing, radii, and control dimensions."
+    }
+  }
+
+  var isEmbeddedWorkspacePreview: Bool {
+    switch self {
+    case .navigator, .inspector, .timeline, .workspace3D:
+      true
+    case .overview, .buttons, .inputs, .menus, .panels, .mateEditor,
+      .triadManipulator, .dialogs, .popovers, .tokens:
+      false
     }
   }
 }

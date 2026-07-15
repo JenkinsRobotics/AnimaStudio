@@ -8,10 +8,10 @@ struct UIDevRibbonView: View {
     ScrollView(.horizontal) {
       HStack(alignment: .center, spacing: 0) {
         CreationToolGroup(
-          title: "Windows",
+          title: "App Surfaces",
           systemImage: "macwindow.on.rectangle",
           tint: StudioPalette.accent,
-          detail: "1 docked · 5 windows"
+          detail: "5 docked · 1 detached"
         ) {
           CreationToolButton(
             title: "Agent",
@@ -21,11 +21,22 @@ struct UIDevRibbonView: View {
             action: toggleAgentPanel
           )
           .keyboardShortcut("a", modifiers: [.command, .shift])
-          windowButton(.navigator)
-          windowButton(.inspector)
-          windowButton(.timeline)
-          windowButton(.floatingTemplate)
-          windowButton(.workspace3D)
+          sectionButton(.navigator, title: "Navigator", systemImage: "sidebar.left")
+          sectionButton(.inspector, title: "Inspector", systemImage: "sidebar.right")
+          sectionButton(
+            .timeline,
+            title: "Timeline",
+            systemImage: "rectangle.bottomthird.inset.filled"
+          )
+          sectionButton(.workspace3D, title: "3D View", systemImage: "view.3d")
+          CreationToolButton(
+            title: UIDevDetachedWindowDescriptor.title,
+            systemImage: UIDevDetachedWindowDescriptor.systemImage,
+            tint: StudioPalette.sourceModel,
+            help: "Open the one explicit detached floating-window template."
+          ) {
+            UIDevDetachedWindowRegistry.show()
+          }
         }
 
         CreationToolGroup(
@@ -77,28 +88,6 @@ struct UIDevRibbonView: View {
     .accessibilityLabel("UI Dev workspace tools")
   }
 
-  private func windowButton(_ kind: UIDevUtilityWindowKind) -> some View {
-    CreationToolButton(
-      title: kind.title,
-      systemImage: kind.systemImage,
-      tint: kind == .workspace3D ? StudioPalette.semanticPart : StudioPalette.accent,
-      help: windowHelp(for: kind)
-    ) {
-      UIDevUtilityWindowRegistry.show(kind)
-    }
-  }
-
-  private func windowHelp(for kind: UIDevUtilityWindowKind) -> String {
-    switch kind {
-    case .workspace3D:
-      "Open a reusable workspace window containing the real interactive 3D viewport."
-    case .floatingTemplate:
-      "Open the explicit floating utility-panel template for short-lived tools."
-    case .navigator, .inspector, .timeline:
-      "Open the real \(kind.title) as a reusable floating side panel."
-    }
-  }
-
   private func sectionButton(
     _ section: UIDevSection,
     title: String,
@@ -117,7 +106,9 @@ struct UIDevRibbonView: View {
 
   private func tint(for section: UIDevSection) -> Color {
     switch section {
-    case .overview, .panels, .dialogs, .popovers: StudioPalette.accent
+    case .overview, .navigator, .inspector, .timeline, .panels, .dialogs, .popovers:
+      StudioPalette.accent
+    case .workspace3D: StudioPalette.semanticPart
     case .buttons, .inputs, .menus: StudioPalette.semanticPart
     case .mateEditor, .triadManipulator, .tokens: StudioPalette.joint
     }

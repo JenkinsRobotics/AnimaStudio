@@ -90,6 +90,7 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | Python kinematics parity: optional per-DOF limits + relations evaluation + format spec (K2/K5/K7 backend) | `anima_studio/rig.py`, `anima_studio/loader.py`, `anima_studio/tests/test_rig.py`, `anima_studio/tests/test_loader.py`, `examples/rc_car.character.anima`, `examples/six_axis_arm.character.anima`, `examples/walle_style.character.anima`, `dev/docs/roadmap/Character_Format.md` (2.0 section) — `tracks.py` not needed (infinite track bounds cover the unlimited case) | `.venv/bin/ruff check .` clean + `.venv/bin/pytest anima_studio/tests -q` (287 passed) | released 2026-07-15 |
 | Codex | UI Dev Mate/triad labs + docked Agent | `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/Theme/StudioControlStyles.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Agent constrained to UI Dev canvas; explicit floating-panel template; interactive Mate editor and triad-manipulator design labs; focused/full tests, lint, root-app build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 | Codex | Integrated workspace selector sizing/menu | `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceSelector.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | non-squishing minimum selector width; anchored custom popover visually continuous with button; selected row, icons, purposes, shortcuts; focused/full tests, lint, root-app build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
+| Codex | UI Dev embedded production-surface previews | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevDetachedWindow.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevEmbeddedWorkspacePreview.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevUtilityWindowTests.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/StudioAgentPresentationTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | Navigator/Inspector/Timeline/3D preview in their real in-app dock regions; Agent remains right app sidebar; only explicit Detached Window uses NSPanel; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 
 ## Requests
 
@@ -632,3 +633,14 @@ change needed in the Handoff log instead of inventing commands.
   one control. The complete 139-test Swift suite, strict format lint,
   Xcode/root-app build, strict signature verification, live accessibility
   sizing/menu interaction, and `git diff --check` pass.
+- **2026-07-15 (Codex, embedded UI Dev production surfaces):** Removed the
+  AppKit window launch path for Navigator, Inspector, Timeline, and 3D View.
+  Their ribbon commands now render the real production surfaces inside the UI
+  Dev canvas in the same regions operators use: left, right, bottom, and center.
+  Agent remains the existing 360-point right app sidebar. The only auxiliary
+  `NSPanel` is now the explicitly labeled **Detached Window**, isolated in its
+  own focused source file. Live accessibility checks confirmed Navigator plus
+  the production viewport and Agent all remain in the single main window;
+  opening Detached Window alone increases the window count to two. Claimed-file
+  lint, six focused tests, the complete 140-test suite, Xcode/root-app build,
+  strict signature, and `git diff --check` pass.
