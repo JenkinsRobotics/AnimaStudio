@@ -61,6 +61,7 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | Bottango UI research reconciliation | `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | official-doc verification; `git diff --check` | released 2026-07-14 |
 | Claude | Anima firmware v0 (B05/B08 device side, Arduino/ESP32) | `firmware/**` | `arduino-cli compile` clean for `arduino:avr:uno` + `esp32:esp32:esp32`; behavior mirrors `anima_studio/sim.py` + `Wire_Protocol.md` | in progress |
 | Codex | B01 task-focused workspaces + Rig mate-guide visualization | `studio/Package.swift`, `studio/Sources/AnimaStudioApp/WorkspaceDescriptor.swift`, `studio/Sources/AnimaStudioApp/WorkspaceChrome.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceModel.swift`, `studio/Sources/AnimaStudioApp/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Sources/AnimaStudioApp/ShowTimelineView.swift`, `studio/Sources/AnimaStudioApp/HardwareWorkspaceView.swift`, `studio/Sources/AnimaStudioApp/RigGuideOverlay.swift`, `studio/Sources/RealityKitViewport/RigGuides.swift`, `studio/Sources/RealityKitViewport/RobotPreviewView.swift`, `studio/Tests/AnimaStudioAppTests/WorkspacePresentationTests.swift`, `studio/Tests/RealityKitViewportTests/RigGuideTests.swift`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | 15 Swift tests; claimed-file format lint; app launch; `git diff --check` | released 2026-07-14 |
+| Codex | B01/B12 source-owned hierarchy navigator pass | `studio/Sources/AnimaStudioApp/StudioTheme.swift`, `studio/Sources/AnimaStudioApp/HierarchyFiltering.swift`, `studio/Sources/AnimaStudioApp/PartTreeRow.swift`, `studio/Sources/AnimaStudioApp/ProjectNavigatorView.swift`, `studio/Sources/AnimaStudioApp/InspectorView.swift`, `studio/Tests/AnimaStudioAppTests/HierarchyFilteringTests.swift`, `dev/docs/roadmap/Studio_App.md`, `dev/docs/roadmap/Bottango_Parity.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | filtered source tree preserves ancestors; imported hierarchy is visibly locked/source-owned; 19 Swift tests + claimed-file lint + app launch + `git diff --check` | released 2026-07-14 |
 
 ## Requests
 
@@ -226,3 +227,14 @@ change needed in the Handoff log instead of inventing commands.
   contract is in `Studio_App.md`. Editable handles and imported attachment wait
   for the shared typed-joint/DOF contract. Fifteen Swift tests, claimed-file
   format lint, `git diff --check`, and a fresh app launch pass.
+- **2026-07-14 (Codex, source hierarchy navigator):** Incorporated Jonathan's
+  Parts Menu/import research as a two-layer navigation contract. Imported
+  RealityKit nodes are now grouped under a searchable, blue, visibly locked
+  Source Model tree; the semantic mechanism and joints remain distinct
+  project-owned roles. Filtering retains matching descendants and their
+  ancestors. The inspector explains source ownership, source-authored
+  appearance, mapping, and reimport prerequisites, with unimplemented actions
+  honestly disabled. `Studio_App.md` now requires immutable source hierarchy,
+  editable semantic hierarchy, mapping cardinality, durable synchronization
+  identity, and non-destructive material handling. Nineteen Swift tests,
+  claimed-file format lint, `git diff --check`, and native app launch pass.

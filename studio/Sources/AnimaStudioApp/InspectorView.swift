@@ -147,21 +147,35 @@ struct InspectorView: View {
     }
   }
 
+  @ViewBuilder
   private func modelNodeInspector(_ node: ModelHierarchyNode) -> some View {
     Section("Model Node") {
+      Label("Source-owned hierarchy", systemImage: "lock.fill")
+        .foregroundStyle(StudioPalette.sourceModel)
       LabeledContent("Name", value: node.displayName)
+      LabeledContent("Ownership", value: "Imported source (read only)")
       LabeledContent("Children", value: "\(node.children.count)")
       LabeledContent("Subtree", value: "\(node.nodeCount) nodes")
       LabeledContent("Path", value: node.id.displayString)
         .lineLimit(4)
+      LabeledContent("Appearance", value: "Rendered from source asset")
       LabeledContent("Semantic Part", value: "Not mapped")
         .foregroundStyle(.secondary)
       Label(
-        "Map this imported node to a semantic part before assigning a mate connector.",
+        "Edit hierarchy, pivots, and materials in the source model. Map a node to an Anima part before assigning mate connectors or animation.",
         systemImage: "info.circle"
       )
       .font(.caption)
       .foregroundStyle(.secondary)
+    }
+
+    Section("Source Actions") {
+      Button("Map to Semantic Part", systemImage: "arrow.triangle.branch") {}
+        .disabled(true)
+        .help("Available after persistent semantic parts are implemented")
+      Button("Reimport from Source", systemImage: "arrow.clockwise") {}
+        .disabled(true)
+        .help("Available after durable asset identity and source bookmarks are implemented")
     }
   }
 

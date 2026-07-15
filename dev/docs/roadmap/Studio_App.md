@@ -84,6 +84,33 @@ prismatic joint components apply rotation or translation to their child link.
 The same `EvaluatedFrame` therefore supports both organic skeletal characters
 and mechanical URDF-style robots.
 
+Studio deliberately presents two related hierarchies without conflating them:
+
+1. The **source-model hierarchy** is imported from Blender, CAD, or another
+   authoring tool. It is selectable and searchable, but its nodes, ordering,
+   pivots, and materials are source-owned and read-only in Studio. Source rows
+   use a blue model icon plus a lock label; color is not the only cue.
+2. The **semantic-rig hierarchy** contains Anima parts, typed mate connectors,
+   joints, and animatable DOFs. It is project-owned. This is the hierarchy that
+   Rig may rename, duplicate, drag to reparent, and edit with undo once durable
+   semantic parts ship. Parts and joints use distinct icon-plus-label roles.
+
+Mapping bridges the two layers. A semantic part may collect multiple source
+nodes so a detailed imported subtree can behave as one rigid link; a source
+node may drive at most one semantic part instance at a time. Imported nodes are
+never directly reparented as a side effect of Rig editing. Viewport, navigator,
+timeline, graph, and inspector selection all resolve through stable project and
+source identities rather than retaining a transient RealityKit entity pointer.
+
+Reimport synchronization requires a durable asset identity, a restorable source
+bookmark, and source-node identities. It must reconcile moved, added, deleted,
+and renamed nodes, preserve valid semantic mappings, and report ambiguous or
+broken mappings before committing changes. A temporary sibling-index path is
+adequate for current inspection but is not the final synchronization identity.
+Materials remain authored in the source application and rendered from the
+imported asset; a future non-destructive Studio override layer must not pretend
+to be a shader editor or silently rewrite the source file.
+
 Joint editing overlays—axes, limits, pivots, selection outlines, motion trails,
 and constraint warnings—belong to the viewport adapter. Joint definitions,
 limits, units, and animation values belong to `AnimaCore` and the `.anima`
@@ -272,6 +299,10 @@ become the Assets workspace without changing project semantics.
 - The Parts tree, 3D viewport, timeline tracks, graph curves, and inspector use
   one shared selection identity. A single selection opens its typed inspector;
   multiple selection exposes only valid common operations.
+- The Parts tree groups semantic rig content separately from the read-only
+  source model. Search keeps matching descendants and their ancestors visible.
+  Locked source rows can be selected and framed but cannot accept reparent
+  drops; only semantic parts expose hierarchy-editing affordances.
 - The inspector uses progressive disclosure: human-readable common fields
   first, type-specific geometry/DOF/output controls second, and diagnostics or
   raw identifiers last.

@@ -5,6 +5,7 @@ import SwiftUI
 struct ProjectNavigatorView: View {
   @Bindable var workspace: StudioWorkspaceModel
   let importModel: () -> Void
+  @State private var filterText = ""
 
   var body: some View {
     VStack(spacing: 0) {
@@ -12,6 +13,10 @@ struct ProjectNavigatorView: View {
         title: panelTitle,
         systemImage: workspace.activeWorkspace.descriptor.systemImage
       )
+
+      StudioSearchField(prompt: "Filter \(panelTitle)", text: $filterText)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 8)
 
       List(selection: $workspace.selection) {
         navigatorContent
@@ -25,6 +30,9 @@ struct ProjectNavigatorView: View {
       panelFooter
     }
     .studioPanelSurface()
+    .onChange(of: workspace.activeWorkspace) {
+      filterText = ""
+    }
   }
 
   @ViewBuilder
@@ -33,15 +41,17 @@ struct ProjectNavigatorView: View {
     case .assets:
       projectSection
       assetSection
-      importedHierarchySection
+      sourceHierarchySection
     case .rig:
       projectSection
-      structureSection
+      semanticRigSection
       jointSection
+      sourceHierarchySection
     case .animate:
       animationSection
-      structureSection
+      semanticRigSection
       jointSection
+      sourceHierarchySection
     case .show:
       showSection
       animationSection
@@ -65,61 +75,79 @@ struct ProjectNavigatorView: View {
         Label("No imported assets", systemImage: "cube.transparent")
           .foregroundStyle(.secondary)
       } else {
-        ForEach(workspace.project.assets) { asset in
-          Label(asset.name, systemImage: "cube")
+        ForEach(filteredAssets) { asset in
+          PartTreeRow(title: asset.name, role: .sourceNode, detail: "Asset")
             .tag(NavigatorItem.asset(asset.id))
+        }
+        if filteredAssets.isEmpty {
+          noFilterResults
         }
       }
     }
   }
 
   @ViewBuilder
-  private var importedHierarchySection: some View {
+  private var sourceHierarchySection: some View {
     if workspace.importedModelHierarchy != nil || workspace.isLoadingModelHierarchy {
-      structureSection
+      Section("Source Model · Read Only") {
+        if workspace.isLoadingModelHierarchy {
+          HStack {
+            ProgressView()
+              .controlSize(.small)
+            Text("Reading model hierarchy…")
+              .foregroundStyle(.secondary)
+          }
+        } else if let hierarchy = filteredModelHierarchy {
+          OutlineGroup([hierarchy], children: \.outlineChildren) { node in
+            PartTreeRow(
+              title: node.displayName,
+              role: node.children.isEmpty ? .sourceNode : .sourceAssembly,
+              isSourceLocked: true
+            )
+            .tag(NavigatorItem.modelNode(node.id))
+          }
+        } else {
+          noFilterResults
+        }
+      }
     }
   }
 
-  @ViewBuilder
-  private var structureSection: some View {
-    Section("Parts & Structure") {
-      if workspace.isLoadingModelHierarchy {
-        HStack {
-          ProgressView()
-            .controlSize(.small)
-          Text("Reading model hierarchy…")
-            .foregroundStyle(.secondary)
-        }
-      } else if let hierarchy = workspace.importedModelHierarchy {
-        OutlineGroup([hierarchy], children: \.outlineChildren) { node in
-          Label(
-            node.displayName,
-            systemImage: node.children.isEmpty ? "cube" : "square.3.layers.3d"
-          )
-          .tag(NavigatorItem.modelNode(node.id))
-        }
+  private var semanticRigSection: some View {
+    Section("Semantic Rig") {
+      if matchesFilter("Sample Mechanism") {
+        PartTreeRow(
+          title: "Sample Mechanism",
+          role: .semanticPart,
+          detail: "\(workspace.project.rig.joints.count) joints"
+        )
+        .tag(NavigatorItem.structure)
       } else {
-        Label("Sample Mechanism", systemImage: "square.3.layers.3d")
-          .tag(NavigatorItem.structure)
-          .badge("2")
+        noFilterResults
       }
     }
   }
 
   private var jointSection: some View {
     Section("Joints") {
-      ForEach(workspace.project.rig.joints, id: \.id) { joint in
-        Label(joint.displayName, systemImage: "rotate.3d")
+      ForEach(filteredJoints, id: \.id) { joint in
+        PartTreeRow(title: joint.displayName, role: .joint)
           .tag(NavigatorItem.joint(joint.id))
+      }
+      if filteredJoints.isEmpty {
+        noFilterResults
       }
     }
   }
 
   private var animationSection: some View {
     Section("Animations") {
-      ForEach(workspace.project.clips, id: \.name) { clip in
+      ForEach(filteredClips, id: \.name) { clip in
         Label(clip.name, systemImage: "timeline.selection")
           .tag(NavigatorItem.animation(clip.name))
+      }
+      if filteredClips.isEmpty {
+        noFilterResults
       }
     }
   }
@@ -162,11 +190,19 @@ struct ProjectNavigatorView: View {
       .disabled(workspace.isLoadingModelHierarchy)
       .padding(12)
     case .rig:
-      Button("Create Semantic Part", systemImage: "plus.circle.fill") {}
-        .buttonStyle(.borderedProminent)
-        .disabled(true)
-        .help("Part creation follows the typed-joint project contract")
-        .padding(12)
+      VStack(alignment: .leading, spacing: 8) {
+        Button("Create Semantic Part", systemImage: "plus.circle.fill") {}
+          .buttonStyle(.borderedProminent)
+          .disabled(true)
+          .help("Part creation follows the typed-joint project contract")
+        Label(
+          "Source nodes stay locked; map them into the rig to edit relationships.",
+          systemImage: "lock"
+        )
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+      }
+      .padding(12)
     case .animate:
       Text(selectionGuidance)
         .font(.caption)
@@ -199,5 +235,32 @@ struct ProjectNavigatorView: View {
     case .show: "Show Contents"
     case .hardware: "Hardware"
     }
+  }
+
+  private var filteredAssets: [ProjectAsset] {
+    workspace.project.assets.filter { matchesFilter($0.name) }
+  }
+
+  private var filteredJoints: [JointDefinition] {
+    workspace.project.rig.joints.filter { matchesFilter($0.displayName) }
+  }
+
+  private var filteredClips: [AnimationClip] {
+    workspace.project.clips.filter { matchesFilter($0.name) }
+  }
+
+  private var filteredModelHierarchy: ModelHierarchyNode? {
+    workspace.importedModelHierarchy?.filtered(matching: filterText)
+  }
+
+  private func matchesFilter(_ value: String) -> Bool {
+    let query = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return query.isEmpty || value.localizedStandardContains(query)
+  }
+
+  private var noFilterResults: some View {
+    Label("No matching items", systemImage: "line.3.horizontal.decrease.circle")
+      .font(.caption)
+      .foregroundStyle(StudioPalette.muted)
   }
 }

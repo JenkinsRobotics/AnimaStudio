@@ -7,6 +7,10 @@ enum StudioPalette {
   static let panelInset = Color(red: 0.16, green: 0.17, blue: 0.19)
   static let field = Color(red: 0.12, green: 0.13, blue: 0.15)
   static let accent = Color(red: 0.12, green: 0.58, blue: 0.90)
+  static let sourceModel = Color(red: 0.25, green: 0.62, blue: 0.96)
+  static let semanticPart = Color(red: 0.23, green: 0.76, blue: 0.68)
+  static let joint = Color(red: 0.72, green: 0.45, blue: 0.96)
+  static let hardware = Color(red: 0.96, green: 0.58, blue: 0.24)
   static let muted = Color.white.opacity(0.62)
   static let border = Color.white.opacity(0.10)
 }
@@ -140,5 +144,35 @@ struct StudioPrimaryButtonStyle: ButtonStyle {
         StudioPalette.accent.opacity(configuration.isPressed ? 0.72 : 1),
         in: RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
       )
+  }
+}
+
+struct StudioSearchField: View {
+  let prompt: String
+  @Binding var text: String
+
+  var body: some View {
+    HStack(spacing: 7) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(StudioPalette.muted)
+      TextField(prompt, text: $text)
+        .textFieldStyle(.plain)
+      if !text.isEmpty {
+        Button("Clear filter", systemImage: "xmark.circle.fill") {
+          text = ""
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
+        .foregroundStyle(StudioPalette.muted)
+      }
+    }
+    .padding(.horizontal, 9)
+    .frame(height: StudioMetrics.fieldHeight)
+    .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 7))
+    .overlay {
+      RoundedRectangle(cornerRadius: StudioMetrics.controlCornerRadius)
+        .stroke(StudioPalette.border, lineWidth: 1)
+    }
+    .accessibilityLabel(prompt)
   }
 }

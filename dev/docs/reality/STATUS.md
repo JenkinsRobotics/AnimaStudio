@@ -35,7 +35,12 @@
   Command/Shift select multiple, one item opens its configuration, and Escape
   or the inspector close control clears selection. Imported geometry can also
   be selected directly in the viewport, with Command/Shift extending the same
-  Parts-tree selection. Shared theme metrics and
+  Parts-tree selection. Every navigator workspace now has a standardized
+  filter. Imported assemblies appear in a separate blue, locked **Source Model ·
+  Read Only** tree; filtering preserves the ancestors of matching nodes. The
+  semantic mechanism and joints remain separate, editable-role rows in teal and
+  purple, and source-node inspection explains ownership, source appearance,
+  mapping, and reimport prerequisites. Shared theme metrics and
   reusable panel, text-field, picker, readout, and primary-button styles keep
   new Studio windows visually consistent. The sample Rig viewport also renders
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
@@ -46,9 +51,10 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Fifteen tests pass with `cd studio && swift test`, including real USD
-  hierarchy loading/projection through RealityKit and duplicate/unnamed entity
-  identity coverage. The Python package skeleton also
+  inspector. Nineteen tests pass with `cd studio && swift test`, including real
+  USD hierarchy loading/projection through RealityKit, duplicate/unnamed entity
+  identity coverage, and hierarchy filtering/ancestor retention. The Python
+  package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
   the Anima Wire Protocol v0 reference host (`anima_studio/wire.py` — encode
   HELLO/CFG/FRM/EN/STOP/PING, parse ANIMA/OK/ERR/PONG, 3-decimal normalized
@@ -76,8 +82,12 @@
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
-- **Known gaps:** imported model hierarchies can be inspected but cannot yet be
-  mapped to persistent semantic parts; the mate guides currently visualize the
+- **Known gaps:** imported model hierarchies can be inspected and filtered but
+  still use temporary sibling-index paths; durable source identity, security
+  bookmarks, reimport reconciliation, collapse, and mapping to persistent
+  semantic parts are not implemented. Source nodes are intentionally locked,
+  and semantic-part drag reparenting waits for the persistent part/undo model.
+  The mate guides currently visualize the
   sample revolute joint but are not editable handles or attached to imported
   parts; joint limits and keyframes are not yet
   editable; project changes are not

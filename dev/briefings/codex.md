@@ -63,6 +63,14 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-14 — source hierarchy pass complete:** Jonathan's Parts Menu
+  research is now an explicit two-layer navigator contract. Imported assembly
+  nodes preserve source hierarchy and remain selectable/searchable but visibly
+  locked; semantic rig parts will be editable/reparentable once the durable
+  part model lands. Role icon+color styling, ancestor-preserving filtering, and
+  inspector ownership/reimport guidance are live without a duplicate rig model
+  or fake synchronization action. Nineteen Swift tests and app launch pass.
+
 - **2026-07-14 — task-focused workspace implementation complete:** Assets,
   Rig, Animate, Show, and Hardware now own distinct contextual tools and panel
   contents, Command-1…5 switching, and independent in-session layout state.
