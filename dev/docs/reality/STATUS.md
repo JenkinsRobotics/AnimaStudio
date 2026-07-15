@@ -181,9 +181,12 @@
   Overrides are deliberately in-session presentation state until the durable
   project document defines non-destructive material-override persistence, and
   imported source-model materials remain source-owned and read-only. A selected
-  semantic component also has a native viewport context menu for direct
-  Properties or Appearance inspection, framing, show/hide, lock/unlock,
-  position/rotation reset, and clearing selection. Menu commands use the same
+  semantic component also has a native, CAD-ordered viewport context menu. It
+  identifies the body and groups property editing, attached-mate navigation,
+  show/hide, reversible isolate and transparency previews, select-all/clear,
+  Home and Zoom to Selection, lock/unlock, transform reset, and Appearance.
+  Isolation and transparency are renderer-only overlays that leave the saved
+  rig and underlying appearance override unchanged. Menu commands use the same
   model-owned lock guards as the Inspector and transform gizmo. During
   mate placement, transform handles are suppressed so connector markers own the
   click target. Outside mate placement, the focused component shows the same
@@ -229,7 +232,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. One hundred sixty-two tests pass with
+  inspector. One hundred sixty-six tests pass with
   `cd studio && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key

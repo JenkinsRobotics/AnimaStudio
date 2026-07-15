@@ -95,4 +95,85 @@ final class ComponentViewportContextMenuTests: XCTestCase {
     XCTAssertEqual(resetPart.positionMeters, RigVector3())
     XCTAssertEqual(resetPart.rotationEulerRadians, RigVector3())
   }
+
+  func testIsolationAndTransparencyAreReversibleViewportPresentation() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let selectedPart = try XCTUnwrap(model.project.rig.parts.first)
+    model.addPart(kind: .sphere)
+    let otherPart = try XCTUnwrap(model.project.rig.parts.last)
+    model.selectPart(id: selectedPart.id, extendingSelection: false)
+
+    model.toggleSelectedComponentIsolation()
+    model.toggleSelectedComponentTransparency()
+
+    let activeState = try XCTUnwrap(model.selectedComponentContextMenuState)
+    XCTAssertTrue(activeState.isIsolated)
+    XCTAssertTrue(activeState.hasActiveIsolation)
+    XCTAssertTrue(activeState.isTransparent)
+    XCTAssertTrue(try XCTUnwrap(model.viewportPartAppearances[selectedPart.id]).isVisible)
+    XCTAssertEqual(try XCTUnwrap(model.viewportPartAppearances[selectedPart.id]).opacity, 0.28)
+    XCTAssertFalse(try XCTUnwrap(model.viewportPartAppearances[otherPart.id]).isVisible)
+
+    model.toggleSelectedComponentIsolation()
+    model.toggleSelectedComponentTransparency()
+
+    XCTAssertNil(model.isolatedComponentID)
+    XCTAssertFalse(model.transparentComponentIDs.contains(selectedPart.id))
+    XCTAssertTrue(try XCTUnwrap(model.viewportPartAppearances[otherPart.id]).isVisible)
+  }
+
+  func testLockedComponentRejectsTransparencyButCanBeIsolatedForInspection() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let part = try XCTUnwrap(model.project.rig.parts.first)
+    model.toggleComponentLock(part.id)
+
+    model.toggleSelectedComponentTransparency()
+    model.toggleSelectedComponentIsolation()
+
+    XCTAssertFalse(model.transparentComponentIDs.contains(part.id))
+    XCTAssertEqual(model.isolatedComponentID, part.id)
+  }
+
+  func testDependencyMenuSelectsOnlyAnAttachedMate() throws {
+    let parent = RigPartDefinition(displayName: "Base", primitiveKind: .box)
+    let part = RigPartDefinition(displayName: "Head", primitiveKind: .sphere)
+    let attachedMate = JointDefinition(
+      id: "head_yaw",
+      displayName: "Head Yaw",
+      axis: .z,
+      minimumRadians: -.pi,
+      maximumRadians: .pi,
+      parentPartID: parent.id,
+      childPartID: part.id
+    )
+    let model = StudioWorkspaceModel(
+      project: AnimaProject(
+        name: "Context Menu Test",
+        rig: CharacterRig(parts: [parent, part], joints: [attachedMate]),
+        clips: []
+      )
+    )
+    model.selectPart(id: part.id, extendingSelection: false)
+
+    let state = try XCTUnwrap(model.selectedComponentContextMenuState)
+    XCTAssertTrue(state.dependencies.contains(where: { $0.id == attachedMate.id }))
+
+    model.selectAttachedMate(attachedMate.id)
+    XCTAssertEqual(model.primarySelection, .joint(attachedMate.id))
+  }
+
+  func testSelectAllAndHomeViewCommandsUseSharedWorkspaceState() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.cameraViewpoint = .custom
+
+    model.selectAllComponents()
+    model.showHomeView()
+
+    XCTAssertEqual(model.selectedComponentIDs.count, 2)
+    XCTAssertEqual(model.cameraViewpoint, .home)
+  }
 }

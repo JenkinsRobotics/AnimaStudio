@@ -54,6 +54,8 @@ final class StudioWorkspaceModel {
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
   var componentAppearances: [PartID: PreviewPartAppearance] = [:]
+  var isolatedComponentID: PartID?
+  var transparentComponentIDs: Set<PartID> = []
   var componentInspectorTab = ComponentInspectorTab.properties
   var matePlacement: MatePlacementSession?
   private var storedSelectedFeature: MateConnectorCandidate?

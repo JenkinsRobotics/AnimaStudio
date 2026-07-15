@@ -90,6 +90,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — CAD-reference context-menu refinement complete:** Reorganized
+  the native component menu to follow the supplied CAD reference: identity,
+  properties/dependencies, visibility/isolation/transparency, selection and
+  camera, lock/transform, then Appearance. Attached mates are navigable from a
+  submenu; Isolate and Make Transparent are reversible renderer overlays and
+  never rewrite saved rig or base appearance data. Select All, Clear Selection,
+  Home View, and Zoom to Selection use shared workspace commands. Four new
+  tests bring the focused menu suite to nine and the full Swift suite to 166;
+  recursive format lint, Xcode/root-app builds, signature verification, launch,
+  and `git diff --check` pass.
+
 - **2026-07-15 — selected-component viewport context menu complete:** A
   right-click in the viewport now exposes native actions for the selected
   semantic component: Properties, Appearance, Frame Selection, Show/Hide,

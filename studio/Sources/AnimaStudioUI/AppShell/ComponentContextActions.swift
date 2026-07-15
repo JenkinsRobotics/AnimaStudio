@@ -1,10 +1,16 @@
 import AnimaCore
 import Foundation
+import RealityKitViewport
 
 enum ComponentContextLockScope: Equatable {
   case unlocked
   case component
   case group(UUID)
+}
+
+struct ComponentContextDependency: Equatable, Identifiable {
+  let id: JointID
+  let displayName: String
 }
 
 struct ComponentContextMenuState: Equatable {
@@ -13,6 +19,10 @@ struct ComponentContextMenuState: Equatable {
   let primitiveKind: RigPrimitiveKind
   let lockScope: ComponentContextLockScope
   let isVisible: Bool
+  let isIsolated: Bool
+  let hasActiveIsolation: Bool
+  let isTransparent: Bool
+  let dependencies: [ComponentContextDependency]
 
   var isLocked: Bool {
     lockScope != .unlocked
@@ -35,6 +45,21 @@ struct ComponentContextMenuState: Equatable {
 }
 
 extension StudioWorkspaceModel {
+  var viewportPartAppearances: [PartID: PreviewPartAppearance] {
+    Dictionary(
+      uniqueKeysWithValues: project.rig.parts.compactMap { part in
+        guard var appearance = componentAppearance(for: part.id) else { return nil }
+        if let isolatedComponentID, part.id != isolatedComponentID {
+          appearance.isVisible = false
+        }
+        if transparentComponentIDs.contains(part.id) {
+          appearance.opacity = min(appearance.opacity, 0.28)
+        }
+        return (part.id, appearance)
+      }
+    )
+  }
+
   var selectedComponentContextMenuState: ComponentContextMenuState? {
     guard let partID = selectedPartID,
       let part = project.rig.parts.first(where: { $0.id == partID }),
@@ -49,13 +74,21 @@ extension StudioWorkspaceModel {
     } else {
       lockScope = .unlocked
     }
+    let dependencies: [ComponentContextDependency] = project.rig.joints.compactMap { joint in
+      guard joint.parentPartID == partID || joint.childPartID == partID else { return nil }
+      return ComponentContextDependency(id: joint.id, displayName: joint.displayName)
+    }
 
     return ComponentContextMenuState(
       partID: partID,
       displayName: part.displayName,
       primitiveKind: part.primitiveKind,
       lockScope: lockScope,
-      isVisible: appearance.isVisible
+      isVisible: appearance.isVisible,
+      isIsolated: isolatedComponentID == partID,
+      hasActiveIsolation: isolatedComponentID != nil,
+      isTransparent: transparentComponentIDs.contains(partID),
+      dependencies: dependencies
     )
   }
 
@@ -73,6 +106,37 @@ extension StudioWorkspaceModel {
     else { return }
     appearance.isVisible.toggle()
     setComponentAppearance(id: state.partID, to: appearance)
+  }
+
+  func toggleSelectedComponentIsolation() {
+    guard let partID = selectedPartID else { return }
+    isolatedComponentID = isolatedComponentID == partID ? nil : partID
+  }
+
+  func toggleSelectedComponentTransparency() {
+    guard let partID = selectedPartID, !isComponentLocked(partID) else { return }
+    if transparentComponentIDs.contains(partID) {
+      transparentComponentIDs.remove(partID)
+    } else {
+      transparentComponentIDs.insert(partID)
+    }
+  }
+
+  func selectAttachedMate(_ id: JointID) {
+    guard let partID = selectedPartID,
+      project.rig.joints.contains(where: {
+        $0.id == id && ($0.parentPartID == partID || $0.childPartID == partID)
+      })
+    else { return }
+    selection = [.joint(id)]
+  }
+
+  func selectAllComponents() {
+    selection = Set(project.rig.parts.map { NavigatorItem.part($0.id) })
+  }
+
+  func showHomeView() {
+    setCameraViewpoint(.home)
   }
 
   func toggleSelectedComponentLock() {
