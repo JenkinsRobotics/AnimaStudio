@@ -7,8 +7,8 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(
       UIDevSection.allCases,
       [
-        .overview, .templateMatrix, .variantBoard, .referenceWidgets, .designKit, .navigator,
-        .inspector, .timeline, .workspace3D, .buttons, .inputs, .menus, .panels,
+        .overview, .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit,
+        .navigator, .inspector, .timeline, .workspace3D, .buttons, .inputs, .menus, .panels,
         .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens,
       ]
     )
@@ -26,6 +26,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertFalse(UIDevSection.overview.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.templateMatrix.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.variantBoard.isEmbeddedWorkspacePreview)
+    XCTAssertFalse(UIDevSection.nodes.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.referenceWidgets.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.designKit.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.panels.isEmbeddedWorkspacePreview)
@@ -33,7 +34,7 @@ final class UIDevCatalogTests: XCTestCase {
 
   func testUIDevIsAnExplicitShellWorkspace() {
     XCTAssertEqual(UIDevWorkspaceDescriptor.title, "UI Dev")
-    XCTAssertEqual(UIDevWorkspaceDescriptor.shortcutNumber, 6)
+    XCTAssertEqual(UIDevWorkspaceDescriptor.shortcutNumber, 7)
     XCTAssertFalse(StudioWorkspaceKind.allCases.map(\.descriptor.title).contains("UI Dev"))
   }
 

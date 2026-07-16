@@ -319,6 +319,8 @@ private struct WorkspaceContextualTools: View {
       animationTools
     case .show:
       showTools
+    case .nodes:
+      nodeTools
     case .hardware:
       hardwareTools
     }
@@ -389,6 +391,23 @@ private struct WorkspaceContextualTools: View {
         .disabled(true)
         .help("Show tracks arrive with scene documents")
       bottomEditorButton(title: "Show Timeline")
+    }
+  }
+
+  private var nodeTools: some View {
+    Group {
+      Button("Select", systemImage: "cursorarrow") {}
+        .disabled(true)
+        .help("Use Select in the node canvas toolbar")
+      Button("Add Node", systemImage: "plus.square.dashed") {}
+        .disabled(true)
+        .help("Use the docked Node Library to add scene actions")
+      Button("Connect", systemImage: "point.3.connected.trianglepath.dotted") {}
+        .disabled(true)
+        .help("Interactive edge authoring arrives with the graph compiler contract")
+      Button("Validate", systemImage: "checkmark.shield") {}
+        .disabled(true)
+        .help("Use Validate in the node canvas toolbar for draft-structure feedback")
     }
   }
 

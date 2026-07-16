@@ -47,6 +47,7 @@ enum WorkspaceRibbonCatalog {
     case .rig: []
     case .animate: animationGroups
     case .show: showGroups
+    case .nodes: nodeGroups
     case .hardware: hardwareGroups
     }
   }
@@ -191,6 +192,47 @@ enum WorkspaceRibbonCatalog {
           "Timeline", "rectangle.bottomthird.inset.filled", "Show or hide the show timeline.",
           .toggleBottomEditor),
         tool("Grid", "grid", "Show or hide the preview grid.", .toggleGrid),
+      ]),
+  ]
+
+  private static let nodeGroups = [
+    group(
+      "Flow", "arrow.triangle.branch", .accent,
+      [
+        tool("Start", "play.fill", "Add the single entry point for a scene graph."),
+        tool("End", "stop.fill", "Add the terminal point for a scene graph."),
+        tool("Sequence", "arrow.right.to.line.compact", "Run child actions in order."),
+        tool("Parallel", "arrow.triangle.branch", "Run child actions together."),
+        tool("Branch", "arrow.triangle.swap", "Choose a path from a structured condition."),
+        tool("Loop", "repeat", "Repeat a structured group of scene actions."),
+      ]),
+    group(
+      "Actions", "figure.walk.motion", .components,
+      [
+        tool("Animation Clip", "figure.walk.motion", "Play an authored character clip."),
+        tool("Pose", "figure.stand", "Move the character to a named or inline pose."),
+        tool("Wait", "timer", "Pause scene execution for a duration."),
+        tool("Wait for Event", "hourglass", "Pause until a named event arrives."),
+        tool("Emit Event", "bolt.circle", "Publish a named scene event."),
+        tool("Set Variable", "equal.circle", "Set a declared scene variable."),
+      ]),
+    group(
+      "Graph", "point.3.connected.trianglepath.dotted", .mates,
+      [
+        tool("Select", "cursorarrow", "Select and move nodes on the canvas."),
+        tool("Hand", "hand.draw", "Pan across a larger node canvas."),
+        tool("Connect", "cable.connector", "Connect compatible flow and data ports."),
+        tool(
+          "Frame All", "arrow.up.left.and.down.right.magnifyingglass",
+          "Frame the complete graph."),
+        tool("Validate", "checkmark.shield", "Validate graph structure and availability."),
+      ]),
+    group(
+      "Future", "clock.badge.exclamationmark", .planned,
+      [
+        tool("Audio Clip", "waveform", "Planned: requires scene audio actions."),
+        tool("Screen / LED", "display", "Planned: requires screen and LED output actions."),
+        tool("AI Behavior", "brain.head.profile", "Planned: requires an optional AI plugin."),
       ]),
   ]
 

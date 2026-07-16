@@ -5,6 +5,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
   case rig
   case animate
   case show
+  case nodes
   case hardware
 
   var id: Self { self }
@@ -63,6 +64,19 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
           showsBottomEditor: true
         )
       )
+    case .nodes:
+      StudioWorkspaceDescriptor(
+        id: self,
+        title: "Nodes",
+        systemImage: "point.3.connected.trianglepath.dotted",
+        purpose: "Plan scene logic, cues, gates, and events",
+        viewportLabel: "NODE GRAPH",
+        defaultPresentation: WorkspacePresentation(
+          showsNavigator: false,
+          showsInspector: false,
+          showsBottomEditor: false
+        )
+      )
     case .hardware:
       StudioWorkspaceDescriptor(
         id: self,
@@ -85,7 +99,8 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
     case .rig: 2
     case .animate: 3
     case .show: 4
-    case .hardware: 5
+    case .nodes: 5
+    case .hardware: 6
     }
   }
 }

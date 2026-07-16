@@ -68,7 +68,7 @@
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
   row followed by one full-width contextual command ribbon. A fixed far-left
-  dropdown switches Assets, Rig, Animate, Show, and Hardware with Command-1…5;
+  dropdown switches Assets, Rig, Animate, Show, Nodes, and Hardware with Command-1…6;
   the former workspace-tab row has been removed. Each workspace replaces the
   ribbon with focused, grouped tools. The selector now keeps a readable
   228-point minimum width and uses an anchored, visually continuous workspace
@@ -79,7 +79,17 @@
   Show exposes Sequence, Clips, Events, and Sync; Hardware exposes Connection,
   Outputs, Mapping, Calibration, Safety, and Monitor. Implemented commands are
   live, while backend-dependent commands remain visibly disabled as planned.
-  A shell-level **UI Dev** workspace follows the five project-authoring
+  **Nodes** is a dedicated scene-logic planning workspace with a dark dotted
+  canvas, draggable and selectable typed sample nodes, live curved flow edges,
+  a searchable node library, a selection-driven inspector, structural
+  validation feedback, zoom/grid/frame controls, add/delete/reset actions, and
+  a compact timeline concept that explicitly presents graph and timeline as two
+  views of one future scene document. Flow, performance, timing, and event
+  families are available in the UI draft; audio, screen/LED, and AI nodes stay
+  visibly locked behind their missing runtime actions. This surface does not
+  yet load, save, compile, execute, or author connections in `.scene.anima`;
+  the in-memory draft is intentionally not a second runtime model.
+  A shell-level **UI Dev** workspace follows the six project-authoring
   workspaces in the selector without becoming saved character data. Its ribbon
   opens Windows, Interaction Labs, Controls, and Foundations galleries for the living Studio UI
   standard: action hierarchy and states, labeled/unit-aware inputs, native
@@ -157,6 +167,10 @@
   and copy-as-JSON are live. The adjacent kit lays out the docked window map,
   all canonical button states, production fields, menus, popovers, panel
   chrome, and direct links to the real embedded surface previews.
+  UI Dev also includes a dedicated **Nodes** tab rendering the production-sized
+  node workspace in place so its library, canvas, cards, ports, edges,
+  inspector, and timeline can be refined alongside the rest of the living UI
+  standard.
   Its Mate Editor interaction lab uses one shared Onshape-style panel for the
   complete eight-mate family. A stable icon strip and full-width Type dropdown
   both switch that panel; the title, degrees-of-freedom readout, constrained

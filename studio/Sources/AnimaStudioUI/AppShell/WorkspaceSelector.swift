@@ -79,9 +79,9 @@ struct WorkspaceRibbonSelector: View {
     }
     .accessibilityLabel("Workspace: \(activeTitle)")
     .accessibilityHint(
-      "Open the task-focused workspace menu. Command 1 through 6 switches directly."
+      "Open the task-focused workspace menu. Command 1 through 7 switches directly."
     )
-    .help("Switch task-focused workspace (⌘1–6)")
+    .help("Switch task-focused workspace (⌘1–7)")
   }
 
   private var activeTitle: String {
@@ -137,7 +137,7 @@ private struct WorkspaceSelectorMenu: View {
         isUIDevWorkspace = true
         dismiss()
       }
-      .keyboardShortcut("6", modifiers: .command)
+      .keyboardShortcut("7", modifiers: .command)
     }
     .padding(5)
     .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 14))

@@ -43,6 +43,17 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
     XCTAssertTrue(titles.contains("Timecode"))
   }
 
+  func testNodeCatalogSeparatesAvailablePlanningToolsFromFutureIntegrations() {
+    let groups = WorkspaceRibbonCatalog.groups(for: .nodes)
+    XCTAssertEqual(groups.map(\.title), ["Flow", "Actions", "Graph", "Future"])
+
+    let titles = groups.flatMap(\.tools).map(\.title)
+    XCTAssertTrue(titles.contains("Parallel"))
+    XCTAssertTrue(titles.contains("Wait for Event"))
+    XCTAssertTrue(titles.contains("Screen / LED"))
+    XCTAssertTrue(groups.last?.tools.allSatisfy { !$0.isImplemented } == true)
+  }
+
   func testHardwareCatalogIncludesConnectionMappingCalibrationSafetyAndMonitoring() {
     XCTAssertEqual(
       WorkspaceRibbonCatalog.groups(for: .hardware).map(\.title),

@@ -121,7 +121,7 @@ struct StudioWorkspaceView: View {
         Divider()
         ShowTimelineView(workspace: workspace)
           .frame(minHeight: 210, idealHeight: 250, maxHeight: 320)
-      case .assets, .rig, .hardware:
+      case .assets, .rig, .nodes, .hardware:
         EmptyView()
       }
     }
@@ -154,7 +154,9 @@ struct StudioWorkspaceView: View {
 
   private var authoringWorkspaceCanvas: some View {
     ZStack {
-      if workspace.activeWorkspace == .hardware {
+      if workspace.activeWorkspace == .nodes {
+        NodeWorkspaceView()
+      } else if workspace.activeWorkspace == .hardware {
         HardwareWorkspaceView()
       } else {
         viewport
@@ -318,6 +320,8 @@ struct StudioWorkspaceView: View {
     return switch workspace.activeWorkspace {
     case .assets, .animate, .show, .hardware:
       true
+    case .nodes:
+      false
     case .rig:
       switch workspace.primarySelection {
       case .asset, .part, .componentGroup, .modelNode, .joint:

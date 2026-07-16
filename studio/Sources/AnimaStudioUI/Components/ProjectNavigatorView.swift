@@ -72,6 +72,8 @@ struct ProjectNavigatorView: View {
       showSection
       animationSection
       mediaSection
+    case .nodes:
+      EmptyView()
     case .hardware:
       hardwareSection
     }
@@ -301,6 +303,8 @@ struct ProjectNavigatorView: View {
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
+    case .nodes:
+      EmptyView()
     case .hardware:
       Label("Hardware output is safely offline", systemImage: "lock.shield")
         .font(.caption)
@@ -349,6 +353,7 @@ struct ProjectNavigatorView: View {
     case .assets: "Assets"
     case .rig, .animate: "Components"
     case .show: "Show Contents"
+    case .nodes: "Nodes"
     case .hardware: "Hardware"
     }
   }

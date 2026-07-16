@@ -148,6 +148,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — Nodes workspace UI draft complete:** Jonathan's requested
+  node editor is now a top-level Nodes workspace and a production-sized UI Dev
+  → Nodes lab. It provides a searchable library, draggable typed cards, visible
+  flow edges, inspector, validation status, canvas zoom/grid controls, and a
+  synced-timeline concept. It stays explicitly UI-only and in-memory until N2
+  supplies the bidirectional `.scene.anima` graph model/compiler; there is still
+  one scene truth and one SceneRunner. The Nodes workspace should own the future
+  Visual/Script builder toggle while Show stays the operator-facing sequencing
+  and playback surface. For N4, prefer a Swift SceneRunner port validated by the
+  same fixtures: native preview/scrubbing and document integration outweigh the
+  short-term convenience of managing a bundled Python subprocess. Twenty-six
+  focused and all 206 Swift tests pass; claimed-file lint, native/root app build,
+  strict signature, launch, and `git diff --check` pass.
+
 - **2026-07-15 — UI Dev all-variants board complete:** Preserved the existing
   29-item Template Matrix, Reference Widgets lab, and every focused editor while
   adding a separate wide Variant Board modeled on Jonathan's component-board
