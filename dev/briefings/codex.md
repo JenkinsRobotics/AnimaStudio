@@ -148,6 +148,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev Reference Widgets pack 05 complete:** Added a reusable
+  responsive concept-template card component matching Jonathan's reference and
+  six Anima starting points for rig organization, AI node-flow generation,
+  tools/resources, assembly import, motion sequencing, and character outputs.
+  Cards provide distinct illustrations, readable title/detail/action hierarchy,
+  hover and selected states, and clear prototype-action feedback. The pack is
+  available in Reference Widgets and the now 30-entry Template Matrix; it does
+  not yet create production project content. Twelve focused and all 207 Swift
+  tests pass with claimed-file strict lint, root-app build/signature, launch,
+  and `git diff --check`.
+
 - **2026-07-15 — Nodes voice/AI/I/O concept pack complete:** The node library
   now separates Inputs, Voice & AI, and Outputs. It includes placeable text,
   microphone, event, and hardware inputs; STT, LLM, conversation memory, tool

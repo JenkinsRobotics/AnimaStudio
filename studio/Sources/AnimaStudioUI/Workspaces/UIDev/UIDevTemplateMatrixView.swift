@@ -85,6 +85,7 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case animationTimeline
   case showTimeline
   case timelineDesignB
+  case conceptTemplateCards
   case componentInspector
   case appearanceInspector
   case mateEditor
@@ -217,6 +218,10 @@ enum UIDevTemplateMatrixCatalog {
       .progressAndStatus, "Progress & Status",
       "Success, loading, unavailable, and safety feedback.",
       .statusAndFeedback, 380, 280, 290, "checkmark.circle"),
+    descriptor(
+      .conceptTemplateCards, "Concept Template Cards",
+      "Starting points for onboarding, empty workspaces, and add-content flows.",
+      .statusAndFeedback, 1_080, 680, 520, "rectangle.grid.3x2"),
   ]
 
   static func templates(in category: UIDevTemplateCategory) -> [UIDevTemplateDescriptor] {
@@ -402,6 +407,10 @@ struct UIDevTemplateMatrixView: View {
     case .showTimeline: timelineTemplate(showMode: true)
     case .timelineDesignB:
       UIDevReferenceWidgetSpecimen(kind: .timelineDesignB)
+    case .conceptTemplateCards:
+      scaledLab(designSize: CGSize(width: 1_080, height: 680)) {
+        UIDevReferenceWidgetSpecimen(kind: .conceptTemplateCards)
+      }
     case .componentInspector: componentInspectorTemplate
     case .appearanceInspector: appearanceTemplate
     case .mateEditor:

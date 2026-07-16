@@ -8,6 +8,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
   case documentTabStrip
   case materialEditor
   case timelineDesignB
+  case conceptTemplateCards
 
   var id: Self { self }
 
@@ -20,6 +21,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .documentTabStrip: "Document Tab Strip"
     case .materialEditor: "Material Editor"
     case .timelineDesignB: "Timeline Design B"
+    case .conceptTemplateCards: "Concept Template Cards"
     }
   }
 
@@ -39,6 +41,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
       "A compact surface editor with preview, color, channels, textures, and assignment actions."
     case .timelineDesignB:
       "Multiple timeline views over shared rows, keyframes, playhead, and connected motion data."
+    case .conceptTemplateCards:
+      "Selectable starting-point cards with illustrations, descriptions, and clear actions."
     }
   }
 
@@ -51,6 +55,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .documentTabStrip: "rectangle.split.3x1"
     case .materialEditor: "circle.hexagongrid.fill"
     case .timelineDesignB: "timeline.selection"
+    case .conceptTemplateCards: "rectangle.grid.3x2"
     }
   }
 
@@ -63,6 +68,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .documentTabStrip: CGSize(width: 980, height: 88)
     case .materialEditor: CGSize(width: 410, height: 620)
     case .timelineDesignB: CGSize(width: 1_080, height: 560)
+    case .conceptTemplateCards: CGSize(width: 1_080, height: 680)
     }
   }
 }
@@ -129,6 +135,15 @@ struct UIDevReferenceWidgetsView: View {
         )
 
         referenceCard(.timelineDesignB)
+
+        StudioSectionHeader(
+          title: "Reference Widgets · Pack 05 · Concept Template Cards",
+          detail:
+            "Reusable starting-point cards for onboarding, empty workspaces, and add-content flows.",
+          systemImage: "rectangle.grid.3x2"
+        )
+
+        referenceCard(.conceptTemplateCards)
       }
       .frame(maxWidth: 1_440, alignment: .topLeading)
       .padding(24)
@@ -190,6 +205,8 @@ struct UIDevReferenceWidgetSpecimen: View {
       UIDevMaterialWidgetView()
     case .timelineDesignB:
       UIDevTimelineDesignBView()
+    case .conceptTemplateCards:
+      UIDevConceptTemplateCardsView()
     }
   }
 }

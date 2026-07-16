@@ -112,7 +112,7 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on an **all-surfaces Template Matrix**: twenty-nine current app
+  UI Dev opens on an **all-surfaces Template Matrix**: thirty current app
   specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
   Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
   States. Every specimen is visible together in a responsive board and names
@@ -158,7 +158,13 @@
   ruler uses 0–240 frame numbers at 30 fps, and the blue playhead reports its
   current frame in both the ruler and status footer. This remains a UI Dev
   comparison and does not
-  replace the production Animate timeline yet. None of these reference widgets is wired into an
+  replace the production Animate timeline yet. Pack 05 adds six reusable
+  **Concept Template Cards** for rig organization, AI node-flow generation,
+  tools/resources, assembly import, motion sequencing, and character outputs.
+  The responsive cards provide purpose-built illustrations, title/detail/action
+  hierarchy, hover and selected states, and explicit prototype-action feedback;
+  they are available in both Reference Widgets and the Template Matrix. None of
+  these reference widgets is wired into an
   operator workflow until it is reviewed and adopted there. The separate
   **Live UI Kit** remains available with a resizable Design Inspector
   beside a production-component catalog. The inspector edits the shared Studio surface

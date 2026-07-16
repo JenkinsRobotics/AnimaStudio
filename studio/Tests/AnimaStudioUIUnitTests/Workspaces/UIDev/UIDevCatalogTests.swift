@@ -49,7 +49,7 @@ final class UIDevCatalogTests: XCTestCase {
   func testTemplateMatrixCoversEveryCategoryWithStableUniqueTemplates() {
     let templates = UIDevTemplateMatrixCatalog.templates
 
-    XCTAssertEqual(templates.count, 29)
+    XCTAssertEqual(templates.count, 30)
     XCTAssertEqual(Set(templates.map(\.id)).count, templates.count)
     XCTAssertEqual(Set(templates.map(\.id)), Set(UIDevTemplateID.allCases))
     XCTAssertTrue(templates.allSatisfy { !$0.title.isEmpty && !$0.detail.isEmpty })
@@ -94,6 +94,7 @@ final class UIDevCatalogTests: XCTestCase {
       [
         .layeredIconList, .notificationPopup, .layoutStyleControls, .compactTabPanel,
         .documentTabStrip, .materialEditor, .timelineDesignB,
+        .conceptTemplateCards,
       ]
     )
 
@@ -105,6 +106,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertTrue(matrixIDs.contains(.documentTabStrip))
     XCTAssertTrue(matrixIDs.contains(.materialEditor))
     XCTAssertTrue(matrixIDs.contains(.timelineDesignB))
+    XCTAssertTrue(matrixIDs.contains(.conceptTemplateCards))
 
     for widget in UIDevReferenceWidgetKind.allCases {
       XCTAssertFalse(widget.title.isEmpty)
@@ -112,6 +114,29 @@ final class UIDevCatalogTests: XCTestCase {
       XCTAssertGreaterThan(widget.idealSize.width, 0)
       XCTAssertGreaterThan(widget.idealSize.height, 0)
     }
+  }
+
+  func testConceptTemplateCardsCoverReusableStartingPointFamilies() throws {
+    XCTAssertEqual(
+      UIDevConceptTemplateKind.allCases,
+      [
+        .organizeRig, .aiWorkspace, .toolsAndResources, .importAssembly, .motionSequence,
+        .outputStack,
+      ]
+    )
+    XCTAssertTrue(
+      UIDevConceptTemplateKind.allCases.allSatisfy {
+        !$0.title.isEmpty && !$0.detail.isEmpty && !$0.actionTitle.isEmpty
+          && !$0.systemImage.isEmpty
+      }
+    )
+
+    let descriptor = try XCTUnwrap(
+      UIDevTemplateMatrixCatalog.templates.first { $0.id == .conceptTemplateCards }
+    )
+    XCTAssertEqual(descriptor.category, .statusAndFeedback)
+    XCTAssertGreaterThanOrEqual(descriptor.idealWidth, 1_000)
+    XCTAssertGreaterThanOrEqual(descriptor.idealHeight, 600)
   }
 
   func testTabReferencePackHasReadableDefaultsAndProductionProportions() throws {
