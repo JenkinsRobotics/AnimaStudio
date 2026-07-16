@@ -81,6 +81,14 @@ public actor AnimaCoreClient {
     )
   }
 
+  public func mateTypes() async throws -> AnimaCoreMateTypeCatalog {
+    _ = try await start()
+    return try request(
+      method: "mate_types",
+      params: EmptyParameters()
+    )
+  }
+
   public func evaluate(
     handle: String,
     clip: String? = nil,
@@ -225,6 +233,7 @@ public protocol AnimaCoreServing: Actor {
   func start() async throws -> AnimaCoreHello
   func loadCharacter(text: String) async throws -> AnimaCoreCharacterLoad
   func validateCharacter(text: String) async throws -> AnimaCoreValidation
+  func mateTypes() async throws -> AnimaCoreMateTypeCatalog
   func evaluate(
     handle: String,
     clip: String?,

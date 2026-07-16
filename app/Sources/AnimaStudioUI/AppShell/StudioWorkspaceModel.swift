@@ -63,6 +63,8 @@ final class StudioWorkspaceModel {
   var animaCoreErrorMessage: String?
   var animaCoreState: AnimaCoreState = .unavailable
   var engineEvaluationTimeSeconds: Double?
+  var engineMateTypes: [AnimaCoreMateTypeSummary] = []
+  var engineMates: [AnimaCoreJointSummary] = []
   var componentGroups: [NavigatorComponentGroup] = []
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
@@ -148,6 +150,15 @@ final class StudioWorkspaceModel {
     return id
   }
 
+  var selectedEngineMate: AnimaCoreJointSummary? {
+    guard case .joint(let selectedID) = primarySelection else { return nil }
+    return engineMates.first { $0.selectionKey == selectedID.rawValue }
+  }
+
+  func engineMateType(for mate: AnimaCoreJointSummary) -> AnimaCoreMateTypeSummary? {
+    engineMateTypes.first { $0.type == mate.type }
+  }
+
   /// The standing sub-object (face/edge/corner/axis/origin) selection made
   /// in the viewport. Valid only while its owning component remains the
   /// focused component and no mate placement is running, so it can never
@@ -170,7 +181,7 @@ final class StudioWorkspaceModel {
   }
 
   var isRigEmpty: Bool {
-    project.rig.parts.isEmpty && project.rig.joints.isEmpty
+    project.rig.parts.isEmpty && project.rig.joints.isEmpty && engineMates.isEmpty
   }
 
   var animaCoreStatusLabel: String {
@@ -199,7 +210,9 @@ final class StudioWorkspaceModel {
     animaCoreState = .connecting
     do {
       let hello = try await animaCoreClient.start()
+      let mateCatalog = try await animaCoreClient.mateTypes()
       animaCoreEngineVersion = hello.engineVersion
+      engineMateTypes = mateCatalog.mateTypes
       animaCoreState = .ready(engineVersion: hello.engineVersion)
     } catch {
       animaCoreState = .failed
@@ -231,6 +244,7 @@ final class StudioWorkspaceModel {
     do {
       let text = try String(contentsOf: url, encoding: .utf8)
       let hello = try await animaCoreClient.start()
+      let mateCatalog = try await animaCoreClient.mateTypes()
       let loaded = try await animaCoreClient.loadCharacter(text: text)
       pendingHandle = loaded.handle
       let clip = loaded.rig.clips.first
@@ -247,6 +261,8 @@ final class StudioWorkspaceModel {
       animaCoreHandle = loaded.handle
       pendingHandle = nil
       animaCoreEngineVersion = hello.engineVersion
+      engineMateTypes = mateCatalog.mateTypes
+      engineMates = loaded.rig.joints
       engineEvaluation = evaluation
       engineEvaluationTimeSeconds = evaluationTimeSeconds
       project = Self.previewProject(for: loaded.rig)
@@ -284,6 +300,8 @@ final class StudioWorkspaceModel {
     animaCoreEngineVersion = nil
     engineEvaluation = nil
     engineEvaluationTimeSeconds = nil
+    engineMateTypes.removeAll()
+    engineMates.removeAll()
     animaCoreState = .unavailable
   }
 

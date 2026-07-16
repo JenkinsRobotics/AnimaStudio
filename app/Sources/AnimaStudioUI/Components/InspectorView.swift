@@ -117,6 +117,11 @@ struct InspectorView: View {
       .disabled(workspace.isComponentLocked(selectedPart.id))
     } else if let selectedModelNode {
       modelNodeInspector(selectedModelNode)
+    } else if let selectedEngineMate = workspace.selectedEngineMate {
+      EngineMateInspectorView(
+        mate: selectedEngineMate,
+        mateType: workspace.engineMateType(for: selectedEngineMate)
+      )
     } else if let selectedJoint {
       if workspace.isMateLocked(selectedJoint.id) {
         lockedEditingSection(unlockTitle: "Unlock Mate") {

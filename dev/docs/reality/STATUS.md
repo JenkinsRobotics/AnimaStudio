@@ -86,7 +86,18 @@
   editable name. Two UI hooks surface it: the `mate_types` bridge verb
   (static per-kind catalog — label, DOF slots, the shared universal
   controls) and `describe_mate` (per-instance descriptor carried in the
-  `load_character` joint summary). Motors, 3D Models & Media, and Events are also
+  `load_character` joint summary). The Swift bridge now mirrors both hooks as
+  typed DTOs and requests the engine-owned catalog when it connects. Imported
+  engine mates are listed in the real Components navigator by their stable
+  tracking id, so a zero-DOF Fastened mate remains selectable rather than
+  disappearing from the rotational preview projection. Selecting one opens a
+  reusable engine-driven mate inspector showing its type/name/id, parent and
+  child, both connector frames and per-side flip state, offset values formatted
+  in millimetres/degrees, whole-mate axis flip/reorientation, simulation
+  connection, and its engine-supplied DOF rows. Fastened presents an explicit
+  fully-bonded zero-DOF state. This first panel is intentionally read-only;
+  editing the canonical character text and revalidating it through the bridge
+  is the next mate-authoring packet. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live

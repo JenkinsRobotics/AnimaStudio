@@ -50,7 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
-| Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | active 2026-07-15 |
+| Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | BR1 Swift AnimaCore client + engine-evaluated viewport proof | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Tests/AnimaCoreClientTests/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,WorkspaceRibbonView}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,RigPoseResolver}.swift`, `app/App/AnimaCoreHelper.entitlements`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, focused Swift tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real helper spawn + hello/load/evaluate/release/shutdown; typed protocol/path errors; explicit `.character.anima` import; engine-evaluated DOF values reach RealityKit preview through transitional pose projection; bundled signed helper for sandboxed app; deterministic client/unit/integration/UI tests; strict claimed-file lint; full Swift tests; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | Swift app half of AnimaCore repository restructure | `studio/**` → `app/**`, `.github/workflows/**`, `.gitignore`, `AGENTS.md`, `CONVENTIONS.md`, `README.md`, `dev/docs/reality/STATUS.md`, `dev/docs/roadmap/Studio_App.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | root contains `animacore/`, `app/`, and `firmware/` with no `studio/`; Swift `AnimaModel` owns data/validation and `AnimaEvaluation` owns evaluation; no Swift `AnimaCore` target/import remains; format lint, full Swift tests, Xcode build, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | CAD viewport pointer + navigation refinement | `studio/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,SubObjectSelection,RobotPreviewView}.swift`, `studio/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceView,ComponentContextActions}.swift`, `studio/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, `studio/Tests/RealityKitViewportTests/{CADNavigationTests,SubObjectSelectionTests}.swift`, `studio/Tests/AnimaStudioUIUnitTests/{Components/ViewportRenderMenuTests.swift,Workspaces/Rig/ComponentViewportContextMenuTests.swift}`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | persistent orbit/pan/zoom speed settings with slower default zoom; right-drag orbit; body/feature hover and left-click selection with empty-click deselection; pointer-targeted compact empty-space menu vs full selected-component menu; focused/full tests; claimed-file lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -134,6 +134,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Mate motion resolver (resolve_pose): per-mate kinematic motion about/along connectors + FK chain + bridge hook (BR2) | `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/test_kinematics.py`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-15 (843 suite total, +27; ruff clean; no `app/`/`firmware/` touched; verbatim `resolve_pose` JSON + convention in the handoff entry below) |
 
+| Claude | Width + Tangent mates (geometry-constraint category) + mate `category` in the schema hook | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Kinematics.md`, `examples/**` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -187,6 +189,25 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-15 (Codex, Fastened engine-backed mate inspector):** Added the
+  `mate_types` client call and complete typed DTOs for the enriched
+  `describe_mate` joint summary. On engine connection/import, Studio retains
+  the engine type catalog and per-instance descriptors. The production navigator
+  prefers those engine mates over the transitional Swift joint projection and
+  keys selection by the engine's stable `id` (with a clearly session-only
+  fallback for legacy empty ids), so Fastened mates remain present with zero
+  DOFs. The new generic inspector displays identity/type, parent/child,
+  connector A/B frames and flips, offset in operator mm/deg, whole-mate axis
+  controls, simulation connection, and engine-provided DOFs; Fastened shows the
+  locked fully-bonded state. It is deliberately read-only until the follow-up
+  canonical document edit/revalidate packet. Verification: seven live helper
+  tests across the client/workspace, all 216 XCTest cases (223 total), strict
+  claimed-file format lint, root-app/Xcode build, deep signature verification,
+  and a clean claimed-file `git diff --check`; no `animacore/` file was edited
+  by Codex. The concurrent Width/Tangent backend claim currently leaves one
+  repo-wide whitespace diagnostic in `animacore/tests/test_loader.py`, which
+  remains in Claude's lane.
 
 - **2026-07-15 (Claude, BR2 — mate motion resolver / `resolve_pose`):**
   Shipped `animacore/kinematics.py` (the canonical forward-kinematics

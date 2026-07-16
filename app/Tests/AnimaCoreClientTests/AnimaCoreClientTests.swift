@@ -19,6 +19,33 @@ struct AnimaCoreClientTests {
     #expect(hello.engine == "animacore")
     #expect(hello.protocolVersion == 1)
     #expect(hello.capabilities.contains("evaluate"))
+    #expect(hello.capabilities.contains("mate_types"))
+
+    let mateCatalog = try await client.mateTypes()
+    #expect(
+      Set(mateCatalog.mateTypes.map(\.type)).isSuperset(
+        of: [
+          "fastened", "parallel", "prismatic", "revolute",
+          "cylindrical", "pin_slot", "planar", "ball",
+        ]
+      )
+    )
+    let fastenedType = try #require(
+      mateCatalog.mateTypes.first { $0.type == "fastened" }
+    )
+    #expect(fastenedType.label == "Fastened")
+    #expect(fastenedType.degreeOfFreedomCount == 0)
+    #expect(fastenedType.degreesOfFreedom.isEmpty)
+    #expect(
+      fastenedType.universalControls == [
+        "connector_a",
+        "connector_b",
+        "offset",
+        "flip_primary_axis",
+        "secondary_axis_rotation",
+        "simulation_connection",
+      ]
+    )
 
     let characterURL =
       repositoryRoot
@@ -28,6 +55,14 @@ struct AnimaCoreClientTests {
     #expect(loaded.handle == "rig1")
     #expect(loaded.rig.identity.name == "six_axis_arm")
     #expect(loaded.rig.joints.count == 6)
+    let baseYaw = try #require(loaded.rig.joints.first)
+    #expect(baseYaw.id == "Revolute 1")
+    #expect(baseYaw.parentPart == "base")
+    #expect(baseYaw.childPart == "shoulder")
+    #expect(baseYaw.controls.connectors.a?.feature == "base/top_face")
+    #expect(baseYaw.controls.offset.translationMeters == [0, 0, 0.012])
+    #expect(baseYaw.controls.offset.rotationAxis == .z)
+    #expect(abs(baseYaw.controls.offset.rotationRadians - .pi / 120) < 1e-12)
 
     let evaluation = try await client.evaluate(
       handle: loaded.handle,
@@ -40,6 +75,71 @@ struct AnimaCoreClientTests {
 
     try await client.release(handle: loaded.handle)
     await client.shutdown()
+  }
+
+  @Test
+  func fastenedMateUsesStableIdentityAndUniversalControls() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    defer { Task { await client.shutdown() } }
+
+    let text = """
+      anima_version: "2.0"
+      type: character
+      identity: { name: fastened_fixture, display_name: "Fastened Fixture" }
+      parts:
+        base: {}
+        lid: { parent: base }
+      joints:
+        fixed_lid:
+          type: fastened
+          id: "Fastened 33"
+          parent: base
+          child: lid
+          connectors:
+            a:
+              part: base
+              origin_m: [0.0, 0.0, 0.025]
+              primary_axis: [0.0, 0.0, 1.0]
+              secondary_axis: [1.0, 0.0, 0.0]
+              feature: "base/top_face"
+            b:
+              part: lid
+              origin_m: [0.0, 0.0, -0.004]
+              primary_axis: [0.0, 0.0, 1.0]
+              secondary_axis: [1.0, 0.0, 0.0]
+              flipped: true
+              feature: "lid/bottom_face"
+          offset:
+            enabled: true
+            translation_m: [0.001, 0.002, 0.003]
+            rotate_about: x
+            angle_deg: 15
+          flip_primary_axis: true
+          secondary_axis_rotation_deg: 90
+          simulation_connection: false
+      """
+
+    let loaded = try await client.loadCharacter(text: text)
+    let mate = try #require(loaded.rig.joints.first)
+    #expect(mate.id == "Fastened 33")
+    #expect(mate.selectionKey == "Fastened 33")
+    #expect(mate.name == "fixed_lid")
+    #expect(mate.type == "fastened")
+    #expect(mate.degreesOfFreedom.isEmpty)
+    #expect(mate.controls.connectors.a?.part == "base")
+    #expect(mate.controls.connectors.b?.isFlipped == true)
+    #expect(mate.controls.offset.translationMeters == [0.001, 0.002, 0.003])
+    #expect(mate.controls.offset.rotationAxis == .x)
+    #expect(abs(mate.controls.offset.rotationRadians - .pi / 12) < 1e-12)
+    #expect(mate.controls.flipsPrimaryAxis)
+    #expect(mate.controls.secondaryAxisRotationDegrees == 90)
+    #expect(!mate.controls.isSimulationConnection)
   }
 
   @Test

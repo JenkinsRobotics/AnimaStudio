@@ -69,15 +69,119 @@ public enum AnimaCoreDOFUnit: String, Codable, Sendable {
 }
 
 public struct AnimaCoreJointSummary: Codable, Equatable, Sendable {
+  public let id: String
   public let name: String
   public let type: String
+  public let parentPart: String?
+  public let childPart: String?
+  public let controls: AnimaCoreMateControls
   public let degreesOfFreedom: [AnimaCoreDOFSummary]
 
   enum CodingKeys: String, CodingKey {
+    case id
     case name
     case type
+    case parentPart = "parent_part"
+    case childPart = "child_part"
+    case controls
     case degreesOfFreedom = "dofs"
   }
+
+  /// The engine tracking id is authoritative when present. Legacy files may
+  /// still carry an empty id; the fallback is session-local presentation
+  /// identity only and must never be persisted as a replacement engine id.
+  public var selectionKey: String {
+    id.isEmpty ? "untracked:\(type):\(name)" : id
+  }
+}
+
+public struct AnimaCoreMateControls: Codable, Equatable, Sendable {
+  public let connectors: AnimaCoreMateConnectorPair
+  public let offset: AnimaCoreMateOffset
+  public let flipsPrimaryAxis: Bool
+  public let secondaryAxisRotationDegrees: Int
+  public let isSimulationConnection: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case connectors
+    case offset
+    case flipsPrimaryAxis = "flip_primary_axis"
+    case secondaryAxisRotationDegrees = "secondary_axis_rotation_deg"
+    case isSimulationConnection = "simulation_connection"
+  }
+}
+
+public struct AnimaCoreMateConnectorPair: Codable, Equatable, Sendable {
+  public let a: AnimaCoreMateConnector?
+  public let b: AnimaCoreMateConnector?
+}
+
+public struct AnimaCoreMateConnector: Codable, Equatable, Sendable {
+  public let part: String
+  public let originMeters: [Double]
+  public let primaryAxis: [Double]
+  public let secondaryAxis: [Double]
+  public let isFlipped: Bool
+  public let feature: String
+
+  enum CodingKeys: String, CodingKey {
+    case part
+    case originMeters = "origin_m"
+    case primaryAxis = "primary_axis"
+    case secondaryAxis = "secondary_axis"
+    case isFlipped = "flipped"
+    case feature
+  }
+}
+
+public enum AnimaCoreMateAxis: String, Codable, CaseIterable, Sendable {
+  case x
+  case y
+  case z
+}
+
+public struct AnimaCoreMateOffset: Codable, Equatable, Sendable {
+  public let isEnabled: Bool
+  public let translationMeters: [Double]
+  public let rotationAxis: AnimaCoreMateAxis
+  public let rotationRadians: Double
+
+  enum CodingKeys: String, CodingKey {
+    case isEnabled = "enabled"
+    case translationMeters = "translation_m"
+    case rotationAxis = "rotation_axis"
+    case rotationRadians = "rotation_radians"
+  }
+}
+
+public struct AnimaCoreMateTypeCatalog: Codable, Equatable, Sendable {
+  public let mateTypes: [AnimaCoreMateTypeSummary]
+
+  enum CodingKeys: String, CodingKey {
+    case mateTypes = "mate_types"
+  }
+}
+
+public struct AnimaCoreMateTypeSummary: Codable, Equatable, Sendable {
+  public let type: String
+  public let label: String
+  public let degreeOfFreedomCount: Int
+  public let universalControls: [String]
+  public let degreesOfFreedom: [AnimaCoreMateTypeDOF]
+
+  enum CodingKeys: String, CodingKey {
+    case type
+    case label
+    case degreeOfFreedomCount = "dof_count"
+    case universalControls = "universal_controls"
+    case degreesOfFreedom = "dofs"
+  }
+}
+
+public struct AnimaCoreMateTypeDOF: Codable, Equatable, Sendable {
+  public let name: String
+  public let kind: AnimaCoreDOFKind
+  public let unit: AnimaCoreDOFUnit
 }
 
 public struct AnimaCoreDOFSummary: Codable, Equatable, Sendable {

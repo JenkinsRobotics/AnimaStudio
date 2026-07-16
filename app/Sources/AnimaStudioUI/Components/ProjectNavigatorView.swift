@@ -1,3 +1,4 @@
+import AnimaCoreClient
 import AnimaEvaluation
 import AnimaModel
 import RealityKitViewport
@@ -196,27 +197,43 @@ struct ProjectNavigatorView: View {
 
   private var jointSection: some View {
     Section("Mates") {
-      ForEach(filteredJoints, id: \.id) { joint in
-        PartTreeRow(
-          title: joint.displayName,
-          role: .joint,
-          detail: "Revolute",
-          isLocked: workspace.isMateLocked(joint.id)
-        )
-        .tag(NavigatorItem.joint(joint.id))
-        .contextMenu {
-          mateActions(joint)
+      if !workspace.engineMates.isEmpty {
+        ForEach(filteredEngineMates, id: \.selectionKey) { mate in
+          PartTreeRow(
+            title: mate.id.isEmpty ? mate.name : mate.id,
+            role: .joint,
+            detail: mateTypeLabel(for: mate)
+          )
+          .tag(NavigatorItem.joint(JointID(rawValue: mate.selectionKey)))
+          .help(
+            mate.id.isEmpty
+              ? "\(mate.name) has no stable tracking id yet"
+              : "\(mate.name) · stable id \(mate.id)"
+          )
         }
-        .navigatorDragSource(.mate(joint.id), activePayload: $activeDragPayload)
-        .navigatorDropTarget(activePayload: $activeDragPayload, behavior: .mate) {
-          payload, intent in
-          handleMateDrop(payload, intent: intent, relativeTo: joint.id)
+      } else {
+        ForEach(filteredJoints, id: \.id) { joint in
+          PartTreeRow(
+            title: joint.displayName,
+            role: .joint,
+            detail: "Revolute",
+            isLocked: workspace.isMateLocked(joint.id)
+          )
+          .tag(NavigatorItem.joint(joint.id))
+          .contextMenu {
+            mateActions(joint)
+          }
+          .navigatorDragSource(.mate(joint.id), activePayload: $activeDragPayload)
+          .navigatorDropTarget(activePayload: $activeDragPayload, behavior: .mate) {
+            payload, intent in
+            handleMateDrop(payload, intent: intent, relativeTo: joint.id)
+          }
         }
       }
-      if workspace.project.rig.joints.isEmpty {
+      if workspace.project.rig.joints.isEmpty && workspace.engineMates.isEmpty {
         Label("No mates yet", systemImage: "rotate.3d")
           .foregroundStyle(.secondary)
-      } else if filteredJoints.isEmpty {
+      } else if filteredJoints.isEmpty && filteredEngineMates.isEmpty {
         noFilterResults
       }
     }
@@ -365,6 +382,22 @@ struct ProjectNavigatorView: View {
 
   private var filteredJoints: [JointDefinition] {
     workspace.project.rig.joints.filter { matchesFilter($0.displayName) }
+  }
+
+  private var filteredEngineMates: [AnimaCoreJointSummary] {
+    workspace.engineMates.filter { mate in
+      matchesFilter(mate.id)
+        || matchesFilter(mate.name)
+        || matchesFilter(mateTypeLabel(for: mate))
+    }
+  }
+
+  private func mateTypeLabel(for mate: AnimaCoreJointSummary) -> String {
+    workspace.engineMateType(for: mate)?.label
+      ?? mate.type.replacingOccurrences(
+        of: "_",
+        with: " "
+      ).capitalized
   }
 
   private var filteredComponentGroups: [NavigatorComponentGroup] {

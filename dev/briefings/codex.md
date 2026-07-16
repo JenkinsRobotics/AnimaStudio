@@ -205,6 +205,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — Fastened mate inspector wired to AnimaCore:** Extended
+  `AnimaCoreClient` with the real `mate_types` verb and complete typed
+  `describe_mate` DTOs. Studio retains the engine catalog and mate descriptors,
+  lists imported mates by stable engine id, and keeps zero-DOF Fastened mates
+  visible/selectable. The new reusable production inspector renders both
+  connectors, per-side flip, offset in mm/deg, whole-mate flip and secondary
+  reorientation, simulation connection, and engine-provided DOFs; Fastened is
+  explicitly shown as fully bonded. This packet is read-only by contract—no
+  authoring mutation or mate semantics were recreated in Swift. Seven real
+  bridge/integration tests and all 216 XCTest cases pass (223 total), strict
+  claimed-file format lint is clean, and the rebuilt root app passes strict
+  deep signature verification.
+
 - **2026-07-15 — BR1 Swift bridge vertical slice complete:** Added the typed
   `AnimaCoreClient` package and the long-running newline-JSON process client for
   hello/load/validate/evaluate/release/shutdown. Assets now imports canonical
