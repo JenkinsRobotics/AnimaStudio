@@ -35,6 +35,29 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (DH1 — Denavit-Hartenberg chain + forward kinematics):
+  Shipped the standalone articulated-arm FK foundation as a **new
+  self-contained module** `animacore/dh.py` (+ `tests/test_dh.py`, 26
+  tests) — the first step of `dev/docs/roadmap/DH_Kinematics.md`.
+  **Convention: STANDARD (distal) DH**, `A = Rotz(theta_eff)·Transz(
+  d_eff)·Transx(a)·Rotx(alpha)`, chained `base · A_1…A_n · tool`. Stdlib
+  + `math` + reused `kinematics.Transform` only, **no numpy** (numpy
+  lands with DH2's IK). API: `JointKind` (revolute/prismatic), `DHLink`
+  (`a`/`alpha`/`d`/`theta` + `joint_type` + optional `min`/`max`/
+  `neutral` on the joint variable, `.variable` property),
+  `DHChain` (links + optional `base_frame`/`tool_frame`, `.dof`),
+  `link_transform`, `forward_kinematics → DHForwardResult(link_frames,
+  tool_pose)`. Out-of-range/wrong-count joint values **RAISE** a typed
+  `DHError` naming the 0-based index (chosen over clamping so IK sees
+  violations). Verified against the planar-2R closed form and an
+  independent 4x4-matrix 6R (UR5) reference. **Did NOT touch**
+  rig/loader/serialize/bridge/kinematics.py — DH2 (IK, numpy) and DH3
+  (character-format `kinematic_chain` block + bridge verbs) are the
+  later integration packets. 979 → **1005 tests** (+26), ruff clean, no
+  `app/`/`firmware/` touched. Full API, exact convention, and the
+  DH2/DH3 plan in the briefing handoff entry. Left uncommitted for
+  main-session integration.
+
 - 2026-07-16 (Part rest transform + coordinate-frame model): Parts now
   carry a **LOCATION** (rest transform) that persists in the
   `.character.anima` and drives `resolve_pose`, so a part the app moved

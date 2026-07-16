@@ -153,7 +153,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Part rest transform (location, part-in-character) + coordinate-frame model (world/character/part) | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/test_part_rest_transform.py`, `examples/pan_tilt_head.character.anima`, `dev/docs/roadmap/{Character_Format,Kinematics,Coordinate_Frames}.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` (clean) + `.venv/bin/pytest animacore/tests -q` (979 passed); rest transform round-trips + roots/grounded resolve at rest, mated child not double-applied | released 2026-07-16 |
 
-| Claude | DH1: Denavit-Hartenberg chain model + forward kinematics (standalone module, articulated-arm rig type) | `animacore/dh.py` (new), `animacore/tests/test_dh.py` (new) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; DH FK matches known 2R/6R poses | in progress |
+| Claude | DH1: Denavit-Hartenberg chain model + forward kinematics (standalone module, articulated-arm rig type) | `animacore/dh.py` (new), `animacore/tests/test_dh.py` (new) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; DH FK matches known 2R/6R poses | released 2026-07-16 |
 
 ## Requests
 
@@ -208,6 +208,59 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, DH1 — Denavit-Hartenberg chain + forward
+  kinematics):** Shipped the standalone articulated-arm FK foundation in
+  a **new self-contained module** `animacore/dh.py` (+ `tests/test_dh.py`,
+  26 tests). No rig/loader/serialize/bridge/kinematics.py code touched —
+  DH2 (IK) and DH3 (character-format `kinematic_chain` block + bridge
+  verbs) are the integration packets. Stdlib + `math` + reused
+  `kinematics.Transform` only, **no numpy** (numpy arrives with DH2's
+  damped-least-squares IK, per `DH_Kinematics.md`). 979 → **1005 tests**
+  (+26), `.venv/bin/ruff check .` clean. Left uncommitted for
+  main-session integration.
+
+  **Convention: STANDARD (distal) DH** — not modified/Craig/proximal (the
+  two place the link frame differently and are not interchangeable). The
+  per-link transform is `A = Rotz(theta_eff) · Transz(d_eff) · Transx(a)
+  · Rotx(alpha)`, composed left-to-right as `compose(compose(compose(
+  Rotz, Transz), Transx), Rotx)` so `A.apply_point(p)` applies `Rotx`
+  innermost. Chain pose `T = base_frame · A_1 · … · A_n · tool_frame`.
+  Verified against the planar-2R closed form (`x = L1 cos q1 + L2
+  cos(q1+q2)`, `y = …`) and an **independent 4x4 homogeneous-matrix**
+  reference for a 6R UR5-style arm (separate code path from the
+  quaternion `Transform` composition).
+
+  **API (DH3 will build the character-format block + bridge verbs on
+  this):**
+  - `JointKind(StrEnum)`: `REVOLUTE` (`theta` is the joint variable, `d`
+    fixed) / `PRISMATIC` (`d` is the variable, `theta` fixed).
+  - `DHLink(frozen)`: `a`, `alpha`, `d`, `theta` (metres / radians;
+    `theta` and `d` are the *home offset* the joint variable adds to),
+    `joint_type: JointKind = REVOLUTE`, `min`/`max`
+    (`float | None`, inclusive limits on the **joint variable**),
+    `neutral: float = 0.0`. `.variable` → `"theta"`|`"d"`;
+    `.within_limits(v)`; `__post_init__` raises `DHError` on inverted
+    limits / neutral out of range.
+  - `DHChain(frozen)`: `links: tuple[DHLink, ...]`, `base_frame:
+    Transform = IDENTITY` (chain root in character space), `tool_frame:
+    Transform = IDENTITY` (end-effector offset). `.dof` = len(links);
+    `.neutral_values()`; empty chain rejected.
+  - `link_transform(link, joint_value) -> Transform`.
+  - `forward_kinematics(chain, joint_values) -> DHForwardResult(
+    link_frames: tuple[Transform,...], tool_pose: Transform)`. Cumulative
+    frames `frame_i = compose(frame_{i-1}, A_i)` (base-relative);
+    `tool_pose = compose(frame_n, tool_frame)`.
+  - `DHError(ValueError)` — typed. **Decision: RAISE (never clamp)** on a
+    joint value outside limits or a wrong joint-value count, message
+    naming the 0-based joint index, so IK/callers see violations. Chosen
+    over clamping because IK must know the constraint is active.
+
+  **Next (not in this packet):** DH2 = damped-least-squares IK (numpy,
+  Jacobian, joint-limit clamping); DH3 = `kinematic_chain` block in the
+  character format + loader/serialize + arm rig type + bridge
+  `forward_kinematics`/`solve_ik` verbs. Both consume this module's
+  `DHChain`/`forward_kinematics` unchanged.
 
 - **2026-07-16 (Claude, part rest transform + coordinate-frame model):**
   Parts now carry a **LOCATION** (a rest transform) that persists in the

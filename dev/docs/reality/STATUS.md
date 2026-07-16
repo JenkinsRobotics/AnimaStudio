@@ -672,7 +672,24 @@
   lossless the `load_character` rig summary was additively enriched (clip
   `keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`,
   joint `description`; nothing renamed or removed).
-  979 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  The runtime also ships the standalone **Denavit-Hartenberg
+  articulated-arm foundation** (DH1, `animacore/dh.py`): serial
+  kinematic chains parameterized by the standard (distal) DH convention
+  with **forward kinematics only** — `DHLink` (`a`/`alpha`/`d`/`theta`
+  + `joint_type` revolute/prismatic + optional `min`/`max`/`neutral`
+  limits on the joint variable), `DHChain` (ordered links + optional
+  `base_frame`/`tool_frame`, `dof`), `link_transform` (the standard
+  `A = Rotz·Transz·Transx·Rotx` link matrix built from the shared
+  `Transform` primitives), and `forward_kinematics` returning every
+  cumulative link frame plus the tool pose, raising a typed `DHError`
+  naming the joint index on a limit or arity violation. Stdlib + `math`
+  + `Transform` only (no numpy — FK stays pure); verified against the
+  planar-2R closed form and an independent 4x4-matrix reference for a
+  6R UR5-style arm. It is self-contained: inverse kinematics (numpy,
+  DH2) and the character-format `kinematic_chain` block + bridge verbs
+  (DH3) are later packets and no rig/loader/serialize/bridge code was
+  touched.
+  1005 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,
