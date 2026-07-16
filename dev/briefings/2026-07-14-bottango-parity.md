@@ -103,7 +103,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Extensions E2 backend: parametric_feature template schema + expansion into standard rig | `anima_studio/features.py`, `anima_studio/extensions.py` (kind enablement only), `anima_studio/tests/test_features.py`, `examples/extensions/parametric-linkage.animaext/**`, `dev/docs/roadmap/Extensions.md` (E2 section) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (90 new tests in test_features.py; 460 suite total, ruff clean) | released 2026-07-15 |
 | Claude | Serial wire transport (pyserial) as an OutputAdapter — real-hardware bridge | `anima_studio/serial_transport.py`, `anima_studio/tests/test_serial_transport.py`, `pyproject.toml` (add pyserial), `dev/docs/roadmap/Wire_Protocol.md` (transport note if needed) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (loop:// URL tests, no hardware) | released 2026-07-15 (20 new tests, 370 suite total at release time; ruff clean; `pip install -e ".[dev]"` re-verified with pyserial) |
-| Codex | Start-screen Recent Projects gallery | `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/RecentProjects.swift`, `studio/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, `studio/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | thumbnail/name/last-opened/revision cards; real recency persistence; honest disabled reopen until P0; empty state; milestone-ready metadata; tests/lint/build/signature/live walkthrough; `git diff --check` | in progress |
+| Codex | Start-screen Recent Projects gallery | `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/RecentProjects.swift`, `studio/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, `studio/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | thumbnail/name/last-opened/revision cards; real recency persistence; honest disabled reopen until P0; empty state; milestone-ready metadata; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 
 ## Requests
 
@@ -884,3 +884,13 @@ change needed in the Handoff log instead of inventing commands.
   suite to nine and the full suite to 166; recursive format lint, native
   Xcode/root-app builds, strict signature verification, launch, and
   `git diff --check` pass.
+- **2026-07-15 (Codex, start-screen Recent Projects gallery):** Replaced the
+  home screen's permanent empty placeholder with compact reusable project cards
+  modeled on Jonathan's reference. Each card carries a cached render path with
+  a project-type fallback, project name, real last-opened time, V-number, and an
+  optional milestone label. User-local records are Codable, recency-sorted,
+  deduplicated, and capped at twelve; creating the scratch project records its
+  V1 entry. Cards remain honestly non-opening until P0 durable documents can
+  resolve their IDs. Four focused tests and all 170 Swift tests pass, along
+  with recursive format lint, Xcode/root-app builds, strict signature
+  verification, launch, and `git diff --check`.

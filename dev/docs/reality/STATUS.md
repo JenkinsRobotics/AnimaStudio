@@ -31,7 +31,14 @@
   time clamping, joint-limit clamping, and Codable project round-tripping. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
   New Studio Project action and honestly disabled project-open/templates until
-  persistence ships. A new project now opens as a genuinely empty Rig rather
+  persistence ships. Its Recent Projects section now uses compact thumbnail
+  cards with the project name, actual last-opened timestamp, revision badge,
+  and optional milestone metadata. Records are recency-sorted, deduplicated,
+  capped at twelve, and stored as versioned user-local metadata. Cards load a
+  cached render path when one exists and otherwise show an honest project-type
+  preview. Creating the current scratch project records its V1 entry; reopening
+  remains visibly unavailable until P0 produces durable project documents. A
+  new project now opens as a genuinely empty Rig rather
   than silently inserting the sample mechanism. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
   proxy components with their local origin at the workspace origin, then
@@ -232,7 +239,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. One hundred sixty-six tests pass with
+  inspector. One hundred seventy tests pass with
   `cd studio && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key

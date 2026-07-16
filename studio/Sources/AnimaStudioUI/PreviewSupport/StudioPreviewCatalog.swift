@@ -2,8 +2,25 @@
   import SwiftUI
 
   #Preview("Anima Studio · Home") {
-    StudioHomeView(createProject: {})
-      .frame(width: 1_180, height: 760)
+    StudioHomeView(
+      recentProjects: [
+        RecentProjectSummary(
+          displayName: "Jaeger Joint Representation",
+          lastOpenedAt: Date(timeIntervalSince1970: 1_700_000_000),
+          revisionNumber: 12,
+          milestoneName: "Rig foundation",
+          thumbnailKind: .rig
+        ),
+        RecentProjectSummary(
+          displayName: "MK1 Robot Component",
+          lastOpenedAt: Date(timeIntervalSince1970: 1_735_000_000),
+          revisionNumber: 38,
+          thumbnailKind: .character
+        ),
+      ],
+      createProject: {}
+    )
+    .frame(width: 1_180, height: 760)
   }
 
   #Preview("Anima Studio · Complete Workspace") {

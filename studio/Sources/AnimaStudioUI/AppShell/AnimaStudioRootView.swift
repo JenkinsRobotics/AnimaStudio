@@ -3,11 +3,13 @@ import SwiftUI
 public struct AnimaStudioRootView: View {
   @State private var hasOpenProject = false
   @State private var designProfile: StudioDesignProfile
+  @State private var recentProjects: [RecentProjectSummary]
 
   public init() {
     let profile = StudioDesignPersistence.load()
     StudioDesignRuntime.shared.apply(profile)
     _designProfile = State(initialValue: profile)
+    _recentProjects = State(initialValue: RecentProjectsPersistence.load())
   }
 
   public var body: some View {
@@ -17,11 +19,20 @@ public struct AnimaStudioRootView: View {
           hasOpenProject = false
         }
       } else {
-        StudioHomeView {
-          hasOpenProject = true
-        }
+        StudioHomeView(
+          recentProjects: recentProjects,
+          createProject: createProject
+        )
       }
     }
+  }
+
+  private func createProject() {
+    recentProjects = RecentProjectsPersistence.recordOpened(
+      .scratch(),
+      in: recentProjects
+    )
+    hasOpenProject = true
   }
 
   private var liveDesignProfile: Binding<StudioDesignProfile> {

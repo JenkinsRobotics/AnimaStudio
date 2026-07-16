@@ -90,6 +90,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — start-screen Recent Projects gallery complete:** Replaced the
+  permanent empty placeholder with compact reusable cards showing a cached
+  render (or project-type fallback), project name, real last-opened timestamp,
+  V-number badge, and optional milestone label. User-local metadata is sorted,
+  deduplicated, capped at twelve, and Codable so later project documents can
+  provide the real ID/revision/render path without redesigning the view. New
+  Studio Project records the current scratch V1 entry; the cards remain
+  honestly non-opening until P0 persistence exists. Four focused tests and all
+  170 Swift tests, recursive format lint, Xcode/root-app builds, signature
+  verification, launch, and `git diff --check` pass.
+
 - **2026-07-15 — CAD-reference context-menu refinement complete:** Reorganized
   the native component menu to follow the supplied CAD reference: identity,
   properties/dependencies, visibility/isolation/transparency, selection and

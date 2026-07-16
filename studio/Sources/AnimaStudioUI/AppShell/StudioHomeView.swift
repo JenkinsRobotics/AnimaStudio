@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StudioHomeView: View {
+  let recentProjects: [RecentProjectSummary]
   let createProject: () -> Void
 
   var body: some View {
@@ -48,18 +49,36 @@ struct StudioHomeView: View {
         Text("Recent Projects")
           .font(.headline)
         Spacer()
-        Text("NONE YET")
+        Text(recentProjects.isEmpty ? "NONE YET" : "\(recentProjects.count) RECENT")
           .font(.caption2.weight(.semibold))
           .foregroundStyle(StudioPalette.muted)
       }
       .padding(.top, 8)
 
-      ContentUnavailableView(
-        "No Recent Projects",
-        systemImage: "clock.arrow.circlepath",
-        description: Text("Create a project to begin the hardware-animation workflow.")
-      )
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      if recentProjects.isEmpty {
+        ContentUnavailableView(
+          "No Recent Projects",
+          systemImage: "clock.arrow.circlepath",
+          description: Text("Create a project to begin the hardware-animation workflow.")
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        ScrollView {
+          LazyVStack(spacing: 8) {
+            ForEach(recentProjects) { project in
+              RecentProjectCard(project: project)
+            }
+          }
+          .padding(.vertical, 2)
+        }
+
+        Label(
+          "Cards record real recency. Reopening is enabled with project documents.",
+          systemImage: "info.circle"
+        )
+        .font(.caption2)
+        .foregroundStyle(StudioPalette.muted)
+      }
     }
     .padding(.trailing, 18)
   }
