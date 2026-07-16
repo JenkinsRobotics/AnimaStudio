@@ -154,7 +154,9 @@ struct NodeCanvasView: View {
     case .performance: StudioPalette.semanticPart
     case .timing: StudioPalette.joint
     case .events: StudioPalette.hardware
-    case .future: StudioPalette.muted
+    case .inputs: Color(red: 0.35, green: 0.72, blue: 0.96)
+    case .voiceAI: Color(red: 0.72, green: 0.48, blue: 0.96)
+    case .outputs: Color(red: 0.98, green: 0.55, blue: 0.24)
     }
   }
 }

@@ -85,8 +85,12 @@
   validation feedback, zoom/grid/frame controls, add/delete/reset actions, and
   a compact timeline concept that explicitly presents graph and timeline as two
   views of one future scene document. Flow, performance, timing, and event
-  families are available in the UI draft; audio, screen/LED, and AI nodes stay
-  visibly locked behind their missing runtime actions. This surface does not
+  families are available in the UI draft. The concept library now separates
+  Inputs, Voice & AI, and Outputs, with placeable STT/TTS/LLM, memory, tool,
+  microphone, text, event, audio, motion, screen, LED, and hardware cards.
+  Typed visual ports and editable sample properties support UI review, while
+  every concept stays validation-blocked from execution until its runtime
+  provider ships. This surface does not
   yet load, save, compile, execute, or author connections in `.scene.anima`;
   the in-memory draft is intentionally not a second runtime model.
   A shell-level **UI Dev** workspace follows the six project-authoring

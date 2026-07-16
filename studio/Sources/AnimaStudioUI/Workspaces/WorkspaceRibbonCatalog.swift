@@ -228,11 +228,33 @@ enum WorkspaceRibbonCatalog {
         tool("Validate", "checkmark.shield", "Validate graph structure and availability."),
       ]),
     group(
-      "Future", "clock.badge.exclamationmark", .planned,
+      "Inputs", "arrow.down.to.line", .planned,
       [
-        tool("Audio Clip", "waveform", "Planned: requires scene audio actions."),
-        tool("Screen / LED", "display", "Planned: requires screen and LED output actions."),
-        tool("AI Behavior", "brain.head.profile", "Planned: requires an optional AI plugin."),
+        tool("Text", "text.cursor", "Concept: receive operator or plugin-provided text."),
+        tool("Microphone", "mic", "Concept: receive a live microphone audio stream."),
+        tool("Event", "bolt.horizontal.circle", "Concept: receive a scene, OSC, or MIDI event."),
+        tool("Hardware", "switch.2", "Concept: receive a sensor, button, or controller value."),
+      ]),
+    group(
+      "Voice & AI", "brain.head.profile", .planned,
+      [
+        tool("STT", "captions.bubble", "Concept: convert an audio stream to text."),
+        tool("LLM", "brain.head.profile", "Concept: send text and context to an LLM provider."),
+        tool("Memory", "books.vertical", "Concept: retain bounded conversation context."),
+        tool("Tool Call", "wrench.and.screwdriver", "Concept: invoke an approved plugin tool."),
+        tool("TTS", "speaker.wave.2", "Concept: convert text to a voice audio stream."),
+        tool("AI Behavior", "sparkles", "Concept: select a bounded character behavior."),
+      ]),
+    group(
+      "Outputs", "arrow.up.from.line", .planned,
+      [
+        tool("Audio Clip", "waveform", "Concept: provide an audio asset stream."),
+        tool("Audio", "speaker.wave.2", "Concept: send audio to an output device."),
+        tool("Motion", "figure.walk.motion", "Concept: send bounded character motion."),
+        tool("Event", "bolt.circle", "Concept: emit an external event."),
+        tool("Screen", "display", "Concept: send content to a simulated or physical screen."),
+        tool("LED", "circle.grid.3x3", "Concept: send color data to an LED matrix."),
+        tool("Hardware", "cable.connector", "Concept: send a safely mapped hardware value."),
       ]),
   ]
 

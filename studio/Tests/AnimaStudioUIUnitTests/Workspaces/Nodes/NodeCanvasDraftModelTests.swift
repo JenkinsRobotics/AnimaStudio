@@ -38,18 +38,30 @@ final class NodeCanvasDraftModelTests: XCTestCase {
     )
   }
 
-  func testFutureIntegrationsStayVisibleButUnavailable() {
-    let futureKinds = NodeCanvasDraftKind.allCases.filter { $0.family == .future }
-    XCTAssertEqual(futureKinds, [.audio, .screen, .aiBehavior])
-    XCTAssertTrue(futureKinds.allSatisfy { !$0.isRuntimeAvailable })
+  func testInputVoiceAIAndOutputConceptsHaveTypedPortsButNoRuntime() {
+    XCTAssertEqual(
+      NodeCanvasDraftKind.allCases.filter { $0.family == .inputs },
+      [.textInput, .microphoneInput, .eventInput, .hardwareInput]
+    )
+    XCTAssertEqual(
+      NodeCanvasDraftKind.allCases.filter { $0.family == .voiceAI },
+      [.speechToText, .llmPrompt, .memory, .toolCall, .textToSpeech, .aiBehavior]
+    )
+    XCTAssertEqual(NodeCanvasDraftKind.speechToText.inputPorts, ["AUDIO"])
+    XCTAssertEqual(NodeCanvasDraftKind.speechToText.outputPorts, ["TEXT"])
+    XCTAssertEqual(NodeCanvasDraftKind.llmPrompt.inputPorts, ["TEXT", "CONTEXT"])
+    XCTAssertEqual(NodeCanvasDraftKind.textToSpeech.outputPorts, ["AUDIO"])
+
+    let conceptKinds = NodeCanvasDraftKind.allCases.filter { !$0.isRuntimeAvailable }
+    XCTAssertTrue(conceptKinds.allSatisfy { !$0.availabilityDetail.isEmpty })
 
     var graph = NodeCanvasDraftGraph.sample
     graph.nodes.append(
-      NodeCanvasDraftNode(kind: .screen, position: CGPoint(x: 500, y: 500))
+      NodeCanvasDraftNode(kind: .llmPrompt, position: CGPoint(x: 500, y: 500))
     )
     XCTAssertTrue(
       graph.validationMessages.contains(
-        "Future nodes stay disabled until their runtime actions ship."
+        "Concept nodes cannot execute until their runtime providers ship."
       )
     )
   }

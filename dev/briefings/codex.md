@@ -148,6 +148,16 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — Nodes voice/AI/I/O concept pack complete:** The node library
+  now separates Inputs, Voice & AI, and Outputs. It includes placeable text,
+  microphone, event, and hardware inputs; STT, LLM, conversation memory, tool
+  call, TTS, and AI behavior concepts; and audio, motion, event, screen, LED,
+  and hardware outputs. Cards expose typed visual ports and editable sample
+  properties for UI review. They remain explicitly labeled CONCEPT and cannot
+  execute until the future graph compiler and provider/runtime adapters ship.
+  All 206 Swift tests, claimed-file strict lint, root-app build/signature,
+  launch, and `git diff --check` pass.
+
 - **2026-07-15 — Nodes workspace UI draft complete:** Jonathan's requested
   node editor is now a top-level Nodes workspace and a production-sized UI Dev
   → Nodes lab. It provides a searchable library, draggable typed cards, visible

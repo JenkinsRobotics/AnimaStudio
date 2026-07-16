@@ -153,13 +153,13 @@ struct NodeWorkspaceView: View {
                         Text(kind.title)
                           .font(.caption.weight(.semibold))
                         if !kind.isRuntimeAvailable {
-                          Text("Planned")
+                          Text("Concept")
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(StudioPalette.muted)
                         }
                       }
                       Spacer()
-                      Image(systemName: kind.isRuntimeAvailable ? "plus" : "lock")
+                      Image(systemName: "plus")
                         .font(.caption2)
                         .foregroundStyle(StudioPalette.muted)
                     }
@@ -168,7 +168,6 @@ struct NodeWorkspaceView: View {
                     .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 6))
                   }
                   .buttonStyle(.plain)
-                  .disabled(!kind.isRuntimeAvailable)
                   .help(kind.availabilityDetail)
                 }
               }
@@ -198,7 +197,7 @@ struct NodeWorkspaceView: View {
                 .font(.callout.weight(.bold))
                 .foregroundStyle(nodeColor(node.kind))
               Spacer()
-              Text(node.kind.isRuntimeAvailable ? "SCENE V1" : "PLANNED")
+              Text(node.kind.isRuntimeAvailable ? "SCENE V1" : "CONCEPT")
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
                 .foregroundStyle(
                   node.kind.isRuntimeAvailable ? StudioPalette.semanticPart : StudioPalette.muted
@@ -337,13 +336,15 @@ struct NodeWorkspaceView: View {
   }
 
   private func addNode(_ kind: NodeCanvasDraftKind) {
-    guard kind.isRuntimeAvailable else { return }
     let offset = CGFloat(graph.nodes.count % 5) * 26
     selectedNodeID = graph.addNode(
       kind: kind,
       position: CGPoint(x: 560 + offset, y: 180 + offset)
     )
-    statusMessage = "Added \(kind.title); connect it when the graph contract lands"
+    statusMessage =
+      kind.isRuntimeAvailable
+      ? "Added \(kind.title); connect it when the graph contract lands"
+      : "Added \(kind.title) concept; no runtime provider is connected"
   }
 
   private func deleteSelectedNode() {
@@ -414,7 +415,9 @@ struct NodeWorkspaceView: View {
     case .performance: StudioPalette.semanticPart
     case .timing: StudioPalette.joint
     case .events: StudioPalette.hardware
-    case .future: StudioPalette.muted
+    case .inputs: Color(red: 0.35, green: 0.72, blue: 0.96)
+    case .voiceAI: Color(red: 0.72, green: 0.48, blue: 0.96)
+    case .outputs: Color(red: 0.98, green: 0.55, blue: 0.24)
     }
   }
 }

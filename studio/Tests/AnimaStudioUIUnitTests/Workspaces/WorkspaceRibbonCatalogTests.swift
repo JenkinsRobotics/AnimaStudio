@@ -43,15 +43,21 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
     XCTAssertTrue(titles.contains("Timecode"))
   }
 
-  func testNodeCatalogSeparatesAvailablePlanningToolsFromFutureIntegrations() {
+  func testNodeCatalogIncludesInputVoiceAIAndOutputConceptFamilies() {
     let groups = WorkspaceRibbonCatalog.groups(for: .nodes)
-    XCTAssertEqual(groups.map(\.title), ["Flow", "Actions", "Graph", "Future"])
+    XCTAssertEqual(
+      groups.map(\.title),
+      ["Flow", "Actions", "Graph", "Inputs", "Voice & AI", "Outputs"]
+    )
 
     let titles = groups.flatMap(\.tools).map(\.title)
     XCTAssertTrue(titles.contains("Parallel"))
     XCTAssertTrue(titles.contains("Wait for Event"))
-    XCTAssertTrue(titles.contains("Screen / LED"))
-    XCTAssertTrue(groups.last?.tools.allSatisfy { !$0.isImplemented } == true)
+    XCTAssertTrue(titles.contains("STT"))
+    XCTAssertTrue(titles.contains("LLM"))
+    XCTAssertTrue(titles.contains("TTS"))
+    XCTAssertTrue(titles.contains("Screen"))
+    XCTAssertTrue(groups.suffix(3).flatMap(\.tools).allSatisfy { !$0.isImplemented })
   }
 
   func testHardwareCatalogIncludesConnectionMappingCalibrationSafetyAndMonitoring() {

@@ -11,7 +11,9 @@ enum NodeCanvasDraftFamily: String, CaseIterable, Identifiable, Sendable {
   case performance
   case timing
   case events
-  case future
+  case inputs
+  case voiceAI
+  case outputs
 
   var id: Self { self }
 
@@ -21,7 +23,9 @@ enum NodeCanvasDraftFamily: String, CaseIterable, Identifiable, Sendable {
     case .performance: "Performance"
     case .timing: "Timing & Gates"
     case .events: "Events & Data"
-    case .future: "Future Integrations"
+    case .inputs: "Inputs"
+    case .voiceAI: "Voice & AI"
+    case .outputs: "Outputs"
     }
   }
 }
@@ -40,7 +44,21 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
   case emitEvent
   case setVariable
   case audio
+  case textInput
+  case microphoneInput
+  case eventInput
+  case hardwareInput
+  case speechToText
+  case llmPrompt
+  case memory
+  case toolCall
+  case textToSpeech
+  case audioOutput
+  case motionOutput
+  case eventOutput
   case screen
+  case ledOutput
+  case hardwareOutput
   case aiBehavior
 
   var id: Self { self }
@@ -60,7 +78,21 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .emitEvent: "Emit Event"
     case .setVariable: "Set Variable"
     case .audio: "Audio Clip"
-    case .screen: "Screen / LED Cue"
+    case .textInput: "Text Input"
+    case .microphoneInput: "Microphone Input"
+    case .eventInput: "Event Input"
+    case .hardwareInput: "Hardware Input"
+    case .speechToText: "Speech to Text (STT)"
+    case .llmPrompt: "LLM Prompt"
+    case .memory: "Conversation Memory"
+    case .toolCall: "Tool Call"
+    case .textToSpeech: "Text to Speech (TTS)"
+    case .audioOutput: "Audio Output"
+    case .motionOutput: "Motion Output"
+    case .eventOutput: "Event Output"
+    case .screen: "Screen Output"
+    case .ledOutput: "LED Output"
+    case .hardwareOutput: "Hardware Output"
     case .aiBehavior: "AI Behavior"
     }
   }
@@ -71,7 +103,11 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .clip, .pose: .performance
     case .wait, .waitForEvent: .timing
     case .emitEvent, .setVariable: .events
-    case .audio, .screen, .aiBehavior: .future
+    case .textInput, .microphoneInput, .eventInput, .hardwareInput: .inputs
+    case .speechToText, .llmPrompt, .memory, .toolCall, .textToSpeech, .aiBehavior: .voiceAI
+    case .audio, .audioOutput, .motionOutput, .eventOutput, .screen, .ledOutput,
+      .hardwareOutput:
+      .outputs
     }
   }
 
@@ -90,7 +126,21 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .emitEvent: "bolt.circle"
     case .setVariable: "equal.circle"
     case .audio: "waveform"
+    case .textInput: "text.cursor"
+    case .microphoneInput: "mic"
+    case .eventInput: "bolt.horizontal.circle"
+    case .hardwareInput: "switch.2"
+    case .speechToText: "captions.bubble"
+    case .llmPrompt: "brain.head.profile"
+    case .memory: "books.vertical"
+    case .toolCall: "wrench.and.screwdriver"
+    case .textToSpeech: "speaker.wave.2"
+    case .audioOutput: "speaker.wave.2"
+    case .motionOutput: "figure.walk.motion"
+    case .eventOutput: "bolt.circle"
     case .screen: "display"
+    case .ledOutput: "circle.grid.3x3"
+    case .hardwareOutput: "cable.connector"
     case .aiBehavior: "brain.head.profile"
     }
   }
@@ -101,6 +151,19 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .branch: ["FLOW", "CONDITION"]
     case .loop: ["FLOW", "COUNT"]
     case .setVariable: ["FLOW", "VALUE"]
+    case .textInput, .microphoneInput, .eventInput, .hardwareInput: []
+    case .speechToText: ["AUDIO"]
+    case .llmPrompt: ["TEXT", "CONTEXT"]
+    case .memory: ["TEXT"]
+    case .toolCall: ["FLOW", "REQUEST"]
+    case .textToSpeech: ["TEXT"]
+    case .audioOutput: ["FLOW", "AUDIO"]
+    case .motionOutput: ["FLOW", "MOTION"]
+    case .eventOutput: ["FLOW", "EVENT"]
+    case .screen: ["FLOW", "CONTENT"]
+    case .ledOutput: ["FLOW", "COLOR"]
+    case .hardwareOutput: ["FLOW", "VALUE"]
+    case .aiBehavior: ["FLOW", "CONTEXT"]
     default: ["FLOW"]
     }
   }
@@ -111,12 +174,28 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .parallel: ["A", "B"]
     case .branch: ["TRUE", "FALSE"]
     case .loop: ["BODY", "DONE"]
+    case .audio: ["FLOW", "AUDIO"]
+    case .textInput: ["TEXT"]
+    case .microphoneInput: ["AUDIO"]
+    case .eventInput: ["EVENT"]
+    case .hardwareInput: ["VALUE"]
+    case .speechToText: ["TEXT"]
+    case .llmPrompt: ["TEXT"]
+    case .memory: ["CONTEXT"]
+    case .toolCall: ["FLOW", "RESULT"]
+    case .textToSpeech: ["AUDIO"]
+    case .aiBehavior: ["FLOW", "ACTION"]
     default: ["FLOW"]
     }
   }
 
   var isRuntimeAvailable: Bool {
-    family != .future
+    switch family {
+    case .flow, .performance, .timing, .events:
+      true
+    case .inputs, .voiceAI, .outputs:
+      false
+    }
   }
 
   var availabilityDetail: String {
@@ -124,9 +203,22 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
       return "Scene v1 action"
     }
     return switch self {
-    case .audio: "Waiting for scene audio actions"
-    case .screen: "Waiting for screen and LED output actions"
-    case .aiBehavior: "Waiting for optional AI integration"
+    case .textInput: "Concept: operator text or plugin-provided text input"
+    case .microphoneInput: "Concept: live microphone audio stream"
+    case .eventInput: "Concept: scene, network, MIDI, or OSC event input"
+    case .hardwareInput: "Concept: sensor, button, or controller input"
+    case .speechToText: "Concept: speech-to-text provider required"
+    case .llmPrompt: "Concept: optional LLM provider required"
+    case .memory: "Concept: optional conversation-memory provider required"
+    case .toolCall: "Concept: approved tool or plugin contract required"
+    case .textToSpeech: "Concept: text-to-speech provider required"
+    case .audio, .audioOutput: "Concept: scene audio runtime required"
+    case .motionOutput: "Concept: scene-to-animation binding required"
+    case .eventOutput: "Concept: external event adapter required"
+    case .screen: "Concept: screen output runtime required"
+    case .ledOutput: "Concept: LED output runtime required"
+    case .hardwareOutput: "Concept: safely armed hardware mapping required"
+    case .aiBehavior: "Concept: optional AI behavior provider required"
     default: "Available"
     }
   }
@@ -232,7 +324,7 @@ struct NodeCanvasDraftGraph: Equatable, Sendable {
       messages.append("One or more connections reference a missing node.")
     }
     if nodes.contains(where: { !$0.kind.isRuntimeAvailable }) {
-      messages.append("Future nodes stay disabled until their runtime actions ship.")
+      messages.append("Concept nodes cannot execute until their runtime providers ship.")
     }
     return messages
   }
@@ -293,8 +385,22 @@ struct NodeCanvasDraftGraph: Equatable, Sendable {
     case .loop: ["Count": "2"]
     case .branch: ["Condition": "variable == value"]
     case .audio: ["Asset": "Choose audio", "Volume": "100%"]
-    case .screen: ["Target": "Choose screen", "Cue": "Choose cue"]
-    case .aiBehavior: ["Prompt": "Describe behavior"]
+    case .textInput: ["Label": "Operator text", "Default": ""]
+    case .microphoneInput: ["Device": "System default", "Mode": "Streaming"]
+    case .eventInput: ["Source": "Scene event", "Name": "event_name"]
+    case .hardwareInput: ["Device": "Choose device", "Channel": "0"]
+    case .speechToText: ["Provider": "Choose provider", "Language": "Auto"]
+    case .llmPrompt: ["Model": "Choose model", "System": "Character behavior"]
+    case .memory: ["Scope": "Scene", "History": "12 turns"]
+    case .toolCall: ["Tool": "Choose approved tool", "Timeout": "10 s"]
+    case .textToSpeech: ["Provider": "Choose provider", "Voice": "Choose voice"]
+    case .audioOutput: ["Device": "System default", "Volume": "100%"]
+    case .motionOutput: ["Character": "Active character", "Blend": "100%"]
+    case .eventOutput: ["Adapter": "Scene event", "Name": "event_name"]
+    case .screen: ["Target": "Choose screen", "Content": "TEXT"]
+    case .ledOutput: ["Target": "Choose matrix", "Brightness": "100%"]
+    case .hardwareOutput: ["Mapping": "Choose output", "Safety": "Disarmed"]
+    case .aiBehavior: ["Goal": "Describe behavior", "Policy": "Approval required"]
     case .start, .end, .sequence, .parallel: [:]
     }
   }
