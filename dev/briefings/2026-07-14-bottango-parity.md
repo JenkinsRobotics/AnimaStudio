@@ -126,6 +126,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Scene v2 — the scripting-engine standard (FANUC-inspired: conditions, select, call, wait_until, inputs, background monitors) | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py`, `examples/patrol_and_greet.scene.anima` (new), `dev/docs/roadmap/Scene_Format.md`, `dev/docs/roadmap/Node_Graph.md` (taxonomy + Show-workspace toggle spec) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (732 passed; 146 new in test_scene.py, all 126 prior scene tests unmodified) | released 2026-07-15 |
 
+| Claude | AnimaCore-canonical policy + Studio↔AnimaCore bridge protocol + engine helper (BR1) | `dev/docs/roadmap/Studio_Bridge.md`, `animacore/bridge.py`, `animacore/tests/test_bridge.py`, `CONVENTIONS.md`, `AGENTS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; bridge handshake→load example→evaluate frame round-trips | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact

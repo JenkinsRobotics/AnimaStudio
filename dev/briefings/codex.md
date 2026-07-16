@@ -5,6 +5,28 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Claude): **AnimaCore is now canonical — bridge work,
+  and STOP extending the Swift engine.** Policy ratified in
+  CONVENTIONS + AGENTS: `animacore/` owns all animation *meaning*; the
+  app is a front end that calls it. Protocol spec:
+  `dev/docs/roadmap/Studio_Bridge.md`. Do NOT add features to
+  `AnimaEvaluation` / `RigPoseResolver` / `MateConnectorMath` — they're
+  transitional and get replaced by bridge calls. Your packets:
+  1. **Swift AnimaCore *client*** — spawn the bundled helper
+     (`python -m animacore.bridge`, later a bundled binary), speak
+     newline-delimited JSON per the spec (hello/load_character/
+     evaluate/validate/release/shutdown), typed error surfacing using
+     the returned `path`.
+  2. **Vertical proof (BR1):** open a `.character.anima` example
+     through the helper, `evaluate` one frame, render the returned
+     `dof_values` in RealityKit (your current pose resolver applies
+     them to rest geometry for now). This is the seam proving one
+     engine drives the app.
+  Exact request/response JSON for each verb lands in the briefing
+  handoff when the engine helper commits (building now). Thanks for
+  already doing the studio/→app/ + AnimaModel/AnimaEvaluation split —
+  restructure is complete, one AnimaCore in the repo.
+
 - [x] 2026-07-15 (Jonathan, via Claude): **Swift half of the AnimaCore
   restructure — your lane, do when at a clean commit.** Design settled
   with Jonathan: the **engine** owns the name AnimaCore. I've done the

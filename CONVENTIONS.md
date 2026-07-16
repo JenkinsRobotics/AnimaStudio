@@ -36,10 +36,23 @@ ecosystem's rules, trimmed to what Anima Studio actually uses.
   `AGENTS.md`.
 - **`firmware/`** — the open microcontroller firmware speaking
   `dev/docs/roadmap/Wire_Protocol.md`.
-- **Cross-implementation parity:** the `.anima` format and Wire
-  Protocol docs in `dev/docs/roadmap/` are the contracts; Swift and
-  Python implement the same semantics with fixture parity tests, and a
-  contract change updates the doc before either implementation.
+## AnimaCore is the one engine (canonical)
+
+`animacore/` is the **single canonical implementation** of animation
+meaning: typed mates/DOF/limits/relations, validation, keyframe and
+scene evaluation, mate alignment + kinematic pose resolution, `.anima`
+parsing/writing, output mapping, transport, hardware safety, and
+node-graph compilation. There is **no second engine.** The Swift app is
+a **front end** that speaks the Studio↔AnimaCore protocol
+(`dev/docs/roadmap/Studio_Bridge.md`) to a bundled AnimaCore helper; it
+owns presentation, editing, rendering, and `.animastudio` editor
+metadata, and holds DTOs that mirror engine results — it never
+independently defines what a rig, pose, or frame means. The Swift
+`AnimaEvaluation`/`RigPoseResolver` logic is transitional and is being
+*replaced* by bridge calls, not extended. (Superseded the earlier
+"parallel Swift/Python implementations with fixture parity" policy,
+2026-07-15 — parity of two engines invited drift; one engine removes
+the failure mode entirely.)
 
 ## Versioning & contract changes
 

@@ -58,6 +58,19 @@ IN before working, write your OUT before stopping.**
    [`Character_Format.md`](dev/docs/roadmap/Character_Format.md) or
    [`Scene_Format.md`](dev/docs/roadmap/Scene_Format.md)
 
+## One engine (canonical) — read this first
+
+`animacore/` (Python) is the **single canonical engine**: it owns the
+meaning of mates/DOF/limits/relations, validation, evaluation, mate
+alignment + pose resolution, `.anima` I/O, output/transport/safety, and
+node-graph compilation. The Swift app is a **front end** that calls it
+over the Studio↔AnimaCore bridge (`dev/docs/roadmap/Studio_Bridge.md`)
+and owns only presentation, editing, rendering, and `.animastudio`
+editor metadata. **Do not add or extend animation-*meaning* logic in
+Swift** — the existing `AnimaEvaluation`/`RigPoseResolver`/
+`MateConnectorMath` code is transitional and gets replaced by bridge
+calls. New semantics land in `animacore/`, surfaced through the bridge.
+
 ## Non-negotiable boundaries
 
 - AnimaCore's model and evaluation layers are renderer-, UI-, AI-, and
