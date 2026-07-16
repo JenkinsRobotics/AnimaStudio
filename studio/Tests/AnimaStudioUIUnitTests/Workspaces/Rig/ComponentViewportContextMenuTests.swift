@@ -176,4 +176,37 @@ final class ComponentViewportContextMenuTests: XCTestCase {
     XCTAssertEqual(model.selectedComponentIDs.count, 2)
     XCTAssertEqual(model.cameraViewpoint, .home)
   }
+
+  func testShowAllClearsIsolationAndRestoresUnlockedVisibility() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let first = try XCTUnwrap(model.project.rig.parts.first)
+    model.addPart(kind: .sphere)
+    let second = try XCTUnwrap(model.project.rig.parts.last)
+
+    model.selectPart(id: first.id, extendingSelection: false)
+    model.toggleSelectedComponentIsolation()
+    model.selectPart(id: second.id, extendingSelection: false)
+    model.toggleSelectedComponentVisibility()
+
+    model.showAllComponents()
+
+    XCTAssertNil(model.isolatedComponentID)
+    XCTAssertTrue(try XCTUnwrap(model.componentAppearance(for: first.id)).isVisible)
+    XCTAssertTrue(try XCTUnwrap(model.componentAppearance(for: second.id)).isVisible)
+  }
+
+  func testShowAllPreservesLockedComponentAppearance() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let part = try XCTUnwrap(model.project.rig.parts.first)
+    var appearance = try XCTUnwrap(model.componentAppearance(for: part.id))
+    appearance.isVisible = false
+    model.setComponentAppearance(id: part.id, to: appearance)
+    model.toggleComponentLock(part.id)
+
+    model.showAllComponents()
+
+    XCTAssertFalse(try XCTUnwrap(model.componentAppearance(for: part.id)).isVisible)
+  }
 }

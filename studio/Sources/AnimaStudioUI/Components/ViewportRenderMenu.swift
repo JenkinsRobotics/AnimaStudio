@@ -15,6 +15,9 @@ struct ViewportRenderMenu: View {
   @Binding var navigationProfile: PreviewNavigationProfile
   @Binding var customRotateDrag: NavigationDragBinding
   @Binding var customPanDrag: NavigationDragBinding
+  @Binding var orbitSpeed: PreviewNavigationSpeed
+  @Binding var panSpeed: PreviewNavigationSpeed
+  @Binding var zoomSpeed: PreviewNavigationSpeed
   let canFrameSelection: Bool
   let frameSelection: () -> Void
 
@@ -111,6 +114,20 @@ struct ViewportRenderMenu: View {
           }
         }
 
+        Menu("Navigation Speed", systemImage: "gauge.with.dots.needle.33percent") {
+          Picker("Orbit Speed", selection: $orbitSpeed) {
+            speedChoices
+          }
+          Picker("Pan Speed", selection: $panSpeed) {
+            speedChoices
+          }
+          Picker("Zoom Speed", selection: $zoomSpeed) {
+            speedChoices
+          }
+        }
+
+        Label("Select · Left Click", systemImage: "cursorarrow.click")
+        Label("Orbit · Right Drag", systemImage: "rotate.3d")
         Label("Zoom · Scroll Wheel", systemImage: "computermouse")
       }
     } label: {
@@ -136,6 +153,13 @@ struct ViewportRenderMenu: View {
   }
 
   private static let fieldOfViewPresets: [Float] = [30, 45, 60, 75, 90]
+
+  @ViewBuilder
+  private var speedChoices: some View {
+    ForEach(PreviewNavigationSpeed.allCases) { speed in
+      Text(speed.title).tag(speed)
+    }
+  }
 }
 
 enum ViewportRenderMenuPresentation {

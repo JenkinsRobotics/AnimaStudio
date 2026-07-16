@@ -1,4 +1,5 @@
 import AnimaCore
+import AppKit
 import Foundation
 import RealityKit
 import SwiftUI
@@ -12,6 +13,7 @@ public struct RobotPreviewView: View {
   /// authoritative for the inspector; this local copy only drives the
   /// persistent marker treatment.
   @State private var standingFeature: MateConnectorCandidate?
+  @State private var pointerTarget = ViewportPointerTarget.canvas
 
   private let frame: EvaluatedFrame
   private let rig: CharacterRig
@@ -23,6 +25,7 @@ public struct RobotPreviewView: View {
   private let cameraState: PreviewCameraState
   private let navigationProfile: PreviewNavigationProfile
   private let customNavigationMapping: CustomNavigationMapping
+  private let navigationSensitivity: PreviewNavigationSensitivity
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
   private let partAppearances: [PartID: PreviewPartAppearance]
@@ -45,6 +48,7 @@ public struct RobotPreviewView: View {
   private let showsShadows: Bool
   private let fieldOfViewDegrees: Float
   private let onCameraStateChange: (PreviewCameraState) -> Void
+  private let onPointerTargetChange: (ViewportPointerTarget) -> Void
 
   public init(
     frame: EvaluatedFrame,
@@ -57,6 +61,7 @@ public struct RobotPreviewView: View {
     cameraState: PreviewCameraState = PreviewCameraState(),
     navigationProfile: PreviewNavigationProfile = .default,
     customNavigationMapping: CustomNavigationMapping = CustomNavigationMapping(),
+    navigationSensitivity: PreviewNavigationSensitivity = PreviewNavigationSensitivity(),
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
     partAppearances: [PartID: PreviewPartAppearance] = [:],
@@ -78,7 +83,8 @@ public struct RobotPreviewView: View {
     onSetPartPosition: @escaping (PartID, RigVector3) -> Void = { _, _ in },
     onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in },
     onSelectMateCandidate: @escaping (ViewportPickEvent) -> Void = { _ in },
-    onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in }
+    onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in },
+    onPointerTargetChange: @escaping (ViewportPointerTarget) -> Void = { _ in }
   ) {
     self.frame = frame
     self.rig = rig
@@ -90,6 +96,7 @@ public struct RobotPreviewView: View {
     self.cameraState = cameraState
     self.navigationProfile = navigationProfile
     self.customNavigationMapping = customNavigationMapping
+    self.navigationSensitivity = navigationSensitivity
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
     self.partAppearances = partAppearances
@@ -112,6 +119,7 @@ public struct RobotPreviewView: View {
     self.onSetPartRotation = onSetPartRotation
     self.onSelectMateCandidate = onSelectMateCandidate
     self.onCameraStateChange = onCameraStateChange
+    self.onPointerTargetChange = onPointerTargetChange
   }
 
   public var body: some View {
@@ -313,10 +321,22 @@ public struct RobotPreviewView: View {
           transformDragState = nil
         }
     )
+    .simultaneousGesture(
+      SpatialEventGesture()
+        .targetedToAnyEntity()
+        .onChanged { value in
+          reportPointerTarget(
+            SubObjectSelection.pointerTarget(
+              for: Self.tapTarget(for: value.entity, rig: rig)
+            )
+          )
+        }
+    )
     .overlay {
       CADNavigationCapture(
         profile: navigationProfile,
-        customMapping: customNavigationMapping
+        customMapping: customNavigationMapping,
+        sensitivity: navigationSensitivity
       ) { action in
         navigationAction = action
         navigationCommandRevision += 1
@@ -350,6 +370,14 @@ public struct RobotPreviewView: View {
       if placementActive {
         standingFeature = nil
       }
+    }
+    .onHover { isInside in
+      if !isInside {
+        reportPointerTarget(.canvas)
+      }
+    }
+    .onDisappear {
+      reportPointerTarget(.canvas)
     }
     .background(appearance.backgroundColor.gradient)
     .id(sceneIdentity)
@@ -536,6 +564,12 @@ public struct RobotPreviewView: View {
     Task { @MainActor in
       onCameraStateChange(updatedState)
     }
+  }
+
+  private func reportPointerTarget(_ updatedTarget: ViewportPointerTarget) {
+    guard updatedTarget != pointerTarget else { return }
+    pointerTarget = updatedTarget
+    onPointerTargetChange(updatedTarget)
   }
 
   private func consumeNavigationAction(revision: Int) {
@@ -880,6 +914,7 @@ public struct RobotPreviewView: View {
   private static func prepareForSelection(_ entity: Entity) {
     entity.generateCollisionShapes(recursive: true)
     addInputTargets(to: entity)
+    addHoverEffects(to: entity)
   }
 
   private static func applyShadowParticipation(_ enabled: Bool, to root: Entity) {
@@ -898,6 +933,19 @@ public struct RobotPreviewView: View {
     entity.components.set(InputTargetComponent(allowedInputTypes: .indirect))
     for child in entity.children {
       addInputTargets(to: child)
+    }
+  }
+
+  private static func addHoverEffects(to entity: Entity) {
+    if entity.components[ModelComponent.self] != nil {
+      entity.components.set(
+        HoverEffectComponent(
+          .highlight(.init(color: .systemCyan, strength: 1.35))
+        )
+      )
+    }
+    for child in entity.children {
+      addHoverEffects(to: child)
     }
   }
 

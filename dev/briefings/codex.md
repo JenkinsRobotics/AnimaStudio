@@ -148,6 +148,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — CAD viewport pointer/navigation refinement complete:** The
+  Display → Input menu now persists independent Orbit, Pan, and Zoom speed
+  presets; zoom defaults to Reduced for finer wheel control. Right drag remains
+  orbit. Semantic/imported geometry gets cyan hover preselection, selected
+  proxies keep orange selection plus their inferred feature-marker interaction,
+  and empty left-click still clears the selection. Context menus now follow the
+  pointer: selected body/feature gets the complete component menu; empty space
+  gets Show All, Zoom to Fit, and Isometric. The proxy feature system does not
+  pretend to provide durable imported-mesh topology selection. All 216 Swift
+  tests pass with strict claimed-file lint, native Xcode/root-app builds,
+  signature verification, launch, and `git diff --check`.
+
 - **2026-07-15 — UI Dev Reference Widgets pack 06 complete:** Added a reusable
   Icon Selector & Theme Lab with a four-tool dock, hover/selection/glow states,
   native right-click actions, and a persistent Edit/Duplicate/Delete menu

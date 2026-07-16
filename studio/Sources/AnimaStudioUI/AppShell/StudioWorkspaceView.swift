@@ -13,6 +13,7 @@ struct StudioWorkspaceView: View {
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
+  @State private var viewportPointerTarget = ViewportPointerTarget.canvas
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
@@ -21,6 +22,12 @@ struct StudioWorkspaceView: View {
     NavigationDragBinding.rightMouse.rawValue
   @AppStorage("viewportCustomPanDrag") private var viewportCustomPanDragRawValue =
     NavigationDragBinding.middleMouse.rawValue
+  @AppStorage("viewportOrbitSpeed") private var viewportOrbitSpeedRawValue =
+    PreviewNavigationSpeed.standard.rawValue
+  @AppStorage("viewportPanSpeed") private var viewportPanSpeedRawValue =
+    PreviewNavigationSpeed.standard.rawValue
+  @AppStorage("viewportZoomSpeed") private var viewportZoomSpeedRawValue =
+    PreviewNavigationSpeed.reduced.rawValue
   @AppStorage("viewportRenderStyle") private var viewportRenderStyleRawValue =
     ViewportRenderStyle.shaded.rawValue
   @AppStorage("viewportEdgeDisplay") private var viewportEdgeDisplayRawValue =
@@ -197,6 +204,7 @@ struct StudioWorkspaceView: View {
         cameraState: workspace.cameraState,
         navigationProfile: viewportNavigationProfile,
         customNavigationMapping: viewportCustomNavigationMapping,
+        navigationSensitivity: viewportNavigationSensitivity,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
         partAppearances: workspace.viewportPartAppearances,
@@ -239,10 +247,16 @@ struct StudioWorkspaceView: View {
         },
         onCameraStateChange: { state in
           workspace.reportCameraState(state)
+        },
+        onPointerTargetChange: { target in
+          viewportPointerTarget = target
         }
       )
       .frame(minWidth: 520, minHeight: 420)
-      .componentViewportContextMenu(workspace: workspace)
+      .componentViewportContextMenu(
+        workspace: workspace,
+        pointerTarget: viewportPointerTarget
+      )
 
       viewportTitle
       cameraHUD
@@ -308,7 +322,10 @@ struct StudioWorkspaceView: View {
         fieldOfViewDegrees: viewportFieldOfViewBinding,
         navigationProfile: viewportNavigationProfileBinding,
         customRotateDrag: viewportCustomRotateDragBinding,
-        customPanDrag: viewportCustomPanDragBinding
+        customPanDrag: viewportCustomPanDragBinding,
+        orbitSpeed: viewportOrbitSpeedBinding,
+        panSpeed: viewportPanSpeedBinding,
+        zoomSpeed: viewportZoomSpeedBinding
       )
       .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
@@ -366,6 +383,47 @@ struct StudioWorkspaceView: View {
     CustomNavigationMapping(
       rotateDrag: viewportCustomRotateDrag,
       panDrag: viewportCustomPanDrag
+    )
+  }
+
+  private var viewportNavigationSensitivity: PreviewNavigationSensitivity {
+    PreviewNavigationSensitivity(
+      orbit: viewportOrbitSpeed,
+      pan: viewportPanSpeed,
+      zoom: viewportZoomSpeed
+    )
+  }
+
+  private var viewportOrbitSpeed: PreviewNavigationSpeed {
+    PreviewNavigationSpeed(rawValue: viewportOrbitSpeedRawValue) ?? .standard
+  }
+
+  private var viewportPanSpeed: PreviewNavigationSpeed {
+    PreviewNavigationSpeed(rawValue: viewportPanSpeedRawValue) ?? .standard
+  }
+
+  private var viewportZoomSpeed: PreviewNavigationSpeed {
+    PreviewNavigationSpeed(rawValue: viewportZoomSpeedRawValue) ?? .reduced
+  }
+
+  private var viewportOrbitSpeedBinding: Binding<PreviewNavigationSpeed> {
+    Binding(
+      get: { viewportOrbitSpeed },
+      set: { viewportOrbitSpeedRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportPanSpeedBinding: Binding<PreviewNavigationSpeed> {
+    Binding(
+      get: { viewportPanSpeed },
+      set: { viewportPanSpeedRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportZoomSpeedBinding: Binding<PreviewNavigationSpeed> {
+    Binding(
+      get: { viewportZoomSpeed },
+      set: { viewportZoomSpeedRawValue = $0.rawValue }
     )
   }
 

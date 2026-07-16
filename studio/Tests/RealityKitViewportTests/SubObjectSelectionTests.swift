@@ -71,6 +71,53 @@ final class SubObjectSelectionTests: XCTestCase {
     XCTAssertEqual(outcome, .selectImportedNode)
   }
 
+  func testPointerTargetsKeepOnlySemanticIdentity() {
+    let feature = candidate()
+
+    XCTAssertEqual(
+      SubObjectSelection.pointerTarget(for: .feature(feature)),
+      .feature(feature.partID)
+    )
+    XCTAssertEqual(
+      SubObjectSelection.pointerTarget(for: .component(part.id)),
+      .component(part.id)
+    )
+    XCTAssertEqual(SubObjectSelection.pointerTarget(for: .importedNode), .importedNode)
+    XCTAssertEqual(SubObjectSelection.pointerTarget(for: .empty), .canvas)
+  }
+
+  func testObjectMenuRequiresSelectedComponentUnderPointer() {
+    XCTAssertEqual(
+      SubObjectSelection.contextMenuTarget(
+        pointerTarget: .component(part.id),
+        selectedPartID: part.id
+      ),
+      .selectedComponent(part.id)
+    )
+    XCTAssertEqual(
+      SubObjectSelection.contextMenuTarget(
+        pointerTarget: .feature(part.id),
+        selectedPartID: part.id
+      ),
+      .selectedComponent(part.id)
+    )
+
+    let otherPart = RigPartDefinition(displayName: "Other", primitiveKind: .sphere)
+    for pointerTarget in [
+      ViewportPointerTarget.canvas,
+      .importedNode,
+      .component(otherPart.id),
+    ] {
+      XCTAssertEqual(
+        SubObjectSelection.contextMenuTarget(
+          pointerTarget: pointerTarget,
+          selectedPartID: part.id
+        ),
+        .canvas
+      )
+    }
+  }
+
   // MARK: Staged Escape
 
   func testEscapeClearsAStandingFeatureBeforeComponentSelection() {

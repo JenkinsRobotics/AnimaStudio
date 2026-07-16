@@ -23,6 +23,27 @@ public enum SubObjectTapTarget: Equatable, Sendable {
   case empty
 }
 
+/// Lightweight pointer identity shared with the SwiftUI workspace shell.
+/// It deliberately carries semantic IDs rather than RealityKit entities.
+public enum ViewportPointerTarget: Equatable, Sendable {
+  case feature(PartID)
+  case component(PartID)
+  case importedNode
+  case canvas
+
+  public var semanticPartID: PartID? {
+    switch self {
+    case .feature(let partID), .component(let partID): partID
+    case .importedNode, .canvas: nil
+    }
+  }
+}
+
+public enum ViewportContextMenuTarget: Equatable, Sendable {
+  case selectedComponent(PartID)
+  case canvas
+}
+
 /// The deterministic reaction to a viewport tap.
 public enum SubObjectTapOutcome: Equatable, Sendable {
   /// Standing mode: mark the feature selected and report `.feature`.
@@ -44,6 +65,28 @@ public enum SubObjectTapOutcome: Equatable, Sendable {
 /// features. Pure functions so hit resolution and state transitions stay
 /// unit-testable without RealityKit.
 public enum SubObjectSelection {
+  public static func pointerTarget(for target: SubObjectTapTarget) -> ViewportPointerTarget {
+    switch target {
+    case .feature(let candidate): .feature(candidate.partID)
+    case .component(let partID): .component(partID)
+    case .importedNode: .importedNode
+    case .empty: .canvas
+    }
+  }
+
+  /// The detailed object menu is intentionally limited to the selected
+  /// component under the pointer. Right-clicking anywhere else gets the
+  /// compact canvas menu, even while another component remains selected.
+  public static func contextMenuTarget(
+    pointerTarget: ViewportPointerTarget,
+    selectedPartID: PartID?
+  ) -> ViewportContextMenuTarget {
+    guard let hoveredPartID = pointerTarget.semanticPartID,
+      hoveredPartID == selectedPartID
+    else { return .canvas }
+    return .selectedComponent(hoveredPartID)
+  }
+
   /// Resolves a tap into its selection outcome. During mate placement the
   /// existing placement flow wins: feature taps forward unchanged and empty
   /// clicks do nothing, so placement is never double-handled.

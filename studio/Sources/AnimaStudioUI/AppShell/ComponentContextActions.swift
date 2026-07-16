@@ -139,6 +139,15 @@ extension StudioWorkspaceModel {
     setCameraViewpoint(.home)
   }
 
+  func showAllComponents() {
+    isolatedComponentID = nil
+    for part in project.rig.parts where !isComponentLocked(part.id) {
+      guard var appearance = componentAppearance(for: part.id) else { continue }
+      appearance.isVisible = true
+      setComponentAppearance(id: part.id, to: appearance)
+    }
+  }
+
   func toggleSelectedComponentLock() {
     guard let state = selectedComponentContextMenuState else { return }
     switch state.lockScope {

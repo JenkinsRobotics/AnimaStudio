@@ -86,6 +86,39 @@ final class CADNavigationTests: XCTestCase {
     )
   }
 
+  func testNavigationSpeedOrderAndDefaultZoomAreStable() {
+    XCTAssertEqual(
+      PreviewNavigationSpeed.allCases,
+      [.slow, .reduced, .standard, .fast, .veryFast]
+    )
+    let sensitivity = PreviewNavigationSensitivity()
+    XCTAssertEqual(sensitivity.orbit, .standard)
+    XCTAssertEqual(sensitivity.pan, .standard)
+    XCTAssertEqual(sensitivity.zoom, .reduced)
+    XCTAssertLessThan(sensitivity.zoom.multiplier, sensitivity.orbit.multiplier)
+  }
+
+  func testNavigationActionsScaleEachAxisIndependently() {
+    let sensitivity = PreviewNavigationSensitivity(
+      orbit: .fast,
+      pan: .slow,
+      zoom: .reduced
+    )
+
+    XCTAssertEqual(
+      CADNavigationAction.orbit(deltaX: 10, deltaY: -4).scaled(by: sensitivity),
+      .orbit(deltaX: 13.5, deltaY: -5.4)
+    )
+    XCTAssertEqual(
+      CADNavigationAction.pan(deltaX: 10, deltaY: -4).scaled(by: sensitivity),
+      .pan(deltaX: 4, deltaY: -1.6)
+    )
+    XCTAssertEqual(
+      CADNavigationAction.zoom(delta: 10).scaled(by: sensitivity),
+      .zoom(delta: 6.5)
+    )
+  }
+
   func testTrackpadPanAndZoomAreProfileIndependent() {
     for profile in PreviewNavigationProfile.allCases {
       XCTAssertEqual(

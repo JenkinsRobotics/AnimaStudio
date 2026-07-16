@@ -30,4 +30,17 @@ final class ViewportRenderMenuTests: XCTestCase {
       "square.grid.3x3"
     )
   }
+
+  func testNavigationSpeedChoicesRemainHumanReadable() {
+    XCTAssertEqual(
+      PreviewNavigationSpeed.allCases.map(\.title),
+      ["Slow", "Reduced", "Standard", "Fast", "Very Fast"]
+    )
+    XCTAssertTrue(
+      zip(
+        PreviewNavigationSpeed.allCases,
+        PreviewNavigationSpeed.allCases.dropFirst()
+      ).allSatisfy { $0.multiplier < $1.multiplier }
+    )
+  }
 }

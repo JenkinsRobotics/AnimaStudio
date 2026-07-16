@@ -16,6 +16,9 @@ struct ViewportCameraHUD: View {
   @Binding var navigationProfile: PreviewNavigationProfile
   @Binding var customRotateDrag: NavigationDragBinding
   @Binding var customPanDrag: NavigationDragBinding
+  @Binding var orbitSpeed: PreviewNavigationSpeed
+  @Binding var panSpeed: PreviewNavigationSpeed
+  @Binding var zoomSpeed: PreviewNavigationSpeed
 
   var body: some View {
     VStack(alignment: .trailing, spacing: 7) {
@@ -51,6 +54,9 @@ struct ViewportCameraHUD: View {
           navigationProfile: $navigationProfile,
           customRotateDrag: $customRotateDrag,
           customPanDrag: $customPanDrag,
+          orbitSpeed: $orbitSpeed,
+          panSpeed: $panSpeed,
+          zoomSpeed: $zoomSpeed,
           canFrameSelection: workspace.canFrameSelection,
           frameSelection: workspace.frameSelection
         )

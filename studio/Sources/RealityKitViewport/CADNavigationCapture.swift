@@ -7,6 +7,21 @@ enum CADNavigationAction: Equatable {
   case zoom(delta: CGFloat)
 }
 
+extension CADNavigationAction {
+  func scaled(by sensitivity: PreviewNavigationSensitivity) -> Self {
+    switch self {
+    case .orbit(let deltaX, let deltaY):
+      let multiplier = CGFloat(sensitivity.orbit.multiplier)
+      return .orbit(deltaX: deltaX * multiplier, deltaY: deltaY * multiplier)
+    case .pan(let deltaX, let deltaY):
+      let multiplier = CGFloat(sensitivity.pan.multiplier)
+      return .pan(deltaX: deltaX * multiplier, deltaY: deltaY * multiplier)
+    case .zoom(let delta):
+      return .zoom(delta: delta * CGFloat(sensitivity.zoom.multiplier))
+    }
+  }
+}
+
 enum CADNavigationMouseButton: Equatable {
   case right
   case middle
@@ -179,20 +194,28 @@ struct ViewportEscapeCapture: NSViewRepresentable {
 struct CADNavigationCapture: NSViewRepresentable {
   let profile: PreviewNavigationProfile
   let customMapping: CustomNavigationMapping
+  let sensitivity: PreviewNavigationSensitivity
   let onAction: (CADNavigationAction) -> Void
 
   init(
     profile: PreviewNavigationProfile,
     customMapping: CustomNavigationMapping = CustomNavigationMapping(),
+    sensitivity: PreviewNavigationSensitivity = PreviewNavigationSensitivity(),
     onAction: @escaping (CADNavigationAction) -> Void
   ) {
     self.profile = profile
     self.customMapping = customMapping
+    self.sensitivity = sensitivity
     self.onAction = onAction
   }
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(profile: profile, customMapping: customMapping, onAction: onAction)
+    Coordinator(
+      profile: profile,
+      customMapping: customMapping,
+      sensitivity: sensitivity,
+      onAction: onAction
+    )
   }
 
   func makeNSView(context: Context) -> NSView {
@@ -205,6 +228,7 @@ struct CADNavigationCapture: NSViewRepresentable {
   func updateNSView(_ nsView: NSView, context: Context) {
     context.coordinator.profile = profile
     context.coordinator.customMapping = customMapping
+    context.coordinator.sensitivity = sensitivity
     context.coordinator.onAction = onAction
   }
 
@@ -217,16 +241,19 @@ struct CADNavigationCapture: NSViewRepresentable {
     weak var observedView: NSView?
     var profile: PreviewNavigationProfile
     var customMapping: CustomNavigationMapping
+    var sensitivity: PreviewNavigationSensitivity
     var onAction: (CADNavigationAction) -> Void
     private var eventMonitor: Any?
 
     init(
       profile: PreviewNavigationProfile,
       customMapping: CustomNavigationMapping,
+      sensitivity: PreviewNavigationSensitivity,
       onAction: @escaping (CADNavigationAction) -> Void
     ) {
       self.profile = profile
       self.customMapping = customMapping
+      self.sensitivity = sensitivity
       self.onAction = onAction
     }
 
@@ -247,7 +274,7 @@ struct CADNavigationCapture: NSViewRepresentable {
           )
         else { return event }
 
-        self.onAction(action)
+        self.onAction(action.scaled(by: self.sensitivity))
         return nil
       }
     }
