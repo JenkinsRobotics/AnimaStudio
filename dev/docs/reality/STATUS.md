@@ -86,7 +86,7 @@
   editable name. Two UI hooks surface it: the `mate_types` bridge verb
   (static per-kind catalog — label, DOF slots, the shared universal
   controls) and `describe_mate` (per-instance descriptor carried in the
-  `load_character` joint summary). 811 Python tests pass. Motors, 3D Models & Media, and Events are also
+  `load_character` joint summary). Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
@@ -516,15 +516,31 @@
   newline-delimited JSON to it — `hello` handshake, `load_character`
   (returns a deterministic handle + a rig summary the app mirrors),
   `validate_character`, `evaluate` (DOF values, parameters, projected
-  channels, and reported limit violations for one frame), `release`,
+  channels, and reported limit violations for one frame), `resolve_pose`
+  (per-part world transforms — see below), `mate_types`, `release`,
   and `shutdown`. This is the seam that keeps the app a front end: it
   holds DTOs that mirror engine results and never redefines what a rig,
   pose, or frame means. Protocol logic is a pure
   `handle_request(session, request)` over dicts (format/protocol errors
   become typed `{ok:false,error:{code,message,path}}` envelopes, never a
   loop crash); an `evaluate` response's DOF values equal a direct
-  `evaluate_pose` call, tested as a faithful passthrough.
-  760 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  `evaluate_pose` call, tested as a faithful passthrough. The engine also
+  owns canonical **forward kinematics** (`animacore/kinematics.py`): a
+  stdlib-only rigid `Transform` (unit quaternion `(x,y,z,w)`, real part
+  last per RealityKit `simd_quatf`, plus a metre translation),
+  `connector_frame`/`mate_motion`/`mate_offset_transform`/
+  `child_in_parent`, and `resolve_pose(rig, pose)` walking the joint
+  graph parents-before-children. Each mate moves the child relative to
+  the parent about/along the **mate connector as the relative origin**
+  per its DOF; at zero DOF/offset the child connector coincides with the
+  parent connector with primary(Z) axes opposed (matching the Swift
+  "opposing primary axes" default), unless `flip_primary_axis` aligns
+  them, plus a `secondary_axis_rotation_deg` twist. Roots (no parent
+  joint) sit at identity. The bridge `resolve_pose` verb returns
+  `{parts:{name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — the
+  RealityKit render hook that supersedes the Swift `RigPoseResolver` +
+  `MateConnectorMath` (bridge migration step 2, engine side done).
+  843 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,

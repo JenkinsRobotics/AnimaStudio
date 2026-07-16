@@ -35,6 +35,31 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (BR2 — mate motion resolver / `resolve_pose`): Shipped
+  `animacore/kinematics.py` (canonical forward kinematics, stdlib +
+  `math` only, no numpy) and the bridge `resolve_pose` verb. Each mate
+  now actually MOVES the child part relative to the parent about/along
+  the mate connector as the relative origin, per its DOF, chained
+  through the rig — superseding the Swift `RigPoseResolver` +
+  `MateConnectorMath` (Studio_Bridge migration step 2, engine side
+  done). `Transform` = unit quaternion `(x,y,z,w)` (real part last, per
+  RealityKit `simd_quatf`) + metre translation;
+  `child_in_parent = C_A ∘ ALIGN ∘ Offset ∘ Motion ∘ inverse(C_B)` with
+  ALIGN = opposed-Z default (180° about X) unless `flip_primary_axis`,
+  plus a `secondary_axis_rotation_deg` twist; connectorless joints put
+  motion at the part origin. `resolve_pose(rig, pose)` returns every
+  part's world transform (roots at identity). Bridge verb result:
+  `{parts:{name:{position:[x,y,z], orientation:[x,y,z,w]}}}`.
+  `evaluate_pose`/`project_channels` unchanged. 843 suite total (+27),
+  ruff clean, no `app/`/`firmware/` touched. **Codex:** the verbatim
+  `resolve_pose` request/response JSON, the full `child_in_parent`
+  convention, and four decisions — chief among them that motion uses the
+  **canonical connector-frame axis** (so a connectorless revolute
+  rotates about part-origin Z; the six-axis-arm example needs per-joint
+  connectors authored to articulate realistically — a data task, not a
+  code bug) — are in the briefing handoff entry. Left uncommitted for
+  main-session integration.
+
 - 2026-07-15 (mate authoring model — universal controls + `mates.py`):
   Shipped the dedicated mate-authoring module `animacore/mates.py`
   unifying Kinematics §4's flip/reorient/offset into one universal

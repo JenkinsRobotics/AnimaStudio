@@ -61,6 +61,78 @@ values, same DOF names):
 | planar | translation_x, translation_y, rotation (Z) |
 | ball | rotation_x, rotation_y, rotation_z |
 
+## 1a. Pose resolution (implemented — `animacore/kinematics.py`)
+
+The forward-kinematics engine that makes every mate actually *move* the
+child part relative to the parent — about/along the **mate connector as
+the relative origin**, per the mate's DOF, chained through the rig. This
+is the canonical home for the math the Swift `RigPoseResolver` /
+`MateConnectorMath` used to own (Studio_Bridge migration step 2);
+RealityKit consumes it through the bridge `resolve_pose` verb. Stdlib +
+`math` only, deterministic, kinematic (no dynamics).
+
+**Rigid `Transform`.** A unit-quaternion rotation (`(x, y, z, w)`, real
+part last — RealityKit `simd_quatf(ix, iy, iz, r)` order) plus a metre
+translation. `compose(a, b)` is `a ∘ b` (apply `b` then `a`);
+`apply_point(p) = rotate(p) + translation`; `inverse` round-trips.
+
+**Connector frame.** `connector_frame(connector)` builds a `Transform`:
+translation = `origin_m`; rotation from the orthonormal basis
+`Z = normalize(primary_axis)` (negated first when `flipped`),
+`X = normalize(secondary_axis made ⊥ Z by Gram-Schmidt)`, `Y = Z × X`
+(right-handed). Z is the axis a revolute turns about / a slider travels
+along; X is pin-slot's slot direction.
+
+**Motion.** `mate_motion(joint, dof_values)` composes, in template
+order, one sub-transform per DOF: a rotation DOF (θ radians) rotates θ
+about its **canonical connector-frame axis** (the x/y/z from
+`JOINT_TYPE_DOF_TEMPLATES` — revolute about Z, slider along Z, pin-slot
+translation along X), a translation DOF (d metres) translates d along
+it. The DOF's own stored `axis` vector is *not* used — direction is the
+connector frame's, per §1. A missing DOF uses its neutral.
+
+**Offset.** `mate_offset_transform(offset)` is identity when disabled,
+else `translate(translation_m) ∘ rotate(rotation_axis,
+rotation_radians)` — rotation first, then translation, both in the
+aligned connector frame. Offsets shift the zero pose; they never consume
+a DOF (§4).
+
+**Child in parent.** `child_in_parent(joint, dof_values)` is the child
+part's transform relative to the parent:
+
+```
+child_in_parent = C_A ∘ ALIGN ∘ Offset ∘ Motion ∘ inverse(C_B)
+```
+
+where `C_A` = `connector_frame(connector_a)` (parent-local), `C_B` =
+`connector_frame(connector_b)` (child-local). `ALIGN` is **180° about X**
+(which opposes the two Z axes — the CAD "first selection moves onto the
+second" default, matching the Swift `opposingPrimaryAxisMatrix`) **unless
+`flip_primary_axis`** is set (then Z axes align), composed with a Z
+rotation of `secondary_axis_rotation_deg`. **Coincidence property:** at
+zero DOF and zero offset the child connector origin maps exactly onto the
+parent connector origin, with primary(Z) opposed and secondary(X)
+aligned. A joint with **no connectors** (`controls is None` or a
+connector is `None`) puts motion at the part origin:
+`child_in_parent = Offset ∘ Motion`. **Fastened** (no DOF) reduces to the
+rigid alignment `C_A ∘ ALIGN ∘ Offset ∘ inverse(C_B)`.
+
+**Forward kinematics.** `resolve_pose(rig, pose)` returns every part's
+**world** `Transform`. A part that is no joint's `child_part` is a ROOT
+at identity (parts carry no rest transform). Walking parents before
+children (repeated pass over the acyclic joint graph),
+`world[child] = compose(world[parent], child_in_parent(joint, …))`,
+pulling DOF values from `pose.dof_values` (keyed `"<joint>.<dof>"`).
+`transform_to_json(t)` serializes to `{position:[x,y,z],
+orientation:[x,y,z,w]}` for the wire.
+
+> **Connector direction is the source of truth.** A connectorless mate
+> rotates/translates about the *part-origin* canonical axis (Z for every
+> revolute). To make a chain articulate in different planes (a serial
+> arm's alternating pitch axes), each joint needs connectors orienting
+> its Z — the per-DOF `axis:` vector authors may still write is legacy
+> and does not steer motion here.
+
 ## 2. Limits and range of motion (Onshape "Limits" checkbox)
 
 - Limits are **per DOF**, optional, and live in the mate dialog: an

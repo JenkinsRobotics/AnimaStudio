@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import IO
 
 from animacore import __version__ as ENGINE_VERSION
+from animacore.kinematics import resolve_pose, transform_to_json
 from animacore.loader import CharacterFormatError, parse_character
 from animacore.mates import all_mate_type_schemas, describe_mate
 from animacore.rig import (
@@ -40,6 +41,7 @@ CAPABILITIES = [
     "load_character",
     "validate_character",
     "evaluate",
+    "resolve_pose",
     "mate_types",
     "release",
     "shutdown",
@@ -274,6 +276,39 @@ def _evaluate(session: Session, params: dict, request_id: object) -> dict:
     )
 
 
+def _resolve_pose(session: Session, params: dict, request_id: object) -> dict:
+    # The RealityKit render hook: evaluate one frame, run forward
+    # kinematics over the joint graph (per-mate motion about/along the
+    # connector as the relative origin), and return every part's world
+    # transform. Supersedes the Swift RigPoseResolver / MateConnectorMath.
+    handle = _require_str(params, "handle")
+    rig = session.get(handle)
+    if rig is None:
+        return _error(
+            request_id, "unknown_handle", f"no rig loaded as {handle!r}"
+        )
+    clip = params.get("clip")
+    if clip is not None and not isinstance(clip, str):
+        raise _BadRequest("'clip' must be a string or null")
+    time_s = params.get("time_s", 0.0)
+    if isinstance(time_s, bool) or not isinstance(time_s, (int, float)):
+        raise _BadRequest("'time_s' must be a number")
+    try:
+        pose = evaluate_pose(rig, clip, float(time_s))
+    except KeyError:
+        raise _BadRequest(f"rig {handle!r} has no clip named {clip!r}")
+    transforms = resolve_pose(rig, pose)
+    return _ok(
+        request_id,
+        {
+            "parts": {
+                part_name: transform_to_json(transform)
+                for part_name, transform in transforms.items()
+            }
+        },
+    )
+
+
 def _mate_types(session: Session, params: dict, request_id: object) -> dict:
     # The palette/panel-builder hook: the static per-kind schema for all
     # eight mate kinds (label, DOF slots, and the shared universal
@@ -298,6 +333,7 @@ _VERBS = {
     "load_character": _load_character,
     "validate_character": _validate_character,
     "evaluate": _evaluate,
+    "resolve_pose": _resolve_pose,
     "mate_types": _mate_types,
     "release": _release,
     "shutdown": _shutdown,

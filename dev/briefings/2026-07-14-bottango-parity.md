@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | active 2026-07-15 |
 | Codex | BR1 Swift AnimaCore client + engine-evaluated viewport proof | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Tests/AnimaCoreClientTests/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,WorkspaceRibbonView}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,RigPoseResolver}.swift`, `app/App/AnimaCoreHelper.entitlements`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, focused Swift tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real helper spawn + hello/load/evaluate/release/shutdown; typed protocol/path errors; explicit `.character.anima` import; engine-evaluated DOF values reach RealityKit preview through transitional pose projection; bundled signed helper for sandboxed app; deterministic client/unit/integration/UI tests; strict claimed-file lint; full Swift tests; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | Swift app half of AnimaCore repository restructure | `studio/**` → `app/**`, `.github/workflows/**`, `.gitignore`, `AGENTS.md`, `CONVENTIONS.md`, `README.md`, `dev/docs/reality/STATUS.md`, `dev/docs/roadmap/Studio_App.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | root contains `animacore/`, `app/`, and `firmware/` with no `studio/`; Swift `AnimaModel` owns data/validation and `AnimaEvaluation` owns evaluation; no Swift `AnimaCore` target/import remains; format lint, full Swift tests, Xcode build, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | CAD viewport pointer + navigation refinement | `studio/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,SubObjectSelection,RobotPreviewView}.swift`, `studio/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceView,ComponentContextActions}.swift`, `studio/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, `studio/Tests/RealityKitViewportTests/{CADNavigationTests,SubObjectSelectionTests}.swift`, `studio/Tests/AnimaStudioUIUnitTests/{Components/ViewportRenderMenuTests.swift,Workspaces/Rig/ComponentViewportContextMenuTests.swift}`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | persistent orbit/pan/zoom speed settings with slower default zoom; right-drag orbit; body/feature hover and left-click selection with empty-click deselection; pointer-targeted compact empty-space menu vs full selected-component menu; focused/full tests; claimed-file lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -131,7 +132,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Complete mate authoring model: universal connector/offset/flip/orient controls + per-mate DOF, engine module + bridge hook (mates.py) | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/roadmap/Studio_Bridge.md`, `examples/**`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-15 (811 suite total, +51; ruff clean; no `app/`/`firmware/` files touched; `mate_types` + `describe_mate` JSON and the universal-controls contract in the handoff entry below) |
 
-| Claude | Mate motion resolver (resolve_pose): per-mate kinematic motion about/along connectors + FK chain + bridge hook (BR2) | `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/test_kinematics.py`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | in progress |
+| Claude | Mate motion resolver (resolve_pose): per-mate kinematic motion about/along connectors + FK chain + bridge hook (BR2) | `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/test_kinematics.py`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-15 (843 suite total, +27; ruff clean; no `app/`/`firmware/` touched; verbatim `resolve_pose` JSON + convention in the handoff entry below) |
 
 ## Requests
 
@@ -186,6 +187,98 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, BR2 — mate motion resolver / `resolve_pose`):**
+  Shipped `animacore/kinematics.py` (the canonical forward-kinematics
+  engine, stdlib + `math` only, no numpy) and the bridge `resolve_pose`
+  verb. Each mate now actually MOVES the child part relative to the
+  parent about/along the **mate connector as the relative origin**, per
+  its DOF, chained through the rig. Supersedes the Swift
+  `RigPoseResolver` + `MateConnectorMath` (Studio_Bridge migration step
+  2 — engine side done; app work = route RealityKit through the verb and
+  delete both Swift files). 843 suite total (+27 in
+  `test_kinematics.py`), ruff clean, no `app/`/`firmware/` touched.
+  `evaluate_pose`/`project_channels` unchanged.
+
+  **Convention I implemented (canonical — Codex renders/replaces
+  `RigPoseResolver` against this):**
+  - `Transform` = unit quaternion `(x, y, z, w)` (**real part last** —
+    build RealityKit `simd_quatf(ix: o[0], iy: o[1], iz: o[2], r: o[3])`
+    directly) + metre translation. `compose(a, b) = a ∘ b` (apply `b`
+    then `a`). `apply_point(p) = rotate(p) + translation`.
+  - `connector_frame`: translation = `origin_m`; basis `Z =
+    normalize(primary_axis)` (negated first if `flipped`), `X =
+    normalize(secondary ⊥ Z)` (Gram-Schmidt), `Y = Z × X`.
+  - `child_in_parent = C_A ∘ ALIGN ∘ Offset ∘ Motion ∘ inverse(C_B)`,
+    `C_A/C_B` = parent-/child-local connector frames. **`ALIGN` = 180°
+    about X (opposes the two Z axes — matches your
+    `opposingPrimaryAxisMatrix`) UNLESS `flip_primary_axis` (then Z
+    aligned), composed with a Z rotation of
+    `secondary_axis_rotation_deg`.** Coincidence property (tested): zero
+    DOF + disabled offset → child connector origin maps exactly onto the
+    parent connector origin, primary(Z) opposed, secondary(X) aligned.
+  - `Offset` (when enabled) = `translate(translation_m) ∘
+    rotate(rotation_axis, rotation_radians)` — rotation first, then
+    translation.
+  - `Motion` composes one sub-transform per DOF in template order, about/
+    along the **canonical connector-frame axis** from
+    `JOINT_TYPE_DOF_TEMPLATES` (revolute about Z, slider along Z,
+    pin-slot rotates Z + translates X). Missing DOF → its neutral.
+  - No connectors (`controls is None` or a connector `None`) → motion at
+    the part origin: `child_in_parent = Offset ∘ Motion`. Fastened (no
+    DOF) → rigid `C_A ∘ ALIGN ∘ Offset ∘ inverse(C_B)`.
+  - `resolve_pose(rig, pose)`: parts that are no joint's `child_part` are
+    ROOTS at identity (parts carry no rest transform); walk
+    parents-before-children; `world[child] = compose(world[parent],
+    child_in_parent(...))`. Deterministic.
+
+  **Decisions Codex must know:**
+  1. **Canonical axis, not the DOF's stored vector.** Motion direction
+     comes from the connector frame + the template axis (Z for every
+     revolute), never the per-DOF `axis:[...]` vector some examples still
+     carry (that vector is legacy/decorative now, per Kinematics §1).
+     Consequence: **a connectorless revolute rotates about part-origin
+     Z.** `examples/six_axis_arm` only gives `base_yaw` connectors, so
+     the other five joints all rotate about Z and the arm does not
+     articulate in alternating planes — the parts still visibly *move*
+     (orientations change frame-to-frame; the end-to-end test asserts
+     `tool_flange` moves between t=0 and t=1.0), but making it a
+     realistic serial arm is a **data task**: give each joint connectors
+     orienting its Z. Not a code bug. Flag if you want me to author those
+     connectors into the example.
+  2. **Opposed-Z is the default** (matches your Swift default). `flip_
+     primary_axis` flips to aligned-Z. This is now the single source of
+     truth — the Swift `opposingPrimaryAxisMatrix` should be deleted, not
+     mirrored.
+  3. **Quaternion order `(x, y, z, w)`** in the wire JSON — real part
+     LAST. `transform_to_json` normalizes before emitting.
+  4. `resolve_pose` params mirror `evaluate` (`{handle, clip?, time_s?}`);
+     unknown handle → `unknown_handle`; unknown clip → `bad_request`
+     (same as `evaluate`).
+
+  **Verbatim `resolve_pose` request / response** (real output,
+  `six_axis_arm` `pick` clip at `time_s: 1.0`; floats rounded to 4 dp
+  here for readability — the wire carries full precision):
+
+  ```json
+  {"id": 2, "method": "resolve_pose",
+   "params": {"handle": "rig1", "clip": "pick", "time_s": 1.0}}
+  ```
+  ```json
+  {"id": 2, "ok": true, "result": {"parts": {
+    "base":        {"position": [0.0, 0.0, 0.0],   "orientation": [0.0, 0.0, 0.0, 1.0]},
+    "shoulder":    {"position": [0.0, 0.0, 0.038], "orientation": [0.8594, -0.5113, 0.0, 0.0]},
+    "upper_arm":   {"position": [0.0, 0.0, 0.038], "orientation": [0.6659, -0.7461, 0.0, 0.0]},
+    "forearm":     {"position": [0.0, 0.0, 0.038], "orientation": [-0.1002, -0.995, 0.0, 0.0]},
+    "wrist_inner": {"position": [0.0, 0.0, 0.038], "orientation": [0.3706, -0.9288, 0.0, 0.0]},
+    "wrist_outer": {"position": [0.0, 0.0, 0.038], "orientation": [-0.3947, -0.9188, 0.0, 0.0]},
+    "tool_flange": {"position": [0.0, 0.0, 0.038], "orientation": [-0.3947, -0.9188, 0.0, 0.0]}
+  }}}
+  ```
+  (Positions cluster near the base connector origin `z=0.038` precisely
+  because the connectorless joints are collinear on Z — decision 1;
+  orientation is the moving quantity here.) Left uncommitted for
+  main-session integration.
 
 - **2026-07-15 (Claude, mate authoring model — universal controls +
   `mates.py`):** Shipped the dedicated mate-authoring module

@@ -59,6 +59,7 @@ line — one error surface, never a second parser.
 | `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[<describe_mate>…], parameters:[…], clips:[{name,duration_s,loop}], outputs:[{dof_path,channel}]}}` — invalid → `format_error` with `path`. Each joint entry is `describe_mate` (see below). |
 | `validate_character` | `{text}` | `{diagnostics:[…]}` (empty = valid) — no handle allocated |
 | `evaluate` | `{handle, clip?, time_s?}` | `{dof_values:{path:native_units}, parameters:{name:0..1}, channels:{channel:0..1}, limit_violations:[{dof_path,value,min,max}]}` |
+| `resolve_pose` | `{handle, clip?, time_s?}` | `{parts:{part_name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — per-part **world** transforms after forward kinematics. **The RealityKit render hook.** Unknown handle → `unknown_handle`. See below. |
 | `mate_types` | `{}` | `{mate_types:[{type,label,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all 8 mate kinds (the palette / panel-builder hook); no handle needed |
 | `release` | `{handle}` | `{}` — drop a loaded rig |
 | `shutdown` | `{}` | `{}` then the helper exits |
@@ -91,11 +92,29 @@ per kind — see `mate_types`). Offset rotation is native radians here,
 like the DOF descriptors. A mate that declared no controls reports
 null connectors and default control values.
 
+**Pose resolution (`resolve_pose`).** Forward kinematics over the joint
+graph: `evaluate` the frame, then walk parents-before-children giving
+each part its **world** transform. `params` mirror `evaluate`
+(`{handle, clip?, time_s?}`); the result is one entry per part:
+
+```
+{parts: {part_name: {position:[x,y,z],
+                     orientation:[x,y,z,w]}}}
+```
+
+`position` is metres; `orientation` is a unit quaternion with the real
+part **last** — RealityKit `simd_quatf(ix, iy, iz, r)` order, so the app
+constructs `simd_quatf(ix: o[0], iy: o[1], iz: o[2], r: o[3])` directly.
+A part that is no joint's child is a root at identity (parts carry no
+rest transform). Each mate moves the child relative to the parent about/
+along the **mate connector as the relative origin**, per its DOF — the
+canonical convention lives in `Kinematics.md` → "Pose resolution". This
+verb **supersedes** the Swift `RigPoseResolver` + `MateConnectorMath`
+(migration step 2 below): RealityKit renders engine-resolved geometry
+instead of applying scalar joint angles to rest transforms.
+
 ## Later verbs (reserved, each gated on its engine feature)
 
-- `resolve_pose {handle,…}` → per-part world transforms (migrates
-  `RigPoseResolver` + `MateConnectorMath` into the engine — **the step
-  that lets RealityKit render engine-resolved geometry**).
 - `load_scene` / `scene_new_runner` / `scene_advance` / `scene_post_event`
   → drive `SceneRunner` for Show playback.
 - `open_output` / `send_frame` / `stop` → the app's Hardware workspace
@@ -109,7 +128,10 @@ null connectors and default control values.
    `.character.anima` example through the helper, evaluates one frame,
    renders the returned DOF values in RealityKit (its current pose
    resolver applies them to rest geometry).
-2. Add `resolve_pose`; move mate-alignment/kinematic math out of Swift.
+2. **Done (engine side):** `resolve_pose` ships the mate-alignment +
+   kinematic math in the engine (`animacore/kinematics.py`). Remaining
+   app work: route RealityKit through `resolve_pose` and delete the
+   Swift `RigPoseResolver` + `MateConnectorMath`.
 3. Route the Swift timeline/inspector through `evaluate`; delete the
    Swift `AnimaEvaluation` evaluator.
 4. `.animastudio` save/open wraps canonical `.character.anima` /
