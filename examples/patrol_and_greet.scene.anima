@@ -4,7 +4,7 @@
 # wait_until with an AND/OR condition tree, a select multi-way branch
 # over a mode variable, a wave subroutine called from two places, and
 # a background estop monitor that ends the scene. Loaded by
-# anima_studio/tests/test_scene.py; spec subset in
+# anima_core/tests/test_scene.py; spec subset in
 # dev/docs/roadmap/Scene_Format.md. The v1 sibling is
 # pick_and_wave.scene.anima.
 #

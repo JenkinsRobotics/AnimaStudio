@@ -3,9 +3,9 @@ end-to-end clip → wire → servo loop."""
 
 import pytest
 
-from anima_studio.tracks import Clip, Interpolation, Keyframe, Track, evaluate_clip
-from anima_studio.sim import SimulatedDevice
-from anima_studio.wire import (
+from anima_core.tracks import Clip, Interpolation, Keyframe, Track, evaluate_clip
+from anima_core.sim import SimulatedDevice
+from anima_core.wire import (
     ERR_BAD_CHANNEL,
     ERR_BAD_VALUE,
     ERR_NOT_CONFIGURED,

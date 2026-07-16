@@ -1,4 +1,4 @@
-"""anima_studio — open-source unified character animation system for AI
+"""anima_core — open-source unified character animation system for AI
 robots: digital avatars and physical animatronics from one rig, one
 format, one authoring tool.
 

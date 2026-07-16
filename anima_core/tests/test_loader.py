@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from anima_studio.loader import (
+from anima_core.loader import (
     CharacterFormatError,
     load_character_file,
     parse_character,
 )
-from anima_studio.rig import (
+from anima_core.rig import (
     DofKind,
     JointType,
     LimitViolationError,
@@ -20,9 +20,9 @@ from anima_studio.rig import (
     evaluate_pose,
     project_channels,
 )
-from anima_studio.sim import SimulatedDevice
-from anima_studio.tracks import Interpolation
-from anima_studio.wire import Ok, encode_frm, parse_reply
+from anima_core.sim import SimulatedDevice
+from anima_core.tracks import Interpolation
+from anima_core.wire import Ok, encode_frm, parse_reply
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 EXAMPLE_PATHS = sorted(EXAMPLES_DIR.glob("*.character.anima"))

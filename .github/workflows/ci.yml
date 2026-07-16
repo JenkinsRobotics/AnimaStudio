@@ -34,4 +34,4 @@ jobs:
         run: ruff check .
 
       - name: Test
-        run: pytest anima_studio/tests -q
+        run: pytest anima_core/tests -q

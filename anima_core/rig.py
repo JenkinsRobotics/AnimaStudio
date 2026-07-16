@@ -7,10 +7,10 @@ alone defines the set of ``DegreeOfFreedom`` being controlled. Clips
 target DOF by path (``"<joint_name>.<dof_name>"``) and generic 0..1
 ``Parameter``s by name; every unanimated target falls back to its
 neutral — empty or missing tracks are legal at rig level. Per-track
-hold/linear interpolation is reused from ``anima_studio.tracks``;
+hold/linear interpolation is reused from ``anima_core.tracks``;
 ``project_channels`` is the B04 seam mapping evaluated DOF/parameter
 values to the normalized 0..1 channels ``wire.encode_frm`` takes. Rigs
-come from ``.character.anima`` files via ``anima_studio.loader``.
+come from ``.character.anima`` files via ``anima_core.loader``.
 
 Kinematics (per ``dev/docs/roadmap/Kinematics.md``): per-DOF limits are
 optional — an unlimited DOF (a wheel) is legal and never clamped, but
@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import ClassVar
 
-from anima_studio.tracks import Clip, evaluate_clip
+from anima_core.tracks import Clip, evaluate_clip
 
 
 class DofKind(StrEnum):

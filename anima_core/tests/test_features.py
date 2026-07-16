@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from anima_studio.extensions import (
+from anima_core.extensions import (
     ContributionKind,
     ExtensionManifestError,
     discover_extensions,
     parse_manifest,
 )
-from anima_studio.features import (
+from anima_core.features import (
     FeatureExpansionError,
     FeatureTemplate,
     FeatureTemplateError,
@@ -24,8 +24,8 @@ from anima_studio.features import (
     merge_fragment,
     parse_feature_template,
 )
-from anima_studio.loader import parse_character
-from anima_studio.rig import evaluate_pose, project_channels
+from anima_core.loader import parse_character
+from anima_core.rig import evaluate_pose, project_channels
 
 EXTENSIONS_DIR = (
     Path(__file__).resolve().parents[2] / "examples" / "extensions"

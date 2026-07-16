@@ -1,7 +1,7 @@
 // Anima Wire Protocol v0 — device-side state machine.
 //
 // Core-agnostic: no Arduino calls here; hardware goes through
-// servo_backend.h. Behavior mirrors anima_studio/sim.py line by line:
+// servo_backend.h. Behavior mirrors anima_core/sim.py line by line:
 // channels start disabled after CFG until EN; STOP/failsafe leave them
 // disabled until re-enabled; FRM frames are atomic; retargeting starts
 // from the current (in-flight) value; ERR messages are hyphenated
@@ -18,7 +18,7 @@
 #include "config.h"
 #include "servo_backend.h"
 
-// ERR,<code>,<msg> codes, matching anima_studio/wire.py.
+// ERR,<code>,<msg> codes, matching anima_core/wire.py.
 #define ERR_PARSE 1
 #define ERR_BAD_CHANNEL 2
 #define ERR_BAD_VALUE 3

@@ -171,6 +171,14 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Handoff log
 
+- **2026-07-15 (Claude, AnimaCore restructure — Python half):** Engine
+  now owns the name AnimaCore. `anima_studio/` → `anima_core/`
+  (import + package `anima_core`, distribution `anima-core`);
+  pyproject, CI, firmware comments, and every contract/current-truth
+  doc updated; `pip install -e .` re-runs clean, 732 tests pass, ruff
+  clean. Swift half (studio/→app/, AnimaCore→AnimaModel+AnimaEvaluation)
+  handed to Codex in its mailbox — its lane, to run at a clean commit.
+
 - **2026-07-15 (Codex, CAD viewport pointer/navigation refinement):** Added
   persistent per-axis Slow/Reduced/Standard/Fast/Very Fast response settings;
   zoom now defaults to Reduced while the established CAD mouse profiles and

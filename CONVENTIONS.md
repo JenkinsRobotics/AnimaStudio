@@ -24,12 +24,15 @@ ecosystem's rules, trimmed to what Anima Studio actually uses.
 
 ## Where things live
 
-- **`anima_studio/` (Python)** — the headless runtime: `.anima`
-  loading, rig/DOF evaluation, relations, wire protocol host,
-  simulator. Mechanism-agnostic: domain vocabulary (faces, cars, arms)
-  appears only in `examples/` data, never in core types.
-- **`studio/` (Swift)** — the macOS authoring app. Package ownership
-  table and boundaries live in `AGENTS.md`.
+- **`anima_core/` (Python) — AnimaCore, the engine** — the headless
+  animation core: `.anima` loading, rig/DOF evaluation, relations,
+  scene execution, wire protocol host, simulator, extensions.
+  Mechanism-agnostic: domain vocabulary (faces, cars, arms) appears
+  only in `examples/` data, never in core types. Cross-platform; the
+  app and firmware author for it.
+- **`studio/` (Swift; rename to `app/` planned)** — the macOS
+  authoring app. Package ownership table and boundaries live in
+  `AGENTS.md`.
 - **`firmware/`** — the open microcontroller firmware speaking
   `dev/docs/roadmap/Wire_Protocol.md`.
 - **Cross-implementation parity:** the `.anima` format and Wire

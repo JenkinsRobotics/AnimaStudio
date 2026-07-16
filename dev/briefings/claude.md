@@ -35,6 +35,14 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (AnimaCore restructure, Python half): Per Jonathan, the
+  engine owns the name AnimaCore. Renamed `anima_studio/` →
+  `anima_core/` (package/import `anima_core`, distribution `anima-core`),
+  updated pyproject/CI/firmware comments/all contract+current-truth
+  docs; `pip install -e .` and 732 tests green. Swift half (studio/ →
+  app/, split AnimaCore → AnimaModel + AnimaEvaluation) speced in
+  codex.md — Codex's lane. Dated briefing history left as-is.
+
 - 2026-07-15 (`.scene.anima` execution v1): Shipped headless show
   playback — the B10 offline-playback foundation that outruns a
   tethered export (`anima_studio/scene.py`; 123 new tests, 583 suite

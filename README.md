@@ -40,12 +40,13 @@ driven simultaneously from one character file and one scene script.
 
 ## The three components
 
-- **Anima Runtime** (`anima_studio/`, Python) — the headless runtime: loads
-  `.character.anima` files into a typed parts/joints/DOF mechanism rig
+- **AnimaCore** (`anima_core/`, Python) — the headless animation **engine**:
+  loads `.character.anima` files into a typed parts/joints/DOF mechanism rig
   (Onshape-mate model), evaluates clips with limits and gear/rack/screw/linear
-  relations, and streams normalized channel targets over the open Anima Wire
-  Protocol to real or simulated devices. Scene execution and JaegerOS
-  integration remain **(planned)**.
+  relations, runs `.scene.anima` shows, and streams normalized channel targets
+  over the open Anima Wire Protocol to real or simulated devices. The
+  cross-platform core the app and firmware author for. JaegerOS integration
+  remains **(planned)**.
 - **Anima Studio app** (`studio/`, Swift/SwiftUI, macOS) — the native
   authoring app: CAD-style workspaces, model import, proxy components,
   two-click connector-authored mates, face/edge selection, timeline with
@@ -110,14 +111,17 @@ contract: [AGENTS.md](AGENTS.md).
 
 | Path | What it is |
 |---|---|
-| `anima_studio/` | Python runtime: `.anima` loader, rig/DOF/relations evaluation, wire protocol host, device simulator, tests |
-| `studio/` | Swift macOS app — `App/` (thin app target), `Sources/` (AnimaCore, AnimaStudioUI, viewport packages), `Tests/` |
+| `anima_core/` | **AnimaCore** — the Python animation engine: `.anima` loader, rig/DOF/relations evaluation, `.scene.anima` execution, wire protocol host, device simulator, extensions, tests |
+| `studio/` | Swift macOS app (rename to `app/` planned) — `App/` (thin app target), `Sources/` (its Swift model/eval + `AnimaStudioUI` + viewport packages), `Tests/` |
 | `firmware/` | Arduino/ESP32 firmware speaking the wire protocol |
-| `examples/` | Sample `.anima` files (the only place domain-specific naming lives) |
+| `examples/` | Sample `.anima` files + extension bundles (the only place domain-specific naming lives) |
 | `dev/briefings/` | Multi-agent coordination: mailboxes, claims, handoff log |
 | `dev/docs/` | `reality/STATUS.md` (shipped truth) · `roadmap/` (planned) · `vision/` (why) |
 | `docs/` | GitHub Pages site source |
-| `Anima Studio.app` | Local development build (gitignored) — rebuild with `studio/Scripts/build-root-app.sh` |
+
+> **AnimaCore is the engine; Anima Studio is one app that authors for it.**
+> The `.anima` format and wire protocol in `dev/docs/roadmap/` are the
+> contract both `anima_core/` (Python) and the Swift app implement.
 
 ## Ecosystem links
 

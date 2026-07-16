@@ -1,4 +1,4 @@
-# anima_studio — design notes
+# anima_core — design notes
 
 Copy to `DESIGN.md` (drop the `.example` suffix) once this module has a
 real shape. This is the module's own design doc — decisions, tradeoffs,

@@ -3,7 +3,7 @@
 # variables, clips (with a speed ratio), one-off poses, a wait, a
 # wait_for gate with timeout, if/else, count and while_var loops,
 # deterministic parallel tracks, and outbound events. Loaded by
-# anima_studio/tests/test_scene.py; spec subset in
+# anima_core/tests/test_scene.py; spec subset in
 # dev/docs/roadmap/Scene_Format.md.
 #
 # Show logic: run the pick gesture, then scan side to side while one

@@ -2,7 +2,7 @@
 
 import pytest
 
-from anima_studio.wire import (
+from anima_core.wire import (
     Err,
     Hello,
     Ok,

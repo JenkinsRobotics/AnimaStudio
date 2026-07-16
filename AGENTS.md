@@ -28,7 +28,7 @@ The current goal is Bottango-level capability, working straight down
 
 - **Claude Code — backend** (per Jonathan, 2026-07-14, superseding the
   earlier all-implementation split): the Python runtime
-  (`anima_studio/`), the wire protocol and its simulator, `.anima`
+  (`anima_core/`), the wire protocol and its simulator, `.anima`
   loading/execution, and the microcontroller firmware
   (`firmware/`, when it exists).
 - **Codex — Swift app GUI** (`studio/`), plus planning + review across
@@ -151,7 +151,7 @@ Python (Runtime), from the repo root:
 
 ```bash
 .venv/bin/ruff check .
-.venv/bin/pytest anima_studio/tests
+.venv/bin/pytest anima_core/tests
 ```
 
 For a user-facing workspace change, also launch the native app target (or the

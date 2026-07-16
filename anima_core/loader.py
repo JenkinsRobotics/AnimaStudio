@@ -1,6 +1,6 @@
 """Load ``.character.anima`` YAML into the runtime mechanism rig model.
 
-Parses the character-format 2.0 subset that ``anima_studio.rig``
+Parses the character-format 2.0 subset that ``anima_core.rig``
 models — identity, parts, typed joints with per-DOF optional ``limits``
 blocks and per-joint ``offset`` blocks (``_deg`` degree keys and ``_m``
 meter keys in the file; radians and meters in the model), generic 0..1
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-from anima_studio.rig import (
+from anima_core.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
     RELATION_DISPLAY_KEYS,
     RELATION_KIND_DOF_KINDS,
@@ -43,7 +43,7 @@ from anima_studio.rig import (
     RotationDof,
     TranslationDof,
 )
-from anima_studio.tracks import Clip, Interpolation, Keyframe, Track
+from anima_core.tracks import Clip, Interpolation, Keyframe, Track
 
 SUPPORTED_ANIMA_VERSION = "2.0"
 SUPPORTED_TYPE = "character"

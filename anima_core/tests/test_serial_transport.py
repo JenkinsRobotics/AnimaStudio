@@ -13,19 +13,19 @@ import pytest
 import serial
 import yaml
 
-from anima_studio import serial_transport
-from anima_studio.loader import parse_character
-from anima_studio.outputs import ChannelConfig, OutputAdapter
-from anima_studio.rig import evaluate_pose, project_channels
-from anima_studio.serial_transport import (
+from anima_core import serial_transport
+from anima_core.loader import parse_character
+from anima_core.outputs import ChannelConfig, OutputAdapter
+from anima_core.rig import evaluate_pose, project_channels
+from anima_core.serial_transport import (
     DeviceRejectedError,
     HandshakeError,
     ProtocolError,
     ReplyTimeoutError,
     SerialWireOutput,
 )
-from anima_studio.sim import SimulatedDevice
-from anima_studio.wire import ERR_NOT_CONFIGURED
+from anima_core.sim import SimulatedDevice
+from anima_core.wire import ERR_NOT_CONFIGURED
 
 CHANNEL_CONFIGS = (
     ChannelConfig(channel=0, pin=9, min_us=600, max_us=2400),

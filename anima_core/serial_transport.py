@@ -1,6 +1,6 @@
 """Serial wire transport: ``OutputAdapter`` over a real serial port.
 
-Third consumer of the ``anima_studio.outputs.OutputAdapter`` contract
+Third consumer of the ``anima_core.outputs.OutputAdapter`` contract
 (after ``SimulatorOutput`` and the UDP example extension): bridges
 evaluated 0..1 channel frames over pyserial to physical hardware
 speaking Anima Wire Protocol v0 (``dev/docs/roadmap/Wire_Protocol.md``)
@@ -25,8 +25,8 @@ from collections.abc import Mapping, Sequence
 
 import serial
 
-from anima_studio.outputs import ChannelConfig
-from anima_studio.wire import (
+from anima_core.outputs import ChannelConfig
+from anima_core.wire import (
     PROTOCOL_VERSION,
     Err,
     Hello,

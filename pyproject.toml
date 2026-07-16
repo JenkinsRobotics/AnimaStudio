@@ -1,15 +1,15 @@
-# AnimaStudio — packaging + dev-tooling config.
-# Tracked for real (unlike the template convention) — this repo is a
-# product, not a template instance. pyproject.toml.example is kept only
-# as the upstream template reference.
+# AnimaCore — the Anima animation engine (Python runtime).
+# The headless core the Mac app (app/, Swift) and the firmware author
+# for; see dev/docs/roadmap/ for the .anima format + wire protocol
+# contracts both implementations answer to.
 
 [build-system]
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "anima-studio"
-description = "Open-source animation, motion-authoring, and show-control system for AI characters and audio-animatronic robots."
+name = "anima-core"
+description = "AnimaCore — the open animation engine: mechanism rigs, mates/DOF, kinematics, show execution, and hardware wire protocol for AI characters and animatronic robots."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dynamic = ["version"]
@@ -23,14 +23,14 @@ dependencies = [
 dev = ["pytest>=7", "ruff"]
 
 [tool.setuptools.dynamic]
-version = {attr = "anima_studio.__version__"}
+version = {attr = "anima_core.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["anima_studio*"]
+include = ["anima_core*"]
 
 [tool.pytest.ini_options]
-testpaths = ["anima_studio/tests"]
+testpaths = ["anima_core/tests"]
 
 [tool.ruff]
 line-length = 88

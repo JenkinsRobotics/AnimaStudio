@@ -6,7 +6,7 @@ sense. A feature is **pure data**: one YAML template file inside an
 ``.animaext`` bundle (no Python — that is its safety property). The
 template declares typed parameters (a form the Studio UI can render)
 and a ``body`` of parts/joints/relations/rig-parameters in the exact
-shapes ``anima_studio.loader`` accepts, plus two template-only
+shapes ``anima_core.loader`` accepts, plus two template-only
 constructs:
 
 - ``${expr}`` substitution inside scalar values and mapping keys — a
@@ -21,7 +21,7 @@ with ``<instance_name>_`` so two instances coexist; ``merge_fragment``
 inserts that fragment into a loaded character mapping. Expansion never
 bypasses loader validation: features emit standard primitives, never
 new kernel types, and the merged document is re-parsed by
-``anima_studio.loader`` — the loader stays the single gatekeeper.
+``anima_core.loader`` — the loader stays the single gatekeeper.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ SUPPORTED_TEMPLATE_VERSION = "1.0"
 PARENT_SENTINEL = "$parent"
 
 # The character-format sections a feature body may emit, in the exact
-# shapes anima_studio.loader accepts.
+# shapes anima_core.loader accepts.
 _BODY_SECTIONS = ("parts", "joints", "relations", "parameters")
 _MAPPING_SECTIONS = ("parts", "joints", "parameters")
 
@@ -623,7 +623,7 @@ def expand_feature(
     and a ``$parent`` joint reference is an error.
 
     The result is a plain mapping in loader shapes — merge it with
-    ``merge_fragment`` and re-parse through ``anima_studio.loader``;
+    ``merge_fragment`` and re-parse through ``anima_core.loader``;
     expansion never bypasses loader validation.
     """
     if not isinstance(instance_name, str) or not instance_name.isidentifier():

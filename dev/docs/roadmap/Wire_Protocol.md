@@ -2,7 +2,7 @@
 
 > The host↔microcontroller contract — Anima's equivalent of the Bottango
 > firmware protocol, but open and ours. Implemented by the Python
-> reference host (`anima_studio/wire.py`), Studio's serial
+> reference host (`anima_core/wire.py`), Studio's serial
 > `AnimationOutput`, and the Arduino/ESP32 firmware. Change this doc
 > first, implementations second (see `dev/briefings/` protocol).
 

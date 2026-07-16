@@ -1,8 +1,8 @@
 """UDP wire output adapter (the packaged E1 example extension).
 
-Implements the ``anima_studio.outputs.OutputAdapter`` protocol by
+Implements the ``anima_core.outputs.OutputAdapter`` protocol by
 encoding Anima Wire Protocol v0 lines with the public
-``anima_studio.wire`` encoders (one copy of the wire truth — an
+``anima_core.wire`` encoders (one copy of the wire truth — an
 extension composes the core primitives, it never re-encodes them) and
 sending each line as one UDP datagram, without a trailing newline, to
 a configurable ``host:port``. Fire-and-forget: UDP has no reply path,
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import socket
 
-from anima_studio.wire import encode_cfg, encode_en, encode_frm, encode_stop
+from anima_core.wire import encode_cfg, encode_en, encode_frm, encode_stop
 
 
 class UdpWireOutput:

@@ -10,10 +10,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from anima_studio.loader import parse_character
-from anima_studio.outputs import ChannelConfig, SimulatorOutput
-from anima_studio.rig import LimitViolationError
-from anima_studio.scene import (
+from anima_core.loader import parse_character
+from anima_core.outputs import ChannelConfig, SimulatorOutput
+from anima_core.rig import LimitViolationError
+from anima_core.scene import (
     ClipAction,
     SceneFormatError,
     SceneResult,
@@ -24,7 +24,7 @@ from anima_studio.scene import (
     parse_scene,
     validate_scene,
 )
-from anima_studio.sim import SimulatedDevice
+from anima_core.sim import SimulatedDevice
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 

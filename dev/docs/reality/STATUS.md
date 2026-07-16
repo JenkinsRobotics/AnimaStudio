@@ -9,7 +9,7 @@
 - **Repo:** `AnimaStudio` — open-source unified character animation
   system for AI robots (digital avatars + physical animatronics from
   one rig, one format, one authoring tool)
-- **Version:** 0.1.0 (see `anima_studio/__init__.py`)
+- **Version:** 0.1.0 (see `anima_core/__init__.py`)
 - **JaegerOS pin:** not yet set — for now the runtime is standalone and
   Jaegers read `.anima` files natively; the `jaeger-os` dependency and
   `animation`-slot module land later (see `dev/docs/roadmap/`)
@@ -364,20 +364,20 @@
   home screen stays honestly disabled until it does. The Python
   package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
-  the Anima Wire Protocol v0 reference host (`anima_studio/wire.py` — encode
+  the Anima Wire Protocol v0 reference host (`anima_core/wire.py` — encode
   HELLO/CFG/FRM/EN/STOP/PING, parse ANIMA/OK/ERR/PONG, 3-decimal normalized
-  values), an in-process simulated device (`anima_studio/sim.py` — handshake,
+  values), an in-process simulated device (`anima_core/sim.py` — handshake,
   servo CFG, device-side linear FRM interpolation on an explicit `tick(now_ms)`
   clock, E-stop, per-channel 2000 ms failsafe, spec ERR codes), and a
-  normalized output-track evaluator (`anima_studio/tracks.py` — hold/linear,
+  normalized output-track evaluator (`anima_core/tracks.py` — hold/linear,
   time and limit clamping, deterministic; explicitly not a rig evaluator —
   AnimaCore keeps rig semantics; no Bézier yet). Per review: only successfully
   parsed commands refresh the failsafe heartbeat, and duplicate CFG keys or
   duplicate FRM channels are rejected (no last-write-wins). The runtime also
-  loads `.character.anima` 2.0 files (`anima_studio/loader.py` — version/type
+  loads `.character.anima` 2.0 files (`anima_core/loader.py` — version/type
   check, typed errors naming the offending path, unknown-field rejection;
   unsupported/superseded spec sections are rejected loudly, never
-  silently dropped) into a mechanism-rig model (`anima_studio/rig.py` —
+  silently dropped) into a mechanism-rig model (`anima_core/rig.py` —
   parts plus the eight typed Onshape-style mates whose type defines the
   DOF set; per-DOF limits are optional per Kinematics.md §2: an
   unlimited DOF is legal and never clamped, but mapping one to a
@@ -395,12 +395,12 @@
   .character.anima` load end-to-end; rc_car exercises a steering
   rack-and-pinion relation and an unlimited free-spinning axle.
   The runtime also ships the community-extension foundation
-  (Extensions.md packet E1): `anima_studio/outputs.py` defines the
+  (Extensions.md packet E1): `anima_core/outputs.py` defines the
   `OutputAdapter` extension-point protocol (`open(channel_configs)` /
   `send_frame(targets, duration_ms)` / `stop()` e-stop / `close()`,
   with `ChannelConfig` mirroring the wire CFG fields) plus the
   built-in `SimulatorOutput` wrapping `SimulatedDevice` through that
-  exact API, and `anima_studio/extensions.py` loads `<slug>.animaext`
+  exact API, and `anima_core/extensions.py` loads `<slug>.animaext`
   bundles — closed-schema `extension.yaml` manifests with typed errors
   naming offending paths, capability declarations (hardware/network/
   filesystem), `discover_extensions(search_dirs)` over caller-passed
@@ -412,7 +412,7 @@
   `examples/extensions/udp-wire-output.animaext/` example streams
   wire lines as UDP datagrams and is tested from its real bundle path.
   Parametric features (Extensions.md packet E2 backend,
-  `anima_studio/features.py`) are pure-data YAML templates — a
+  `anima_core/features.py`) are pure-data YAML templates — a
   `parametric_feature` entry must be a `.yaml` file, never Python —
   declaring typed parameters (float with explicit unit hint / int /
   bool / choice, defaults and ranges) and a body of standard
@@ -431,7 +431,7 @@
   through discover → load template → expand → merge → loader →
   `evaluate_pose` → `project_channels`.
   The runtime also ships the real-hardware serial bridge
-  (`anima_studio/serial_transport.py`): `SerialWireOutput` implements
+  (`anima_core/serial_transport.py`): `SerialWireOutput` implements
   the same `OutputAdapter` contract over pyserial (`pyserial>=3.5` is
   now a package dependency) — `serial_for_url` port opening (device
   paths like `/dev/tty.usbmodem*` or URLs like `loop://` for tests),
@@ -447,7 +447,7 @@
   against the reference `SimulatedDevice` with exact-line assertions
   (no reconnect/threading yet — that lands with Studio live control).
   The runtime also executes `.scene.anima` shows headless
-  (`anima_studio/scene.py`, the B10 offline-playback foundation):
+  (`anima_core/scene.py`, the B10 offline-playback foundation):
   the execution-v1 subset of `Scene_Format.md` — `clip` (speed ratio,
   background `wait: false`, required `duration_s` for looping clips),
   one-off `pose` interpolation from captured start values, `wait`,
@@ -486,7 +486,7 @@
   the whole v1 surface and `examples/patrol_and_greet.scene.anima`
   through the v2 surface (input-gated wait_until, select, a twice-
   called subroutine, an estop monitor).
-  732 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  732 Python tests pass with `.venv/bin/pytest anima_core/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,
@@ -494,7 +494,7 @@
   tests, rig evaluation → serial bytes → simulated servo tests, and
   scene file → `SceneRunner` → simulated servo values at exact
   timestamps with logic-gate branching and monitor-driven e-stop.
-- **What's stubbed:** every `*.example` file under `anima_studio/` —
+- **What's stubbed:** every `*.example` file under `anima_core/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
 - **Known gaps:** imported model hierarchies can be inspected and filtered but

@@ -3,11 +3,11 @@
 import pytest
 import yaml
 
-from anima_studio.loader import parse_character
-from anima_studio.outputs import ChannelConfig, OutputAdapter, SimulatorOutput
-from anima_studio.rig import evaluate_pose, project_channels
-from anima_studio.sim import SimulatedDevice
-from anima_studio.wire import WireError
+from anima_core.loader import parse_character
+from anima_core.outputs import ChannelConfig, OutputAdapter, SimulatorOutput
+from anima_core.rig import evaluate_pose, project_channels
+from anima_core.sim import SimulatedDevice
+from anima_core.wire import WireError
 
 CHARACTER_DOCUMENT = {
     "anima_version": "2.0",

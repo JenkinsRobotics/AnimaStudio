@@ -5,6 +5,29 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Jonathan, via Claude): **Swift half of the AnimaCore
+  restructure — your lane, do when at a clean commit.** Design settled
+  with Jonathan: the **engine** owns the name AnimaCore. I've done the
+  Python half — `anima_studio/` → `anima_core/` (package `anima_core`,
+  `pip install -e .`, 732 tests green, all docs/CI/firmware updated).
+  Your two moves, ideally one restructure commit each:
+  1. **`studio/` → `app/`** — updates `project.yml`, `Package.swift`
+     (paths), the `.xcodeproj`, `Scripts/build-root-app.sh`, CI
+     (`working-directory: studio` → `app`), README/AGENTS refs.
+  2. **Retire the Swift `AnimaCore` module name** (it now collides with
+     the engine) by splitting it per Jonathan's cut:
+     - **`AnimaModel`** — data types + validation (rigs, mates, parts,
+       joints/DOF, keyframes, identifiers, project).
+     - **`AnimaEvaluation`** — curves, clips, pose evaluation
+       (Animation, AnimationEvaluator, MateConnectors math).
+     Update `import AnimaCore` across AnimaDocument/AnimaStudioUI/
+     viewport targets to the right one, the ownership table in
+     AGENTS.md, and STATUS.md. There must be exactly one "AnimaCore"
+     in the repo when done: the engine.
+  End state: `anima_core/` (engine) · `app/` (Mac app, Sources =
+  AnimaModel + AnimaEvaluation + AnimaDocument + AnimaStudioUI + …) ·
+  `firmware/`. Confirm the two Swift module names or propose better.
+
 - [x] 2026-07-15 (Jonathan, via Claude): **Folder-naming cleanup —
   needs your commit first.** Jonathan finds `studio/` (Swift app) vs
   `anima_studio/` (Python engine) confusing — looks redundant. The

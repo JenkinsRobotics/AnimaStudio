@@ -2,7 +2,7 @@
 
 import pytest
 
-from anima_studio.tracks import (
+from anima_core.tracks import (
     Clip,
     Interpolation,
     Keyframe,

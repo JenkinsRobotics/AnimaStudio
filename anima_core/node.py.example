@@ -20,7 +20,7 @@ queue, not in a subscriber callback — see kokoro_tts's TTSNode in
 JaegerOS for the reference implementation of this pattern.
 
 Copy to node.py (drop the .example suffix), rename AnimaStudioNode and
-make_anima_studio_node to match your module, and wire it to whatever
+make_anima_core_node to match your module, and wire it to whatever
 engine/adapter this module actually drives.
 """
 
@@ -64,7 +64,7 @@ class AnimaStudioNode:  # (bases: Node — see the commented import above)
         *,
         bus: Any,
         engine: Engine,
-        name: str = "anima_studio",
+        name: str = "anima_core",
         queue_maxsize: int = 32,
         install_signal_handlers: bool = False,
     ) -> None:
@@ -133,7 +133,7 @@ class AnimaStudioNode:  # (bases: Node — see the commented import above)
         pass
 
 
-def make_anima_studio_node(bus: Any, config: dict) -> "AnimaStudioNode":
+def make_anima_core_node(bus: Any, config: dict) -> "AnimaStudioNode":
     """The module.yaml `factory:` entrypoint. Builds a live node wired to
     a real (but not-yet-warmed) engine — no model load, no hardware I/O
     at construction time; that's what setup()/first tick() are for."""

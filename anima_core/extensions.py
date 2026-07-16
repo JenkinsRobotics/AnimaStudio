@@ -5,7 +5,7 @@ Implements the community-extension packet E1 of
 ``<slug>.animaext/`` whose single ``extension.yaml`` manifest describes
 everything it contributes. The manifest is closed-schema — unknown
 fields are rejected with a typed ``ExtensionManifestError`` naming the
-offending path, the same loader discipline as ``anima_studio.loader``.
+offending path, the same loader discipline as ``anima_core.loader``.
 
 ``discover_extensions`` scans caller-supplied directories for bundles
 and returns an ``ExtensionRegistry``; duplicate extension ids (and
@@ -14,9 +14,9 @@ are loadable: ``output_adapter`` (E1) contributions name an
 ``entry: "<module>.py:<ClassName>"`` module that is imported from
 inside the bundle under an extension-id-namespaced module name (no
 ``sys.path`` pollution) and whose class must implement the
-``anima_studio.outputs.OutputAdapter`` protocol; ``parametric_feature``
+``anima_core.outputs.OutputAdapter`` protocol; ``parametric_feature``
 (E2) contributions name a pure-data YAML template file inside the
-bundle, parsed and validated by ``anima_studio.features`` — no Python
+bundle, parsed and validated by ``anima_core.features`` — no Python
 ever runs for a feature. The other known kinds (``scene_action``,
 ``motor_backend``) parse but raise "not yet supported" when loaded;
 unknown kinds are manifest errors.
@@ -34,12 +34,12 @@ from pathlib import Path
 
 import yaml
 
-from anima_studio.features import (
+from anima_core.features import (
     FeatureTemplate,
     FeatureTemplateError,
     load_feature_template,
 )
-from anima_studio.outputs import OutputAdapter
+from anima_core.outputs import OutputAdapter
 
 SUPPORTED_MANIFEST_VERSION = "1.0"
 
@@ -529,7 +529,7 @@ def _load_output_adapter_class(
             f"extension {extension_id!r}: entry module not found: "
             f"{module_file!r}"
         )
-    module_name = "anima_studio._animaext_" + re.sub(
+    module_name = "anima_core._animaext_" + re.sub(
         r"[^0-9a-zA-Z_]", "_", f"{extension_id}_{module_path.stem}"
     )
     spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -570,7 +570,7 @@ def _load_feature_template(
     """Load ``entry: "<template>.yaml"`` from inside a bundle (E2).
 
     The entry is pure data: it is read and validated by
-    ``anima_studio.features.load_feature_template``, never imported or
+    ``anima_core.features.load_feature_template``, never imported or
     executed. Template validation errors are re-raised with the
     template file path prefixed, mirroring manifest error handling.
     """

@@ -6,7 +6,7 @@
 # bounded channel mapping allowed), a per-joint as-mated offset block
 # that Studio consumes spatially, and a generic 0..1 `throttle`
 # parameter riding the same clip and output layers as joints. Loaded
-# by anima_studio/tests/test_loader.py; spec in
+# by anima_core/tests/test_loader.py; spec in
 # dev/docs/roadmap/Character_Format.md.
 
 anima_version: "2.0"

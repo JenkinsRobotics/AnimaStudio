@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from anima_studio.wire import (
+from anima_core.wire import (
     ERR_BAD_CHANNEL,
     ERR_BAD_VALUE,
     ERR_NOT_CONFIGURED,

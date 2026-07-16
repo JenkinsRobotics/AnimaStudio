@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from anima_studio.extensions import (
+from anima_core.extensions import (
     Capability,
     Contribution,
     ContributionKind,
@@ -18,7 +18,7 @@ from anima_studio.extensions import (
     load_extension,
     parse_manifest,
 )
-from anima_studio.outputs import ChannelConfig, OutputAdapter
+from anima_core.outputs import ChannelConfig, OutputAdapter
 
 EXTENSIONS_DIR = (
     Path(__file__).resolve().parents[2] / "examples" / "extensions"

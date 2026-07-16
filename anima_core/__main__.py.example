@@ -1,6 +1,6 @@
 """Standalone CLI — every Jaeger module runs by itself.
 
-    python -m anima_studio [args]
+    python -m anima_core [args]
 
 The convention (whisper_stt.engine precedent): build the engine/node on a
 local in-proc bus with NO agent and NO app — smoke it, bench it, or drive it
@@ -10,7 +10,7 @@ import argparse
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="anima_studio",
+    p = argparse.ArgumentParser(prog="anima_core",
                                 description="{{DESCRIPTION}} — standalone runner")
     p.add_argument("--smoke", action="store_true",
                    help="build the module on a local bus and run one round-trip")

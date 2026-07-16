@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from anima_studio.rig import (
+from anima_core.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
     RELATION_KIND_DOF_KINDS,
     DofKind,
@@ -27,8 +27,8 @@ from anima_studio.rig import (
     project_channels,
     relations_in_dependency_order,
 )
-from anima_studio.sim import SimulatedDevice
-from anima_studio.tracks import Clip, Keyframe, Track
+from anima_core.sim import SimulatedDevice
+from anima_core.tracks import Clip, Keyframe, Track
 
 PAN_RANGE_RADIANS = math.radians(45.0)
 

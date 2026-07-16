@@ -9,7 +9,7 @@ ESP32 (built-in LEDC PWM at 50 Hz — no third-party libraries anywhere).
 Up to 12 servo channels (`ANIMA_MAX_CHANNELS` in `config.h` — the AVR
 Servo library's per-timer ceiling on an Uno; raise per board and
 re-check RAM). Protocol behavior mirrors the reference simulator
-(`anima_studio/sim.py`) exactly: channels start disabled after `CFG`
+(`anima_core/sim.py`) exactly: channels start disabled after `CFG`
 until `EN`, frames are atomic, only successfully parsed commands
 refresh the failsafe heartbeat, and duplicate CFG keys / FRM channels
 are rejected.
@@ -49,8 +49,8 @@ STOP                                      → OK   (signal detached)
 ## Smoke test from Python (the real host path)
 
 ```python
-from anima_studio.serial_transport import SerialWireOutput
-from anima_studio.outputs import ChannelConfig
+from anima_core.serial_transport import SerialWireOutput
+from anima_core.outputs import ChannelConfig
 
 out = SerialWireOutput("/dev/tty.usbmodemXXXX")  # handshake_timeout_s=3.0 if an Uno resets slowly
 out.open([ChannelConfig(channel=0, pin=9, min_us=600, max_us=2400)])

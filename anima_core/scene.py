@@ -17,7 +17,7 @@ before the main sequence, edge-triggered, restricted to ``set`` /
 naming the offending path, every spec'd action the runtime cannot
 execute yet (``speak``, ``expression``, ``blend_shapes``, ``lights``,
 ``ai_response``, ``goto``/``label``) rather than playing a show back
-incompletely. Parsing follows ``anima_studio.loader`` discipline:
+incompletely. Parsing follows ``anima_core.loader`` discipline:
 closed schema, typed pathed errors, explicit units (``_s``/``_ms``).
 
 The executor, ``SceneRunner``, has no wall clock — the caller drives
@@ -68,9 +68,9 @@ from pathlib import Path
 
 import yaml
 
-from anima_studio.loader import CharacterFormatError, load_character_file
-from anima_studio.outputs import OutputAdapter
-from anima_studio.rig import (
+from anima_core.loader import CharacterFormatError, load_character_file
+from anima_core.outputs import OutputAdapter
+from anima_core.rig import (
     DofKind,
     Identity,
     LimitViolation,
@@ -80,7 +80,7 @@ from anima_studio.rig import (
     project_channels,
     relations_in_dependency_order,
 )
-from anima_studio.tracks import evaluate_clip
+from anima_core.tracks import evaluate_clip
 
 SUPPORTED_ANIMA_VERSION = "2.0"
 SUPPORTED_TYPE = "scene"

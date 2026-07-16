@@ -2,7 +2,7 @@
 
 The contract that ``output_adapter`` extension contributions implement
 (``dev/docs/roadmap/Extensions.md``; bundles load via
-``anima_studio.extensions``) and that the built-in ``SimulatorOutput``
+``anima_core.extensions``) and that the built-in ``SimulatorOutput``
 ships as the first consumer. An adapter carries normalized 0..1 channel
 frames — exactly what ``rig.project_channels`` produces and
 ``wire.encode_frm`` encodes — to one device or protocol backend.
@@ -18,8 +18,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from anima_studio.sim import SimulatedDevice
-from anima_studio.wire import (
+from anima_core.sim import SimulatedDevice
+from anima_core.wire import (
     Err,
     Hello,
     WireError,
@@ -89,7 +89,7 @@ class SimulatorOutput:
 
     First consumer of the ``OutputAdapter`` point. It wraps — never
     reimplements — ``sim.SimulatedDevice``: every call encodes wire
-    protocol lines via ``anima_studio.wire`` and feeds them through
+    protocol lines via ``anima_core.wire`` and feeds them through
     ``receive_line``, so the adapter exercises the same protocol path a
     hardware transport would. The wrapped ``device`` stays public so
     callers/tests can assert servo state and drive the simulated clock

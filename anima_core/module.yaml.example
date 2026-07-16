@@ -11,7 +11,7 @@
 # this module gets discovered from (jaeger_os/nodes/<name>/ or
 # jaeger_os/plugins/<name>/ in-tree; an out-of-tree module root once 0.9's
 # out-of-tree loading lands).
-module: "anima_studio"
+module: "anima_core"
 
 # The slot this module fills. Most slots are one-module (tts, stt,
 # vision, ...); a few are genuinely multi-module (messaging — discord/
@@ -51,11 +51,11 @@ kind: "{{kind}}"
 # Bus topics this module SUBSCRIBES to (the commands it acts on).
 # Empty list if this module only produces (e.g. a pure sensor).
 consumes: []
-# consumes: [/act/anima_studio]
+# consumes: [/act/anima_core]
 
 # Bus topics this module PUBLISHES (the results/acks it produces).
 produces: []
-# produces: [/sense/anima_studio_result]
+# produces: [/sense/anima_core_result]
 
 # Tool names this module makes available to the agent's tool registry
 # (the tool ↔ node contract: "a tool does the networking, the node does
@@ -67,13 +67,13 @@ tools: []
 # Dotted path to the factory function module discovery calls to build a
 # live node on an injected bus: `factory(bus, config) -> Node`. Must be
 # importable from this module's __init__.py (or the file it points at).
-factory: "anima_studio:make_anima_studio_node"
+factory: "anima_core:make_anima_core_node"
 
 # This module's group/key in the settings catalog — must match the
 # Pydantic model exported from config.py (see config.py.example). Leave
 # blank (or delete this line) if the module ships no configurable
 # settings.
-config: "anima_studio"
+config: "anima_core"
 
 # The third-party libraries this module's engine actually imports at
 # runtime. The availability gate probes these with
