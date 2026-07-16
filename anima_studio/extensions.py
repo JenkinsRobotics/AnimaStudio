@@ -9,15 +9,17 @@ offending path, the same loader discipline as ``anima_studio.loader``.
 
 ``discover_extensions`` scans caller-supplied directories for bundles
 and returns an ``ExtensionRegistry``; duplicate extension ids (and
-duplicate per-kind contribution ids) are loud load errors. In E1 only
-``output_adapter`` contributions are loadable: their
-``entry: "<module>.py:<ClassName>"`` module is imported from inside the
-bundle under an extension-id-namespaced module name (no ``sys.path``
-pollution) and the class must implement the
-``anima_studio.outputs.OutputAdapter`` protocol. The other known kinds
-(``parametric_feature``, ``scene_action``, ``motor_backend``) parse but
-raise "not yet supported" when loaded; unknown kinds are manifest
-errors.
+duplicate per-kind contribution ids) are loud load errors. Two kinds
+are loadable: ``output_adapter`` (E1) contributions name an
+``entry: "<module>.py:<ClassName>"`` module that is imported from
+inside the bundle under an extension-id-namespaced module name (no
+``sys.path`` pollution) and whose class must implement the
+``anima_studio.outputs.OutputAdapter`` protocol; ``parametric_feature``
+(E2) contributions name a pure-data YAML template file inside the
+bundle, parsed and validated by ``anima_studio.features`` — no Python
+ever runs for a feature. The other known kinds (``scene_action``,
+``motor_backend``) parse but raise "not yet supported" when loaded;
+unknown kinds are manifest errors.
 """
 
 from __future__ import annotations
@@ -32,6 +34,11 @@ from pathlib import Path
 
 import yaml
 
+from anima_studio.features import (
+    FeatureTemplate,
+    FeatureTemplateError,
+    load_feature_template,
+)
 from anima_studio.outputs import OutputAdapter
 
 SUPPORTED_MANIFEST_VERSION = "1.0"
@@ -55,9 +62,10 @@ class Capability(StrEnum):
 class ContributionKind(StrEnum):
     """The known extension points (Extensions.md table).
 
-    Only ``OUTPUT_ADAPTER`` is loadable in E1; the others parse so a
-    bundle targeting a future point fails at load time with "not yet
-    supported" instead of failing at parse time with "unknown".
+    ``OUTPUT_ADAPTER`` (E1) and ``PARAMETRIC_FEATURE`` (E2) are
+    loadable; the others parse so a bundle targeting a future point
+    fails at load time with "not yet supported" instead of failing at
+    parse time with "unknown".
     """
 
     OUTPUT_ADAPTER = "output_adapter"
@@ -299,6 +307,21 @@ def _parse_contribution(raw: object, path: str) -> Contribution:
                 f"{path}.entry",
                 f'expected "<module>.py:<ClassName>", got {entry_str!r}',
             )
+    elif kind is ContributionKind.PARAMETRIC_FEATURE:
+        # Pure data by construction: the entry is a YAML template file,
+        # never Python code.
+        if not entry_str.endswith((".yaml", ".yml")):
+            raise ExtensionManifestError(
+                f"{path}.entry",
+                f'expected a bundle-relative "<template>.yaml" file, '
+                f"got {entry_str!r}",
+            )
+        if "config" in entry:
+            raise ExtensionManifestError(
+                f"{path}.config",
+                "parametric_feature contributions are pure data and take "
+                "no config (parameters live in the template)",
+            )
     config: dict[str, object] = {}
     if "config" in entry:
         config_path = f"{path}.config"
@@ -437,12 +460,14 @@ class ExtensionRegistry:
 
     def load_contribution(
         self, kind: ContributionKind, contribution_id: str
-    ) -> type:
-        """Load one contribution's implementation class.
+    ) -> type | FeatureTemplate:
+        """Load one contribution's implementation.
 
-        Only ``output_adapter`` contributions are loadable in E1; the
-        other known kinds raise ``ExtensionLoadError`` ("not yet
-        supported") here rather than failing at parse time.
+        ``output_adapter`` contributions load their adapter class (E1);
+        ``parametric_feature`` contributions load their validated
+        ``FeatureTemplate`` (E2, pure data). The other known kinds
+        raise ``ExtensionLoadError`` ("not yet supported") here rather
+        than failing at parse time.
         """
         pair = self._contributions.get((kind, contribution_id))
         if pair is None:
@@ -450,14 +475,16 @@ class ExtensionRegistry:
                 f"no {kind.value} contribution with id "
                 f"{contribution_id!r} is registered"
             )
-        if kind is not ContributionKind.OUTPUT_ADAPTER:
-            raise ExtensionLoadError(
-                f"{kind.value} contributions are not yet supported "
-                f"(E1 loads output_adapter only; see "
-                f"dev/docs/roadmap/Extensions.md)"
-            )
         extension, contribution = pair
-        return _load_output_adapter_class(extension, contribution)
+        if kind is ContributionKind.OUTPUT_ADAPTER:
+            return _load_output_adapter_class(extension, contribution)
+        if kind is ContributionKind.PARAMETRIC_FEATURE:
+            return _load_feature_template(extension, contribution)
+        raise ExtensionLoadError(
+            f"{kind.value} contributions are not yet supported "
+            f"(output_adapter and parametric_feature load today; see "
+            f"dev/docs/roadmap/Extensions.md)"
+        )
 
     def load_output_adapter(
         self, contribution_id: str
@@ -465,6 +492,14 @@ class ExtensionRegistry:
         """Load one ``output_adapter`` contribution's adapter class."""
         return self.load_contribution(
             ContributionKind.OUTPUT_ADAPTER, contribution_id
+        )
+
+    def load_parametric_feature(
+        self, contribution_id: str
+    ) -> FeatureTemplate:
+        """Load one ``parametric_feature`` contribution's template."""
+        return self.load_contribution(
+            ContributionKind.PARAMETRIC_FEATURE, contribution_id
         )
 
 
@@ -527,6 +562,37 @@ def _load_output_adapter_class(
             f"(open/send_frame/stop/close)"
         )
     return adapter_class
+
+
+def _load_feature_template(
+    extension: Extension, contribution: Contribution
+) -> FeatureTemplate:
+    """Load ``entry: "<template>.yaml"`` from inside a bundle (E2).
+
+    The entry is pure data: it is read and validated by
+    ``anima_studio.features.load_feature_template``, never imported or
+    executed. Template validation errors are re-raised with the
+    template file path prefixed, mirroring manifest error handling.
+    """
+    extension_id = extension.manifest.id
+    bundle_dir = extension.bundle_dir.resolve()
+    template_path = (bundle_dir / contribution.entry).resolve()
+    if not template_path.is_relative_to(bundle_dir):
+        raise ExtensionLoadError(
+            f"extension {extension_id!r}: entry {contribution.entry!r} "
+            f"escapes the bundle directory"
+        )
+    if not template_path.is_file():
+        raise ExtensionLoadError(
+            f"extension {extension_id!r}: entry template not found: "
+            f"{contribution.entry!r}"
+        )
+    try:
+        return load_feature_template(template_path)
+    except FeatureTemplateError as error:
+        raise FeatureTemplateError(
+            f"{template_path}: {error.path}", error.message
+        ) from error
 
 
 # Primitive validators ----------------------------------------------------------

@@ -1,4 +1,4 @@
-# Community extensions (E1 shipped; later packets planned)
+# Community extensions (E1 + E2 backend shipped; later packets planned)
 
 > The open ecosystem layer (Jonathan, 2026-07-15): users expand Anima
 > Studio the way Onshape users build
@@ -53,7 +53,47 @@ contribution `config:` mapping (identifier keys) passes through as the
 adapter's constructor keyword arguments; contribution ids are unique
 per kind across the whole registry (v1 keeps one flat namespace per
 extension point). The other known kinds parse but raise "not yet
-supported" when loaded; unknown kinds are manifest errors.
+supported" when loaded (except `parametric_feature`, loadable since
+E2 — see below); unknown kinds are manifest errors.
+
+Shipped `parametric_feature` semantics (E2 backend,
+`anima_studio/features.py`): the contribution's `entry` is a
+**YAML template file** inside the bundle (must end `.yaml`/`.yml`,
+takes no `config:` — pure data, no Python ever runs, which is why the
+example bundle declares `capabilities: []`). The template
+(`anima_feature: "1.0"`, closed schema, typed pathed errors) declares
+`name`, `description`, a `parameters:` list — each with `name`
+(identifier), `kind` (`float|int|bool|choice`), required explicit
+`unit` for floats (`deg|m|mm|ratio|count`, a form-display hint only:
+values substitute verbatim, templates convert in expressions),
+`default`, optional `min`/`max`, `choices` for choice kind, optional
+`description` — and a `body:` of `parts:`/`joints:`/`relations:`/
+`parameters:` in the exact shapes the character loader accepts, plus
+two template-only constructs: `${expr}` substitution in scalar values
+and mapping keys (a safe recursive-descent evaluator over numbers,
+parameter/loop names, `+ - * /`, unary minus, parentheses — no
+`eval`, no functions in v1; unknown names and division by zero are
+typed errors) and `repeat:` blocks (`{count: <int-or-${expr}>, var:
+i, body: ...}`, 0-based, nestable; a bool count makes an optional
+block). `expand_feature(template, instance_name, parameter_values,
+parent_part)` validates supplied values against the declared
+parameters (defaults for unsupplied), prefixes every emitted
+part/joint/relation-target/rig-parameter name with
+`<instance_name>_` so instances coexist, rewrites internal
+references to match, and resolves the reserved `$parent` part
+reference to `parent_part` (default: unattached root part; `$parent`
+inside a joint requires an attachment). `merge_fragment(character,
+fragment)` inserts the fragment into a loaded character mapping with
+collision errors; the merged document is then re-parsed by the
+standard loader — expansion never bypasses loader validation
+(composition rule: features emit standard primitives only).
+**For E3 Studio rendering (Codex):**
+`registry.load_parametric_feature(id)` returns the validated
+`FeatureTemplate`; its `parameters` tuple (name/kind/unit/min/max/
+choices/default/description) is the insertion-form model; the flow is
+form values → `expand_feature` (instance name + optional attach part
+picked in the UI) → `merge_fragment` → reload through the loader.
+Example: `examples/extensions/parametric-linkage.animaext/`.
 
 ## Extension points — access to all the layers
 
@@ -91,7 +131,7 @@ the standard evaluated-channel frame. Core contracts stay small.
 | # | Packet | Depends on | Lane |
 |---|---|---|---|
 | E1 | Manifest schema + discovery/registry + `output_adapter` point + built-in simulator adapter behind the same API + one real packaged example extension — **shipped 2026-07-15** (`anima_studio/extensions.py`, `anima_studio/outputs.py`, `examples/extensions/udp-wire-output.animaext/`; see STATUS.md) | — | Claude (Python) |
-| E2 | `parametric_feature`: declarative template schema (params → parts/joints/relations), loader + expansion into the standard rig | format 2.0 | Claude format/runtime; Codex Studio rendering |
+| E2 | `parametric_feature`: declarative template schema (params → parts/joints/relations), loader + expansion into the standard rig — **backend shipped 2026-07-15** (`anima_studio/features.py`, `examples/extensions/parametric-linkage.animaext/`; Studio rendering remains with E3) | format 2.0 | Claude format/runtime; Codex Studio rendering |
 | E3 | Studio: Extensions browser (installed list, capabilities display, enable/disable), parametric features appearing in the Rig ribbon like built-ins | E1/E2 | Codex |
 | E4 | `scene_action` point | `.scene.anima` execution | Claude |
 | E5 | Firmware `motor_backend` build hooks | firmware v0 | Claude |

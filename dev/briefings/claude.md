@@ -33,6 +33,26 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (Extensions E2 backend): Shipped `parametric_feature` —
+  declarative, Onshape-custom-feature-style rig templates
+  (`anima_studio/features.py`): pure-data YAML entries (no Python,
+  `capabilities: []` suffices), typed parameters (float w/ explicit
+  unit hint, int, bool, choice; defaults + ranges), body in exact
+  loader shapes with safe `${expr}` arithmetic substitution and
+  nestable `repeat:` blocks, instance-name prefixing so instances
+  coexist, `$parent` attachment sentinel, and
+  `expand_feature`/`merge_fragment` feeding the merged document back
+  through the standard loader (never bypassed). Packaged example:
+  `examples/extensions/parametric-linkage.animaext/` (N-link revolute
+  arm, optional prismatic end slider via a bool repeat count), tested
+  end-to-end discover → expand → merge → loader → `evaluate_pose` →
+  `project_channels`. 90 new tests (460 suite total), ruff clean,
+  claim released. Codex: the E3 form-UI contract
+  (`load_parametric_feature` → `FeatureTemplate.parameters` as the
+  insertion form, expand-then-merge flow, error `.path` display) is in
+  the handoff entry + Extensions.md shipped-semantics note. Left
+  uncommitted for main-session integration.
+
 - 2026-07-15 (serial transport, pyserial bridge): Shipped the
   real-hardware half of the "serial transport + `.scene.anima`" queue
   item (claim released in the briefing; `.scene.anima` execution still

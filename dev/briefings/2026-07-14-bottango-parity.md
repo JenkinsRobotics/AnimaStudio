@@ -101,7 +101,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Extensions E1: manifest + discovery + output_adapter point + example extension (per Extensions.md) | `anima_studio/extensions.py`, `anima_studio/outputs.py`, `anima_studio/tests/test_extensions.py`, `anima_studio/tests/test_outputs.py`, `examples/extensions/**`, `dev/docs/roadmap/Extensions.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (350 passed) | released 2026-07-15 |
 
-| Claude | Extensions E2 backend: parametric_feature template schema + expansion into standard rig | `anima_studio/features.py`, `anima_studio/extensions.py` (kind enablement only), `anima_studio/tests/test_features.py`, `examples/extensions/parametric-linkage.animaext/**`, `dev/docs/roadmap/Extensions.md` (E2 section) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Claude | Extensions E2 backend: parametric_feature template schema + expansion into standard rig | `anima_studio/features.py`, `anima_studio/extensions.py` (kind enablement only), `anima_studio/tests/test_features.py`, `examples/extensions/parametric-linkage.animaext/**`, `dev/docs/roadmap/Extensions.md` (E2 section) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (90 new tests in test_features.py; 460 suite total, ruff clean) | released 2026-07-15 |
 | Claude | Serial wire transport (pyserial) as an OutputAdapter — real-hardware bridge | `anima_studio/serial_transport.py`, `anima_studio/tests/test_serial_transport.py`, `pyproject.toml` (add pyserial), `dev/docs/roadmap/Wire_Protocol.md` (transport note if needed) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (loop:// URL tests, no hardware) | released 2026-07-15 (20 new tests, 370 suite total at release time; ruff clean; `pip install -e ".[dev]"` re-verified with pyserial) |
 | Codex | Start-screen Recent Projects gallery | `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/RecentProjects.swift`, `studio/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, `studio/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | thumbnail/name/last-opened/revision cards; real recency persistence; honest disabled reopen until P0; empty state; milestone-ready metadata; tests/lint/build/signature/live walkthrough; `git diff --check` | in progress |
 
@@ -150,6 +150,56 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, Extensions E2 backend — parametric_feature
+  templates + expansion):** Shipped `anima_studio/features.py` plus the
+  extensions.py kind enablement and the packaged
+  `examples/extensions/parametric-linkage.animaext/` example (90 new
+  tests in `anima_studio/tests/test_features.py`; 460 suite total,
+  ruff clean; claim released above). **The template contract (all
+  decisions in Extensions.md "shipped semantics"):** a
+  `parametric_feature` entry is a YAML file (`.yaml`/`.yml` enforced
+  at manifest parse; `config:` rejected — pure data, no Python ever
+  runs, so the example declares `capabilities: []`). Template =
+  `anima_feature: "1.0"` + `name`/`description` + typed `parameters:`
+  (`float` with required explicit `unit: deg|m|mm|ratio|count` as a
+  form-display hint only — values substitute verbatim, templates
+  convert in expressions like `${length_mm / 1000}`; `int`; `bool`;
+  `choice` with `choices:`; `default` required, optional `min`/`max`)
+  + `body:` of parts/joints/relations/rig-parameters in the exact
+  loader shapes plus two template-only constructs: `${expr}` in scalar
+  values AND mapping keys (safe recursive-descent evaluator: numbers,
+  parameter/loop names, `+ - * /`, unary minus, parens; bool coerces
+  to 1/0; a choice string is legal only as the whole expression;
+  unknown name / div-by-zero / syntax = typed `FeatureExpansionError`
+  naming the site; `# ponytail:` grammar ceiling noted — upgrade path
+  is a whitelisted function table, never eval) and nestable `repeat:`
+  `{count, var, body}` blocks (0-based; count accepts an int or
+  `${expr}`; a bool count = optional block, which is how the example's
+  `end_slider` works; `var` cannot shadow parameters or outer vars —
+  parse-time error). **Expansion:** `expand_feature(template,
+  instance_name, parameter_values=None, parent_part=None)` validates
+  values (unknown/kind/range/choice = typed errors, defaults fill in),
+  prefixes every part/joint/relation-target/rig-parameter name with
+  `<instance_name>_` (instances coexist — two-instance loader test),
+  rewrites internal references, resolves reserved `$parent` (part
+  parent → `parent_part`, or dropped = unattached root when None;
+  `$parent` in a joint requires attachment). `merge_fragment` inserts
+  with collision errors and mutates nothing; the merged mapping is
+  re-parsed by `loader.parse_character` — the loader stays the single
+  gatekeeper (tested: a loader-invalid joint type expands fine and is
+  rejected at parse). End-to-end test: discover real bundle → load →
+  expand (2 links + slider) → merge → loader → `evaluate_pose` →
+  `project_channels` (channels {0: 0.5, 1: 0.0}). **For E3 (Codex):**
+  `registry.load_parametric_feature(id)` → `FeatureTemplate`;
+  `template.parameters` (name/kind/unit/min/max/choices/default/
+  description) is the insertion-form model, `FloatUnit` is the unit
+  label; flow = form → `expand_feature` (instance name + optional
+  attach part picked in UI) → `merge_fragment` → reload via loader;
+  `FeatureError`/`FeatureTemplateError`/`FeatureExpansionError` carry
+  `.path` + `.message` for form-side display. Sibling serial-transport
+  work untouched; its 20 tests pass in the same suite run. Not
+  committed per packet instructions.
 
 - **2026-07-15 (Claude, serial wire transport — the real-hardware
   bridge):** Shipped `anima_studio/serial_transport.py`:

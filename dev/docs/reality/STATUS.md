@@ -56,7 +56,7 @@
   carries the same eight-type family (`JointType`, including `parallel`:
   XYZ translation + Z rotation) with per-type DOF templates, optional
   per-DOF limits, per-joint mate offsets, and gear/rack-and-pinion/
-  screw/linear relations; 350 Python tests pass. Motors, 3D Models & Media, and Events are also
+  screw/linear relations; 460 Python tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
@@ -281,11 +281,30 @@
   filesystem), `discover_extensions(search_dirs)` over caller-passed
   directories with duplicate-id rejection, and
   `entry: "module.py:ClassName"` class loading namespaced per
-  extension with no `sys.path` pollution; only `output_adapter`
-  contributions load in E1, other known kinds parse but refuse with
-  "not yet supported". The packaged
+  extension with no `sys.path` pollution; `output_adapter` (E1) and
+  `parametric_feature` (E2) contributions load, other known kinds
+  parse but refuse with "not yet supported". The packaged
   `examples/extensions/udp-wire-output.animaext/` example streams
   wire lines as UDP datagrams and is tested from its real bundle path.
+  Parametric features (Extensions.md packet E2 backend,
+  `anima_studio/features.py`) are pure-data YAML templates — a
+  `parametric_feature` entry must be a `.yaml` file, never Python —
+  declaring typed parameters (float with explicit unit hint / int /
+  bool / choice, defaults and ranges) and a body of standard
+  parts/joints/relations/rig-parameters in loader shapes, with safe
+  `${expr}` arithmetic substitution (no `eval`; unknown names and
+  division by zero are typed errors) and nestable `repeat:` blocks
+  for indexed copies. `expand_feature` validates parameter values,
+  prefixes every emitted name with the instance name (two instances
+  coexist), and resolves the `$parent` attachment sentinel;
+  `merge_fragment` inserts the fragment into a character mapping that
+  is then re-parsed by the standard loader — expansion never bypasses
+  loader validation. The packaged
+  `examples/extensions/parametric-linkage.animaext/` example (an
+  N-link serial revolute arm with an optional prismatic end slider,
+  `capabilities: []`) is tested end-to-end from its real bundle path
+  through discover → load template → expand → merge → loader →
+  `evaluate_pose` → `project_channels`.
   The runtime also ships the real-hardware serial bridge
   (`anima_studio/serial_transport.py`): `SerialWireOutput` implements
   the same `OutputAdapter` contract over pyserial (`pyserial>=3.5` is
@@ -302,7 +321,7 @@
   stays the safety net. Tested over a real pyserial `loop://` port
   against the reference `SimulatedDevice` with exact-line assertions
   (no reconnect/threading yet — that lands with Studio live control).
-  370 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  460 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,
