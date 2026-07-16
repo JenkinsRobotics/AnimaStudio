@@ -35,6 +35,25 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (Engine serialization — project-Save write side): The
+  engine now WRITES canonical `.anima` too (one format author). New
+  `animacore/serialize.py` (pure inverse of the loaders:
+  `rig_to_yaml`/`scene_to_yaml`, radians→degrees for character angles,
+  scenes carry no unit conversion, defaults omitted) + two `bridge.py`
+  verbs (in CAPABILITIES): **`serialize_character`** `{rig}`→`{text}`
+  and **`serialize_scene`** `{scene}`→`{text}`, invalid→`format_error`.
+  Round-trip proven: `load → serialize → load` yields an equal rig/scene
+  for every `examples/` file (four characters + two scenes) via the
+  bridge and directly. 927 tests (+26), ruff clean, no `app/`/`firmware/`
+  touched. **Codex:** I **additively** enriched the `load_character` rig
+  summary (nothing renamed/removed) so `serialize_character` can rebuild
+  losslessly — clip `keyframes`, output `value_at_zero`/`value_at_one`,
+  per-DOF `name`/`axis_vector`/`description`, joint `description`. Hand
+  the same `rig` block back to `serialize_character` and it re-serializes
+  exactly. Verbatim verb JSON, the enrichment field list, and the Save
+  wiring note (engine owns `.anima` text, app owns the folder) are in the
+  briefing handoff entry. Left uncommitted for main-session integration.
+
 - 2026-07-16 (Relations bridge hook): Surfaced the already-implemented
   relation engine to the UI, **additively** — no existing field/verb
   changed. Added, all in `animacore/rig.py` beside the `Relation` model

@@ -17,22 +17,48 @@ propagates.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from dataclasses import dataclass, field
 from typing import IO
 
+import yaml
+
 from animacore import __version__ as ENGINE_VERSION
 from animacore.kinematics import resolve_pose, transform_to_json
 from animacore.loader import CharacterFormatError, parse_character
-from animacore.mates import all_mate_type_schemas, describe_mate
+from animacore.mates import (
+    DofKind,
+    JointType,
+    MateConnector,
+    MateControls,
+    MateOffset,
+    RotationAxis,
+    RotationDof,
+    TangentSpec,
+    TranslationDof,
+    all_mate_type_schemas,
+    describe_mate,
+)
 from animacore.rig import (
+    Identity,
+    Joint,
     LimitViolationError,
+    OutputMapping,
+    Parameter,
+    Part,
+    Relation,
+    RelationKind,
     Rig,
+    RigClip,
     all_relation_type_schemas,
     describe_relation,
     evaluate_pose,
     project_channels,
 )
+from animacore.scene import SceneFormatError, parse_scene
+from animacore.serialize import rig_to_yaml, scene_to_yaml
+from animacore.tracks import Clip, Interpolation, Keyframe, Track
 
 PROTOCOL_VERSION = 1
 ENGINE_NAME = "animacore"
@@ -46,6 +72,8 @@ CAPABILITIES = [
     "resolve_pose",
     "mate_types",
     "relation_types",
+    "serialize_character",
+    "serialize_scene",
     "release",
     "shutdown",
 ]
@@ -117,9 +145,20 @@ def _rig_summary(rig: Rig) -> dict:
     DOF). Each relation entry is ``describe_relation(relation)`` — the
     per-instance relation hook (signed ratio, reverse flag, kind-specific
     ratio field value); empty for a rig without relations.
+
+    **Full-fidelity enrichment (additive).** So ``serialize_character``
+    can reconstruct the rig losslessly from exactly this DTO, the summary
+    carries a few fields beyond the spec shapes — all *added*, none
+    renamed/removed, so existing consumers are unaffected:
+    ``describe_mate`` gains a joint ``description`` and, per DOF, its
+    ``name``, per-DOF ``axis_vector`` (the file's ``axis:`` list, null
+    when absent — distinct from the template ``axis`` string) and
+    ``description``; each clip gains ``keyframes`` (the per-time keyframe
+    entries in native units); each output gains ``value_at_zero`` /
+    ``value_at_one`` (the mapping range in native units).
     """
     identity = rig.identity
-    joints = [describe_mate(joint) for joint in rig.joints.values()]
+    joints = [_joint_summary(joint) for joint in rig.joints.values()]
     return {
         "identity": {
             "name": identity.name,
@@ -151,17 +190,69 @@ def _rig_summary(rig: Rig) -> dict:
                 "name": rig_clip.clip.name,
                 "duration_s": rig_clip.clip.duration_seconds,
                 "loop": rig_clip.loop,
+                "keyframes": _clip_keyframes(rig_clip.clip),
             }
             for rig_clip in rig.clips.values()
         ],
         "outputs": [
-            {"dof_path": mapping.target, "channel": mapping.channel}
+            {
+                "dof_path": mapping.target,
+                "channel": mapping.channel,
+                "value_at_zero": mapping.value_at_zero,
+                "value_at_one": mapping.value_at_one,
+            }
             for mapping in rig.outputs
         ],
         "relations": [
             describe_relation(relation) for relation in rig.relations
         ],
     }
+
+
+def _joint_summary(joint: Joint) -> dict:
+    """``describe_mate`` plus the additive full-fidelity fields that make
+    the summary a lossless serialize input (see ``_rig_summary``)."""
+    described = describe_mate(joint)
+    described["description"] = joint.description
+    dof_by_path = {
+        f"{joint.name}.{dof.name}": dof for dof in joint.dofs
+    }
+    for dof_entry in described.get("dofs", []):
+        dof = dof_by_path[dof_entry["path"]]
+        dof_entry["name"] = dof.name
+        dof_entry["axis_vector"] = (
+            None if dof.axis is None else list(dof.axis)
+        )
+        dof_entry["description"] = dof.description
+    return described
+
+
+def _clip_keyframes(clip: Clip) -> list:
+    """One clip's tracks inverted into per-time keyframe entries in native
+    units (radians/metres/0..1) — the lossless serialize input.
+
+    All targets keyed at one time share that entry's interpolation, which
+    is how the file/loader builds them, so grouping by time is lossless.
+    """
+    grouped: dict[float, dict] = {}
+    for target, track in clip.tracks.items():
+        for keyframe in track.keyframes:
+            bucket = grouped.setdefault(
+                keyframe.time_seconds,
+                {
+                    "interpolation": keyframe.interpolation.value,
+                    "values": {},
+                },
+            )
+            bucket["values"][str(target)] = keyframe.value
+    return [
+        {
+            "time_s": time_seconds,
+            "interpolation": grouped[time_seconds]["interpolation"],
+            "values": grouped[time_seconds]["values"],
+        }
+        for time_seconds in sorted(grouped)
+    ]
 
 
 def _projectable_channels(rig: Rig, pose) -> dict[int, float]:
@@ -187,6 +278,217 @@ def _projectable_channels(rig: Rig, pose) -> dict[int, float]:
                 value = pose.parameter_values[mapping.target]
             channels[mapping.channel] = mapping.channel_value(value)
         return channels
+
+
+# Rig DTO → Rig (the serialize_character input adapter) ----------------------
+#
+# The inverse of ``_rig_summary``: rebuild a ``Rig`` from the exact,
+# enriched DTO ``load_character`` returns. The DTO is already in native
+# units (radians/metres/0..1), like the model, so reconstruction is a
+# direct structural mapping with no unit conversion — that keeps the
+# bridge round-trip exact. ``serialize_character`` then hands the rebuilt
+# rig to ``rig_to_yaml``. A malformed DTO raises (KeyError/ValueError/
+# TypeError), which the verb reports as a ``format_error``.
+
+
+def rig_from_dict(dto: dict) -> Rig:
+    """Reconstruct a validated ``Rig`` from a ``load_character`` rig DTO."""
+    identity = _identity_from_dto(dto["identity"])
+    parts = {
+        entry["name"]: Part(
+            name=entry["name"],
+            parent=entry.get("parent"),
+            model_node=entry.get("model_node"),
+            description=entry.get("description", ""),
+        )
+        for entry in dto.get("parts", [])
+    }
+    joints = {
+        entry["name"]: _joint_from_dto(entry) for entry in dto.get("joints", [])
+    }
+    parameters = {
+        entry["name"]: Parameter(
+            name=entry["name"],
+            neutral_value=entry.get("neutral", 0.0),
+            description=entry.get("description", ""),
+        )
+        for entry in dto.get("parameters", [])
+    }
+    dof_paths: dict[str, object] = {}
+    for joint in joints.values():
+        dof_paths.update(joint.dof_paths())
+    clips = {
+        entry["name"]: _clip_from_dto(entry, dof_paths, parameters)
+        for entry in dto.get("clips", [])
+    }
+    outputs = tuple(
+        OutputMapping(
+            target=entry["dof_path"],
+            channel=entry["channel"],
+            value_at_zero=entry["value_at_zero"],
+            value_at_one=entry["value_at_one"],
+        )
+        for entry in dto.get("outputs", [])
+    )
+    relations = tuple(
+        Relation(
+            kind=RelationKind(entry["kind"]),
+            driver=entry["driver"],
+            driven=entry["driven"],
+            ratio=entry["ratio"],
+            offset=entry.get("offset", 0.0),
+            display=dict(entry.get("display", {})),
+        )
+        for entry in dto.get("relations", [])
+    )
+    return Rig(
+        identity=identity,
+        parts=parts,
+        joints=joints,
+        parameters=parameters,
+        clips=clips,
+        outputs=outputs,
+        relations=relations,
+    )
+
+
+def _identity_from_dto(dto: dict) -> Identity:
+    return Identity(
+        name=dto["name"],
+        display_name=dto.get("display_name", ""),
+        description=dto.get("description", ""),
+        version=dto.get("version", ""),
+        author=dto.get("author", ""),
+    )
+
+
+def _joint_from_dto(dto: dict) -> Joint:
+    joint_type = JointType(dto["type"])
+    if joint_type is JointType.TANGENT:
+        tangent_dto = dto["tangent"]
+        return Joint(
+            name=dto["name"],
+            joint_type=joint_type,
+            parent_part=dto["parent_part"],
+            child_part=dto["child_part"],
+            id=dto.get("id", ""),
+            description=dto.get("description", ""),
+            tangent=TangentSpec(
+                selection_a=tangent_dto["selection_a"],
+                selection_b=tangent_dto["selection_b"],
+                propagation=tangent_dto.get("propagation", True),
+            ),
+        )
+    dofs = tuple(_dof_from_dto(entry) for entry in dto.get("dofs", []))
+    return Joint(
+        name=dto["name"],
+        joint_type=joint_type,
+        parent_part=dto["parent_part"],
+        child_part=dto["child_part"],
+        dofs=dofs,
+        id=dto.get("id", ""),
+        description=dto.get("description", ""),
+        controls=_controls_from_dto(dto.get("controls")),
+    )
+
+
+def _dof_from_dto(dto: dict):
+    axis = dto.get("axis_vector")
+    axis = None if axis is None else tuple(axis)
+    description = dto.get("description", "")
+    if DofKind(dto["kind"]) is DofKind.ROTATION:
+        return RotationDof(
+            name=dto["name"],
+            min_radians=dto.get("min"),
+            max_radians=dto.get("max"),
+            neutral_radians=dto.get("neutral", 0.0),
+            axis=axis,
+            description=description,
+        )
+    return TranslationDof(
+        name=dto["name"],
+        min_meters=dto.get("min"),
+        max_meters=dto.get("max"),
+        neutral_meters=dto.get("neutral", 0.0),
+        axis=axis,
+        description=description,
+    )
+
+
+def _controls_from_dto(dto: dict | None) -> MateControls | None:
+    if dto is None:
+        return None
+    connectors = dto.get("connectors", {})
+    offset = dto.get("offset", {})
+    return MateControls(
+        connector_a=_connector_from_dto(connectors.get("a")),
+        connector_b=_connector_from_dto(connectors.get("b")),
+        offset=MateOffset(
+            enabled=offset.get("enabled", False),
+            translation_m=tuple(offset.get("translation_m", (0.0, 0.0, 0.0))),
+            rotation_axis=RotationAxis(offset.get("rotation_axis", "z")),
+            rotation_radians=offset.get("rotation_radians", 0.0),
+        ),
+        flip_primary_axis=dto.get("flip_primary_axis", False),
+        secondary_axis_rotation_deg=dto.get("secondary_axis_rotation_deg", 0),
+        simulation_connection=dto.get("simulation_connection", True),
+    )
+
+
+def _connector_from_dto(dto: dict | None) -> MateConnector | None:
+    if dto is None:
+        return None
+    return MateConnector(
+        part=dto["part"],
+        origin_m=tuple(dto.get("origin_m", (0.0, 0.0, 0.0))),
+        primary_axis=tuple(dto.get("primary_axis", (0.0, 0.0, 1.0))),
+        secondary_axis=tuple(dto.get("secondary_axis", (1.0, 0.0, 0.0))),
+        flipped=dto.get("flipped", False),
+        feature=dto.get("feature", ""),
+    )
+
+
+def _clip_from_dto(
+    dto: dict, dof_paths: dict, parameters: dict
+) -> RigClip:
+    per_target: dict[str, list[Keyframe]] = {}
+    for entry in dto.get("keyframes", []):
+        interpolation = Interpolation(entry.get("interpolation", "linear"))
+        for target, value in entry["values"].items():
+            per_target.setdefault(target, []).append(
+                Keyframe(
+                    time_seconds=entry["time_s"],
+                    value=value,
+                    interpolation=interpolation,
+                )
+            )
+    tracks: dict[int | str, Track] = {}
+    for target, keyframes in per_target.items():
+        minimum, maximum = _dto_target_bounds(target, dof_paths, parameters)
+        tracks[target] = Track(
+            keyframes=tuple(keyframes),
+            minimum_value=minimum,
+            maximum_value=maximum,
+        )
+    return RigClip(
+        clip=Clip(
+            name=dto["name"],
+            duration_seconds=dto["duration_s"],
+            tracks=tracks,
+        ),
+        loop=dto.get("loop", False),
+    )
+
+
+def _dto_target_bounds(
+    target: str, dof_paths: dict, parameters: dict
+) -> tuple[float, float]:
+    dof = dof_paths.get(target)
+    if dof is not None:
+        if not dof.has_limits:
+            return -math.inf, math.inf
+        return dof.minimum, dof.maximum
+    return 0.0, 1.0
 
 
 # Verbs -----------------------------------------------------------------------
@@ -335,6 +637,48 @@ def _relation_types(session: Session, params: dict, request_id: object) -> dict:
     return _ok(request_id, {"relation_types": all_relation_type_schemas()})
 
 
+def _serialize_character(
+    session: Session, params: dict, request_id: object
+) -> dict:
+    # The write side of Save: rebuild a Rig from the full rig DTO (the
+    # exact shape load_character returns) and emit canonical
+    # .character.anima text. Serialization validates — an un-serializable
+    # or invalid rig is a format_error, so the app can never write a
+    # broken file.
+    rig_dto = params.get("rig")
+    if not isinstance(rig_dto, dict):
+        raise _BadRequest("'rig' must be an object")
+    try:
+        rig = rig_from_dict(rig_dto)
+        text = rig_to_yaml(rig)
+    except CharacterFormatError as error:
+        return _error(request_id, "format_error", error.message, error.path)
+    except (ValueError, KeyError, TypeError) as error:
+        return _error(request_id, "format_error", str(error), None)
+    return _ok(request_id, {"text": text})
+
+
+def _serialize_scene(
+    session: Session, params: dict, request_id: object
+) -> dict:
+    # The scene write side: the ``scene`` DTO is the .scene.anima document
+    # structure (the scene AST is rig-independent and stores pose targets
+    # already in file units, so there is no unit conversion). Validate by
+    # parsing it back through the canonical scene loader, then emit
+    # canonical text — one parser, one validator, no second surface.
+    scene_dto = params.get("scene")
+    if not isinstance(scene_dto, dict):
+        raise _BadRequest("'scene' must be an object")
+    try:
+        scene = parse_scene(yaml.safe_dump(scene_dto))
+        text = scene_to_yaml(scene)
+    except SceneFormatError as error:
+        return _error(request_id, "format_error", error.message, error.path)
+    except (yaml.YAMLError, ValueError, KeyError, TypeError) as error:
+        return _error(request_id, "format_error", str(error), None)
+    return _ok(request_id, {"text": text})
+
+
 def _release(session: Session, params: dict, request_id: object) -> dict:
     # Idempotent: dropping an unknown handle is not an error, so a client
     # can release freely without tracking exactly what the engine holds.
@@ -355,6 +699,8 @@ _VERBS = {
     "resolve_pose": _resolve_pose,
     "mate_types": _mate_types,
     "relation_types": _relation_types,
+    "serialize_character": _serialize_character,
+    "serialize_scene": _serialize_scene,
     "release": _release,
     "shutdown": _shutdown,
 }

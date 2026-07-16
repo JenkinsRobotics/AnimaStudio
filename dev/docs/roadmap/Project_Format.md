@@ -95,19 +95,29 @@ character is portable.
 - **Recents** → the gallery tracks project-folder paths (security-scoped
   bookmarks), reading name/revision/thumbnail from each `project.json`.
 
-## Engine serialization contract (BR-SAVE — being built)
+## Engine serialization contract (BR-SAVE — engine side shipped)
 
-The engine gains write verbs, the inverse of its loaders:
+The engine has the write verbs, the inverse of its loaders
+(`animacore/serialize.py` + the `serialize_character` / `serialize_scene`
+bridge verbs; full spec + round-trip guarantee live in
+`Studio_Bridge.md` → "Serialization"):
 
 | Verb | params | result |
 |---|---|---|
-| `serialize_character` | `{rig}` — the full rig DTO (the `load_character` rig shape, full-fidelity: identity, parts, joints w/ controls+dofs+limits, parameters, clips, relations, outputs) | `{text}` — canonical `.character.anima` YAML; invalid rig → `format_error` |
-| `serialize_scene` | `{scene}` — full scene DTO | `{text}` — canonical `.scene.anima` YAML |
+| `serialize_character` | `{rig}` — the full rig DTO (**exactly** the `load_character` rig shape, full-fidelity: identity, parts, joints w/ controls + dofs + limits, parameters, clips w/ keyframes, relations, outputs w/ ranges) | `{text}` — canonical `.character.anima` YAML; invalid rig → `format_error` |
+| `serialize_scene` | `{scene}` — the `.scene.anima` document structure | `{text}` — canonical `.scene.anima` YAML; invalid → `format_error` |
 
 Round-trip is the acceptance test: `load_character(text)` →
 serialize → `text'` where `load_character(text')` yields an equal rig,
-for every file in `examples/`. Serialization validates (an
-un-serializable/invalid rig errors) so the app can never write a broken
-file. `AnimaDocument` (the P0A manifest/asset machinery) is revised from
-its flat bundle to this nested folder layout — the store logic carries;
-the layout gets richer.
+for every file in `examples/` — verified in
+`animacore/tests/test_serialize.py` and `test_bridge.py`. Serialization
+validates (an un-serializable/invalid rig errors) so the app can never
+write a broken file. To make the round-trip lossless the engine
+**additively** enriched the `load_character` rig summary (clip
+`keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`,
+joint `description` — nothing renamed/removed).
+
+Remaining app-side work: `AnimaDocument` (the P0A manifest/asset
+machinery) is revised from its flat bundle to this nested folder
+layout — the store logic carries; the layout gets richer. Codex wires
+the folder writing; the engine owns the `.anima` text.

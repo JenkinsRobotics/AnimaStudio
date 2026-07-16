@@ -56,12 +56,14 @@ line — one error surface, never a second parser.
 | Method | params | result |
 |---|---|---|
 | `hello` | `{client, protocol_version}` | `{engine:"animacore", engine_version, protocol_version, capabilities:[…]}` — mismatched `protocol_version` → `protocol_mismatch` error |
-| `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[<describe_mate>…], parameters:[…], clips:[{name,duration_s,loop}], outputs:[{dof_path,channel}], relations:[<describe_relation>…]}}` — invalid → `format_error` with `path`. Each joint entry is `describe_mate`; each relation entry is `describe_relation` (see below). |
+| `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[<describe_mate>…], parameters:[…], clips:[{name,duration_s,loop,keyframes}], outputs:[{dof_path,channel,value_at_zero,value_at_one}], relations:[<describe_relation>…]}}` — invalid → `format_error` with `path`. Each joint entry is `describe_mate`; each relation entry is `describe_relation` (see below). The `rig` block is **full-fidelity** so `serialize_character` can rebuild the rig losslessly — see "Serialization" for the additive enrichment fields (`keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`, joint `description`). |
 | `validate_character` | `{text}` | `{diagnostics:[…]}` (empty = valid) — no handle allocated |
 | `evaluate` | `{handle, clip?, time_s?}` | `{dof_values:{path:native_units}, parameters:{name:0..1}, channels:{channel:0..1}, limit_violations:[{dof_path,value,min,max}]}` |
 | `resolve_pose` | `{handle, clip?, time_s?}` | `{parts:{part_name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — per-part **world** transforms after forward kinematics. **The RealityKit render hook.** Unknown handle → `unknown_handle`. See below. |
 | `mate_types` | `{}` | `{mate_types:[{type,label,category,drivable,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all **10** mate kinds (the palette / panel-builder hook); no handle needed. See categories below. |
 | `relation_types` | `{}` | `{relation_types:[{kind,label,driver_kind,driven_kind,ratio_field:{key,unit},reverse_supported}]}` — the static per-kind catalog for all **4** relation kinds (Gear, Rack and pinion, Screw, Linear); the relations palette/dialog hook; no handle needed. See relations below. |
+| `serialize_character` | `{rig}` — the full rig DTO, **exactly the shape `load_character` returns in its `rig` field** (identity, parts, joints w/ controls + enriched dofs, parameters, clips w/ keyframes, relations, outputs w/ ranges) | `{text}` — canonical `.character.anima` YAML. The write side of Save: one format author. The engine rebuilds a `Rig` from the DTO (native units in, degrees out) and validates it — an un-serializable/invalid rig is a `format_error` (with `path` when the loader supplies one), so the app can never write a broken file. See "Serialization" below. |
+| `serialize_scene` | `{scene}` — the `.scene.anima` document structure (identity, character, variables, inputs, subroutines, sequence with every v1+v2 action incl. condition trees/select/call/wait_until, monitors, editor). No `load_scene` verb exists yet, so this DTO is the parsed-document shape (what `scene_to_dict` emits). | `{text}` — canonical `.scene.anima` YAML. Validated by re-parsing through the canonical scene loader; invalid → `format_error` with `path`. |
 | `release` | `{handle}` | `{}` — drop a loaded rig |
 | `shutdown` | `{}` | `{}` then the helper exits |
 
@@ -176,6 +178,39 @@ canonical convention lives in `Kinematics.md` → "Pose resolution". This
 verb **supersedes** the Swift `RigPoseResolver` + `MateConnectorMath`
 (migration step 2 below): RealityKit renders engine-resolved geometry
 instead of applying scalar joint angles to rest transforms.
+
+## Serialization (the Save write side — `serialize_character` / `serialize_scene`)
+
+The engine owns `.anima` **writing** as well as reading, so a project
+Save has one format author: the app hands the engine a rig/scene and
+gets back canonical text (`animacore/serialize.py`, the inverse of the
+loaders). Units and cleanliness mirror the loader — rotation angles are
+radians in the model and **degrees** in the file (translations stay
+metres); defaults are omitted, never echoed (`simulation_connection:
+true`, a disabled zero offset, an all-default `controls` block, `loop:
+false`, `linear` interpolation, a zero relation offset). Scenes carry no
+unit conversion (the scene AST stores file units), so the scene write
+side is a pure structural inverse.
+
+**Round-trip guarantee (the acceptance test).** For every file in
+`examples/`: `load_character(text)` → `serialize_character({rig})` →
+`text'`, where `load_character(text')` yields a rig **equal** to the
+first (float-tolerant on the degrees↔radians conversion). Proven for
+`six_axis_arm` (mates + connectors + offset + clip), `rc_car` (relation +
+unlimited wheel + parameter), `walle_style` (mixed joints + parameters),
+and `geometry_mates_demo` (width/tangent). Same for scenes via
+`serialize_scene` (exact AST equality).
+
+**`load_character` enrichment (additive — nothing renamed/removed).** So
+`serialize_character` can rebuild the rig from exactly the DTO
+`load_character` returns, the `rig` block carries a few fields beyond the
+original spec shapes, all *added*: each clip gains `keyframes` (per-time
+keyframe entries in native units); each output gains `value_at_zero` /
+`value_at_one` (the mapping range in native units); each `describe_mate`
+joint gains a `description` and, per DOF, its `name`, `axis_vector` (the
+file's `axis:` list — null when absent, distinct from the template
+`axis` string), and `description`. Existing consumers of the summary /
+`describe_mate` are unaffected.
 
 ## Later verbs (reserved, each gated on its engine feature)
 

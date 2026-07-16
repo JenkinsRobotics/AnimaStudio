@@ -37,15 +37,17 @@
   but new animation meaning belongs in the canonical Python engine rather than
   this Swift module. A dedicated `AnimaCoreClient` now owns the typed newline-JSON
   protocol, long-running helper process, handshake, character load/validation,
-  frame evaluation, release, shutdown, engine errors, and channel-index decoding.
+  frame and world-pose evaluation, release, shutdown, engine errors, and
+  channel-index decoding.
   The Assets ribbon can import a `.character.anima` document, load it through
-  AnimaCore, evaluate its first clip at a deterministic preview time, and pass the
-  returned DOF values into the exact `EvaluatedFrame` consumed by RealityKit.
-  Until the engine exposes `resolve_pose`, Studio presents rotational DOFs as
-  clearly transitional diagnostic proxy parts; it does not infer a second
-  hierarchy, connector frame, or joint axis from the bridge summary. Continuous
-  timeline evaluation, canonical pose resolution, save/open wrapping, scene
-  playback, and hardware output remain subsequent bridge packets. The
+  AnimaCore, evaluate its first clip at a deterministic preview time, and request
+  the engine's per-part world transforms through `resolve_pose`. Studio creates
+  one renderer-only proxy per engine part and applies the returned metre
+  positions and real-last quaternions directly in RealityKit at the playhead;
+  it no longer infers a second hierarchy, connector frame, or mate motion in
+  Swift. Continuous playhead evaluation is live for imported engine clips.
+  Save/open wrapping, canonical authoring mutation, scene playback, and hardware
+  output remain subsequent bridge packets. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
   New Studio Project action and honestly disabled project-open/templates until
   persistence ships. Its Recent Projects section now uses compact thumbnail
@@ -66,20 +68,18 @@
   hover-reactive connector markers expose proxy face centers, edge midpoints,
   corners, cylinder axes/circular centers, sphere cardinal points, and component
   origins. The first selection is the moving component; the second is fixed.
-  Studio aligns the two origins with opposing primary axes, moves the first
-  component into place, stores both local connector frames, and evaluates
-  revolute motion about that connector rather than the component origin.
+  The transitional local Revolute draft stores both connector frames but no
+  longer performs a separate Swift mate solve; canonical document mutation and
+  an AnimaCore reload/`resolve_pose` pass must perform alignment and motion.
   Component names, XYZ positions, XYZ rest rotations, and mate names, axis,
   parent/child
   connection, and angular limits are inspectable/editable in memory. The Rig
-  ribbon presents Fastened, Parallel, Slider, Revolute, Cylindrical, Pin Slot,
-  Planar, and Ball mate families in a stable operator-facing catalog. Revolute
-  is the only live creation action until the typed-mate/DOF backend lands; the
-  other seven remain clearly disabled with motion summaries instead of writing
-  incorrect scalar-joint data. The mate inspector's Type row is an
-  Onshape-style menu listing the full eight-mate family with per-kind DOF
-  summaries — only implemented kinds are selectable, and it binds to the
-  joint's typed kind once the typed-mate backend lands. The Python rig model
+  ribbon presents the complete ten-type family: Fastened, Parallel, Slider,
+  Revolute, Cylindrical, Pin Slot, Planar, Ball, Width, and Tangent. All ten are
+  backed by the engine catalog for inspection; Revolute remains the sole
+  transitional local draft-creation action until canonical character editing
+  is wired. The mate inspector's Type row and UI Dev lab list the same family
+  with per-kind DOF summaries. The Python rig model
   carries the same eight-type kinematic family (`JointType`, including
   `parallel`: XYZ translation + Z rotation) with per-type DOF templates,
   optional per-DOF limits, and gear/rack-and-pinion/screw/linear
@@ -102,7 +102,8 @@
   ten schemas, each with `category`/`drivable` — static per-kind catalog
   of label, DOF slots, control ids) and `describe_mate` (per-instance
   descriptor carried in the `load_character` joint summary, with
-  `category`). The Swift bridge now mirrors both hooks as
+  `category`). The Swift bridge mirrors category, drivable state, DOF axis,
+  optional connector controls, and the Tangent-specific surface payload as
   typed DTOs and requests the engine-owned catalog when it connects. Imported
   engine mates are listed in the real Components navigator by their stable
   tracking id, so a zero-DOF Fastened mate remains selectable rather than
@@ -110,8 +111,10 @@
   reusable engine-driven mate inspector showing its type/name/id, parent and
   child, both connector frames and per-side flip state, offset values formatted
   in millimetres/degrees, whole-mate axis flip/reorientation, simulation
-  connection, and its engine-supplied DOF rows. Fastened presents an explicit
-  fully-bonded zero-DOF state. This first panel is intentionally read-only;
+  connection, and its engine-supplied DOF rows with explicit axes. Fastened
+  presents an explicit fully-bonded zero-DOF state; Width and Tangent present
+  distinct non-drivable geometry-constraint states, and Tangent shows its two
+  opaque surface selections plus propagation. This first panel is intentionally read-only;
   editing the canonical character text and revalidating it through the bridge
   is the next mate-authoring packet. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
@@ -246,12 +249,13 @@
   inspector, and timeline can be refined alongside the rest of the living UI
   standard.
   Its Mate Editor interaction lab uses one shared Onshape-style panel for the
-  complete eight-mate family. A stable icon strip and full-width Type dropdown
+  complete ten-mate family. A stable icon strip and full-width Type dropdown
   both switch that panel; the title, degrees-of-freedom readout, constrained
   translation/rotation Offset controls, and optional minimum/maximum Limits
   rows update from the selected kind. Slider exposes Z translation limits,
   Revolute exposes Z rotation limits, compound mates expose every permitted
-  freedom with mm/degree units, and Fastened explicitly has no motion limits.
+  freedom with mm/degree units, Fastened explicitly has no motion limits, and
+  Width/Tangent are labeled as 0-DOF geometry constraints.
   Connector picking, simulation-connection disclosure, accept/cancel,
   flip/reorient, preview, and solve affordances remain shared rather than
   duplicated per mate. Its Triad Manipulator lab provides a code-drawn,
@@ -259,8 +263,8 @@
   rings, plane pads, ghosted restricted motion, live units, and controls for
   handle scale and stroke weight. Both are explicitly design prototypes for
   refining operator readability and interaction; they do not claim the planned
-  typed-mate/DriveTarget backend is shipped; only Revolute remains a live Rig
-  creation action until that AnimaCore contract lands.
+  canonical authoring-mutation/DriveTarget path is shipped; only Revolute
+  remains a local Rig draft action until that path lands.
   Rig preserves Structures and the complete Mate family and adds focused
   Connectors, Assemble, and Inspect groups before the planned Motors, 3D Models
   & Media, and Events groups. Its creation families stay docked in the ribbon
@@ -546,8 +550,9 @@
   channels, and reported limit violations for one frame), `resolve_pose`
   (per-part world transforms — see below), `mate_types`,
   `relation_types` (the four relation kinds — Gear, Rack and pinion,
-  Screw, Linear — as a static palette catalog), `release`, and
-  `shutdown`. `load_character` also carries a `relations` array
+  Screw, Linear — as a static palette catalog), `serialize_character` /
+  `serialize_scene` (the project-Save write side — see below), `release`,
+  and `shutdown`. `load_character` also carries a `relations` array
   (`describe_relation` per instance: signed semantic `ratio` split into
   a display `magnitude` + `reverse` flag, plus a `ratio_field_value`
   that is the unitless ratio for gear/linear or distance-per-revolution
@@ -567,14 +572,26 @@
   graph parents-before-children. Each mate moves the child relative to
   the parent about/along the **mate connector as the relative origin**
   per its DOF; at zero DOF/offset the child connector coincides with the
-  parent connector with primary(Z) axes opposed (matching the Swift
-  "opposing primary axes" default), unless `flip_primary_axis` aligns
+  parent connector with primary(Z) axes opposed, unless `flip_primary_axis` aligns
   them, plus a `secondary_axis_rotation_deg` twist. Roots (no parent
   joint) sit at identity. The bridge `resolve_pose` verb returns
   `{parts:{name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — the
-  RealityKit render hook that supersedes the Swift `RigPoseResolver` +
-  `MateConnectorMath` (bridge migration step 2, engine side done).
-  901 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  RealityKit render hook. Studio now calls it for imports and every playhead
+  update, maps the result to renderer-only part IDs, and applies those world
+  transforms directly. The duplicate Swift `RigPoseResolver` and
+  `MateConnectorMath` implementations and their semantic tests are removed.
+  The engine also owns `.anima` **writing** (`animacore/serialize.py`) — the
+  project-Save contract: `serialize_character` rebuilds a `Rig` from the full
+  `load_character` rig DTO and emits canonical `.character.anima` text
+  (radians→degrees, metres kept, defaults omitted, deterministic);
+  `serialize_scene` emits `.scene.anima` from a scene document. Both validate
+  (an invalid rig/scene is a `format_error`, so the app never writes a broken
+  file). Round-trip is the acceptance test — `load → serialize → load` yields
+  an equal rig/scene for every `examples/` file. To keep the round-trip
+  lossless the `load_character` rig summary was additively enriched (clip
+  `keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`,
+  joint `description`; nothing renamed or removed).
+  927 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,

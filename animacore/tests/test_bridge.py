@@ -486,6 +486,156 @@ def test_evaluate_bad_time_is_bad_request():
     assert response["error"]["code"] == "bad_request"
 
 
+# serialize_character / serialize_scene --------------------------------------
+
+
+from test_serialize import assert_rigs_equal  # noqa: E402
+
+
+def _serialize_round_trip(session: Session, text: str) -> str:
+    """load_character → serialize_character → the re-serialized text."""
+    load = handle_request(
+        session,
+        {"id": 1, "method": "load_character", "params": {"text": text}},
+    )
+    assert load["ok"], load
+    rig_dto = load["result"]["rig"]
+    serialized = handle_request(
+        session,
+        {"id": 2, "method": "serialize_character", "params": {"rig": rig_dto}},
+    )
+    assert serialized["ok"], serialized
+    assert set(serialized["result"]) == {"text"}
+    return serialized["result"]["text"]
+
+
+def test_serialize_verbs_are_capabilities():
+    assert "serialize_character" in CAPABILITIES
+    assert "serialize_scene" in CAPABILITIES
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "six_axis_arm.character.anima",  # mates + connectors + offset + clip
+        "rc_car.character.anima",  # relation + unlimited wheel + parameter
+        "walle_style.character.anima",  # mixed joints + parameters
+        "geometry_mates_demo.character.anima",  # width/tangent geometry mates
+    ],
+)
+def test_serialize_character_bridge_round_trip(filename):
+    session = Session()
+    text = (EXAMPLES_DIR / filename).read_text()
+    text2 = _serialize_round_trip(session, text)
+    # load(text) and load(text2) yield equal rigs — the acceptance test.
+    assert_rigs_equal(parse_character(text), parse_character(text2))
+
+
+def test_serialize_character_returns_canonical_text():
+    session = Session()
+    text2 = _serialize_round_trip(session, ARM)
+    assert text2.startswith("anima_version:")
+    assert "type: character" in text2
+    assert "six_axis_arm" in text2
+
+
+def test_serialize_character_invalid_rig_is_format_error():
+    # A structurally well-formed DTO whose joint references an undeclared
+    # part — Rig validation rejects it; the verb reports a format_error.
+    session = Session()
+    load = handle_request(
+        session,
+        {"id": 1, "method": "load_character", "params": {"text": ARM}},
+    )
+    rig_dto = load["result"]["rig"]
+    rig_dto["joints"][0]["parent_part"] = "no_such_part"
+    response = handle_request(
+        session,
+        {"id": 2, "method": "serialize_character", "params": {"rig": rig_dto}},
+    )
+    assert response["ok"] is False
+    assert response["error"]["code"] == "format_error"
+    assert response["error"]["message"]
+
+
+def test_serialize_character_missing_rig_is_bad_request():
+    response = handle_request(
+        Session(), {"id": 1, "method": "serialize_character", "params": {}}
+    )
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_serialize_scene_bridge_round_trip():
+    # No load_scene verb yet, so the scene DTO is the .scene.anima
+    # document structure (what scene_to_dict emits / a parsed file yields).
+    from animacore.scene import parse_scene
+    from animacore.serialize import scene_to_dict
+
+    text = (EXAMPLES_DIR / "patrol_and_greet.scene.anima").read_text()
+    scene = parse_scene(text)
+    response = handle_request(
+        Session(),
+        {
+            "id": 1,
+            "method": "serialize_scene",
+            "params": {"scene": scene_to_dict(scene)},
+        },
+    )
+    assert response["ok"], response
+    assert set(response["result"]) == {"text"}
+    assert parse_scene(response["result"]["text"]) == scene
+
+
+def test_serialize_scene_invalid_is_format_error():
+    # A scene document missing its required sequence — the scene loader
+    # rejects it with a pathed error.
+    response = handle_request(
+        Session(),
+        {
+            "id": 1,
+            "method": "serialize_scene",
+            "params": {
+                "scene": {
+                    "anima_version": "2.0",
+                    "type": "scene",
+                    "identity": {"name": "broken"},
+                    "character": "x.character.anima",
+                }
+            },
+        },
+    )
+    assert response["ok"] is False
+    assert response["error"]["code"] == "format_error"
+    assert response["error"]["path"] == "sequence"
+
+
+# load_character enrichment (full-fidelity fields for serialize) --------------
+
+
+def test_load_character_summary_is_enriched_for_serialize():
+    session = Session()
+    rig = handle_request(
+        session,
+        {"id": 1, "method": "load_character", "params": {"text": ARM}},
+    )["result"]["rig"]
+    # Clips carry full keyframe data (not just name/duration/loop).
+    pick = next(clip for clip in rig["clips"] if clip["name"] == "pick")
+    assert pick["keyframes"]
+    first = pick["keyframes"][0]
+    assert set(first) == {"time_s", "interpolation", "values"}
+    # Outputs carry their native-unit range endpoints.
+    output = rig["outputs"][0]
+    assert "value_at_zero" in output and "value_at_one" in output
+    # Joint DOFs carry the per-DOF axis vector + name (distinct from the
+    # template axis string) and description.
+    base_yaw = next(j for j in rig["joints"] if j["name"] == "base_yaw")
+    dof = base_yaw["dofs"][0]
+    assert dof["name"] == "rotation"
+    assert dof["axis_vector"] == [0.0, 0.0, 1.0]
+    assert "description" in dof
+    assert "description" in base_yaw
+
+
 # release / shutdown / dispatch ----------------------------------------------
 
 

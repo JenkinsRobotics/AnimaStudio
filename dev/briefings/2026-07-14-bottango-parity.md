@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | All-ten-mate Swift UI + canonical engine pose rendering | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{CreationPaletteView,EngineMateInspectorView,MateCreationToolCatalog,MateEditorPresentation}.swift`, `app/Sources/AnimaStudioUI/Workspaces/UIDev/{UIDevEmbeddedWorkspacePreview,UIDevMateEditorLab}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,EngineResolvedPose,MateConnectorMarkers}.swift`, removal of `app/Sources/RealityKitViewport/RigPoseResolver.swift` and `app/Sources/AnimaEvaluation/MateConnectorMath.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests,RealityKitViewportTests,AnimaEvaluationTests}/**`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | decode the engine's ten-type catalog/category/drivable/axis contract; category-aware Width/Tangent inspector; engine `resolve_pose` drives RealityKit world transforms at the playhead; no Swift mate/pose semantics; focused/full tests, lint, Xcode/root-app build/signature/launch, `git diff --check` | in progress |
 | Codex | Assets-first startup + self-contained AnimaCore helper repair | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspacePresentationTests.swift`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | new workspaces open in Assets; bundled Python launchers resolve only bundle/system libraries; helper handshake succeeds from the sandboxed root app; Swift tests, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | BR1 Swift AnimaCore client + engine-evaluated viewport proof | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Tests/AnimaCoreClientTests/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,WorkspaceRibbonView}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,RigPoseResolver}.swift`, `app/App/AnimaCoreHelper.entitlements`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, focused Swift tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real helper spawn + hello/load/evaluate/release/shutdown; typed protocol/path errors; explicit `.character.anima` import; engine-evaluated DOF values reach RealityKit preview through transitional pose projection; bundled signed helper for sandboxed app; deterministic client/unit/integration/UI tests; strict claimed-file lint; full Swift tests; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -139,7 +140,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Relations bridge hook: relation_types verb + relations in load_character + reverse/distance-per-rev UI conveniences | `animacore/rig.py` (relation schema hooks), `animacore/bridge.py`, `animacore/tests/{test_rig.py,test_bridge.py}`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-16 (901 suite total, +15; ruff clean; no `app/`/`firmware/` touched; verbatim `relation_types` JSON + `describe_relation` gear/rack examples in the handoff entry below) |
 
-| Claude | Engine serialization (serialize_character/serialize_scene) — the write side for project Save | `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Project_Format.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; load→serialize→load round-trips every example | in progress |
+| Claude | Engine serialization (serialize_character/serialize_scene) — the write side for project Save | `animacore/serialize.py` (new), `animacore/bridge.py`, `animacore/tests/{test_serialize.py (new),test_bridge.py}`, `dev/docs/roadmap/{Studio_Bridge,Project_Format}.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,CLAUDE}.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; load→serialize→load round-trips every example | released 2026-07-16 (927 suite total, +26; ruff clean; no `app/`/`firmware/` touched; ADDITIVE `load_character` enrichment; verbatim serialize verb JSON + enrichment list in the handoff entry below) |
 
 ## Requests
 
@@ -194,6 +195,78 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, Engine serialization — the project-Save write
+  side, BR-SAVE):** The engine now WRITES canonical `.anima`, not just
+  reads it — one format author. New `animacore/serialize.py` is the pure
+  inverse of the loaders: `rig_to_dict`/`rig_to_yaml` (Rig →
+  `.character.anima`), `scene_to_dict`/`scene_to_yaml` (Scene →
+  `.scene.anima`). Units mirror the loader (rotation → **degrees** in
+  file, metres kept; scenes carry NO unit conversion — the AST stores
+  file units). Defaults are omitted, not echoed (`simulation_connection:
+  true`, disabled zero offset, all-default `controls`, `loop: false`,
+  `linear` interp, zero relation offset), so output is minimal yet
+  round-trips. `bridge.py` gains two verbs (in CAPABILITIES):
+  **`serialize_character`** `{rig}` → `{text}` and **`serialize_scene`**
+  `{scene}` → `{text}`; invalid → `format_error` (path when available).
+  `serialize_character` rebuilds a `Rig` from the DTO via `rig_from_dict`
+  (native units in — exact, no double conversion) then `rig_to_yaml`.
+
+  **Round-trip proof (acceptance):** `load_character(text)` →
+  `serialize_character({rig})` → `load_character(text')` yields an equal
+  rig for all four character examples (six_axis_arm: mates+connectors+
+  offset+clip; rc_car: relation+unlimited wheel+parameter; walle_style:
+  mixed joints+parameters; geometry_mates_demo: width/tangent), and the
+  scene analog for both scene examples. Direct file round-trips
+  (`test_serialize.py`) cover every `examples/` file; equality is
+  float-tolerant on the degrees↔radians conversion (character) and exact
+  AST `==` (scene). 927 suite total (+26), ruff clean, no
+  `app/`/`firmware/` touched.
+
+  **`load_character` enrichment — ADDITIVE, for Codex.** To make the
+  bridge round-trip lossless the `load_character` rig summary now carries
+  a few fields *beyond* the prior spec shapes — all **added**, none
+  renamed/removed, so your existing `AnimaCoreClient` decode and
+  `describe_mate` consumption are unaffected: (1) each **clip** gains
+  `keyframes` — a list of per-time entries `{time_s, interpolation,
+  values:{target: native_value}}` (radians/metres/0..1); (2) each
+  **output** gains `value_at_zero` / `value_at_one` (the mapping range in
+  native units — the old `{dof_path, channel}` keys stay); (3) each
+  **joint** gains a top-level `description`, and each **dof** entry gains
+  `name`, `axis_vector` (the file's `axis:` list, `null` when absent —
+  distinct from the existing template `axis` string), and `description`.
+  That's the exact DTO `serialize_character` accepts: hand back the same
+  `rig` block `load_character` returned and it re-serializes losslessly.
+
+  **Verbatim verb JSON (what your Swift client sends/parses):**
+
+  ```
+  // request
+  {"id":7,"method":"serialize_character","params":{"rig": <the rig block
+     from a load_character result — full-fidelity, unchanged>}}
+  // response
+  {"id":7,"ok":true,"result":{"text":"anima_version: '2.0'\ntype: character\n…"}}
+
+  // request
+  {"id":8,"method":"serialize_scene","params":{"scene": <the .scene.anima
+     document dict — no load_scene verb yet, so this is the parsed-file
+     structure: identity, character, variables, inputs, subroutines,
+     sequence[…], monitors, editor>}}
+  // response
+  {"id":8,"ok":true,"result":{"text":"anima_version: '2.0'\ntype: scene\n…"}}
+
+  // invalid rig/scene
+  {"id":9,"ok":false,"error":{"code":"format_error","message":"…","path":"…|null"}}
+  ```
+
+  **For the app's Save flow:** per `Project_Format.md`, Studio writes the
+  folder (`characters/<name>/<name>.character.anima`, `scenes/…`), but the
+  `.anima` TEXT comes from these verbs — hand the engine the rig/scene,
+  write the returned `{text}` atomically. There is no `load_scene`/
+  `serialize_scene` DTO contract beyond "the parsed `.scene.anima`
+  document shape" yet; flag it if the node-canvas → scene document needs a
+  richer DTO and I'll spec a `load_scene` twin. Left uncommitted for
+  main-session integration.
 
 - **2026-07-16 (Codex, Assets-first startup + self-contained helper):** Changed
   the default new-project workspace from Rig to Assets and kept the initializer
