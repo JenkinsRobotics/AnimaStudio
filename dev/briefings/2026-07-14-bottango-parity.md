@@ -139,6 +139,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Relations bridge hook: relation_types verb + relations in load_character + reverse/distance-per-rev UI conveniences | `animacore/rig.py` (relation schema hooks), `animacore/bridge.py`, `animacore/tests/{test_rig.py,test_bridge.py}`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-16 (901 suite total, +15; ruff clean; no `app/`/`firmware/` touched; verbatim `relation_types` JSON + `describe_relation` gear/rack examples in the handoff entry below) |
 
+| Claude | Engine serialization (serialize_character/serialize_scene) — the write side for project Save | `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Project_Format.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; load→serialize→load round-trips every example | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
