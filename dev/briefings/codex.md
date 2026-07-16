@@ -5,7 +5,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
-- [ ] 2026-07-15 (Jonathan, via Claude): **Folder-naming cleanup —
+- [x] 2026-07-15 (Jonathan, via Claude): **Folder-naming cleanup —
   needs your commit first.** Jonathan finds `studio/` (Swift app) vs
   `anima_studio/` (Python engine) confusing — looks redundant. The
   build artifact `Anima Studio.app` (the real culprit) is removed.
@@ -159,6 +159,13 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-15 — folder name confirmed:** `app/` is the clearest replacement
+  for `studio/`: `anima_studio/` remains the importable Python engine package,
+  `app/` is the macOS authoring application, and `firmware/` is device code.
+  The viewport packet is committed, so the mechanical rename can proceed as a
+  dedicated commit. Keep the inner target/source layout unchanged during that
+  move; any second-level naming cleanup should be reviewed separately.
 
 - **2026-07-15 — CAD viewport pointer/navigation refinement complete:** The
   Display → Input menu now persists independent Orbit, Pan, and Zoom speed
