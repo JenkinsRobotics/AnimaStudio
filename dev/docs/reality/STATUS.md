@@ -37,11 +37,11 @@
   but new animation meaning belongs in the canonical Python engine rather than
   this Swift module. A dedicated `AnimaCoreClient` now owns the typed newline-JSON
   protocol, long-running helper process, handshake, character load/validation,
-  frame and world-pose evaluation, release, shutdown, engine errors, and
+  frame and character-space pose evaluation, release, shutdown, engine errors, and
   channel-index decoding.
   The Assets ribbon can import a `.character.anima` document, load it through
   AnimaCore, evaluate its first clip at a deterministic preview time, and request
-  the engine's per-part world transforms through `resolve_pose`. Studio creates
+  the engine's per-part character-space transforms through `resolve_pose`. Studio creates
   one renderer-only proxy per engine part and applies the returned metre
   positions and real-last quaternions directly in RealityKit at the playhead;
   it no longer infers a second hierarchy, connector frame, or mate motion in
@@ -366,12 +366,13 @@
   the operator had hidden it. A selected semantic proxy component exposes
   **Properties** and **Appearance** tabs. Appearance provides a 40-color
   industrial palette, an RGB/ColorPicker mixer, editable six-digit hex color,
-  explicit RGB values, opacity, visibility, reset, and a truthful Automatic
-  tessellation readout. Color, opacity, and visibility update the actual
-  RealityKit proxy body immediately; locked components reject these edits.
-  Overrides are deliberately in-session presentation state until the durable
-  project document defines non-destructive material-override persistence, and
-  imported source-model materials remain source-owned and read-only. A selected
+  explicit RGB values, opacity, visibility, reset, a truthful Automatic
+  tessellation readout, and Matte/Satin/Glossy/Metallic PBR finishes. Color,
+  finish, opacity, and visibility update proxy and imported RealityKit geometry
+  immediately; locked components reject these edits. Overrides persist by
+  engine part name in the active character's app-owned
+  `<character>.editor.json`, never in renderer-independent `.character.anima`.
+  A selected
   semantic component also has a Studio-owned, CAD-ordered viewport context menu. It
   identifies the body and groups property editing, attached-mate navigation,
   show/hide, reversible isolate and transparency previews, mate-guide
@@ -395,13 +396,18 @@
   viewport space now deselects the feature and all components; Escape clears
   the feature first, then component selection, and feature inspection is
   allowed on locked components while locks keep guarding every edit. The
-  Components outline follows macOS file-browser
+  Instances outline follows macOS file-browser
   selection conventions:
   Command/Shift select multiple, one item opens its configuration, and Escape
   or the inspector close control clears selection. Imported geometry can also
   be selected directly in the viewport, with Command/Shift extending the same
-  Components-tree selection. Every navigator workspace now has a standardized
-  filter. Imported assemblies appear in a separate blue, locked **Source Model ·
+  Instances-tree selection. Viewport selection requests reveal the matching
+  row and expands its ancestors; **Go to Item in List** provides the same
+  behavior from row and viewport context menus. Instances and **Mate Features**
+  render through one generic `TreeView`/`TreeNode` adapter and one pure,
+  renderer-independent tree model. Its filter accepts names plus `:part`,
+  `:mate`, `:suppressed`, `:grounded`, `:hidden`, and `:locked` tokens.
+  Imported assemblies appear in a separate blue, locked **Source Model ·
   Read Only** tree; filtering preserves the ancestors of matching nodes. The
   semantic Components and Mates remain separate editable-role rows in teal and
   purple. Component disclosure groups support contextual rename, move up/down,
@@ -411,11 +417,14 @@
   creates an expanded folder containing the target plus the dragged active
   multi-selection. Existing folders accept the dragged selection, while the
   Components heading returns it to top level. Groups and Mates show peer
-  insertion lines. The footer and selected-row context menu expose **Group
+  insertion lines. Invalid drops (self/descendant cycles, incompatible node
+  kinds, or locked source/target) are rejected before feedback or mutation.
+  Rows display lock, hidden, suppressed, and grounded state icons. The footer
+  and selected-row context menu expose **Group
   Selected (N)** and report when locked selections will be skipped. Locked
   items reject inspector, transform, and organization edits, hide transform
-  handles, and locked groups protect their members. Group and lock organization
-  is currently in-session pending the durable `.animastudio` document layer.
+  handles, and locked groups protect their members. Group membership, ordering,
+  locks, and disclosure state persist in the character's `editor.json`.
   Source-node inspection explains ownership, source appearance, mapping, and
   reimport prerequisites. Shared theme metrics and
   reusable panel, text-field, picker, readout, and primary-button styles keep
@@ -460,8 +469,10 @@
   package, `linked` records the external absolute path plus a
   security-scoped bookmark, and resolution returns an explicit needs-relink
   state for stale/missing links instead of throwing. Save accepts canonical
-  text as an opaque write only after `serialize_character`; Open sends the
-  indexed file through `load_character`. Save As copies the source folder,
+  text as an opaque write only after `serialize_character`; that same atomic
+  save writes app-owned appearance/tree state to `<character>.editor.json`.
+  Open sends the indexed file through `load_character` and restores that editor
+  metadata. Save As copies the source folder,
   applies dirty files atomically, increments revision, and retargets the open
   session without modifying the source. Native New/Open/Save/Save As controls
   are live, and imported models are copied under the active character's assets
@@ -513,16 +524,22 @@
   `Part.suppressed` / `Part.grounded` and `Joint.suppressed` /
   `Relation.suppressed` (all default `false`, written to the file only
   when `true`, so round-trip is lossless) — that change the solve and
-  survive save/quit/relaunch, distinct from the app's transient
-  hidden/lock view-state. `evaluate_pose` drops a suppressed joint's DOF
+  survive save/quit/relaunch, distinct from app-owned hidden/lock view-state.
+  Studio binds tree actions to these retained engine DTO fields, then
+  serializes/reloads for engine validation; it does not duplicate suppress or
+  ground as Swift-only flags. `evaluate_pose` drops a suppressed joint's DOF
   from the active solve and skips a suppressed relation; `resolve_pose`
   excludes a suppressed part (and deactivates its joints), skips a
-  suppressed joint, and pins a grounded part as a fixed identity root
+  suppressed joint, and pins a grounded part at its authored rest transform
   overriding any incoming joint. Suppression is per-element (no cascade);
   an orphaned non-suppressed part floats to the origin. The bridge
   surfaces the states in the `load_character` rig summary (`describe_mate`
   / `describe_relation` / part entries) and round-trips them through
-  `serialize_character`.
+  `serialize_character`. Known bridge defect: if an output mapping targets a
+  DOF removed by part/mate suppression, `project_channels` currently indexes
+  that absent path and terminates the helper instead of omitting the inactive
+  output; the Swift integration audit has handed an exact `base_yaw` repro to
+  the engine lane.
   The runtime also ships the community-extension foundation
   (Extensions.md packet E1): `animacore/outputs.py` defines the
   `OutputAdapter` extension-point protocol (`open(channel_configs)` /
@@ -658,8 +675,11 @@
   `dev/docs/roadmap/Coordinate_Frames.md`). The bridge `resolve_pose` verb returns
   `{parts:{name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — the
   RealityKit render hook. Studio now calls it for imports and every playhead
-  update, maps the result to renderer-only part IDs, and applies those world
-  transforms directly. The duplicate Swift `RigPoseResolver` and
+  update, maps the result to renderer-only part IDs, and applies it below an
+  explicit character root (Character-in-World remains a separate identity
+  transform while authoring one character). Free/grounded gizmo edits update
+  engine `position_m` and intrinsic-XYZ `rotation_euler_rad`; save/reopen
+  round-trips them. The duplicate Swift `RigPoseResolver` and
   `MateConnectorMath` implementations and their semantic tests are removed.
   The engine also owns `.anima` **writing** (`animacore/serialize.py`) — the
   project-Save contract: `serialize_character` rebuilds a `Rig` from the full
@@ -673,23 +693,34 @@
   `keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`,
   joint `description`; nothing renamed or removed).
   The runtime also ships the standalone **Denavit-Hartenberg
-  articulated-arm foundation** (DH1, `animacore/dh.py`): serial
+  articulated-arm foundation** (DH1+DH2, `animacore/dh.py`): serial
   kinematic chains parameterized by the standard (distal) DH convention
-  with **forward kinematics only** — `DHLink` (`a`/`alpha`/`d`/`theta`
+  with **forward and inverse kinematics** — `DHLink` (`a`/`alpha`/`d`/`theta`
   + `joint_type` revolute/prismatic + optional `min`/`max`/`neutral`
   limits on the joint variable), `DHChain` (ordered links + optional
   `base_frame`/`tool_frame`, `dof`), `link_transform` (the standard
   `A = Rotz·Transz·Transx·Rotx` link matrix built from the shared
   `Transform` primitives), and `forward_kinematics` returning every
   cumulative link frame plus the tool pose, raising a typed `DHError`
-  naming the joint index on a limit or arity violation. Stdlib + `math`
-  + `Transform` only (no numpy — FK stays pure); verified against the
-  planar-2R closed form and an independent 4x4-matrix reference for a
-  6R UR5-style arm. It is self-contained: inverse kinematics (numpy,
-  DH2) and the character-format `kinematic_chain` block + bridge verbs
-  (DH3) are later packets and no rig/loader/serialize/bridge code was
-  touched.
-  1005 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  naming the joint index on a limit or arity violation. FK is stdlib +
+  `math` + `Transform` only (no numpy — FK stays pure); verified against
+  the planar-2R closed form and an independent 4x4-matrix reference for a
+  6R UR5-style arm. **Inverse kinematics** (DH2) is `solve_ik(chain,
+  target_pose, *, seed=None, position_tolerance_m=1e-4,
+  orientation_tolerance_rad=1e-3, max_iterations=100, damping=0.05) ->
+  IKResult` — damped least-squares (Levenberg-Marquardt) on the 6×N
+  geometric Jacobian, clamping each joint to its limits every step and
+  returning `IKResult(joint_values, reached, position_error_m,
+  orientation_error_rad, iterations)`, reporting non-convergence honestly
+  (`reached=False` with the final residual, no raise). This is the one path
+  that uses **numpy** (added as an `animacore` dependency, `numpy>=1.26`),
+  isolated below the pure-stdlib FK; verified by FK→IK→FK round-trips (the
+  achieved pose matches an FK-generated target for the 2R and 6R arms),
+  joint-limit respect, honest unreachable-target residuals, prismatic-slider
+  IK, and determinism. Analytic per-geometry IK (DH4) and the
+  character-format `kinematic_chain` block + bridge verbs (DH3) are later
+  packets and no rig/loader/serialize/bridge code was touched.
+  1013 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,
@@ -721,8 +752,9 @@
   section views, camera roll, and saved named views are not implemented. Typed
   prismatic/cylindrical/ball/planar/fastened joints and keyframes are not yet
   editable in the canonical rig DTO. Project folders and imported canonical
-  characters persist, but transitional Swift proxy component/mate edits are
-  not yet projected back into that DTO. Scene Open is deferred because the
+  characters persist. Rest-transform, suppress, and ground edits are projected
+  into the retained DTO; transitional proxy creation/rename and mate creation
+  are not all canonical yet. Scene Open is deferred because the
   bridge has no `load_scene` twin. Undo/redo, Home templates, and live hardware
   controls remain visibly disabled. Studio never parses `.anima` itself:
   AnimaCore loads and serializes `.character.anima` and executes the

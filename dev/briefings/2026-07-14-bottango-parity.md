@@ -50,6 +50,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Standard Settings scene + persistent workspace root | `app/App/{AnimaStudioApp.swift,AnimaStudio.entitlements}`, `app/Sources/AnimaStudioUI/AppShell/{ProjectLifecycle,StudioWorkspaceView,WorkspaceLocationPreference}.swift`, `app/Sources/AnimaStudioUI/Settings/{AnimaStudioSettingsView,MouseNavigationSettingsView,StudioPreferenceKeys}.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{AppShell,Settings}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/Project_Format.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one resolved/bookmarked workspace root defaults to `~/Documents/Anima Studio`; New/Open/Save As use it and lazily create it; Settings scene opens through standard macOS command/menu and contains Workspace, Navigation, Appearance; old mouse sheet removed; root preference/bookmark tests, full tests/lint/Xcode/root-app build/signature/launch, `git diff --check` | in progress |
+| Codex | Reusable navigator tree + persistent engine/editor object state | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/AppShell/{NavigatorOrganization,StudioWorkspaceModel,StudioWorkspaceView,ComponentContextActions}.swift`, `app/Sources/AnimaStudioUI/Components/{ProjectNavigatorView,PartTreeRow,NavigatorDropInteraction,ComponentAppearanceEditor,InspectorView}.swift`, new reusable tree files under `app/Sources/AnimaStudioUI/Components/Tree/**`, `app/Sources/RealityKitViewport/{PreviewPartAppearance,RobotPreviewView,CharacterSpaceTransform,EngineResolvedPose}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/{Studio_App,Coordinate_Frames}.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one generic `TreeView`/pure tree model renders Instances and Mate Features; reorder/move/group/filter/drop validation and viewport-to-tree reveal are tested; state badges and context commands work; position/rotation/suppress/ground edit the retained engine DTO and round-trip through serialize/load; material/visibility/locks/disclosure/groups persist in character editor JSON; World→Character→Part remains explicit; full tests/lint/Xcode/root-app build/signature/launch plus move/suppress/material Save+reopen walkthrough and `git diff --check` | released 2026-07-16 (Swift/UI scope complete; engine suppression/output crash recorded in Requests) |
 | Codex | CAD mouse/navigation overhaul + reusable Mouse settings panel | `app/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,RobotPreviewView,SubObjectSelection}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportCameraControls,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, new focused settings views under `app/Sources/AnimaStudioUI/Settings/**`, focused tests under `app/Tests/{RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/Studio_App.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Default/SolidWorks/Onshape/Fusion/Custom mappings match the approved CAD table; Option bindings, click-vs-drag right routing, normalized reversible zoom, precise zoom and middle-double-click frame; reliable selection/empty clear with selection feedback; compact reusable settings window with profile summaries, mouse-button diagram, manual bindings, sensitivity and reverse-wheel persistence; mapping/classifier/UI tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Assets character manager + 3D assembly loading stage | `app/Sources/AnimaCoreClient/AnimaCoreRigDocumentEditor.swift`, `app/Sources/AnimaDocument/{AnimaStudioDocument,ProjectCharacterNaming}.swift`, `app/Sources/RealityKitViewport/ModelHierarchy.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/ModelImportUnitsSheet.swift`, new `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Assets lists indexed characters and selects the active Rig/Animate character; validated 3D-only New Character sheet with disabled honest 2D option; engine-serialized empty character folder; async batch STL/OBJ/USD import with explicit unit preparation, progress, multi-node USD mapping, inline failures, and transition to Rig; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Portable rigid-part model import (STL/OBJ/USD + honest STEP) | `app/Package.swift`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaDocument/{AnimaDocumentStore,CharacterEditorMetadata}.swift`, `app/Sources/RealityKitViewport/{ModelHierarchy,PartModelSource,RealityKitModelLoader,RobotPreviewView}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ModelImportUnitsSheet}.swift`, `app/Sources/AnimaStudioUI/Workspaces/WorkspaceRibbonCatalog.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, `dev/docs/{reality/STATUS.md,roadmap/{Project_Format,Hardware_Animation_Milestone}.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | picker supports STL/OBJ/USD family; STEP presents conversion guidance; STL/OBJ units are explicit and persisted; ModelIO meshes render in RealityKit; imports copy beneath the active character; rig DTO receives safe relative `model` plus optional `model_node` and is engine-validated/reloaded; per-part meshes inherit `resolve_pose`; save/reopen integration; tests/lint/Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-16 |
@@ -155,6 +157,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | DH1: Denavit-Hartenberg chain model + forward kinematics (standalone module, articulated-arm rig type) | `animacore/dh.py` (new), `animacore/tests/test_dh.py` (new) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; DH FK matches known 2R/6R poses | released 2026-07-16 |
 
+| Claude | DH2: inverse kinematics (damped least-squares, numpy) for articulated-arm rigs | `animacore/dh.py`, `animacore/tests/test_dh.py`, `pyproject.toml` (add numpy) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; IK reaches reachable targets, FK(IK(pose))==pose | released 2026-07-16 (1005 → 1013, +8 IK tests; numpy>=1.26 added; FK→IK→FK round-trip proven for 2R and 6R) |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -206,8 +210,101 @@ change needed in the Handoff log instead of inventing commands.
   could not pass against the shared checkout. Claude completed the coordinated
   producer/consumer update; all five Swift bridge tests pass again without
   Codex editing or reverting the backend lane.
+- **Codex → Claude (2026-07-16, backend blocker found by the object-state
+  integration audit):** suppressing an animated mate correctly removes its DOF
+  from `evaluate_pose`, but `rig.project_channels` still indexes that missing
+  path. Reproduction: load `examples/six_axis_arm.character.anima`, set
+  `base_yaw.suppressed=true` in the bridge rig DTO, serialize, reload, then
+  `evaluate(handle, clip="pick", time_s=1)`. The helper terminates with
+  `KeyError: 'base_yaw.rotation'` at `rig.py:913`; Swift consequently receives
+  `.disconnected("the response stream closed")`. Please make channel projection
+  skip outputs whose DOF is inactive because its mate/part is suppressed (and
+  add a real bridge subprocess regression test). This is engine semantics and
+  remains in Claude's lane; the Swift tree toggle already writes and persists
+  `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, DH2 — inverse kinematics, damped least-squares):**
+  Closed the FK↔IK loop for the articulated-arm chains. Extended
+  `animacore/dh.py` (+ `tests/test_dh.py`, now 34 tests) with a numerical
+  IK solver; `numpy>=1.26` added to `pyproject.toml` `[project].dependencies`
+  (installs to 2.4.6 here, `pip install -e ".[dev]"` re-verified so CI's
+  install keeps working). numpy is used **only** in the IK path — FK stays
+  pure stdlib. No rig/loader/serialize/bridge/kinematics.py touched (DH3 is
+  separate). 1005 → **1013 tests** (+8 IK test functions), `.venv/bin/ruff
+  check .` clean. Left uncommitted for main-session integration.
+
+  **API:**
+  - `solve_ik(chain, target_pose: Transform, *, seed: Sequence[float] | None
+    = None, position_tolerance_m: float = 1e-4, orientation_tolerance_rad:
+    float = 1e-3, max_iterations: int = 100, damping: float = 0.05) ->
+    IKResult`.
+  - `IKResult(frozen)`: `joint_values: tuple[float,...]` (always within each
+    link's limits), `reached: bool`, `position_error_m: float`,
+    `orientation_error_rad: float`, `iterations: int` (DLS updates applied; 0
+    when the seed already satisfies the target).
+
+  **Algorithm:** damped least-squares (Levenberg–Marquardt) on the **6×N
+  geometric Jacobian**. Start `q = seed` (or `chain.neutral_values()`),
+  clamped to limits. Each iteration runs `forward_kinematics` and builds the
+  Jacobian from the cumulative link frames: for joint `i` (0-based) the axis
+  is the world Z of `frame_i` where `frame_0 = base_frame` and
+  `frame_k = link_frames[k-1]` (standard-DH: joint `i`'s variable acts about
+  z of frame `i−1` in 1-based terms). Revolute column `[z × (p_tool − p_i);
+  z]`, prismatic column `[z; 0]`. Error twist `e = [target_p − tool_p;
+  rotvec]`, the orientation term being the axis·angle of `q_target ·
+  q_current⁻¹` on the **shortest path** (real part flipped non-negative).
+  Update `Δq = Jᵀ (J Jᵀ + λ²I)⁻¹ e` via `np.linalg.solve` on the 6×6 system
+  (no explicit inverse), then `q += Δq` **clamped to each DHLink min/max**.
+  Converges when `|pos| < position_tolerance_m` AND `|ori| <
+  orientation_tolerance_rad` → `reached=True`. After `max_iterations` without
+  convergence → `reached=False` carrying the final residuals — **does NOT
+  raise** (an unreachable target is a legitimate answer). The only raise is
+  `DHError` on a `seed` whose length ≠ `chain.dof`.
+
+  **Round-trip result (the key test):** FK a random-but-fixed config →
+  target pose, then `solve_ik` from a **different** (perturbed) seed, asserts
+  `reached` and that FK(solved) matches the target on probe points. **Yes —
+  IK reaches FK-generated targets for both the planar 2R and the 6R UR5**
+  (asserts POSE equality, not joints, since redundant/elbow-flip solutions
+  differ). Also covered: honest non-convergence for a target metres outside
+  the workspace (`reached=False`, large finite residual, no crash),
+  joint-limit respect (clamped solution stays within every `[min,max]` and
+  is a valid FK input), zero-iteration convergence when the target equals the
+  seed's FK pose, prismatic-slider IK reaching a translated target, and
+  determinism (identical `IKResult` for the same chain+target+seed; tests use
+  a fixed-seed `numpy.default_rng`, no wall-clock).
+
+  **Ceilings (`# ponytail:` in the module):** single-seed (no random-restart
+  for tough/near-singular targets — a hard basin just reports
+  `reached=False`), geometric-Jacobian DLS (no null-space/redundancy
+  resolution, no collision avoidance), purely numerical. Analytic
+  per-geometry closed-form IK for spherical-wrist arms is **DH4**. Damping
+  trades a little accuracy near singularities for stability.
+
+  **Next:** DH3 = `kinematic_chain` block in the character format +
+  loader/serialize + arm rig type + bridge `forward_kinematics`/`solve_ik`
+  verbs — consumes `solve_ik`/`IKResult` and `forward_kinematics` unchanged.
+
+- **2026-07-16 (Codex, reusable tree + persistent per-object state):** Replaced
+  the navigator-specific tree mechanics with a generic `TreeNode` adapter,
+  pure `TreeModel`, and reusable SwiftUI `TreeView`; both Instances and Mate
+  Features now use it. Added ancestor-preserving token filters, viewport→tree
+  reveal, **Go to Item in List**, lock/hidden/suppressed/grounded badges, and
+  pre-feedback drop validation. Pure tests cover reorder, reparent, grouping,
+  filtering, and invalid descendant/locked drops. Engine summaries/retained DTO
+  edits now carry part rest transforms plus part/mate/relation object states;
+  editor JSON v2 carries appearance/finish/visibility, groups, order, locks,
+  and disclosure. RealityKit applies intrinsic-XYZ rotations below an explicit
+  character root. One Save writes canonical engine text and editor metadata;
+  the integration suite reopens position, metallic appearance, visibility,
+  group membership, and locks. Verification: recursive Swift format lint;
+  `swift test` = 237 XCTest + 16 Swift Testing, all green; Xcode build and root
+  app build/deep-sign succeeded; root app launched. During the required mate
+  suppression walkthrough, the audit found the AnimaCore `project_channels`
+  crash recorded in Requests; no backend file was edited or worked around in
+  Swift.
 
 - **2026-07-16 (Claude, DH1 — Denavit-Hartenberg chain + forward
   kinematics):** Shipped the standalone articulated-arm FK foundation in

@@ -6,12 +6,13 @@ the standard four-parameter-per-link Denavit-Hartenberg convention,
 with forward kinematics. This is a *distinct rig type* from the general
 parts + typed-mate assembly, not a property of every character.
 
-Scope of this packet: **forward kinematics only**, self-contained.
-Stdlib + ``math`` + ``animacore.kinematics.Transform`` — **no numpy**
-(FK stays pure; the numpy dependency arrives with DH2's inverse
-kinematics). This module does not touch ``rig.py`` / ``loader.py`` /
-``serialize.py`` / ``bridge.py``: inverse kinematics is DH2 and the
-character-format / bridge integration is DH3.
+Scope of this module: **forward kinematics (DH1)** and **inverse
+kinematics (DH2)**, self-contained. FK is stdlib + ``math`` +
+``animacore.kinematics.Transform`` and stays pure; IK (``solve_ik``,
+damped least-squares on the geometric Jacobian) is the one path that uses
+**numpy**, isolated below the FK. This module does not touch ``rig.py`` /
+``loader.py`` / ``serialize.py`` / ``bridge.py``: the character-format /
+bridge integration is DH3 and analytic per-geometry IK is DH4.
 
 Convention — STANDARD (distal) Denavit-Hartenberg
 =================================================
@@ -48,11 +49,21 @@ pose, all as ``Transform`` values in the chain-base's parent space.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
-from animacore.kinematics import IDENTITY, Transform
+import numpy as np
+
+from animacore.kinematics import (
+    IDENTITY,
+    Transform,
+    quat_conjugate,
+    quat_multiply,
+    quat_normalize,
+    quat_rotate_vector,
+)
 
 _X_AXIS = (1.0, 0.0, 0.0)
 _Z_AXIS = (0.0, 0.0, 1.0)
@@ -246,3 +257,181 @@ def forward_kinematics(
 
     tool_pose = Transform.compose(frame, chain.tool_frame)
     return DHForwardResult(tuple(link_frames), tool_pose)
+
+
+# Inverse kinematics (DH2) ----------------------------------------------------
+#
+# Numerical inverse kinematics by damped least-squares (Levenberg-Marquardt)
+# on the 6xN geometric Jacobian. This is the one path in the module that uses
+# numpy — FK above stays pure stdlib. Given a target end-effector pose, iterate
+# joint values toward it, clamping each to its DHLink limits every step, and
+# report convergence honestly (no raise on failure — the caller decides).
+#
+# ponytail: single-seed only (no random-restart for tough / near-singular
+# targets — a hard target that needs a different basin just reports
+# reached=False), geometric-Jacobian DLS (no null-space / redundancy
+# resolution for the redundant DOF of a 7+-axis arm, no collision or
+# self-intersection avoidance), and purely numerical (analytic per-geometry
+# closed-form IK for spherical-wrist arms is DH4). Damping trades a little
+# accuracy near singularities for stability — that is the intended ceiling.
+
+
+@dataclass(frozen=True)
+class IKResult:
+    """The outcome of :func:`solve_ik`.
+
+    ``joint_values`` is the best joint vector found (always within each
+    link's limits). ``reached`` is ``True`` only when both residuals fell
+    under their tolerances. ``position_error_m`` / ``orientation_error_rad``
+    are the final residuals (metres / radians) — meaningful whether or not
+    the solve converged, so a caller can accept a near-miss or retry.
+    ``iterations`` is the number of damped-least-squares updates applied
+    (0 when the seed already satisfies the target).
+    """
+
+    joint_values: tuple[float, ...]
+    reached: bool
+    position_error_m: float
+    orientation_error_rad: float
+    iterations: int
+
+
+def _world_z_axis(frame: Transform) -> tuple[float, float, float]:
+    """The world-space Z axis of ``frame`` (the joint's action axis)."""
+    return quat_rotate_vector(frame.rotation, _Z_AXIS)
+
+
+def _orientation_error_rotvec(
+    current: tuple[float, float, float, float],
+    target: tuple[float, float, float, float],
+) -> tuple[float, float, float]:
+    """Axis-angle vector rotating orientation ``current`` onto ``target``.
+
+    ``q_err = q_target * q_current^-1`` in the world frame, mapped to an
+    axis*angle 3-vector on the **shortest** path (the quaternion is sign-
+    flipped so its real part is non-negative, i.e. angle in ``[0, pi]``).
+    Returns the zero vector when the two orientations already agree.
+    """
+    q_err = quat_multiply(
+        quat_normalize(target), quat_conjugate(quat_normalize(current))
+    )
+    x, y, z, w = quat_normalize(q_err)
+    if w < 0.0:  # shortest path: pick the hemisphere with angle <= pi
+        x, y, z, w = -x, -y, -z, -w
+    vec_norm = math.sqrt(x * x + y * y + z * z)
+    if vec_norm < 1e-12:
+        return (0.0, 0.0, 0.0)
+    angle = 2.0 * math.atan2(vec_norm, w)
+    scale = angle / vec_norm
+    return (x * scale, y * scale, z * scale)
+
+
+def _geometric_jacobian(chain: DHChain, forward: DHForwardResult) -> np.ndarray:
+    """The 6xN geometric Jacobian at the configuration ``forward`` describes.
+
+    Under standard (distal) DH, joint ``i``'s variable acts about/along the
+    Z axis of frame ``i-1``. ``frame_0`` is the chain base; ``frame_k`` is
+    ``forward.link_frames[k-1]``. For a revolute joint the column is
+    ``[z x (p_tool - p); z]`` (angular velocity about z induces that linear
+    velocity at the tool); for a prismatic joint it is ``[z; 0]`` (pure
+    translation along z, no angular part).
+    """
+    frames = (chain.base_frame, *forward.link_frames)  # frame_0 .. frame_n
+    p_tool = np.asarray(forward.tool_pose.translation, dtype=float)
+    jac = np.zeros((6, chain.dof))
+    for i, link in enumerate(chain.links):
+        frame = frames[i]  # frame_{i}: the axis for joint i (0-based)
+        z = np.asarray(_world_z_axis(frame), dtype=float)
+        if link.joint_type is JointKind.REVOLUTE:
+            p = np.asarray(frame.translation, dtype=float)
+            jac[0:3, i] = np.cross(z, p_tool - p)
+            jac[3:6, i] = z
+        else:  # PRISMATIC: pure translation along z
+            jac[0:3, i] = z
+            jac[3:6, i] = 0.0
+    return jac
+
+
+def _clamp_to_limits(chain: DHChain, values: Sequence[float]) -> list[float]:
+    """Each joint value clamped into its link's ``[min, max]`` (if set)."""
+    clamped: list[float] = []
+    for link, value in zip(chain.links, values):
+        v = float(value)
+        if link.min is not None and v < link.min:
+            v = link.min
+        if link.max is not None and v > link.max:
+            v = link.max
+        clamped.append(v)
+    return clamped
+
+
+def solve_ik(
+    chain: DHChain,
+    target_pose: Transform,
+    *,
+    seed: Sequence[float] | None = None,
+    position_tolerance_m: float = 1e-4,
+    orientation_tolerance_rad: float = 1e-3,
+    max_iterations: int = 100,
+    damping: float = 0.05,
+) -> IKResult:
+    """Inverse kinematics: joint values putting the tool at ``target_pose``.
+
+    Damped least-squares (Levenberg-Marquardt) Jacobian IK. Starting from
+    ``seed`` (or ``chain.neutral_values()``), each iteration builds the 6xN
+    geometric Jacobian ``J`` and the 6-vector error twist
+    ``e = [target_p - tool_p; rotvec(current -> target)]``, then applies the
+    damped update ``dq = J^T (J J^T + lambda^2 I)^-1 e`` (``lambda`` =
+    ``damping``, solved as a 6x6 linear system, never an explicit inverse).
+    Every step clamps each joint to its :class:`DHLink` limits.
+
+    Converges (``reached=True``) when the position residual is under
+    ``position_tolerance_m`` **and** the orientation residual under
+    ``orientation_tolerance_rad``. After ``max_iterations`` without
+    convergence it returns ``reached=False`` carrying the final residuals —
+    it does **not** raise; an unreachable target is a legitimate answer the
+    caller interprets.
+
+    Raises :class:`DHError` only for a structurally invalid request — a
+    ``seed`` whose length does not match ``chain.dof``.
+    """
+    if seed is None:
+        q = list(chain.neutral_values())
+    elif len(seed) != chain.dof:
+        raise DHError(
+            f"IK seed expected {chain.dof} joint values, got {len(seed)}"
+        )
+    else:
+        q = list(seed)
+    q = _clamp_to_limits(chain, q)
+
+    target_p = np.asarray(target_pose.translation, dtype=float)
+    eye6 = np.eye(6)
+    lambda_sq = float(damping) * float(damping)
+
+    iteration = 0
+    while True:
+        forward = forward_kinematics(chain, q)
+        tool = forward.tool_pose
+        pos_err_vec = target_p - np.asarray(tool.translation, dtype=float)
+        ori_err_vec = _orientation_error_rotvec(
+            tool.rotation, target_pose.rotation
+        )
+        pos_err = float(np.linalg.norm(pos_err_vec))
+        ori_err = float(np.linalg.norm(ori_err_vec))
+
+        if (
+            pos_err < position_tolerance_m
+            and ori_err < orientation_tolerance_rad
+        ):
+            return IKResult(tuple(q), True, pos_err, ori_err, iteration)
+        if iteration >= max_iterations:
+            return IKResult(tuple(q), False, pos_err, ori_err, iteration)
+
+        jac = _geometric_jacobian(chain, forward)
+        twist = np.concatenate([pos_err_vec, np.asarray(ori_err_vec)])
+        # dq = J^T (J J^T + lambda^2 I)^-1 e  — solve the 6x6 system.
+        y = np.linalg.solve(jac @ jac.T + lambda_sq * eye6, twist)
+        dq = jac.T @ y
+        q = _clamp_to_limits(chain, [q[i] + dq[i] for i in range(chain.dof)])
+        iteration += 1

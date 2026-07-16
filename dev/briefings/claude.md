@@ -35,6 +35,38 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (DH2 — inverse kinematics, damped least-squares, numpy):
+  Closed the FK↔IK loop for the DH articulated-arm chains. **Extended**
+  `animacore/dh.py` (+ `tests/test_dh.py`, now 34 tests) with
+  `solve_ik(chain, target_pose, *, seed=None, position_tolerance_m=1e-4,
+  orientation_tolerance_rad=1e-3, max_iterations=100, damping=0.05) ->
+  IKResult(joint_values, reached, position_error_m,
+  orientation_error_rad, iterations)`. Algorithm: damped least-squares
+  (Levenberg–Marquardt) on the **6×N geometric Jacobian** (revolute
+  column `[z×(p_tool−p); z]`, prismatic `[z; 0]`, axes from the
+  cumulative FK link frames under standard DH), error twist = position +
+  shortest-path axis-angle orientation, update `Δq = Jᵀ(JJᵀ+λ²I)⁻¹e` via
+  `np.linalg.solve` (no explicit inverse), **clamping each joint to its
+  DHLink limits every step**. Converges on both residual tolerances;
+  after `max_iterations` returns `reached=False` with the honest final
+  residual — **never raises** on non-convergence (only `DHError` on a
+  seed of wrong length). **numpy>=1.26 added** to
+  `pyproject.toml` `[project].dependencies` (→ 2.4.6; `pip install -e
+  ".[dev]"` re-verified), used **only** in the IK path — FK stays pure
+  stdlib. **FK→IK→FK round-trip proven for both the 2R and the 6R (UR5)
+  arms** (asserts pose equality, not joints — redundant/elbow-flip
+  solutions differ); also unreachable-target honesty, joint-limit
+  respect, zero-iteration convergence at the seed, prismatic-slider IK,
+  and determinism (fixed-seed `default_rng`). Ceilings marked
+  `# ponytail:` (single-seed, DLS, numerical — analytic per-geometry IK
+  is DH4). **Did NOT touch** rig/loader/serialize/bridge/kinematics.py —
+  DH3 (character-format `kinematic_chain` block + bridge
+  `forward_kinematics`/`solve_ik` verbs) is the next packet and consumes
+  `solve_ik`/`forward_kinematics` unchanged. 1005 → **1013 tests** (+8),
+  ruff clean, no `app/`/`firmware/` touched. Full API, algorithm, and
+  round-trip result in the briefing handoff entry. Left uncommitted for
+  main-session integration.
+
 - 2026-07-16 (DH1 — Denavit-Hartenberg chain + forward kinematics):
   Shipped the standalone articulated-arm FK foundation as a **new
   self-contained module** `animacore/dh.py` (+ `tests/test_dh.py`, 26
