@@ -100,12 +100,57 @@ __all__ = [
 ]
 
 
+def _validate_safe_relative_path(value: str, part_name: str) -> None:
+    """Reject an unsafe per-part asset path (absolute / traversal / empty).
+
+    A ``Part.model`` is resolved against the character's ``assets/``
+    folder, so it must be a *safe relative* path: no leading ``/``
+    (absolute), no ``..`` traversal segment, no empty segment (a leading,
+    trailing, or doubled ``/``). The engine still never opens or parses
+    the file — this guards only against a path escaping the character
+    folder on the app's side.
+    """
+    if value.startswith("/"):
+        raise ValueError(
+            f"part {part_name!r} model must be a relative path within the "
+            f"character's assets/, got absolute path {value!r}"
+        )
+    for segment in value.split("/"):
+        if segment == "":
+            raise ValueError(
+                f"part {part_name!r} model has an empty path segment "
+                f"(leading/trailing/doubled '/'): {value!r}"
+            )
+        if segment == "..":
+            raise ValueError(
+                f"part {part_name!r} model must not contain a '..' "
+                f"traversal segment: {value!r}"
+            )
+
+
 @dataclass(frozen=True)
 class Part:
     """A rigid body in the mechanism.
 
-    ``model_node`` optionally references a node path inside an imported
-    model; it is opaque data the runtime stores but never interprets.
+    A character is an *assembly* of rigid parts (the parametric-assembly
+    paradigm, not a skinned mesh), each part backed by its own imported
+    geometry. Two independent, fully opaque geometry references — the
+    runtime stores and round-trips both but never parses either, so any
+    mesh format (STL / OBJ / STEP / USD / ...) is treated identically:
+
+    - ``model`` — a relative path to the part's asset FILE within the
+      character's ``assets/`` folder (e.g. ``"assets/head.stl"``,
+      ``"assets/robot.usdz"``). Empty when the part has no geometry of
+      its own. It must be a *safe relative* path (validated below) so a
+      character folder stays portable.
+    - ``model_node`` — an optional node path WITHIN a multi-node file
+      (e.g. a subtree of a USD stage); null/absent for a single-mesh
+      file like an STL.
+
+    The two combine freely: a multi-file assembly gives each part its
+    own ``model`` and no ``model_node``; a single multi-node USD gives
+    parts a shared ``model`` plus distinct ``model_node``s.
+
     ``parent`` is optional assembly-tree metadata; kinematic
     connectivity is carried by ``Joint``, not here.
     """
@@ -114,12 +159,15 @@ class Part:
     parent: str | None = None
     model_node: str | None = None
     description: str = ""
+    model: str = ""
 
     def __post_init__(self) -> None:
         if not self.name:
             raise ValueError("part name must not be empty")
         if self.parent == self.name:
             raise ValueError(f"part {self.name!r} cannot be its own parent")
+        if self.model:
+            _validate_safe_relative_path(self.model, self.name)
 
 
 @dataclass(frozen=True)

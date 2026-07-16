@@ -96,6 +96,29 @@ class TestAccepts:
         assert rig.clips["sweep"].clip.duration_seconds == 1.0
         assert rig.outputs[0].channel == 0
 
+    def test_part_model_file_reference_parses(self):
+        # A multi-file assembly: each part points at its own mesh FILE
+        # (opaque, relative to assets/). One part carries model without
+        # model_node (single-mesh STL), another carries both (USD node).
+        doc = document(clips={}, joints={}, outputs=[])
+        doc["parts"] = {
+            "base": {"model": "assets/base.stl"},
+            "head": {
+                "parent": "base",
+                "model": "assets/robot.usdz",
+                "model_node": "robot/head",
+            },
+        }
+        rig = parse(doc)
+        assert rig.parts["base"].model == "assets/base.stl"
+        assert rig.parts["base"].model_node is None
+        assert rig.parts["head"].model == "assets/robot.usdz"
+        assert rig.parts["head"].model_node == "robot/head"
+
+    def test_part_model_defaults_to_empty_when_absent(self):
+        rig = parse(document())
+        assert rig.parts["base"].model == ""
+
     def test_sections_other_than_identity_are_optional(self):
         rig = parse({
             "anima_version": "2.0",
@@ -289,6 +312,21 @@ class TestRejects:
         doc = document()
         doc["parts"]["base"] = {"mass_kg": 1.0}
         assert_rejects(doc, "parts.base.mass_kg")
+
+    def test_part_absolute_model_path_rejected(self):
+        doc = document(clips={}, joints={}, outputs=[])
+        doc["parts"]["base"] = {"model": "/etc/base.stl"}
+        assert_rejects(doc, "parts.base.model")
+
+    def test_part_model_path_traversal_rejected(self):
+        doc = document(clips={}, joints={}, outputs=[])
+        doc["parts"]["base"] = {"model": "../../secret.stl"}
+        assert_rejects(doc, "parts.base.model")
+
+    def test_part_model_path_empty_segment_rejected(self):
+        doc = document(clips={}, joints={}, outputs=[])
+        doc["parts"]["base"] = {"model": "assets//base.stl"}
+        assert_rejects(doc, "parts.base.model")
 
     def test_revolute_with_extra_dof_rejected(self):
         doc = document(clips={}, outputs=[])

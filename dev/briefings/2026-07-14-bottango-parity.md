@@ -144,6 +144,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Engine serialization (serialize_character/serialize_scene) — the write side for project Save | `animacore/serialize.py` (new), `animacore/bridge.py`, `animacore/tests/{test_serialize.py (new),test_bridge.py}`, `dev/docs/roadmap/{Studio_Bridge,Project_Format}.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,CLAUDE}.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; load→serialize→load round-trips every example | released 2026-07-16 (927 suite total, +26; ruff clean; no `app/`/`firmware/` touched; ADDITIVE `load_character` enrichment; verbatim serialize verb JSON + enrichment list in the handoff entry below) |
 
+| Claude | Per-part asset file reference in the character format (portable multi-file assemblies: STL/OBJ/STEP/USD) | `animacore/rig.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/**`, `examples/pan_tilt_head.character.anima` (new), `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Project_Format.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,CLAUDE}.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; round-trip of per-part model refs | released 2026-07-16 (944 suite total, +17; ruff clean; no `app/`/`firmware/` touched; ADDITIVE `Part.model` field; DTO shape + validation rules in the handoff entry below) |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -197,6 +199,59 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, per-part asset file reference — portable
+  multi-file assemblies):** A character is an ASSEMBLY of rigid parts
+  (parametric-assembly paradigm, not a skinned mesh); the saved
+  `.character.anima` now records WHICH asset file each part uses so a
+  `characters/<name>/` folder (with its `assets/`) is portable and
+  reopens correctly. **Additive, engine stays mesh-agnostic — it never
+  parses geometry; these are opaque strings it round-trips.**
+
+  **`Part` DTO shape (new `model` field, everything else unchanged):**
+  ```
+  Part(name: str,
+       parent: str|None = None,
+       model_node: str|None = None,   # node WITHIN a multi-node file (e.g. USD subtree); null for single-mesh STL
+       description: str = "",
+       model: str = "")               # NEW: opaque relative path to the part's asset FILE within assets/
+  ```
+  `load_character` rig-summary part entry (bridge) is now
+  `{name, parent, model_node, description, model}` — `model` **added**,
+  nothing renamed; empty string `""` when the part has no geometry.
+  Serializer emits `model:` in the part dict only when non-empty (omit
+  when empty, clean-output convention); `model_node` behavior unchanged.
+
+  **What Codex sets on import:** copy the imported mesh into the active
+  character's `assets/`, then set that part's `model` to the file's path
+  **relative to the character folder** — e.g. `model: "assets/head.stl"`,
+  `model: "assets/robot.usdz"`. STL / OBJ / STEP / USD are all treated
+  identically (engine never interprets the mesh). Two shapes:
+  - **Multi-file assembly** (several STL parts): each part gets its own
+    `model`, no `model_node`.
+  - **Single multi-node USD**: parts share one `model` and each carries
+    a distinct `model_node` (the node inside that file).
+
+  **Validation rules on `model` (a non-empty value must be a SAFE
+  RELATIVE path):** rejected with a typed error —
+  - absolute path (leading `/`) → rejected;
+  - `..` traversal segment → rejected;
+  - empty segment (leading / trailing / doubled `/`) → rejected;
+  - empty string is legal (part has no geometry).
+  Loader raises `CharacterFormatError` naming `parts.<name>.model` on an
+  unsafe path; the `Part` dataclass re-validates defensively (typed
+  `ValueError`). So the app can set `model` from the copied file's
+  character-relative path without any extra guarding — the engine
+  refuses anything that could escape the character folder.
+
+  New example `examples/pan_tilt_head.character.anima` (3-part pan-tilt
+  assembly: `base`/`yoke` = single-mesh STL with `model` only; `head` =
+  a USD node with both `model` + `model_node`) exercises the round-trip.
+  Tests: `Part` accept/reject (test_rig), loader parse + pathed errors
+  (test_loader), serialize round-trip + empty-omission (test_serialize),
+  bridge summary + DTO round-trip (test_bridge). 944 suite total (+17),
+  ruff clean, no `app/`/`firmware/` touched. Left uncommitted for
+  main-session integration.
 
 - **2026-07-16 (Codex, engine-driven Relations UI):** Added typed Swift bridge
   projections for `relation_types` and `load_character.relations`; the client

@@ -153,6 +153,37 @@ def test_load_character_returns_handle_and_summary():
     assert dof["neutral"] == pytest.approx(0.0)
     channels = {output["channel"] for output in rig["outputs"]}
     assert channels == {0, 1, 2, 3, 4, 5}
+    # Every part entry carries the opaque per-part asset file reference
+    # (additive alongside model_node); empty for parts without geometry.
+    parts = {part["name"]: part for part in rig["parts"]}
+    assert all("model" in part for part in parts.values())
+    assert parts["base"]["model"] == ""
+
+
+def test_load_character_part_model_file_round_trips():
+    # The per-part `model` asset file survives load_character ->
+    # serialize_character (the bridge DTO round-trip the app relies on).
+    session = Session()
+    text = (EXAMPLES_DIR / "pan_tilt_head.character.anima").read_text()
+    load = handle_request(
+        session,
+        {"id": 1, "method": "load_character", "params": {"text": text}},
+    )
+    parts = {p["name"]: p for p in load["result"]["rig"]["parts"]}
+    assert parts["base"]["model"] == "assets/base.stl"
+    assert parts["base"]["model_node"] is None
+    assert parts["head"]["model"] == "assets/head.usdz"
+    assert parts["head"]["model_node"] == "head/mesh"
+    serialized = handle_request(
+        session,
+        {
+            "id": 2,
+            "method": "serialize_character",
+            "params": {"rig": load["result"]["rig"]},
+        },
+    )
+    assert serialized["ok"], serialized
+    assert "assets/base.stl" in serialized["result"]["text"]
 
 
 def test_load_character_handles_are_deterministic_and_monotonic():

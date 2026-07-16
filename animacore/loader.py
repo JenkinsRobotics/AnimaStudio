@@ -221,7 +221,7 @@ def _parse_parts(raw: object) -> dict[str, Part]:
         path = f"parts.{name}"
         entry = _mapping(entry if entry is not None else {}, path)
         _reject_unknown_fields(
-            entry, path, {"parent", "model_node", "description"}
+            entry, path, {"parent", "model_node", "description", "model"}
         )
         parent = entry.get("parent")
         if parent is not None:
@@ -233,6 +233,9 @@ def _parse_parts(raw: object) -> dict[str, Part]:
         model_node = entry.get("model_node")
         if model_node is not None:
             model_node = _string(model_node, f"{path}.model_node")
+        model = entry.get("model")
+        model = "" if model is None else _string(model, f"{path}.model")
+        _reject_unsafe_relative_path(model, f"{path}.model")
         try:
             parts[str(name)] = Part(
                 name=str(name),
@@ -241,6 +244,7 @@ def _parse_parts(raw: object) -> dict[str, Part]:
                 description=_string(
                     entry.get("description", ""), f"{path}.description"
                 ),
+                model=model,
             )
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
@@ -1176,6 +1180,36 @@ def _interpolation(value: object, path: str) -> Interpolation:
         raise CharacterFormatError(
             path, f"expected 'hold' or 'linear', got {value!r}"
         ) from None
+
+
+def _reject_unsafe_relative_path(value: str, path: str) -> None:
+    """A per-part asset path must stay inside the character's assets/.
+
+    Empty is fine (no geometry). Otherwise reject an absolute path
+    (leading ``/``), a ``..`` traversal segment, or an empty segment
+    (leading/trailing/doubled ``/``) with a pathed error — the engine
+    never opens the file, but the reference must not escape the folder.
+    """
+    if not value:
+        return
+    if value.startswith("/"):
+        raise CharacterFormatError(
+            path,
+            f"must be a relative path within the character's assets/, "
+            f"got absolute path {value!r}",
+        )
+    for segment in value.split("/"):
+        if segment == "":
+            raise CharacterFormatError(
+                path,
+                f"has an empty path segment "
+                f"(leading/trailing/doubled '/'): {value!r}",
+            )
+        if segment == "..":
+            raise CharacterFormatError(
+                path,
+                f"must not contain a '..' traversal segment: {value!r}",
+            )
 
 
 def _reject_unknown_fields(

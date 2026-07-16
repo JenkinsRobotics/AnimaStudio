@@ -111,6 +111,8 @@ def _parts_dict(rig: Rig) -> dict:
             entry["parent"] = part.parent
         if part.model_node is not None:
             entry["model_node"] = part.model_node
+        if part.model:
+            entry["model"] = part.model
         if part.description:
             entry["description"] = part.description
         parts[part.name] = entry

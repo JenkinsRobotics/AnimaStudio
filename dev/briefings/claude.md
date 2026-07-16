@@ -35,6 +35,30 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (Per-part asset file reference — portable multi-file
+  assemblies): A character is now an ASSEMBLY of rigid parts that each
+  record WHICH asset file they use, so a `characters/<name>/` folder is
+  portable. **Additive, engine stays mesh-agnostic (never parses
+  geometry — opaque round-trip).** `Part` gains **`model: str = ""`** —
+  an opaque relative path to the part's asset FILE within `assets/`
+  (e.g. `"assets/head.stl"`, `"assets/robot.usdz"`), beside the existing
+  `model_node` (node WITHIN a multi-node file). A multi-file assembly
+  gives each part its own `model` and no `model_node`; a single
+  multi-node USD gives parts a shared `model` + distinct `model_node`s.
+  STL/OBJ/STEP/USD all treated identically. **Validation:** a non-empty
+  `model` must be a SAFE RELATIVE path — reject absolute (leading `/`),
+  `..` traversal, empty segments; loader raises `CharacterFormatError`
+  naming `parts.<name>.model`, the dataclass re-validates (typed
+  `ValueError`). **Codex:** the `load_character` part entry is now
+  `{name, parent, model_node, description, model}` (`model` added,
+  nothing renamed; `""` when absent). On import: copy the mesh into the
+  character's `assets/` and set `model` to the file's character-relative
+  path — no extra guarding needed. New example
+  `examples/pan_tilt_head.character.anima` exercises the round-trip.
+  944 tests (+17), ruff clean, no `app/`/`firmware/` touched. Full DTO
+  shape + validation rules in the briefing handoff entry. Left
+  uncommitted for main-session integration.
+
 - 2026-07-16 (Engine serialization — project-Save write side): The
   engine now WRITES canonical `.anima` too (one format author). New
   `animacore/serialize.py` (pure inverse of the loaders:

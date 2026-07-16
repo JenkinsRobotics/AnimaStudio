@@ -173,6 +173,7 @@ def _rig_summary(rig: Rig) -> dict:
                 "parent": part.parent,
                 "model_node": part.model_node,
                 "description": part.description,
+                "model": part.model,
             }
             for part in rig.parts.values()
         ],
@@ -300,6 +301,7 @@ def rig_from_dict(dto: dict) -> Rig:
             parent=entry.get("parent"),
             model_node=entry.get("model_node"),
             description=entry.get("description", ""),
+            model=entry.get("model", ""),
         )
         for entry in dto.get("parts", [])
     }

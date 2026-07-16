@@ -36,8 +36,13 @@ identity:
   name: rc_car                 # required, non-empty
 
 parts:                         # rigid bodies; kinematics lives in joints
-  chassis: { }
-  front_axle: { parent: chassis, model_node: "car/front_axle" }
+  chassis:
+    model: "assets/chassis.stl"  # per-part asset FILE (opaque, relative
+                                 #   to the character's assets/ folder)
+  front_axle:
+    parent: chassis
+    model: "assets/car.usdz"     # a multi-node file shared by several parts
+    model_node: "car/front_axle" # the node WITHIN that file for this part
 
 joints:
   steering:
@@ -107,6 +112,34 @@ outputs:                       # evaluated target → normalized channel
     channel: 1
     range: [0.0, 1.0]
 ```
+
+### Parts — the assembly of rigid bodies
+
+A character is an **assembly** of rigid parts (the parametric-assembly
+paradigm, not a skinned mesh): each part is a rigid body backed by its
+own imported geometry, mated together by `joints`. A part carries two
+independent, fully **opaque** geometry references — the runtime stores
+and round-trips both but never opens or parses either, so STL, OBJ,
+STEP, USD, and any other format are treated identically:
+
+- `model` — a relative path to the part's asset **file** within the
+  character's `assets/` folder (e.g. `assets/head.stl`,
+  `assets/robot.usdz`). Optional; empty when the part has no geometry
+  of its own. It must be a **safe relative** path: an absolute path
+  (leading `/`), a `..` traversal segment, or an empty segment
+  (leading/trailing/doubled `/`) is a load error naming
+  `parts.<name>.model`, so a character folder stays portable.
+- `model_node` — an optional node path **within** a multi-node file
+  (e.g. a subtree of a USD stage); null/absent for a single-mesh file
+  like an STL.
+
+The two combine freely: a **multi-file assembly** gives each part its
+own `model` and no `model_node`; a **single multi-node USD** gives
+several parts a shared `model` plus distinct `model_node`s. Asset paths
+resolve against `characters/<name>/assets/` (see `Project_Format.md`);
+the app copies an imported mesh there on import and sets the part's
+`model`. `parent` is optional assembly-tree metadata — kinematic
+connectivity lives in `joints`, not here.
 
 ### DOF limits (optional per DOF — K2)
 

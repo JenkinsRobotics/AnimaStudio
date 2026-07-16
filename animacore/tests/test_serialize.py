@@ -136,7 +136,12 @@ def _rig_fingerprint(rig) -> dict:
             identity.author,
         ),
         "parts": {
-            part.name: (part.parent, part.model_node, part.description)
+            part.name: (
+                part.parent,
+                part.model_node,
+                part.description,
+                part.model,
+            )
             for part in rig.parts.values()
         },
         "joints": [_joint_fingerprint(j) for j in rig.joints.values()],
@@ -255,6 +260,32 @@ def test_unlimited_dof_emits_neutral_and_no_limits():
     spin = rig_to_dict(rig)["joints"]["drive"]["dofs"]["spin"]
     assert "limits" not in spin
     assert spin["neutral_deg"] == 0.0
+
+
+def test_part_model_file_reference_round_trips():
+    """A per-part ``model`` asset file emits when set, omits when empty,
+    and round-trips losslessly (with or without a ``model_node``)."""
+    rig = parse_character(
+        (EXAMPLES_DIR / "pan_tilt_head.character.anima").read_text()
+    )
+    parts = rig_to_dict(rig)["parts"]
+    # Emitted for parts that carry one; single-mesh STL has no model_node.
+    assert parts["base"]["model"] == "assets/base.stl"
+    assert "model_node" not in parts["base"]
+    # A USD node: shared file plus its own node path.
+    assert parts["head"]["model"] == "assets/head.usdz"
+    assert parts["head"]["model_node"] == "head/mesh"
+    assert_rigs_equal(rig, parse_character(rig_to_yaml(rig)))
+
+
+def test_empty_part_model_is_omitted():
+    from animacore.rig import Identity, Part, Rig
+
+    rig = Rig(
+        identity=Identity(name="bare"),
+        parts={"solo": Part(name="solo")},
+    )
+    assert "model" not in rig_to_dict(rig)["parts"]["solo"]
 
 
 def test_geometry_mates_serialize_width_and_tangent():

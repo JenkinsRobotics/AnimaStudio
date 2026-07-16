@@ -452,7 +452,13 @@
   unsupported/superseded spec sections are rejected loudly, never
   silently dropped) into a mechanism-rig model (`animacore/rig.py` —
   parts plus the eight typed Onshape-style mates whose type defines the
-  DOF set; per-DOF limits are optional per Kinematics.md §2: an
+  DOF set; a character is an assembly of rigid parts, each carrying an
+  opaque per-part `model` asset-file reference (relative to the
+  character's `assets/`, validated as a safe relative path — no
+  absolute/`..`/empty segments) alongside its optional `model_node`
+  (node within a multi-node file), round-tripped for the app and never
+  parsed by the engine, so STL/OBJ/STEP/USD are treated identically;
+  per-DOF limits are optional per Kinematics.md §2: an
   unlimited DOF is legal and never clamped, but mapping one to a
   bounded output channel is a load error naming the fix; per-joint
   as-mated `offset` blocks round-trip for Studio's spatial use; and

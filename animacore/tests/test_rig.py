@@ -290,6 +290,39 @@ class TestPartAndParameterValidation:
         with pytest.raises(ValueError):
             Part(name="a", parent="a")
 
+    def test_part_accepts_safe_relative_model_path(self):
+        part = Part(name="head", model="assets/head.stl")
+        assert part.model == "assets/head.stl"
+        assert part.model_node is None
+
+    def test_part_model_defaults_to_empty(self):
+        assert Part(name="head").model == ""
+
+    def test_part_may_have_model_without_model_node(self):
+        # A single-mesh STL: its own file, no node path.
+        part = Part(name="head", model="assets/head.stl")
+        assert part.model and part.model_node is None
+
+    def test_part_may_have_both_model_and_model_node(self):
+        # A node inside a multi-node USD: shared file plus node path.
+        part = Part(
+            name="head", model="assets/robot.usdz", model_node="robot/head"
+        )
+        assert part.model == "assets/robot.usdz"
+        assert part.model_node == "robot/head"
+
+    def test_part_rejects_absolute_model_path(self):
+        with pytest.raises(ValueError, match="absolute"):
+            Part(name="head", model="/etc/head.stl")
+
+    def test_part_rejects_model_path_traversal(self):
+        with pytest.raises(ValueError, match="traversal"):
+            Part(name="head", model="../secret.stl")
+
+    def test_part_rejects_model_path_empty_segment(self):
+        with pytest.raises(ValueError, match="empty path segment"):
+            Part(name="head", model="assets//head.stl")
+
     def test_parameter_neutral_outside_unit_range_rejected(self):
         with pytest.raises(ValueError):
             Parameter(name="p", neutral_value=1.5)
