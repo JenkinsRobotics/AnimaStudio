@@ -72,7 +72,7 @@ final class UIDevCatalogTests: XCTestCase {
       UIDevReferenceWidgetKind.allCases,
       [
         .layeredIconList, .notificationPopup, .layoutStyleControls, .compactTabPanel,
-        .documentTabStrip, .materialEditor,
+        .documentTabStrip, .materialEditor, .timelineDesignB,
       ]
     )
 
@@ -83,6 +83,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertTrue(matrixIDs.contains(.compactTabPanel))
     XCTAssertTrue(matrixIDs.contains(.documentTabStrip))
     XCTAssertTrue(matrixIDs.contains(.materialEditor))
+    XCTAssertTrue(matrixIDs.contains(.timelineDesignB))
 
     for widget in UIDevReferenceWidgetKind.allCases {
       XCTAssertFalse(widget.title.isEmpty)
@@ -133,5 +134,44 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(material.category, .inspectors)
     XCTAssertGreaterThanOrEqual(material.idealWidth, 400)
     XCTAssertGreaterThanOrEqual(material.idealHeight, 600)
+  }
+
+  func testTimelineDesignBVariantsShareSortedBoundedKeyframeData() throws {
+    XCTAssertEqual(
+      UIDevTimelineBVariant.allCases,
+      [.dopeSheet, .motionCurves, .waypointLanes]
+    )
+    XCTAssertGreaterThanOrEqual(UIDevTimelineBSamples.tracks.count, 4)
+    XCTAssertTrue(UIDevTimelineBSamples.tracks.allSatisfy { !$0.keyframes.isEmpty })
+
+    var track = UIDevTimelineBTrack(
+      name: "Test",
+      colorIndex: 0,
+      keyframes: [.init(time: 4, value: 0.5), .init(time: 1, value: 0.2)]
+    )
+    let insertedID = track.insertKeyframe(time: 10, value: -1, duration: 8)
+
+    XCTAssertEqual(track.keyframes.map(\.time), [1, 4, 8])
+    XCTAssertEqual(track.keyframes.last?.id, insertedID)
+    XCTAssertEqual(track.keyframes.last?.value, 0)
+
+    let source = UIDevTimelineBKeyframe(time: 2, value: 0.75)
+    let point = UIDevTimelineBGeometry.normalizedPoint(
+      for: source,
+      variant: .motionCurves,
+      duration: 8
+    )
+    XCTAssertEqual(point.x, 0.25, accuracy: 0.0001)
+    XCTAssertEqual(
+      UIDevTimelineBGeometry.value(atNormalizedY: point.y, variant: .motionCurves),
+      source.value,
+      accuracy: 0.0001
+    )
+
+    let descriptor = try XCTUnwrap(
+      UIDevTemplateMatrixCatalog.templates.first { $0.id == .timelineDesignB }
+    )
+    XCTAssertEqual(descriptor.category, .timelines)
+    XCTAssertGreaterThanOrEqual(descriptor.idealWidth, 1_000)
   }
 }

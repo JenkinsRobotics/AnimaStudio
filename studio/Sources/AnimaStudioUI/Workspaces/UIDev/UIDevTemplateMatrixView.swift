@@ -84,6 +84,7 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case agent
   case animationTimeline
   case showTimeline
+  case timelineDesignB
   case componentInspector
   case appearanceInspector
   case mateEditor
@@ -143,6 +144,9 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .showTimeline, "Show Timeline", "Audio, video, event, and character tracks.",
       .timelines, 760, 300, 250, "music.note.list"),
+    descriptor(
+      .timelineDesignB, "Timeline Design B", "Rows, authored keys, and connected motion paths.",
+      .timelines, 1_080, 560, 520, "timeline.selection"),
 
     descriptor(
       .componentInspector, "Component Inspector", "Transform, identity, and ownership.",
@@ -396,6 +400,8 @@ struct UIDevTemplateMatrixView: View {
     case .agent: agentTemplate
     case .animationTimeline: timelineTemplate(showMode: false)
     case .showTimeline: timelineTemplate(showMode: true)
+    case .timelineDesignB:
+      UIDevReferenceWidgetSpecimen(kind: .timelineDesignB)
     case .componentInspector: componentInspectorTemplate
     case .appearanceInspector: appearanceTemplate
     case .mateEditor:

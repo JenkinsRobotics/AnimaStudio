@@ -98,7 +98,7 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on an **all-surfaces Template Matrix**: twenty-eight current app
+  UI Dev opens on an **all-surfaces Template Matrix**: twenty-nine current app
   specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
   Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
   States. Every specimen is visible together in a responsive board and names
@@ -125,7 +125,15 @@
   enabled material channels, Float/Texture inputs, per-channel value and mix
   controls, locking, and explicit Node Editor/Assignment/Help feedback. It is a
   UI-only draft until renderer material, texture-asset, assignment, and document
-  contracts are defined. None of these reference widgets is wired into an
+  contracts are defined. Pack 04 adds **Timeline Design B**, an interactive
+  multi-row animation lab with Dopesheet, Motion Curves, and Waypoint Lanes
+  projected from one shared track/keyframe model. Operators can add rows, click
+  empty row space to create sorted bounded keys, select and delete keys, add a
+  key at the playhead, scrub the ruler, and switch presentations without losing
+  state. Every variant draws the authored motion connection between waypoints;
+  Motion Curves uses a smooth value-aware path while the other variants use
+  direct readable segments. This remains a UI Dev comparison and does not
+  replace the production Animate timeline yet. None of these reference widgets is wired into an
   operator workflow until it is reviewed and adopted there. The separate
   **Live UI Kit** remains available with a resizable Design Inspector
   beside a production-component catalog. The inspector edits the shared Studio surface

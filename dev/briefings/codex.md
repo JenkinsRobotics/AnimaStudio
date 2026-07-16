@@ -148,6 +148,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev Timeline Design B variants complete:** Added a dedicated
+  interactive comparison lab with Dopesheet, Motion Curves, and Waypoint Lanes
+  views projected from one shared track/keyframe model. It begins with four
+  motion rows and supports adding rows, click-to-create bounded/sorted keys,
+  proximity-based key selection, deletion, key insertion at the playhead, ruler
+  scrubbing, stepping, and state-preserving view switching. Every presentation
+  connects waypoints to communicate motion; the curve view uses smooth cubic
+  paths while dense and operator-readable variants use direct segments. The lab
+  is available in UI Dev → References and the 29-template matrix but does not
+  replace the production timeline pending human review. Ten focused tests and
+  all 201 Swift tests, recursive strict format lint, native Xcode/root-app build,
+  strict signature verification, and `git diff --check` pass.
+
 - **2026-07-15 — UI Dev Reference Widgets pack 03 complete:** Added Jonathan's
   material-widget reference as a dedicated interactive SwiftUI specimen. The
   HSB sliders and native color picker drive a live shaded preview sphere; name,

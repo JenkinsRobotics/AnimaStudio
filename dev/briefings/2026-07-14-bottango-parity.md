@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | UI Dev Timeline Design B variants | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBModel.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | multiple switchable timeline variants over one state model; multiple addable rows; click-to-create/select keyframes; draggable playhead; motion lines between waypoints; template matrix entry; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 03: material editor | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevMaterialWidgetView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive preview/name/type/color controls; selectable material channels with enablement and values; texture/mix/displacement controls; Node Editor/Assignment/Help feedback; Reference Widgets lab plus matrix entry; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 02: tab views | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTabWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive compact action/settings/theme panel; interactive multi-document tab strip with selection, close, and add; Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 01 | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive layered icon list; dismissible notification popup; layout/border/spacing/background controls; dedicated Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -114,6 +115,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | N1 (partial): scene-format `editor:` block tolerance — opaque, preserved | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (586 passed) | released 2026-07-15 (mapping fixtures await plan review) |
 
+| Claude | Scene v2 — the scripting-engine standard (FANUC-inspired: conditions, select, call, wait_until, inputs, background monitors) | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py`, `examples/**.scene.anima`, `dev/docs/roadmap/Scene_Format.md`, `dev/docs/roadmap/Node_Graph.md` (taxonomy) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -160,6 +163,17 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Handoff log
 
+- **2026-07-15 (Codex, UI Dev Timeline Design B):** Added three timeline
+  presentations—Dopesheet, Motion Curves, and Waypoint Lanes—over one shared
+  multi-row keyframe state. The lab supports Add Row, click-to-create keys,
+  proximity-based key selection, deletion, playhead insertion, ruler scrubbing,
+  transport stepping, and state-preserving variant switching. Every row draws
+  motion connections between its ordered waypoints; curves use smooth cubic
+  presentation and the other variants use direct segments. It appears in UI
+  Dev → References and the 29-template matrix without replacing the production
+  timeline. Ten focused catalog tests, all 201 Swift tests, recursive strict
+  format lint, native Xcode/root-app build, strict signature verification, and
+  `git diff --check` pass.
 - **2026-07-15 (Codex, UI Dev Reference Widgets pack 03):** Added the supplied
   material reference as an isolated interactive SwiftUI specimen. It includes a
   live HSB preview sphere, editable name/type/color, Diffuse/Specular/Roughness/

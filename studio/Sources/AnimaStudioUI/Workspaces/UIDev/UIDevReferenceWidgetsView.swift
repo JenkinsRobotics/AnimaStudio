@@ -7,6 +7,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
   case compactTabPanel
   case documentTabStrip
   case materialEditor
+  case timelineDesignB
 
   var id: Self { self }
 
@@ -18,6 +19,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .compactTabPanel: "Compact Action Panel"
     case .documentTabStrip: "Document Tab Strip"
     case .materialEditor: "Material Editor"
+    case .timelineDesignB: "Timeline Design B"
     }
   }
 
@@ -35,6 +37,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
       "Selectable, closable project tabs with macOS window context and new-tab control."
     case .materialEditor:
       "A compact surface editor with preview, color, channels, textures, and assignment actions."
+    case .timelineDesignB:
+      "Multiple timeline views over shared rows, keyframes, playhead, and connected motion data."
     }
   }
 
@@ -46,6 +50,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .compactTabPanel: "rectangle.3.group"
     case .documentTabStrip: "rectangle.split.3x1"
     case .materialEditor: "circle.hexagongrid.fill"
+    case .timelineDesignB: "timeline.selection"
     }
   }
 
@@ -57,6 +62,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .compactTabPanel: CGSize(width: 320, height: 190)
     case .documentTabStrip: CGSize(width: 980, height: 88)
     case .materialEditor: CGSize(width: 410, height: 620)
+    case .timelineDesignB: CGSize(width: 1_080, height: 560)
     }
   }
 }
@@ -114,6 +120,15 @@ struct UIDevReferenceWidgetsView: View {
         ) {
           referenceCard(.materialEditor)
         }
+
+        StudioSectionHeader(
+          title: "Reference Widgets · Pack 04 · Timeline Design B",
+          detail:
+            "Three interchangeable timeline presentations over the same editable rows and keyframes.",
+          systemImage: "timeline.selection"
+        )
+
+        referenceCard(.timelineDesignB)
       }
       .frame(maxWidth: 1_440, alignment: .topLeading)
       .padding(24)
@@ -173,6 +188,8 @@ struct UIDevReferenceWidgetSpecimen: View {
       UIDevDocumentTabStripWidget()
     case .materialEditor:
       UIDevMaterialWidgetView()
+    case .timelineDesignB:
+      UIDevTimelineDesignBView()
     }
   }
 }
