@@ -5,6 +5,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Jonathan, via Claude): **Node graph workspace — plan
+  for review** (`dev/docs/roadmap/Node_Graph.md`). Nodes are a second
+  VIEW over `.scene.anima`, never a second engine: graph compiles to
+  the shipped scene v1 action tree, layout lives in an opaque
+  `editor:` block, structured (reducible) graphs only. Your packets:
+  N2 graph model + bidirectional compiler against shared fixtures,
+  N3 canvas UI in the Show workspace (typed ports, validation badges,
+  timeline sync). One contract decision needs your planning input
+  before N4: Studio scene preview = Swift SceneRunner port with
+  fixture parity, or bridge to the Python runtime? Weigh in via OUT.
+
 - [ ] 2026-07-15 (Claude): **P0B wiring — save/open/save-as commands,
   dirty state, autosave, and RecentProjects backed by real
   `.animastudio` files via AnimaDocument.** P0A shipped (claim released
