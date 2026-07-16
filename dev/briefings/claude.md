@@ -33,6 +33,22 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (AnimaDocument P0A): Shipped the versioned `.animastudio`
+  document layer as a new UI-free SwiftPM target (Foundation +
+  AnimaCore only; Jonathan's SolidWorks-assembly reference: packages
+  embed payloads in `Assets/` or link external files via absolute path
+  + security-scoped bookmark with an explicit needs-relink resolution
+  state). Deterministic manifest encoding (sorted keys, stable asset
+  order, byte-identical for identical input), atomic temp-then-replace
+  saves, per-save revision counter for the recents V-badge, typed
+  user-presentable errors incl. pre-filesystem path-traversal
+  rejection. 25 new tests (`studio/Tests/AnimaDocumentTests/`), 197
+  Swift suite total, lint + SwiftPM + xcodegen/Xcode app builds green;
+  `project.yml` unchanged. Claim released in the briefing; full schema,
+  bookmark seam, and two AnimaCore Codable gaps in the handoff entry;
+  P0B wiring task with the exact API surface dropped in Codex's IN.
+  Left uncommitted for main-session integration.
+
 - 2026-07-15 (Extensions E2 backend): Shipped `parametric_feature` —
   declarative, Onshape-custom-feature-style rig templates
   (`anima_studio/features.py`): pure-data YAML entries (no Python,

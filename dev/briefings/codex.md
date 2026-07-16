@@ -5,6 +5,53 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Claude): **P0B wiring — save/open/save-as commands,
+  dirty state, autosave, and RecentProjects backed by real
+  `.animastudio` files via AnimaDocument.** P0A shipped (claim released
+  in the briefing; 25 new tests, 197 suite total): new UI-free SwiftPM
+  target `AnimaDocument` (Foundation + AnimaCore only) — your
+  `AnimaStudioUI` layer adds it as a dependency and wires the flows.
+  The exact API surface you consume:
+  - `AnimaStudioDocument` — value type: `project: AnimaProject`,
+    `metadata: DocumentMetadata` (`revision: Int` [0 = never saved;
+    render as "V\(revision)"], `milestoneName: String?`,
+    `modifiedDate: Date?`), `assets: [DocumentAssetReference]`,
+    `displayName` (projection of `project.name`).
+  - `AnimaDocumentStore(bookmarkStyle: .securityScoped, now: Date.init)`
+    — all methods below are on this small struct:
+    - `save(_ document, to packageURL) throws -> AnimaStudioDocument`
+      — atomic temp-then-replace; bumps revision + modifiedDate;
+      returns the updated document (assets in canonical order) — adopt
+      the returned value as the new in-memory/dirty-state baseline.
+    - `load(from packageURL) throws -> AnimaStudioDocument` — full
+      validation (version gate, traversal, duplicate names/IDs,
+      embedded payload presence).
+    - `embedAsset(from sourceURL, into packageURL, document, kind:
+      String) throws -> AnimaStudioDocument` — copies the payload into
+      `Assets/`; persist by calling `save` afterward.
+    - `linkAsset(at externalURL, into document, kind: String) throws
+      -> AnimaStudioDocument` — SolidWorks-style external reference:
+      absolute path + security-scoped bookmark, no copy.
+    - `resolveAsset(_ asset, packageURL) throws -> AssetResolution` —
+      `.resolved(URL)` or `.needsRelink(reason)` (missingBookmark /
+      staleBookmark / unresolvableBookmark / fileMissing) — surface a
+      relink UI, don't treat as an error.
+  - Errors: `AnimaDocumentError` (LocalizedError, user-presentable):
+    `packageNotFound`, `corruptManifest(path:detail:)`,
+    `unsupportedVersion(found:supported:)`, `missingAsset(path:)`,
+    `duplicateAssetName(name:)`, `duplicateAssetID(id:)`,
+    `pathTraversal(path:)`, `writeFailed(path:detail:)`.
+  - Notes: `DocumentAssetReference` is keyed by the same `AssetID` as
+    `AnimaCore.ProjectAsset` — keep the pair in sync on import (core
+    row = meaning, document row = storage). Byte-determinism: identical
+    input saves byte-identically, so a bytes-on-disk dirty check is
+    valid if you prefer it over value equality. RecentProjects: map
+    `displayName`/`metadata.revision`/`metadata.milestoneName`/
+    `modifiedDate` straight onto `RecentProjectSummary`; add the
+    package URL (+ bookmark?) to your summary storage — the store
+    doesn't own the recents list. Full schema + decisions in the
+    briefing handoff entry.
+
 - [x] 2026-07-15 (Claude, updated): **Kinematics plan v2 for review** —
   Jonathan added Onshape's three-rules detail: the plan now also specs
   per-mate **offsets** (K9), on-the-fly mate **kind switching** with

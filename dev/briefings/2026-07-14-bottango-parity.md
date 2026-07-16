@@ -106,6 +106,9 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | Serial wire transport (pyserial) as an OutputAdapter — real-hardware bridge | `anima_studio/serial_transport.py`, `anima_studio/tests/test_serial_transport.py`, `pyproject.toml` (add pyserial), `dev/docs/roadmap/Wire_Protocol.md` (transport note if needed) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (loop:// URL tests, no hardware) | released 2026-07-15 (20 new tests, 370 suite total at release time; ruff clean; `pip install -e ".[dev]"` re-verified with pyserial) |
 | Codex | Start-screen Recent Projects gallery | `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/RecentProjects.swift`, `studio/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, `studio/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | thumbnail/name/last-opened/revision cards; real recency persistence; honest disabled reopen until P0; empty state; milestone-ready metadata; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 
+| Claude | `.scene.anima` execution v1 (backend show playback) | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py`, `examples/**.scene.anima`, `dev/docs/roadmap/Scene_Format.md` (v1 subset), `dev/docs/roadmap/Bottango_Parity.md` (B10 row) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Claude | AnimaDocument: versioned .animastudio package encoding (P0A core, no UI) | `studio/Sources/AnimaDocument/**`, `studio/Tests/AnimaDocumentTests/**`, `studio/Package.swift` (target entries only), `studio/project.yml` (if needed) | `swift test` + claimed-file lint; deterministic round-trip; typed errors; no SwiftUI imports | released 2026-07-15 (25 new tests; 197 suite total; project.yml unchanged — app consumes package products, no new wiring needed) |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -151,6 +154,60 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, AnimaDocument P0A — versioned `.animastudio`
+  package encoding, no UI):** Shipped the durable document layer as a
+  new Foundation-only SwiftPM target `AnimaDocument` (depends on
+  AnimaCore only; 25 new tests in
+  `studio/Tests/AnimaDocumentTests/AnimaDocumentStoreTests.swift`;
+  197 Swift suite total, lint clean, `swift build`, `xcodegen generate`
+  + Xcode app build all green over the shared tree; `project.yml`
+  untouched — the app links package *products*, and nothing app-side
+  consumes AnimaDocument yet). **Package format:** `.animastudio` is a
+  directory: `project.json` + `Assets/`. Manifest v1 (snake_case keys
+  on the manifest's own fields; the nested AnimaCore project keeps its
+  native camelCase Codable keys — do NOT put a key-conversion strategy
+  on the encoder, it breaks `parentPartID`-style keys):
+  `format_version` "1", `display_name` (projection of `project.name` —
+  core stays the one truth), `revision` (bumped per save; feeds the
+  V-badge), optional `milestone_name`, `modified_date` (ISO-8601,
+  truncated to whole seconds so round trips compare equal), `project`,
+  `assets[]` (`id`, `original_filename`, `kind` string, `mode`
+  embedded|linked, `package_path` | `external_path`+`bookmark`
+  base64). Encoding is deterministic: `.sortedKeys + .prettyPrinted +
+  .withoutEscapingSlashes`, assets sorted by ID (byte-identical output
+  for identical input — tested; with a fixed clock a no-change re-save
+  differs in exactly the revision field). **Atomicity:** save stages
+  the whole package (manifest + embedded payload copies from the live
+  package) in an `itemReplacementDirectory` temp dir, then
+  `replaceItemAt`/`moveItem` — a failed save leaves the old package
+  byte-identical (tested) and no staging leftovers. **Linked assets
+  (SolidWorks reference-part behavior):** `linkAsset` records absolute
+  path + bookmark `Data`; `resolveAsset` returns
+  `.needsRelink(reason)` (missingBookmark / staleBookmark /
+  unresolvableBookmark / fileMissing) instead of throwing — broken
+  links are user-fixable state, not errors. Bookmarks are
+  security-scoped by default with a documented seam
+  (`BookmarkStyle.plain`) because the un-sandboxed swiftpm test runner
+  can't reliably create security-scoped bookmarks; tests link a real
+  temp file, delete it, and assert needs-relink. **Typed errors**
+  (`AnimaDocumentError`, all `LocalizedError`): packageNotFound,
+  corruptManifest(path:detail:), unsupportedVersion(found:supported:),
+  missingAsset, duplicateAssetName, duplicateAssetID, pathTraversal
+  (validated *before* any filesystem access; `../`, absolute, and
+  `Assets/../x` manifest paths all rejected — payload paths must be
+  `Assets/<component>`), writeFailed. **AnimaCore Codable gaps found
+  (not fixed — core untouched):** (1) synthesized `init(from:)`
+  bypasses the memberwise-init preconditions, so a hand-edited
+  manifest can decode an AnimaProject violating core invariants
+  (duplicate joint IDs, min>max limits) without error — core
+  validation should eventually run post-decode; (2)
+  `ProjectAsset.sourcePath` overlaps the document asset table: the
+  document layer keys `DocumentAssetReference` by the same `AssetID`
+  so the core row keeps owning meaning (name/kind enum) while the
+  document owns storage — P0B must keep the two in sync when
+  importing. Codex: P0B task with the exact API surface is in your
+  mailbox IN. Not committed per packet instructions.
 
 - **2026-07-15 (Claude, Extensions E2 backend — parametric_feature
   templates + expansion):** Shipped `anima_studio/features.py` plus the

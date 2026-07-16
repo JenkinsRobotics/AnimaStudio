@@ -248,11 +248,30 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. One hundred seventy-two tests pass with
+  inspector. One hundred ninety-seven tests pass with
   `cd studio && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key
-  navigation, and loop/non-loop playback. The Python
+  navigation, and loop/non-loop playback. The Swift side also ships the
+  durable document layer as a UI-free `AnimaDocument` package target:
+  `AnimaDocumentStore` saves/loads versioned `.animastudio` directory
+  packages (`project.json` manifest with `format_version` "1", display
+  name, per-save revision counter for the recents V-badge, optional
+  milestone name, ISO-8601 modified date, the encoded AnimaCore project,
+  and an asset table; `Assets/` holds embedded payloads). Saves are
+  atomic (staged temp directory swapped into place — a crashed save never
+  corrupts an existing package) and deterministic (sorted keys, stable
+  asset ordering: identical input encodes byte-identically). Assets are
+  SolidWorks-assembly style: `embedded` copies the payload into the
+  package, `linked` records the external absolute path plus a
+  security-scoped bookmark, and resolution returns an explicit
+  needs-relink state for stale/missing links instead of throwing.
+  Corrupt manifests, unsupported versions, duplicate asset names/IDs,
+  missing payloads, and any manifest path escaping the package are
+  rejected with typed, user-presentable errors (traversal is validated
+  before the path touches the filesystem). Save/open/dirty-state UI
+  wiring on top of this store has not landed yet — reopening from the
+  home screen stays honestly disabled until it does. The Python
   package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
   the Anima Wire Protocol v0 reference host (`anima_studio/wire.py` — encode
