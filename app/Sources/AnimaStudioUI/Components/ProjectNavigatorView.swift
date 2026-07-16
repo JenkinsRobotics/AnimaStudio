@@ -64,11 +64,13 @@ struct ProjectNavigatorView: View {
       projectSection
       semanticRigSection
       jointSection
+      relationSection
       sourceHierarchySection
     case .animate:
       animationSection
       semanticRigSection
       jointSection
+      relationSection
       sourceHierarchySection
     case .show:
       showSection
@@ -239,6 +241,26 @@ struct ProjectNavigatorView: View {
     }
   }
 
+  @ViewBuilder
+  private var relationSection: some View {
+    if !workspace.engineRelations.isEmpty {
+      Section("Relations · Advanced") {
+        ForEach(filteredEngineRelations) { relation in
+          PartTreeRow(
+            title: relationTypeLabel(for: relation),
+            role: .joint,
+            detail: relation.isReversed ? "Reversed" : "Coupled"
+          )
+          .tag(NavigatorItem.relation(relation.id))
+          .help("\(relation.driver) → \(relation.driven)")
+        }
+        if filteredEngineRelations.isEmpty {
+          noFilterResults
+        }
+      }
+    }
+  }
+
   private var animationSection: some View {
     Section("Animations") {
       ForEach(filteredClips, id: \.name) { clip in
@@ -392,12 +414,25 @@ struct ProjectNavigatorView: View {
     }
   }
 
+  private var filteredEngineRelations: [AnimaCoreRelationSummary] {
+    workspace.engineRelations.filter { relation in
+      matchesFilter(relationTypeLabel(for: relation))
+        || matchesFilter(relation.driver)
+        || matchesFilter(relation.driven)
+    }
+  }
+
   private func mateTypeLabel(for mate: AnimaCoreJointSummary) -> String {
     workspace.engineMateType(for: mate)?.label
       ?? mate.type.replacingOccurrences(
         of: "_",
         with: " "
       ).capitalized
+  }
+
+  private func relationTypeLabel(for relation: AnimaCoreRelationSummary) -> String {
+    workspace.engineRelationType(for: relation)?.label
+      ?? relation.kind.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
   }
 
   private var filteredComponentGroups: [NavigatorComponentGroup] {

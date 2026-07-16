@@ -26,6 +26,7 @@ public struct AnimaCoreRigSummary: Codable, Equatable, Sendable {
   public let parameters: [AnimaCoreParameterSummary]
   public let clips: [AnimaCoreClipSummary]
   public let outputs: [AnimaCoreOutputSummary]
+  public let relations: [AnimaCoreRelationSummary]
 }
 
 public struct AnimaCoreRigIdentity: Codable, Equatable, Sendable {
@@ -210,6 +211,76 @@ public struct AnimaCoreMateTypeDOF: Codable, Equatable, Sendable {
   public let kind: AnimaCoreDOFKind
   public let unit: AnimaCoreDOFUnit
   public let axis: AnimaCoreMateAxis
+}
+
+public enum AnimaCoreRelationKind: String, Codable, CaseIterable, Sendable {
+  case gear
+  case rackPinion = "rack_pinion"
+  case screw
+  case linear
+}
+
+public struct AnimaCoreRelationTypeCatalog: Codable, Equatable, Sendable {
+  public let relationTypes: [AnimaCoreRelationTypeSummary]
+
+  enum CodingKeys: String, CodingKey {
+    case relationTypes = "relation_types"
+  }
+}
+
+public struct AnimaCoreRelationTypeSummary: Codable, Equatable, Sendable, Identifiable {
+  public let kind: AnimaCoreRelationKind
+  public let label: String
+  public let driverKind: AnimaCoreDOFKind
+  public let drivenKind: AnimaCoreDOFKind
+  public let ratioField: AnimaCoreRelationRatioField
+  public let supportsReverse: Bool
+
+  public var id: AnimaCoreRelationKind { kind }
+
+  enum CodingKeys: String, CodingKey {
+    case kind
+    case label
+    case driverKind = "driver_kind"
+    case drivenKind = "driven_kind"
+    case ratioField = "ratio_field"
+    case supportsReverse = "reverse_supported"
+  }
+}
+
+public struct AnimaCoreRelationRatioField: Codable, Equatable, Sendable {
+  public let key: String
+  public let unit: String
+}
+
+public struct AnimaCoreRelationSummary: Codable, Equatable, Sendable, Identifiable {
+  public let kind: AnimaCoreRelationKind
+  public let driver: String
+  public let driven: String
+  public let ratio: Double
+  public let offset: Double
+  public let isReversed: Bool
+  public let magnitude: Double
+  public let ratioFieldValue: Double
+  public let display: [String: Double]
+
+  /// Relations do not yet carry a persisted tracking id. This deterministic
+  /// key is presentation identity only and is never written into `.anima`.
+  public var id: String {
+    "\(kind.rawValue):\(driver)->\(driven)"
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case kind
+    case driver
+    case driven
+    case ratio
+    case offset
+    case isReversed = "reverse"
+    case magnitude
+    case ratioFieldValue = "ratio_field_value"
+    case display
+  }
 }
 
 public struct AnimaCoreDOFSummary: Codable, Equatable, Sendable {

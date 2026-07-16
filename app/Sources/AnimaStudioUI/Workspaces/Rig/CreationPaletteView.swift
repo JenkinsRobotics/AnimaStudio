@@ -1,3 +1,4 @@
+import AnimaCoreClient
 import AnimaEvaluation
 import AnimaModel
 import SwiftUI
@@ -31,6 +32,7 @@ struct CreationPaletteView: View {
         HStack(alignment: .center, spacing: 0) {
           structuresGroup
           matesGroup
+          relationsGroup
           futureGroup(
             title: "Connectors",
             systemImage: "scope",
@@ -111,6 +113,17 @@ struct CreationPaletteView: View {
     .frame(height: StudioMetrics.rigCreationRibbonHeight)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Rig creation tools")
+    .sheet(item: $workspace.relationDraft) { draft in
+      RelationEditorView(
+        draft: Binding(
+          get: { workspace.relationDraft ?? draft },
+          set: { workspace.relationDraft = $0 }
+        ),
+        driverOptions: workspace.relationDOFOptions(kind: draft.type.driverKind),
+        drivenOptions: workspace.relationDOFOptions(kind: draft.type.drivenKind),
+        dismiss: workspace.dismissRelationDraft
+      )
+    }
   }
 
   private var structuresGroup: some View {
@@ -169,6 +182,42 @@ struct CreationPaletteView: View {
     }
     return
       "\(kind.motionSummary) Choose a connector on the moving component, then one on the fixed component."
+  }
+
+  private var relationsGroup: some View {
+    CreationToolGroup(
+      title: "Relations",
+      systemImage: "link",
+      tint: StudioPalette.joint,
+      detail: "4 engine types"
+    ) {
+      if workspace.engineRelationTypes.isEmpty {
+        CreationToolButton(
+          title: "Loading",
+          systemImage: "ellipsis.circle",
+          tint: StudioPalette.muted,
+          isEnabled: false,
+          help: "The Relations catalog appears after AnimaCore connects"
+        ) {}
+      } else {
+        ForEach(workspace.engineRelationTypes) { type in
+          CreationToolButton(
+            title: type.label,
+            systemImage: type.kind.systemImage,
+            tint: StudioPalette.joint,
+            help: relationToolHelp(type)
+          ) {
+            workspace.beginRelationDraft(type)
+          }
+        }
+      }
+    }
+  }
+
+  private func relationToolHelp(_ type: AnimaCoreRelationTypeSummary) -> String {
+    let presentation = RelationEditorPresentation(type: type)
+    return
+      "\(presentation.compatibilitySummary). Opens the engine-backed relation draft dialog; document mutation is not wired yet."
   }
 
   private func futureGroup(

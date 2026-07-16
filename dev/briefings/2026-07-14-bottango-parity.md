@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Engine-driven Relations palette, navigator, inspector, and draft dialog | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{ProjectNavigatorView,InspectorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{CreationPaletteView,EngineRelationInspectorView,RelationEditorPresentation,RelationEditorView}.swift`, `app/Sources/RealityKitViewport/RobotPreviewView.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `relation_types` catalog; decode `load_character.relations`; four Rig ribbon tools; filtered driver/driven DOF pickers with ratio/reverse presentation; existing relation navigator + inspector; selecting a relation highlights both coupled mate child components; no local coupling semantics or character mutation; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | All-ten-mate Swift UI + canonical engine pose rendering | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{CreationPaletteView,EngineMateInspectorView,MateCreationToolCatalog,MateEditorPresentation}.swift`, `app/Sources/AnimaStudioUI/Workspaces/UIDev/{UIDevEmbeddedWorkspacePreview,UIDevMateEditorLab}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,EngineResolvedPose,MateConnectorMarkers}.swift`, removal of `app/Sources/RealityKitViewport/RigPoseResolver.swift` and `app/Sources/AnimaEvaluation/MateConnectorMath.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests,RealityKitViewportTests,AnimaEvaluationTests}/**`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | decode the engine's ten-type catalog/category/drivable/axis contract; category-aware Width/Tangent inspector; engine `resolve_pose` drives RealityKit world transforms at the playhead; no Swift mate/pose semantics; focused/full tests, lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Assets-first startup + self-contained AnimaCore helper repair | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspacePresentationTests.swift`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | new workspaces open in Assets; bundled Python launchers resolve only bundle/system libraries; helper handshake succeeds from the sandboxed root app; Swift tests, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | released 2026-07-15 |
@@ -195,6 +196,23 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Codex, engine-driven Relations UI):** Added typed Swift bridge
+  projections for `relation_types` and `load_character.relations`; the client
+  requests the four-entry catalog alongside mates. The Rig ribbon now presents
+  Gear, Rack and pinion, Screw, and Linear directly from that catalog. One
+  shared draft dialog filters Driver/Driven DOFs by the engine's required kinds,
+  shows the correct positive ratio or mm/revolution field, keeps Reverse as a
+  separate control, and previews the signed native value without mutating the
+  character. Imported relations appear in the navigator and a dedicated
+  read-only inspector. Selecting one splits its two DOF paths at the joint name,
+  resolves the engine mates, and highlights their child components in
+  RealityKit; no relation evaluation or dependency semantics were added in
+  Swift. Live proof: the rc_car rack reads `125.663706 mm/rev` and the UI
+  conversion previews `0.02 m/rad`. Verification passed: 220 XCTest cases plus
+  11 real-bridge Swift Testing cases, recursive format lint, `git diff --check`,
+  native Xcode build, root-app build, bundled-helper embedding, strict deep
+  signing, and launch with the app/helper still alive.
 
 - **2026-07-16 (Codex, all-ten-mate UI + canonical engine pose):** Studio now
   decodes the engine's ten-type `mate_types` catalog, including category,

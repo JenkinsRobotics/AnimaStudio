@@ -21,6 +21,7 @@ struct AnimaCoreClientTests {
     #expect(hello.capabilities.contains("evaluate"))
     #expect(hello.capabilities.contains("resolve_pose"))
     #expect(hello.capabilities.contains("mate_types"))
+    #expect(hello.capabilities.contains("relation_types"))
 
     let mateCatalog = try await client.mateTypes()
     #expect(
@@ -50,6 +51,21 @@ struct AnimaCoreClientTests {
         "simulation_connection",
       ]
     )
+
+    let relationCatalog = try await client.relationTypes()
+    #expect(
+      relationCatalog.relationTypes.map(\.kind)
+        == [.gear, .rackPinion, .screw, .linear]
+    )
+    let rackPinionType = try #require(
+      relationCatalog.relationTypes.first { $0.kind == .rackPinion }
+    )
+    #expect(rackPinionType.label == "Rack and pinion")
+    #expect(rackPinionType.driverKind == .rotation)
+    #expect(rackPinionType.drivenKind == .translation)
+    #expect(rackPinionType.ratioField.key == "distance_per_revolution")
+    #expect(rackPinionType.ratioField.unit == "mm")
+    #expect(rackPinionType.supportsReverse)
 
     let characterURL =
       repositoryRoot
@@ -91,6 +107,35 @@ struct AnimaCoreClientTests {
 
     try await client.release(handle: loaded.handle)
     await client.shutdown()
+  }
+
+  @Test
+  func loadedCharacterCarriesEngineDescribedRelations() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    defer { Task { await client.shutdown() } }
+
+    let text = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "examples/rc_car.character.anima"),
+      encoding: .utf8
+    )
+    let loaded = try await client.loadCharacter(text: text)
+    let relation = try #require(loaded.rig.relations.first)
+
+    #expect(relation.kind == .rackPinion)
+    #expect(relation.driver == "steering.rotation")
+    #expect(relation.driven == "rack.travel")
+    #expect(relation.ratio == 0.02)
+    #expect(!relation.isReversed)
+    #expect(relation.magnitude == 0.02)
+    #expect(abs(relation.ratioFieldValue - 125.663_706) < 0.000_001)
+    #expect(relation.display == ["pinion_diameter_mm": 40])
   }
 
   @Test

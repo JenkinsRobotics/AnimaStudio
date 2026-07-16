@@ -139,6 +139,46 @@ struct AnimaCoreWorkspaceIntegrationTests {
     await workspace.shutdownAnimaCore()
   }
 
+  @Test
+  func relationsPopulateCatalogNavigatorAndCoupledViewportHighlights() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    let characterURL = repositoryRoot.appendingPathComponent(
+      "examples/rc_car.character.anima")
+
+    await workspace.importAnimaCharacter(from: characterURL)
+
+    #expect(workspace.engineRelationTypes.map(\.kind) == [.gear, .rackPinion, .screw, .linear])
+    let relation = try #require(workspace.engineRelations.first)
+    #expect(relation.kind == .rackPinion)
+    #expect(abs(relation.ratioFieldValue - 125.663_706) < 0.000_001)
+
+    workspace.selection = [.relation(relation.id)]
+    #expect(workspace.selectedEngineRelation?.id == relation.id)
+    let highlightedNames = Set(
+      workspace.project.rig.parts.compactMap { part in
+        workspace.viewportHighlightedPartIDs.contains(part.id) ? part.displayName : nil
+      }
+    )
+    #expect(highlightedNames == ["front_axle", "steering_rack"])
+
+    let driverOptions = workspace.relationDOFOptions(kind: .rotation)
+    let drivenOptions = workspace.relationDOFOptions(kind: .translation)
+    #expect(driverOptions.contains { $0.path == "steering.rotation" })
+    #expect(drivenOptions.map(\.path) == ["rack.travel"])
+
+    await workspace.shutdownAnimaCore()
+  }
+
   private var fastenedCharacterText: String {
     """
     anima_version: "2.0"

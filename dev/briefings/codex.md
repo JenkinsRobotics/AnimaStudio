@@ -205,6 +205,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — Relations UI wired to AnimaCore:** Studio now consumes the
+  four-type relation catalog and imported relation descriptors. The Rig ribbon
+  exposes Gear, Rack and pinion, Screw, and Linear; one generic draft dialog
+  filters driver/driven DOFs from the engine catalog, presents ratio or
+  mm/revolution plus Reverse, and previews the native signed ratio without
+  claiming canonical mutation. Existing relations appear in the navigator and
+  inspector, and selection highlights both coupled mate child components in the
+  viewport. The live rc_car value is `125.663706 mm/rev` ↔ `0.02 m/rad`.
+  Verification: 220 XCTest + 11 real-bridge tests, recursive lint, Xcode/root
+  builds, helper embedding, deep signing, and launch all passed.
+
 - **2026-07-16 — all ten mate presentations and engine-resolved motion:** The
   Swift client now consumes category/drivable/axis data for the complete mate
   catalog and decodes both connector controls and Tangent's geometry payload.

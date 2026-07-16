@@ -13,6 +13,7 @@ enum NavigatorItem: Hashable {
   case structure
   case modelNode(ModelEntityPath)
   case joint(JointID)
+  case relation(String)
   case animation(String)
 }
 
@@ -66,6 +67,9 @@ final class StudioWorkspaceModel {
   var engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:]
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
   var engineMates: [AnimaCoreJointSummary] = []
+  var engineRelationTypes: [AnimaCoreRelationTypeSummary] = []
+  var engineRelations: [AnimaCoreRelationSummary] = []
+  var relationDraft: RelationDraft?
   var componentGroups: [NavigatorComponentGroup] = []
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
@@ -161,8 +165,33 @@ final class StudioWorkspaceModel {
     return engineMates.first { $0.selectionKey == selectedID.rawValue }
   }
 
+  var selectedEngineRelation: AnimaCoreRelationSummary? {
+    guard case .relation(let selectedID) = primarySelection else { return nil }
+    return engineRelations.first { $0.id == selectedID }
+  }
+
   func engineMateType(for mate: AnimaCoreJointSummary) -> AnimaCoreMateTypeSummary? {
     engineMateTypes.first { $0.type == mate.type }
+  }
+
+  func engineRelationType(
+    for relation: AnimaCoreRelationSummary
+  ) -> AnimaCoreRelationTypeSummary? {
+    engineRelationTypes.first { $0.kind == relation.kind }
+  }
+
+  var viewportHighlightedPartIDs: Set<PartID> {
+    var highlighted = Set(selectedComponentIDs)
+    guard let relation = selectedEngineRelation else { return highlighted }
+    for path in [relation.driver, relation.driven] {
+      guard let mateName = Self.mateName(fromDOFPath: path),
+        let mate = engineMates.first(where: { $0.name == mateName }),
+        let childPart = mate.childPart,
+        let partID = enginePartIDsByName[childPart]
+      else { continue }
+      highlighted.insert(partID)
+    }
+    return highlighted
   }
 
   /// The standing sub-object (face/edge/corner/axis/origin) selection made
@@ -181,7 +210,7 @@ final class StudioWorkspaceModel {
     switch primarySelection {
     case .modelNode, .part, .structure, .joint:
       true
-    case .project, .asset, .componentGroup, .animation, nil:
+    case .project, .asset, .componentGroup, .relation, .animation, nil:
       false
     }
   }
@@ -217,8 +246,10 @@ final class StudioWorkspaceModel {
     do {
       let hello = try await animaCoreClient.start()
       let mateCatalog = try await animaCoreClient.mateTypes()
+      let relationCatalog = try await animaCoreClient.relationTypes()
       animaCoreEngineVersion = hello.engineVersion
       engineMateTypes = mateCatalog.mateTypes
+      engineRelationTypes = relationCatalog.relationTypes
       animaCoreState = .ready(engineVersion: hello.engineVersion)
     } catch {
       animaCoreState = .failed
@@ -251,6 +282,7 @@ final class StudioWorkspaceModel {
       let text = try String(contentsOf: url, encoding: .utf8)
       let hello = try await animaCoreClient.start()
       let mateCatalog = try await animaCoreClient.mateTypes()
+      let relationCatalog = try await animaCoreClient.relationTypes()
       let loaded = try await animaCoreClient.loadCharacter(text: text)
       pendingHandle = loaded.handle
       let clip = loaded.rig.clips.first
@@ -275,6 +307,8 @@ final class StudioWorkspaceModel {
       animaCoreEngineVersion = hello.engineVersion
       engineMateTypes = mateCatalog.mateTypes
       engineMates = loaded.rig.joints
+      engineRelationTypes = relationCatalog.relationTypes
+      engineRelations = loaded.rig.relations
       engineEvaluation = evaluation
       engineEvaluationTimeSeconds = evaluationTimeSeconds
       enginePartIDsByName = preview.partIDsByEngineName
@@ -290,6 +324,7 @@ final class StudioWorkspaceModel {
       componentGroups.removeAll()
       lockedComponentIDs.removeAll()
       lockedMateIDs.removeAll()
+      relationDraft = nil
       componentAppearances.removeAll()
       importedModelURL = nil
       importedModelHierarchy = nil
@@ -324,7 +359,32 @@ final class StudioWorkspaceModel {
     engineFrameRequestRevision += 1
     engineMateTypes.removeAll()
     engineMates.removeAll()
+    engineRelationTypes.removeAll()
+    engineRelations.removeAll()
+    relationDraft = nil
     animaCoreState = .unavailable
+  }
+
+  func beginRelationDraft(_ type: AnimaCoreRelationTypeSummary) {
+    relationDraft = RelationDraft(type: type)
+  }
+
+  func dismissRelationDraft() {
+    relationDraft = nil
+  }
+
+  func relationDOFOptions(kind: AnimaCoreDOFKind) -> [RelationDOFOption] {
+    engineMates.flatMap { mate in
+      mate.degreesOfFreedom.compactMap { degreeOfFreedom in
+        guard degreeOfFreedom.kind == kind else { return nil }
+        return RelationDOFOption(
+          path: degreeOfFreedom.path,
+          mateName: mate.name,
+          mateTrackingID: mate.id,
+          kind: degreeOfFreedom.kind
+        )
+      }
+    }
   }
 
   /// Refreshes both the inspector/output frame and the renderer transform from
@@ -1172,6 +1232,10 @@ final class StudioWorkspaceModel {
     )
   }
 
+  private static func mateName(fromDOFPath path: String) -> String? {
+    path.split(separator: ".", maxSplits: 1).first.map(String.init)
+  }
+
   private func updateActivePresentation(
     _ update: (inout WorkspacePresentation) -> Void
   ) {
@@ -1183,7 +1247,7 @@ final class StudioWorkspaceModel {
   private func revealInspectorForInspectableSelection() {
     let hasInspectableSelection = selection.contains { item in
       switch item {
-      case .asset, .part, .componentGroup, .modelNode, .joint, .animation:
+      case .asset, .part, .componentGroup, .modelNode, .joint, .relation, .animation:
         true
       case .project, .structure:
         false

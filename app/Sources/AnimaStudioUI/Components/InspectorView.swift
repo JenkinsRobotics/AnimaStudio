@@ -122,6 +122,11 @@ struct InspectorView: View {
         mate: selectedEngineMate,
         mateType: workspace.engineMateType(for: selectedEngineMate)
       )
+    } else if let selectedEngineRelation = workspace.selectedEngineRelation {
+      EngineRelationInspectorView(
+        relation: selectedEngineRelation,
+        relationType: workspace.engineRelationType(for: selectedEngineRelation)
+      )
     } else if let selectedJoint {
       if workspace.isMateLocked(selectedJoint.id) {
         lockedEditingSection(unlockTitle: "Unlock Mate") {

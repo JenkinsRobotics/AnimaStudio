@@ -28,6 +28,7 @@ public struct RobotPreviewView: View {
   private let navigationSensitivity: PreviewNavigationSensitivity
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
+  private let highlightedPartIDs: Set<PartID>
   private let partAppearances: [PartID: PreviewPartAppearance]
   private let focusedPartIsLocked: Bool
   private let mateCandidatePartIDs: Set<PartID>
@@ -64,6 +65,7 @@ public struct RobotPreviewView: View {
     navigationSensitivity: PreviewNavigationSensitivity = PreviewNavigationSensitivity(),
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
+    highlightedPartIDs: Set<PartID> = [],
     partAppearances: [PartID: PreviewPartAppearance] = [:],
     focusedPartIsLocked: Bool = false,
     mateCandidatePartIDs: Set<PartID> = [],
@@ -99,6 +101,7 @@ public struct RobotPreviewView: View {
     self.navigationSensitivity = navigationSensitivity
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
+    self.highlightedPartIDs = highlightedPartIDs
     self.partAppearances = partAppearances
     self.focusedPartIsLocked = focusedPartIsLocked
     self.mateCandidatePartIDs = mateCandidatePartIDs
@@ -209,6 +212,7 @@ public struct RobotPreviewView: View {
       }
       Self.applySelection(
         focusedPartID,
+        highlightedPartIDs: highlightedPartIDs,
         isLocked: focusedPartIsLocked,
         allowsTransformGizmo: !isPlacementActive,
         rig: rig,
@@ -597,6 +601,7 @@ public struct RobotPreviewView: View {
 
   private static func applySelection(
     _ selectedPartID: PartID?,
+    highlightedPartIDs: Set<PartID>,
     isLocked: Bool,
     allowsTransformGizmo: Bool,
     rig: CharacterRig,
@@ -605,14 +610,15 @@ public struct RobotPreviewView: View {
     for part in rig.parts {
       guard let entity = root.findEntity(named: partEntityName(part.id)) else { continue }
       let isSelected = part.id == selectedPartID
+      let isHighlighted = isSelected || highlightedPartIDs.contains(part.id)
       let highlight = entity.findEntity(named: TransformGizmoFactory.selectionHighlightName)
       let gizmo = entity.findEntity(named: TransformGizmoFactory.gizmoName)
 
-      if isSelected {
+      if isHighlighted {
         if highlight == nil {
           entity.addChild(TransformGizmoFactory.makeSelectionHighlight(for: part.primitiveKind))
         }
-        if isLocked || !allowsTransformGizmo {
+        if !isSelected || isLocked || !allowsTransformGizmo {
           gizmo?.removeFromParent()
         } else if gizmo == nil {
           entity.addChild(TransformGizmoFactory.make())

@@ -246,6 +246,7 @@ struct StudioWorkspaceView: View {
         navigationSensitivity: viewportNavigationSensitivity,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
+        highlightedPartIDs: workspace.viewportHighlightedPartIDs,
         partAppearances: workspace.viewportPartAppearances,
         focusedPartIsLocked: workspace.selectedPartID.map(workspace.isComponentLocked) ?? false,
         mateCandidatePartIDs: workspace.mateCandidatePartIDs,
@@ -408,7 +409,7 @@ struct StudioWorkspaceView: View {
       false
     case .rig:
       switch workspace.primarySelection {
-      case .asset, .part, .componentGroup, .modelNode, .joint:
+      case .asset, .part, .componentGroup, .modelNode, .joint, .relation:
         true
       case .project, .structure, .animation, nil:
         false

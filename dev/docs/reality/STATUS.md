@@ -118,7 +118,19 @@
   editing the canonical character text and revalidating it through the bridge
   is the next mate-authoring packet. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
-  features. Its project
+  features. The Rig ribbon also consumes AnimaCore's `relation_types` catalog
+  and presents Gear, Rack and pinion, Screw, and Linear in engine order. Each
+  opens one shared draft dialog whose Driver and Driven pickers are filtered by
+  the engine-declared rotation/translation kinds. The dialog shows the positive
+  Relation ratio or Distance per revolution field, a separate Reverse direction
+  checkbox, and a read-only signed-native-ratio preview; it does not mutate the
+  character yet. Imported `load_character.relations` entries appear in the
+  navigator with a dedicated read-only inspector for their paths, ratio, offset,
+  reverse state, and reference geometry. Selecting one resolves both DOF paths
+  to their engine mates and highlights the two corresponding child components
+  in RealityKit. Dependency ordering, coupling motion, limits, and sign meaning
+  remain exclusively engine-owned; canonical create/edit is a later
+  character-document authoring packet. Its project
   window now uses a CAD-style two-level header: a compact global document/live
   row followed by one full-width contextual command ribbon. A fixed far-left
   dropdown switches Assets, Rig, Animate, Show, Nodes, and Hardware with Command-1…6;
