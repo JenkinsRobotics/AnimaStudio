@@ -27,13 +27,27 @@ final class MateEditorPresentationTests: XCTestCase {
       MateCreationToolKind.ball.editorDegreesOfFreedom,
       [.rotationX, .rotationY, .rotationZ]
     )
+    XCTAssertEqual(MateCreationToolKind.width.editorDegreesOfFreedom, [])
+    XCTAssertEqual(MateCreationToolKind.tangent.editorDegreesOfFreedom, [])
   }
 
   func testOnlyMotionBearingMatesExposeLimits() {
     XCTAssertFalse(MateCreationToolKind.fastened.supportsLimits)
-    for kind in MateCreationToolKind.allCases where kind != .fastened {
+    for kind in MateCreationToolKind.allCases
+    where ![.fastened, .width, .tangent].contains(kind) {
       XCTAssertTrue(kind.supportsLimits, "\(kind.title) should expose Limits")
     }
+    XCTAssertFalse(MateCreationToolKind.width.supportsLimits)
+    XCTAssertFalse(MateCreationToolKind.tangent.supportsLimits)
+  }
+
+  func testGeometryMatesSuppressOffsetAndUseTheCorrectSelectionModel() {
+    XCTAssertFalse(MateCreationToolKind.width.supportsOffset)
+    XCTAssertFalse(MateCreationToolKind.width.usesTangentSurfaceSelections)
+    XCTAssertTrue(MateCreationToolKind.width.isGeometryConstraint)
+    XCTAssertFalse(MateCreationToolKind.tangent.supportsOffset)
+    XCTAssertTrue(MateCreationToolKind.tangent.usesTangentSurfaceSelections)
+    XCTAssertTrue(MateCreationToolKind.tangent.isGeometryConstraint)
   }
 
   func testSliderOffsetsOnlyConstrainedTranslationAxes() {

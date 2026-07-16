@@ -1,4 +1,3 @@
-import AnimaEvaluation
 import AnimaModel
 import XCTest
 import simd
@@ -31,7 +30,7 @@ final class MateConnectorInferenceTests: XCTestCase {
     let part = RigPartDefinition(displayName: "Box", primitiveKind: .box)
 
     for candidate in MateConnectorInference.candidates(for: part) {
-      let basis = MateConnectorMath.orthonormalBasis(for: candidate.connector)
+      let basis = MateConnectorBasis.orthonormalBasis(for: candidate.connector)
       XCTAssertEqual(simd_length(basis.x), 1, accuracy: 1e-9)
       XCTAssertEqual(simd_length(basis.y), 1, accuracy: 1e-9)
       XCTAssertEqual(simd_length(basis.z), 1, accuracy: 1e-9)

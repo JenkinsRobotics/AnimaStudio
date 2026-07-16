@@ -2,9 +2,9 @@ import Foundation
 
 /// UI-facing mate catalog used by the Rig creation ribbon.
 ///
-/// The operational type and DOF definitions will come from AnimaModel when the
-/// typed-mate backend lands. Until then, only Revolute maps to an authoring
-/// action; the remaining entries are honest, disabled previews of that contract.
+/// AnimaCore supplies the operational type/category/DOF contract at runtime.
+/// This enum is only the stable ribbon presentation order. Revolute retains the
+/// transitional local draft action until canonical character mutation ships.
 enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
   case fastened
   case parallel
@@ -14,6 +14,8 @@ enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
   case pinSlot
   case planar
   case ball
+  case width
+  case tangent
 
   var id: Self { self }
 
@@ -27,6 +29,8 @@ enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
     case .pinSlot: "Pin Slot"
     case .planar: "Planar"
     case .ball: "Ball"
+    case .width: "Width"
+    case .tangent: "Tangent"
     }
   }
 
@@ -40,6 +44,8 @@ enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
     case .pinSlot: "arrow.left.and.right.circle"
     case .planar: "square.3.layers.3d"
     case .ball: "move.3d"
+    case .width: "arrow.left.and.right.square"
+    case .tangent: "circle.dotted.and.circle"
     }
   }
 
@@ -61,6 +67,10 @@ enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
       "Allows translation in X and Y plus rotation around Z."
     case .ball:
       "Allows rotation around X, Y, and Z while preventing translation."
+    case .width:
+      "Centers a component between two geometry references; it is not an animation driver."
+    case .tangent:
+      "Keeps two selected surfaces in contact; geometry is resolved by the app."
     }
   }
 
@@ -69,7 +79,7 @@ enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
     editorDofSummary
   }
 
-  var isImplemented: Bool {
+  var hasLocalDraftAuthoringAction: Bool {
     self == .revolute
   }
 }

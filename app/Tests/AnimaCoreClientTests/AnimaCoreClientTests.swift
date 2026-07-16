@@ -19,21 +19,25 @@ struct AnimaCoreClientTests {
     #expect(hello.engine == "animacore")
     #expect(hello.protocolVersion == 1)
     #expect(hello.capabilities.contains("evaluate"))
+    #expect(hello.capabilities.contains("resolve_pose"))
     #expect(hello.capabilities.contains("mate_types"))
 
     let mateCatalog = try await client.mateTypes()
     #expect(
-      Set(mateCatalog.mateTypes.map(\.type)).isSuperset(
-        of: [
-          "fastened", "parallel", "prismatic", "revolute",
-          "cylindrical", "pin_slot", "planar", "ball",
-        ]
-      )
+      Set(mateCatalog.mateTypes.map(\.type))
+        == Set(
+          [
+            "fastened", "parallel", "prismatic", "revolute",
+            "cylindrical", "pin_slot", "planar", "ball", "width", "tangent",
+          ]
+        )
     )
     let fastenedType = try #require(
       mateCatalog.mateTypes.first { $0.type == "fastened" }
     )
     #expect(fastenedType.label == "Fastened")
+    #expect(fastenedType.category == .kinematic)
+    #expect(fastenedType.isDrivable)
     #expect(fastenedType.degreeOfFreedomCount == 0)
     #expect(fastenedType.degreesOfFreedom.isEmpty)
     #expect(
@@ -56,13 +60,16 @@ struct AnimaCoreClientTests {
     #expect(loaded.rig.identity.name == "six_axis_arm")
     #expect(loaded.rig.joints.count == 6)
     let baseYaw = try #require(loaded.rig.joints.first)
+    let baseYawControls = try #require(baseYaw.controls)
     #expect(baseYaw.id == "Revolute 1")
     #expect(baseYaw.parentPart == "base")
     #expect(baseYaw.childPart == "shoulder")
-    #expect(baseYaw.controls.connectors.a?.feature == "base/top_face")
-    #expect(baseYaw.controls.offset.translationMeters == [0, 0, 0.012])
-    #expect(baseYaw.controls.offset.rotationAxis == .z)
-    #expect(abs(baseYaw.controls.offset.rotationRadians - .pi / 120) < 1e-12)
+    #expect(baseYaw.category == .kinematic)
+    #expect(baseYaw.degreesOfFreedom.first?.axis == .z)
+    #expect(baseYawControls.connectors.a?.feature == "base/top_face")
+    #expect(baseYawControls.offset.translationMeters == [0, 0, 0.012])
+    #expect(baseYawControls.offset.rotationAxis == .z)
+    #expect(abs(baseYawControls.offset.rotationRadians - .pi / 120) < 1e-12)
 
     let evaluation = try await client.evaluate(
       handle: loaded.handle,
@@ -72,6 +79,15 @@ struct AnimaCoreClientTests {
     #expect(evaluation.degreesOfFreedom["base_yaw.rotation"] == .pi / 3)
     #expect(evaluation.channelsByIndex.keys.sorted() == [0, 1, 2, 3, 4, 5])
     #expect(evaluation.limitViolations.isEmpty)
+
+    let resolvedPose = try await client.resolvePose(
+      handle: loaded.handle,
+      clip: "pick",
+      timeSeconds: 1
+    )
+    #expect(Set(resolvedPose.parts.keys) == Set(loaded.rig.parts.map(\.name)))
+    #expect(resolvedPose.parts["base"]?.position == [0, 0, 0])
+    #expect(resolvedPose.parts["base"]?.orientation == [0, 0, 0, 1])
 
     try await client.release(handle: loaded.handle)
     await client.shutdown()
@@ -127,19 +143,60 @@ struct AnimaCoreClientTests {
 
     let loaded = try await client.loadCharacter(text: text)
     let mate = try #require(loaded.rig.joints.first)
+    let controls = try #require(mate.controls)
     #expect(mate.id == "Fastened 33")
     #expect(mate.selectionKey == "Fastened 33")
     #expect(mate.name == "fixed_lid")
     #expect(mate.type == "fastened")
+    #expect(mate.category == .kinematic)
     #expect(mate.degreesOfFreedom.isEmpty)
-    #expect(mate.controls.connectors.a?.part == "base")
-    #expect(mate.controls.connectors.b?.isFlipped == true)
-    #expect(mate.controls.offset.translationMeters == [0.001, 0.002, 0.003])
-    #expect(mate.controls.offset.rotationAxis == .x)
-    #expect(abs(mate.controls.offset.rotationRadians - .pi / 12) < 1e-12)
-    #expect(mate.controls.flipsPrimaryAxis)
-    #expect(mate.controls.secondaryAxisRotationDegrees == 90)
-    #expect(!mate.controls.isSimulationConnection)
+    #expect(controls.connectors.a?.part == "base")
+    #expect(controls.connectors.b?.isFlipped == true)
+    #expect(controls.offset.translationMeters == [0.001, 0.002, 0.003])
+    #expect(controls.offset.rotationAxis == .x)
+    #expect(abs(controls.offset.rotationRadians - .pi / 12) < 1e-12)
+    #expect(controls.flipsPrimaryAxis)
+    #expect(controls.secondaryAxisRotationDegrees == 90)
+    #expect(!controls.isSimulationConnection)
+  }
+
+  @Test
+  func geometryMateDescriptorsKeepWidthAndTangentDistinct() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    defer { Task { await client.shutdown() } }
+
+    let text = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "examples/geometry_mates_demo.character.anima"),
+      encoding: .utf8
+    )
+    let catalog = try await client.mateTypes()
+    let loaded = try await client.loadCharacter(text: text)
+    let widthType = try #require(catalog.mateTypes.first { $0.type == "width" })
+    let tangentType = try #require(catalog.mateTypes.first { $0.type == "tangent" })
+    let width = try #require(loaded.rig.joints.first { $0.type == "width" })
+    let tangent = try #require(loaded.rig.joints.first { $0.type == "tangent" })
+
+    #expect(widthType.category == .geometryConstraint)
+    #expect(!widthType.isDrivable)
+    #expect(!widthType.universalControls.contains("offset"))
+    #expect(width.controls != nil)
+    #expect(width.tangent == nil)
+    #expect(width.degreesOfFreedom.isEmpty)
+
+    #expect(tangentType.category == .geometryConstraint)
+    #expect(!tangentType.isDrivable)
+    #expect(tangent.controls == nil)
+    #expect(tangent.tangent?.selectionA.isEmpty == false)
+    #expect(tangent.tangent?.selectionB.isEmpty == false)
+    #expect(tangent.tangent?.propagatesAcrossTangentFaces == true)
+    #expect(tangent.degreesOfFreedom.isEmpty)
   }
 
   @Test

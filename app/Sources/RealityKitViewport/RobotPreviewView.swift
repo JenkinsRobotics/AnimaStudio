@@ -1,4 +1,3 @@
-import AnimaEvaluation
 import AnimaModel
 import AppKit
 import Foundation
@@ -16,8 +15,8 @@ public struct RobotPreviewView: View {
   @State private var standingFeature: MateConnectorCandidate?
   @State private var pointerTarget = ViewportPointerTarget.canvas
 
-  private let frame: EvaluatedFrame
   private let rig: CharacterRig
+  private let engineResolvedPartPoses: [PartID: EngineResolvedPartPose]
   private let modelURL: URL?
   private let showsGrid: Bool
   private let projection: PreviewCameraProjection
@@ -52,8 +51,8 @@ public struct RobotPreviewView: View {
   private let onPointerTargetChange: (ViewportPointerTarget) -> Void
 
   public init(
-    frame: EvaluatedFrame,
     rig: CharacterRig = CharacterRig(joints: []),
+    engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:],
     modelURL: URL? = nil,
     showsGrid: Bool = true,
     projection: PreviewCameraProjection = .perspective,
@@ -87,8 +86,8 @@ public struct RobotPreviewView: View {
     onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in },
     onPointerTargetChange: @escaping (ViewportPointerTarget) -> Void = { _ in }
   ) {
-    self.frame = frame
     self.rig = rig
+    self.engineResolvedPartPoses = engineResolvedPartPoses
     self.modelURL = modelURL
     self.showsGrid = showsGrid
     self.projection = projection
@@ -179,7 +178,7 @@ public struct RobotPreviewView: View {
       ) {
         reportCameraState(updatedCameraState)
       }
-      Self.applyRig(rig, frame: frame, to: root)
+      Self.applyRig(rig, engineResolvedPartPoses: engineResolvedPartPoses, to: root)
       Self.applyPartAppearances(
         partAppearances,
         rig: rig,
@@ -582,15 +581,17 @@ public struct RobotPreviewView: View {
 
   private static func applyRig(
     _ rig: CharacterRig,
-    frame: EvaluatedFrame,
+    engineResolvedPartPoses: [PartID: EngineResolvedPartPose],
     to root: Entity
   ) {
-    let matrices = RigPoseResolver.matrices(rig: rig, frame: frame)
     for part in rig.parts {
-      guard let entity = root.findEntity(named: partEntityName(part.id)),
-        let matrix = matrices[part.id]
-      else { continue }
-      entity.transform = Transform(matrix: matrix)
+      guard let entity = root.findEntity(named: partEntityName(part.id)) else { continue }
+      if let pose = engineResolvedPartPoses[part.id] {
+        entity.transform = pose.realityKitTransform
+      } else {
+        entity.position = simdPosition(part.positionMeters)
+        entity.orientation = orientation(part.rotationEulerRadians)
+      }
     }
   }
 

@@ -205,6 +205,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — all ten mate presentations and engine-resolved motion:** The
+  Swift client now consumes category/drivable/axis data for the complete mate
+  catalog and decodes both connector controls and Tangent's geometry payload.
+  The production inspector and UI Dev lab distinguish all eight kinematic mates
+  from Width/Tangent geometry constraints without recreating engine semantics.
+  Imported characters request `evaluate` and `resolve_pose` at the playhead;
+  RealityKit applies the returned world positions and real-last quaternions to
+  renderer-only proxies. Removed the duplicate Swift `RigPoseResolver` and
+  `MateConnectorMath`; the local Revolute draft now records connectors but does
+  not locally solve motion. All 218 XCTest and 9 real-bridge Swift Testing cases
+  pass, recursive lint is clean, Xcode/root-app builds and deep signing pass,
+  and the launched app plus bundled bridge remain alive.
+
 - **2026-07-16 — Assets-first startup and root-app crash repaired:** New
   projects now open in Assets, while `StudioWorkspaceModel` accepts an injected
   startup workspace for a future user preference. Both supplied reports were

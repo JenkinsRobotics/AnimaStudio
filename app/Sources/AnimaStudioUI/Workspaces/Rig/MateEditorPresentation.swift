@@ -63,6 +63,18 @@ enum MateEditorDegreeOfFreedom: String, Identifiable, Sendable {
 }
 
 extension MateCreationToolKind {
+  var isGeometryConstraint: Bool {
+    self == .width || self == .tangent
+  }
+
+  var supportsOffset: Bool {
+    !isGeometryConstraint
+  }
+
+  var usesTangentSurfaceSelections: Bool {
+    self == .tangent
+  }
+
   /// Stable template order shared with the runtime contract.
   var editorDegreesOfFreedom: [MateEditorDegreeOfFreedom] {
     switch self {
@@ -82,6 +94,8 @@ extension MateCreationToolKind {
       [.translationX, .translationY, .rotationZ]
     case .ball:
       [.rotationX, .rotationY, .rotationZ]
+    case .width, .tangent:
+      []
     }
   }
 
@@ -108,6 +122,9 @@ extension MateCreationToolKind {
   }
 
   var editorDofSummary: String {
+    if isGeometryConstraint {
+      return "0 — geometry constraint"
+    }
     guard !editorDegreesOfFreedom.isEmpty else { return "0 — fully bonded" }
 
     var runs: [(kind: MateEditorMotionKind, count: Int)] = []

@@ -1,4 +1,3 @@
-import AnimaEvaluation
 import AnimaModel
 import AppKit
 import RealityKit
@@ -170,7 +169,7 @@ enum MateConnectorMarkerFactory {
   }
 
   static func orientation(_ connector: MateConnectorDefinition) -> simd_quatf {
-    let basis = MateConnectorMath.orthonormalBasis(for: connector)
+    let basis = MateConnectorBasis.orthonormalBasis(for: connector)
     let rotation = simd_float3x3(
       SIMD3<Float>(basis.x),
       SIMD3<Float>(basis.y),
@@ -205,5 +204,40 @@ enum MateConnectorMarkerFactory {
 
   private static func vector(_ value: RigVector3) -> SIMD3<Float> {
     SIMD3<Float>(Float(value.x), Float(value.y), Float(value.z))
+  }
+}
+
+/// Viewport-only basis normalization for drawing a connector marker. This is
+/// not mate alignment or kinematics; AnimaCore owns both of those operations.
+enum MateConnectorBasis {
+  static func orthonormalBasis(
+    for connector: MateConnectorDefinition
+  ) -> (x: SIMD3<Double>, y: SIMD3<Double>, z: SIMD3<Double>) {
+    let requestedZ = vector(connector.primaryAxis)
+    let z = normalized(requestedZ, fallback: SIMD3<Double>(0, 0, 1))
+
+    let requestedX = vector(connector.secondaryAxis)
+    let projectedX = requestedX - z * simd_dot(requestedX, z)
+    let fallbackX = abs(z.x) < 0.9 ? SIMD3<Double>(1, 0, 0) : SIMD3<Double>(0, 1, 0)
+    let fallbackProjectedX = fallbackX - z * simd_dot(fallbackX, z)
+    let x = normalized(projectedX, fallback: fallbackProjectedX)
+    let y = normalized(simd_cross(z, x), fallback: SIMD3<Double>(0, 1, 0))
+    return (x, y, z)
+  }
+
+  private static func normalized(
+    _ vector: SIMD3<Double>,
+    fallback: SIMD3<Double>
+  ) -> SIMD3<Double> {
+    let length = simd_length(vector)
+    if length.isFinite, length > 1e-10 {
+      return vector / length
+    }
+    let fallbackLength = simd_length(fallback)
+    return fallbackLength > 1e-10 ? fallback / fallbackLength : SIMD3<Double>(1, 0, 0)
+  }
+
+  private static func vector(_ value: RigVector3) -> SIMD3<Double> {
+    SIMD3<Double>(value.x, value.y, value.z)
   }
 }

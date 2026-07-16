@@ -105,6 +105,22 @@ public actor AnimaCoreClient {
     )
   }
 
+  public func resolvePose(
+    handle: String,
+    clip: String? = nil,
+    timeSeconds: Double = 0
+  ) async throws -> AnimaCoreResolvedPose {
+    _ = try await start()
+    return try request(
+      method: "resolve_pose",
+      params: EvaluationParameters(
+        handle: handle,
+        clip: clip,
+        timeSeconds: timeSeconds
+      )
+    )
+  }
+
   public func release(handle: String) async throws {
     guard process != nil else { return }
     let _: EmptyResult = try request(
@@ -239,6 +255,11 @@ public protocol AnimaCoreServing: Actor {
     clip: String?,
     timeSeconds: Double
   ) async throws -> AnimaCoreEvaluation
+  func resolvePose(
+    handle: String,
+    clip: String?,
+    timeSeconds: Double
+  ) async throws -> AnimaCoreResolvedPose
   func release(handle: String) async throws
   func shutdown() async
 }

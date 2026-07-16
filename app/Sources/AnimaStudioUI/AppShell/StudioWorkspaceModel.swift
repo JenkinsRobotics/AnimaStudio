@@ -63,6 +63,7 @@ final class StudioWorkspaceModel {
   var animaCoreErrorMessage: String?
   var animaCoreState: AnimaCoreState = .unavailable
   var engineEvaluationTimeSeconds: Double?
+  var engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:]
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
   var engineMates: [AnimaCoreJointSummary] = []
   var componentGroups: [NavigatorComponentGroup] = []
@@ -78,6 +79,9 @@ final class StudioWorkspaceModel {
   @ObservationIgnored private var animaCoreHandle: String?
   @ObservationIgnored private var animaCoreEngineVersion: String?
   @ObservationIgnored private var engineEvaluation: AnimaCoreEvaluation?
+  @ObservationIgnored private var enginePartIDsByName: [String: PartID] = [:]
+  @ObservationIgnored private var engineClipName: String?
+  @ObservationIgnored private var engineFrameRequestRevision = 0
 
   private let evaluator = AnimationEvaluator()
 
@@ -256,6 +260,12 @@ final class StudioWorkspaceModel {
         clip: clip?.name,
         timeSeconds: evaluationTimeSeconds
       )
+      let resolvedPose = try await animaCoreClient.resolvePose(
+        handle: loaded.handle,
+        clip: clip?.name,
+        timeSeconds: evaluationTimeSeconds
+      )
+      let preview = Self.previewProject(for: loaded.rig)
 
       if let previousHandle = animaCoreHandle {
         try? await animaCoreClient.release(handle: previousHandle)
@@ -267,7 +277,13 @@ final class StudioWorkspaceModel {
       engineMates = loaded.rig.joints
       engineEvaluation = evaluation
       engineEvaluationTimeSeconds = evaluationTimeSeconds
-      project = Self.previewProject(for: loaded.rig)
+      enginePartIDsByName = preview.partIDsByEngineName
+      engineClipName = clip?.name
+      engineResolvedPartPoses = Self.previewPoses(
+        from: resolvedPose,
+        partIDsByEngineName: preview.partIDsByEngineName
+      )
+      project = preview.project
       playheadSeconds = evaluationTimeSeconds
       isPlaying = false
       selection.removeAll()
@@ -302,9 +318,50 @@ final class StudioWorkspaceModel {
     animaCoreEngineVersion = nil
     engineEvaluation = nil
     engineEvaluationTimeSeconds = nil
+    engineResolvedPartPoses.removeAll()
+    enginePartIDsByName.removeAll()
+    engineClipName = nil
+    engineFrameRequestRevision += 1
     engineMateTypes.removeAll()
     engineMates.removeAll()
     animaCoreState = .unavailable
+  }
+
+  /// Refreshes both the inspector/output frame and the renderer transform from
+  /// one canonical AnimaCore playhead evaluation. Superseded requests may
+  /// finish in the actor queue but never overwrite a newer playhead state.
+  func refreshAnimaCoreFrameAtPlayhead() async {
+    guard let animaCoreClient, let handle = animaCoreHandle else { return }
+    engineFrameRequestRevision += 1
+    let revision = engineFrameRequestRevision
+    let requestedTimeSeconds = playheadSeconds
+    do {
+      let evaluation = try await animaCoreClient.evaluate(
+        handle: handle,
+        clip: engineClipName,
+        timeSeconds: requestedTimeSeconds
+      )
+      let resolvedPose = try await animaCoreClient.resolvePose(
+        handle: handle,
+        clip: engineClipName,
+        timeSeconds: requestedTimeSeconds
+      )
+      guard revision == engineFrameRequestRevision,
+        handle == animaCoreHandle,
+        abs(requestedTimeSeconds - playheadSeconds) < 0.000_001
+      else { return }
+      engineEvaluation = evaluation
+      engineEvaluationTimeSeconds = requestedTimeSeconds
+      engineResolvedPartPoses = Self.previewPoses(
+        from: resolvedPose,
+        partIDsByEngineName: enginePartIDsByName
+      )
+    } catch is CancellationError {
+      return
+    } catch {
+      guard revision == engineFrameRequestRevision else { return }
+      animaCoreErrorMessage = error.localizedDescription
+    }
   }
 
   var canCreateRevoluteJoint: Bool {
@@ -487,18 +544,8 @@ final class StudioWorkspaceModel {
     guard let source = placement.sourceCandidate,
       source.partID != candidate.partID,
       mateCandidatePartIDs.contains(candidate.partID),
-      let childIndex = project.rig.parts.firstIndex(where: { $0.id == source.partID }),
       let parent = project.rig.parts.first(where: { $0.id == candidate.partID })
     else { return }
-
-    let snappedTransform = MateConnectorMath.snappedChildTransform(
-      childPart: project.rig.parts[childIndex],
-      childConnector: source.connector,
-      parentPart: parent,
-      parentConnector: candidate.connector
-    )
-    project.rig.parts[childIndex].positionMeters = snappedTransform.positionMeters
-    project.rig.parts[childIndex].rotationEulerRadians = snappedTransform.rotationEulerRadians
 
     var sequence = project.rig.joints.count + 1
     while project.rig.joints.contains(where: { $0.id.rawValue == "joint_\(sequence)" }) {
@@ -1073,44 +1120,24 @@ final class StudioWorkspaceModel {
     }
   }
 
-  /// BR1 presentation adapter: each rotational engine DOF gets a separate
-  /// proxy so RealityKit can visibly consume the exact value returned by the
-  /// bridge. It deliberately does not infer a mechanism hierarchy or axis.
-  /// Canonical per-part transforms arrive with the planned `resolve_pose`
-  /// bridge verb, at which point this diagnostic projection is removed.
-  private static func previewProject(for summary: AnimaCoreRigSummary) -> AnimaProject {
-    let rotationalDegreesOfFreedom = summary.joints.flatMap { joint in
-      joint.degreesOfFreedom
-        .filter { $0.kind == .rotation }
-        .map { (joint, $0) }
-    }
-    let spacingMeters = 0.42
-    let centerOffset = Double(max(rotationalDegreesOfFreedom.count - 1, 0)) / 2
-    let parts = rotationalDegreesOfFreedom.enumerated().map { index, pair in
+  private struct EnginePreviewProject {
+    let project: AnimaProject
+    let partIDsByEngineName: [String: PartID]
+  }
+
+  /// Creates renderer-only proxy geometry for every engine part. The engine
+  /// name-to-ID projection is session-local; all transforms come from
+  /// `resolve_pose`, never from a Swift reconstruction of the mate graph.
+  private static func previewProject(for summary: AnimaCoreRigSummary) -> EnginePreviewProject {
+    let parts = summary.parts.enumerated().map { index, part in
       RigPartDefinition(
-        displayName: pair.1.path,
-        primitiveKind: index.isMultiple(of: 2) ? .cylinder : .box,
-        positionMeters: RigVector3(
-          x: (Double(index) - centerOffset) * spacingMeters,
-          y: 0.35,
-          z: 0
-        )
+        displayName: part.name,
+        primitiveKind: index.isMultiple(of: 2) ? .cylinder : .box
       )
     }
-    let joints = zip(rotationalDegreesOfFreedom, parts).map { pair, part in
-      let degreeOfFreedom = pair.1
-      let minimumRadians = degreeOfFreedom.minimum ?? degreeOfFreedom.neutral - 2 * .pi
-      let maximumRadians = degreeOfFreedom.maximum ?? degreeOfFreedom.neutral + 2 * .pi
-      return JointDefinition(
-        id: JointID(rawValue: degreeOfFreedom.path),
-        displayName: pair.0.name,
-        axis: .z,
-        minimumRadians: minimumRadians,
-        maximumRadians: maximumRadians,
-        neutralRadians: degreeOfFreedom.neutral,
-        childPartID: part.id
-      )
-    }
+    let partIDsByEngineName = Dictionary(
+      uniqueKeysWithValues: zip(summary.parts, parts).map { ($0.name, $1.id) }
+    )
     let clips = summary.clips.map { clip in
       AnimationClip(
         name: clip.name,
@@ -1118,10 +1145,30 @@ final class StudioWorkspaceModel {
         jointTracks: []
       )
     }
-    return AnimaProject(
-      name: summary.identity.displayName,
-      rig: CharacterRig(parts: parts, joints: joints),
-      clips: clips
+    return EnginePreviewProject(
+      project: AnimaProject(
+        name: summary.identity.displayName,
+        rig: CharacterRig(parts: parts, joints: []),
+        clips: clips
+      ),
+      partIDsByEngineName: partIDsByEngineName
+    )
+  }
+
+  private static func previewPoses(
+    from resolvedPose: AnimaCoreResolvedPose,
+    partIDsByEngineName: [String: PartID]
+  ) -> [PartID: EngineResolvedPartPose] {
+    Dictionary(
+      uniqueKeysWithValues: resolvedPose.parts.compactMap { name, pose in
+        guard let partID = partIDsByEngineName[name],
+          let previewPose = EngineResolvedPartPose(
+            positionMeters: pose.position,
+            orientationImaginaryReal: pose.orientation
+          )
+        else { return nil }
+        return (partID, previewPose)
+      }
     )
   }
 

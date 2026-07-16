@@ -15,6 +15,7 @@ struct EngineMateInspectorView: View {
   var body: some View {
     identitySection
     connectorSection
+    tangentSelectionSection
     offsetSection
     orientationSection
     degreesOfFreedomSection
@@ -37,6 +38,8 @@ struct EngineMateInspectorView: View {
       }
       LabeledContent("Parent", value: mate.parentPart ?? "World")
       LabeledContent("Child", value: mate.childPart ?? "Unassigned")
+      LabeledContent("Category", value: presentation.categoryLabel)
+      LabeledContent("Animation Driver", value: presentation.isDrivable ? "Yes" : "No")
       LabeledContent("Degrees of Freedom", value: presentation.degreeOfFreedomSummary)
     }
   }
@@ -70,18 +73,20 @@ struct EngineMateInspectorView: View {
 
   @ViewBuilder
   private var connectorSection: some View {
-    if supports("connector_a") || supports("connector_b") {
+    if let controls = mate.controls,
+      supports("connector_a") || supports("connector_b")
+    {
       Section("Mate Connectors") {
         if supports("connector_a") {
           EngineMateConnectorRow(
             label: "A",
-            connector: mate.controls.connectors.a
+            connector: controls.connectors.a
           )
         }
         if supports("connector_b") {
           EngineMateConnectorRow(
             label: "B",
-            connector: mate.controls.connectors.b
+            connector: controls.connectors.b
           )
         }
       }
@@ -89,12 +94,27 @@ struct EngineMateInspectorView: View {
   }
 
   @ViewBuilder
+  private var tangentSelectionSection: some View {
+    if let tangent = mate.tangent {
+      Section("Tangent Surfaces") {
+        EngineMateSurfaceSelectionRow(label: "Surface A", selection: tangent.selectionA)
+        EngineMateSurfaceSelectionRow(label: "Surface B", selection: tangent.selectionB)
+        EngineMateReadOnlyToggle(
+          title: "Tangent Propagation",
+          isOn: tangent.propagatesAcrossTangentFaces
+        )
+        LabeledContent("Simulation Connection", value: "Engine default")
+      }
+    }
+  }
+
+  @ViewBuilder
   private var offsetSection: some View {
-    if supports("offset") {
+    if let controls = mate.controls, supports("offset") {
       Section("Offset") {
         EngineMateReadOnlyToggle(
           title: "Enable Offset",
-          isOn: mate.controls.offset.isEnabled
+          isOn: controls.offset.isEnabled
         )
         Group {
           ForEach(0..<3, id: \.self) { index in
@@ -106,7 +126,7 @@ struct EngineMateInspectorView: View {
             )
           }
           LabeledContent(
-            "Rotate About", value: mate.controls.offset.rotationAxis.rawValue.uppercased())
+            "Rotate About", value: controls.offset.rotationAxis.rawValue.uppercased())
           LabeledContent("Rotation Angle") {
             Text(
               presentation.offsetRotationDegrees,
@@ -117,33 +137,34 @@ struct EngineMateInspectorView: View {
               .foregroundStyle(StudioPalette.muted)
           }
         }
-        .opacity(mate.controls.offset.isEnabled ? 1 : 0.55)
+        .opacity(controls.offset.isEnabled ? 1 : 0.55)
       }
     }
   }
 
   @ViewBuilder
   private var orientationSection: some View {
-    if supports("flip_primary_axis") || supports("secondary_axis_rotation")
-      || supports("simulation_connection") || !presentation.additionalControlIDs.isEmpty
+    if let controls = mate.controls,
+      supports("flip_primary_axis") || supports("secondary_axis_rotation")
+        || supports("simulation_connection") || !presentation.additionalControlIDs.isEmpty
     {
       Section("Orientation & Simulation") {
         if supports("flip_primary_axis") {
           EngineMateReadOnlyToggle(
             title: "Flip Primary Axis",
-            isOn: mate.controls.flipsPrimaryAxis
+            isOn: controls.flipsPrimaryAxis
           )
         }
         if supports("secondary_axis_rotation") {
           LabeledContent("Secondary Axis Rotation") {
-            Text("\(mate.controls.secondaryAxisRotationDegrees)°")
+            Text("\(controls.secondaryAxisRotationDegrees)°")
               .monospacedDigit()
           }
         }
         if supports("simulation_connection") {
           EngineMateReadOnlyToggle(
             title: "Simulation Connection",
-            isOn: mate.controls.isSimulationConnection
+            isOn: controls.isSimulationConnection
           )
         }
         ForEach(presentation.additionalControlIDs, id: \.self) { controlID in
@@ -161,12 +182,12 @@ struct EngineMateInspectorView: View {
     Section("Degrees of Freedom") {
       if mate.degreesOfFreedom.isEmpty {
         HStack(alignment: .top, spacing: 9) {
-          Image(systemName: "lock.fill")
+          Image(systemName: presentation.zeroDOFSystemImage)
             .foregroundStyle(StudioPalette.joint)
           VStack(alignment: .leading, spacing: 2) {
-            Text("Fully bonded")
+            Text(presentation.zeroDOFTitle)
               .font(.callout.weight(.semibold))
-            Text("Fastened removes all six relative degrees of freedom.")
+            Text(presentation.zeroDOFDetail)
               .font(.caption)
               .foregroundStyle(StudioPalette.muted)
           }
@@ -185,7 +206,7 @@ struct EngineMateInspectorView: View {
       Label("Validated by AnimaCore", systemImage: "checkmark.shield.fill")
         .foregroundStyle(StudioPalette.hardware)
       Text(
-        "This panel is an engine-backed snapshot. Connector and control editing will write the canonical character document and revalidate it in the next packet."
+        "This panel is an engine-backed snapshot. The canonical character document remains the authoring source of truth; Studio does not recreate mate semantics."
       )
       .font(.caption)
       .foregroundStyle(StudioPalette.muted)
@@ -193,7 +214,10 @@ struct EngineMateInspectorView: View {
   }
 
   private func supports(_ controlID: String) -> Bool {
-    mateType?.universalControls.contains(controlID) ?? true
+    if let mateType {
+      return mateType.universalControls.contains(controlID)
+    }
+    return mate.controls != nil && mate.type != "tangent"
   }
 }
 
@@ -215,12 +239,23 @@ struct EngineMateInspectorPresentation {
     return count == 1 ? "1 available" : "\(count) available"
   }
 
+  var categoryLabel: String {
+    switch mate.category {
+    case .kinematic: "Kinematic"
+    case .geometryConstraint: "Geometry constraint"
+    }
+  }
+
+  var isDrivable: Bool {
+    mateType?.isDrivable ?? (mate.category == .kinematic)
+  }
+
   var offsetMillimeters: [Double] {
-    mate.controls.offset.translationMeters.map { $0 * 1_000 }
+    mate.controls?.offset.translationMeters.map { $0 * 1_000 } ?? []
   }
 
   var offsetRotationDegrees: Double {
-    mate.controls.offset.rotationRadians * 180 / .pi
+    (mate.controls?.offset.rotationRadians ?? 0) * 180 / .pi
   }
 
   var systemImage: String {
@@ -233,6 +268,8 @@ struct EngineMateInspectorPresentation {
     case "pin_slot": "arrow.left.and.right.circle"
     case "planar": "square.3.layers.3d"
     case "ball": "move.3d"
+    case "width": "arrow.left.and.right.square"
+    case "tangent": "circle.dotted.and.circle"
     default: "point.3.connected.trianglepath.dotted"
     }
   }
@@ -245,8 +282,50 @@ struct EngineMateInspectorPresentation {
       "flip_primary_axis",
       "secondary_axis_rotation",
       "simulation_connection",
+      "tangent_selection_a",
+      "tangent_selection_b",
+      "tangent_propagation",
     ]
     return mateType?.universalControls.filter { !renderedControls.contains($0) } ?? []
+  }
+
+  var zeroDOFTitle: String {
+    switch mate.type {
+    case "fastened": "Fully bonded"
+    case "width": "Width constraint"
+    case "tangent": "Tangent constraint"
+    default: "No drivable motion"
+    }
+  }
+
+  var zeroDOFDetail: String {
+    switch mate.type {
+    case "fastened":
+      "Fastened removes all six relative degrees of freedom."
+    case "width":
+      "Width centers geometry between its references and is not offered as an animation driver."
+    case "tangent":
+      "Tangent keeps the selected surfaces in contact and is not offered as an animation driver."
+    default:
+      "AnimaCore reports no animation-driving degrees of freedom for this mate."
+    }
+  }
+
+  var zeroDOFSystemImage: String {
+    mate.category == .geometryConstraint ? "ruler.fill" : "lock.fill"
+  }
+}
+
+private struct EngineMateSurfaceSelectionRow: View {
+  let label: String
+  let selection: String
+
+  var body: some View {
+    LabeledContent(label) {
+      Text(selection.isEmpty ? "Not assigned" : selection)
+        .foregroundStyle(selection.isEmpty ? StudioPalette.muted : .primary)
+        .textSelection(.enabled)
+    }
   }
 }
 
@@ -354,6 +433,7 @@ private struct EngineMateDOFRow: View {
       Text(degreeOfFreedom.path)
         .font(.caption.monospaced().weight(.semibold))
       LabeledContent("Kind", value: degreeOfFreedom.kind.rawValue.capitalized)
+      LabeledContent("Axis", value: degreeOfFreedom.axis.rawValue.uppercased())
       LabeledContent("Neutral", value: formatted(degreeOfFreedom.neutral))
       LabeledContent(
         "Limits",

@@ -77,7 +77,7 @@ final class RigCreationTests: XCTestCase {
     XCTAssertEqual(model.project.rig.joints[0].maximumRadians, 0.75)
   }
 
-  func testTwoClickMatePlacementMovesFirstComponentAndStoresConnectors() throws {
+  func testTwoClickDraftMatePlacementStoresConnectorsWithoutLocalKinematicSolve() throws {
     let model = StudioWorkspaceModel()
     model.addPart(kind: .box)
     let base = model.project.rig.parts[0]
@@ -105,7 +105,7 @@ final class RigCreationTests: XCTestCase {
     XCTAssertEqual(mate.childPartID, moving.id)
     XCTAssertEqual(mate.parentConnector, target.connector)
     XCTAssertEqual(mate.childConnector, source.connector)
-    XCTAssertEqual(movedPart.positionMeters.x, 1.55, accuracy: 1e-9)
+    XCTAssertEqual(movedPart.positionMeters, RigVector3())
     XCTAssertEqual(model.selection, [.joint(mate.id)])
   }
 

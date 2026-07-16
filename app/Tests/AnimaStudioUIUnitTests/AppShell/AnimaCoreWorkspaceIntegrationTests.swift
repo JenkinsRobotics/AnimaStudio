@@ -32,7 +32,9 @@ struct AnimaCoreWorkspaceIntegrationTests {
         == .loaded(characterName: "Six-axis arm", engineVersion: "0.1.0")
     )
     #expect(workspace.project.name == "Six-axis arm")
-    #expect(workspace.project.rig.joints.count == 6)
+    #expect(workspace.project.rig.parts.count == 7)
+    #expect(workspace.project.rig.joints.isEmpty)
+    #expect(workspace.engineResolvedPartPoses.count == 7)
     #expect(workspace.engineEvaluationTimeSeconds == 1)
     #expect(
       workspace.evaluatedFrame.jointAnglesRadians["base_yaw.rotation"]
@@ -67,12 +69,13 @@ struct AnimaCoreWorkspaceIntegrationTests {
         == .loaded(characterName: "Fastened Fixture", engineVersion: "0.1.0")
     )
     #expect(
-      Set(workspace.engineMateTypes.map(\.type)).isSuperset(
-        of: [
-          "fastened", "parallel", "prismatic", "revolute",
-          "cylindrical", "pin_slot", "planar", "ball",
-        ]
-      )
+      Set(workspace.engineMateTypes.map(\.type))
+        == Set(
+          [
+            "fastened", "parallel", "prismatic", "revolute",
+            "cylindrical", "pin_slot", "planar", "ball", "width", "tangent",
+          ]
+        )
     )
     #expect(workspace.engineMates.count == 1)
     #expect(workspace.project.rig.joints.isEmpty)
@@ -88,8 +91,50 @@ struct AnimaCoreWorkspaceIntegrationTests {
     #expect(mate.degreesOfFreedom.isEmpty)
     #expect(presentation.typeLabel == "Fastened")
     #expect(presentation.degreeOfFreedomSummary == "0 available")
+    #expect(presentation.categoryLabel == "Kinematic")
+    #expect(presentation.isDrivable)
+    #expect(presentation.zeroDOFTitle == "Fully bonded")
     #expect(presentation.offsetMillimeters == [1, 2, 3])
     #expect(abs(presentation.offsetRotationDegrees - 15) < 1e-12)
+
+    await workspace.shutdownAnimaCore()
+  }
+
+  @Test
+  func geometryMatesUseNonDrivableInspectorPresentations() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    let characterURL = repositoryRoot.appendingPathComponent(
+      "examples/geometry_mates_demo.character.anima")
+
+    await workspace.importAnimaCharacter(from: characterURL)
+
+    let width = try #require(workspace.engineMates.first { $0.type == "width" })
+    let tangent = try #require(workspace.engineMates.first { $0.type == "tangent" })
+    let widthPresentation = EngineMateInspectorPresentation(
+      mate: width,
+      mateType: workspace.engineMateType(for: width)
+    )
+    let tangentPresentation = EngineMateInspectorPresentation(
+      mate: tangent,
+      mateType: workspace.engineMateType(for: tangent)
+    )
+
+    #expect(widthPresentation.categoryLabel == "Geometry constraint")
+    #expect(!widthPresentation.isDrivable)
+    #expect(widthPresentation.zeroDOFTitle == "Width constraint")
+    #expect(tangentPresentation.zeroDOFTitle == "Tangent constraint")
+    #expect(tangent.controls == nil)
+    #expect(tangent.tangent != nil)
 
     await workspace.shutdownAnimaCore()
   }

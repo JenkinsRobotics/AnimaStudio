@@ -67,6 +67,7 @@ struct UIDevMateEditorLab: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       Toggle("Show Offset controls", isOn: $showsOffset)
+        .disabled(!selectedKind.supportsOffset)
       Toggle("Show Limits controls", isOn: $showsLimits)
         .disabled(!selectedKind.supportsLimits)
       Toggle("Simulation connection", isOn: $isSimulationConnection)
@@ -121,6 +122,9 @@ private struct UIDevMateEditorPanel: View {
   @Binding var rotationAngleDegrees: Double
 
   @State private var facesToConnect = ""
+  @State private var tangentSurfaceA = "Part A / face"
+  @State private var tangentSurfaceB = "Part B / face"
+  @State private var propagatesTangentFaces = true
   @State private var offsetRotationAxis = MateEditorAxis.x
   @State private var minimumLimits: [MateEditorDegreeOfFreedom: String] = [:]
   @State private var maximumLimits: [MateEditorDegreeOfFreedom: String] = [:]
@@ -133,11 +137,17 @@ private struct UIDevMateEditorPanel: View {
       Divider()
       VStack(alignment: .leading, spacing: 9) {
         typePicker
-        connectorPicker
-        Toggle("Offset", isOn: $showsOffset)
-          .toggleStyle(.checkbox)
-        if showsOffset {
-          offsetControls
+        if selectedKind.usesTangentSurfaceSelections {
+          tangentSurfacePickers
+        } else {
+          connectorPicker
+        }
+        if selectedKind.supportsOffset {
+          Toggle("Offset", isOn: $showsOffset)
+            .toggleStyle(.checkbox)
+          if showsOffset {
+            offsetControls
+          }
         }
         limitsControls
         Toggle("Simulation connection", isOn: $isSimulationConnection)
@@ -264,6 +274,17 @@ private struct UIDevMateEditorPanel: View {
     .help("Select the two part-local mate connectors")
   }
 
+  private var tangentSurfacePickers: some View {
+    VStack(spacing: 7) {
+      TextField("Surface A", text: $tangentSurfaceA)
+        .textFieldStyle(.roundedBorder)
+      TextField("Surface B", text: $tangentSurfaceB)
+        .textFieldStyle(.roundedBorder)
+      Toggle("Propagate across tangent faces", isOn: $propagatesTangentFaces)
+        .toggleStyle(.checkbox)
+    }
+  }
+
   private var offsetControls: some View {
     VStack(spacing: 7) {
       ForEach(selectedKind.offsetTranslationAxes) { axis in
@@ -317,13 +338,26 @@ private struct UIDevMateEditorPanel: View {
       }
     } else {
       HStack(spacing: 7) {
-        Image(systemName: "lock.fill")
+        Image(systemName: selectedKind.isGeometryConstraint ? "ruler.fill" : "lock.fill")
           .foregroundStyle(StudioPalette.joint)
-        Text("Fastened removes all motion; there are no limits to configure.")
+        Text(zeroDOFExplanation)
           .font(.caption)
           .foregroundStyle(StudioPalette.muted)
       }
       .padding(.vertical, 3)
+    }
+  }
+
+  private var zeroDOFExplanation: String {
+    switch selectedKind {
+    case .fastened:
+      "Fastened removes all motion; there are no limits to configure."
+    case .width:
+      "Width is a geometry constraint and is not an animation driver."
+    case .tangent:
+      "Tangent is a geometry constraint and is not an animation driver."
+    default:
+      "This mate has no animation-driving degrees of freedom."
     }
   }
 

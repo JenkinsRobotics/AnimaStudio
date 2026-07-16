@@ -1,51 +1,40 @@
-import AnimaEvaluation
-import AnimaModel
 import XCTest
+import simd
 
 @testable import RealityKitViewport
 
 @MainActor
 final class MateMotionTests: XCTestCase {
-  func testRevoluteMotionRotatesChildAroundConnectorInsteadOfPartOrigin() throws {
-    let parent = RigPartDefinition(displayName: "Base", primitiveKind: .box)
-    var child = RigPartDefinition(displayName: "Arm", primitiveKind: .box)
-    let parentConnector = MateConnectorDefinition()
-    let childConnector = MateConnectorDefinition(
-      originMeters: RigVector3(x: -1, y: 0, z: 0),
-      primaryAxis: RigVector3(x: 0, y: 0, z: -1),
-      secondaryAxis: RigVector3(x: 1, y: 0, z: 0)
+  func testEnginePoseProjectsQuaternionRealComponentLast() throws {
+    let pose = try XCTUnwrap(
+      EngineResolvedPartPose(
+        positionMeters: [1, 2, 3],
+        orientationImaginaryReal: [0, 0, sin(.pi / 4), cos(.pi / 4)]
+      )
     )
-    let neutralTransform = MateConnectorMath.snappedChildTransform(
-      childPart: child,
-      childConnector: childConnector,
-      parentPart: parent,
-      parentConnector: parentConnector
-    )
-    child.positionMeters = neutralTransform.positionMeters
-    child.rotationEulerRadians = neutralTransform.rotationEulerRadians
-    let joint = JointDefinition(
-      id: "hinge",
-      displayName: "Hinge",
-      axis: .z,
-      minimumRadians: -.pi,
-      maximumRadians: .pi,
-      parentPartID: parent.id,
-      childPartID: child.id,
-      parentConnector: parentConnector,
-      childConnector: childConnector
-    )
-    let rig = CharacterRig(parts: [parent, child], joints: [joint])
-    let frame = EvaluatedFrame(
-      timeSeconds: 0,
-      jointAnglesRadians: [joint.id: .pi / 2]
-    )
+    let transform = pose.realityKitTransform
+    let rotatedX = transform.rotation.act(SIMD3<Float>(1, 0, 0))
 
-    let matrix = try XCTUnwrap(
-      RigPoseResolver.matrices(rig: rig, frame: frame)[child.id]
-    )
+    XCTAssertEqual(transform.translation.x, 1, accuracy: 1e-5)
+    XCTAssertEqual(transform.translation.y, 2, accuracy: 1e-5)
+    XCTAssertEqual(transform.translation.z, 3, accuracy: 1e-5)
+    XCTAssertEqual(rotatedX.x, 0, accuracy: 1e-5)
+    XCTAssertEqual(rotatedX.y, 1, accuracy: 1e-5)
+    XCTAssertEqual(rotatedX.z, 0, accuracy: 1e-5)
+  }
 
-    XCTAssertEqual(matrix.columns.3.x, 0, accuracy: 1e-5)
-    XCTAssertEqual(matrix.columns.3.y, 1, accuracy: 1e-5)
-    XCTAssertEqual(matrix.columns.3.z, 0, accuracy: 1e-5)
+  func testEnginePoseRejectsMalformedOrNonFiniteBridgeValues() {
+    XCTAssertNil(
+      EngineResolvedPartPose(
+        positionMeters: [0, 0],
+        orientationImaginaryReal: [0, 0, 0, 1]
+      )
+    )
+    XCTAssertNil(
+      EngineResolvedPartPose(
+        positionMeters: [0, .infinity, 0],
+        orientationImaginaryReal: [0, 0, 0, 1]
+      )
+    )
   }
 }

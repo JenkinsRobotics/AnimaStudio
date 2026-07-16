@@ -147,6 +147,9 @@ struct StudioWorkspaceView: View {
         workspace.advancePlayback(by: 1.0 / 60.0)
       }
     }
+    .task(id: workspace.playheadSeconds) {
+      await workspace.refreshAnimaCoreFrameAtPlayhead()
+    }
     .onDisappear {
       Task { await workspace.shutdownAnimaCore() }
     }
@@ -230,8 +233,8 @@ struct StudioWorkspaceView: View {
   private var viewport: some View {
     ZStack(alignment: .top) {
       RobotPreviewView(
-        frame: workspace.evaluatedFrame,
         rig: workspace.project.rig,
+        engineResolvedPartPoses: workspace.engineResolvedPartPoses,
         modelURL: workspace.importedModelURL,
         showsGrid: workspace.showsPreviewGrid,
         projection: workspace.cameraProjection,

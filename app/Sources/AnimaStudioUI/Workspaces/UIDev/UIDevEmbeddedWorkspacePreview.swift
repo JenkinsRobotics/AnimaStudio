@@ -78,7 +78,6 @@ struct UIDevEmbeddedWorkspacePreview: View {
   private var viewport: some View {
     ZStack(alignment: .top) {
       RobotPreviewView(
-        frame: workspace.evaluatedFrame,
         rig: workspace.project.rig,
         showsGrid: workspace.showsPreviewGrid,
         projection: workspace.cameraProjection,

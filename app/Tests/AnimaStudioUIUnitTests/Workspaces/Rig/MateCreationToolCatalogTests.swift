@@ -15,13 +15,15 @@ final class MateCreationToolCatalogTests: XCTestCase {
         "Pin Slot",
         "Planar",
         "Ball",
+        "Width",
+        "Tangent",
       ]
     )
   }
 
-  func testOnlyRevoluteIsMarkedImplementedUntilTypedMateBackendLands() {
+  func testOnlyRevoluteHasTheTransitionalLocalDraftAction() {
     XCTAssertEqual(
-      MateCreationToolKind.allCases.filter(\.isImplemented),
+      MateCreationToolKind.allCases.filter(\.hasLocalDraftAuthoringAction),
       [.revolute]
     )
   }
@@ -48,5 +50,7 @@ final class MateCreationToolCatalogTests: XCTestCase {
     XCTAssertEqual(
       MateCreationToolKind.planar.dofSummary, "2 translational + 1 rotational")
     XCTAssertEqual(MateCreationToolKind.ball.dofSummary, "3 rotational")
+    XCTAssertEqual(MateCreationToolKind.width.dofSummary, "0 — geometry constraint")
+    XCTAssertEqual(MateCreationToolKind.tangent.dofSummary, "0 — geometry constraint")
   }
 }

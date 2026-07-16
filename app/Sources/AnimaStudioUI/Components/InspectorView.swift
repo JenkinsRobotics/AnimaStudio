@@ -335,7 +335,7 @@ struct InspectorView: View {
               Text(kind.title)
             }
           }
-          .disabled(!kind.isImplemented)
+          .disabled(!kind.hasLocalDraftAuthoringAction)
           .help(kind.motionSummary)
         }
       } label: {

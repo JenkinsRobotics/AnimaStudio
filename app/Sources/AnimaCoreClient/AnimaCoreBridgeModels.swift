@@ -68,22 +68,31 @@ public enum AnimaCoreDOFUnit: String, Codable, Sendable {
   case meters
 }
 
+public enum AnimaCoreMateCategory: String, Codable, Sendable {
+  case kinematic
+  case geometryConstraint = "geometry_constraint"
+}
+
 public struct AnimaCoreJointSummary: Codable, Equatable, Sendable {
   public let id: String
   public let name: String
   public let type: String
+  public let category: AnimaCoreMateCategory
   public let parentPart: String?
   public let childPart: String?
-  public let controls: AnimaCoreMateControls
+  public let controls: AnimaCoreMateControls?
+  public let tangent: AnimaCoreTangentControls?
   public let degreesOfFreedom: [AnimaCoreDOFSummary]
 
   enum CodingKeys: String, CodingKey {
     case id
     case name
     case type
+    case category
     case parentPart = "parent_part"
     case childPart = "child_part"
     case controls
+    case tangent
     case degreesOfFreedom = "dofs"
   }
 
@@ -92,6 +101,18 @@ public struct AnimaCoreJointSummary: Codable, Equatable, Sendable {
   /// identity only and must never be persisted as a replacement engine id.
   public var selectionKey: String {
     id.isEmpty ? "untracked:\(type):\(name)" : id
+  }
+}
+
+public struct AnimaCoreTangentControls: Codable, Equatable, Sendable {
+  public let selectionA: String
+  public let selectionB: String
+  public let propagatesAcrossTangentFaces: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case selectionA = "selection_a"
+    case selectionB = "selection_b"
+    case propagatesAcrossTangentFaces = "propagation"
   }
 }
 
@@ -165,16 +186,22 @@ public struct AnimaCoreMateTypeCatalog: Codable, Equatable, Sendable {
 public struct AnimaCoreMateTypeSummary: Codable, Equatable, Sendable {
   public let type: String
   public let label: String
+  public let category: AnimaCoreMateCategory
+  public let isDrivable: Bool
   public let degreeOfFreedomCount: Int
   public let universalControls: [String]
   public let degreesOfFreedom: [AnimaCoreMateTypeDOF]
+  public let note: String?
 
   enum CodingKeys: String, CodingKey {
     case type
     case label
+    case category
+    case isDrivable = "drivable"
     case degreeOfFreedomCount = "dof_count"
     case universalControls = "universal_controls"
     case degreesOfFreedom = "dofs"
+    case note
   }
 }
 
@@ -182,12 +209,14 @@ public struct AnimaCoreMateTypeDOF: Codable, Equatable, Sendable {
   public let name: String
   public let kind: AnimaCoreDOFKind
   public let unit: AnimaCoreDOFUnit
+  public let axis: AnimaCoreMateAxis
 }
 
 public struct AnimaCoreDOFSummary: Codable, Equatable, Sendable {
   public let path: String
   public let kind: AnimaCoreDOFKind
   public let unit: AnimaCoreDOFUnit
+  public let axis: AnimaCoreMateAxis
   public let minimum: Double?
   public let maximum: Double?
   public let neutral: Double
@@ -196,10 +225,22 @@ public struct AnimaCoreDOFSummary: Codable, Equatable, Sendable {
     case path
     case kind
     case unit
+    case axis
     case minimum = "min"
     case maximum = "max"
     case neutral
   }
+}
+
+public struct AnimaCoreResolvedPose: Codable, Equatable, Sendable {
+  public let parts: [String: AnimaCoreResolvedPartPose]
+}
+
+public struct AnimaCoreResolvedPartPose: Codable, Equatable, Sendable {
+  /// World-space position in metres.
+  public let position: [Double]
+  /// Quaternion imaginary XYZ components followed by the real component.
+  public let orientation: [Double]
 }
 
 public struct AnimaCoreParameterSummary: Codable, Equatable, Sendable {

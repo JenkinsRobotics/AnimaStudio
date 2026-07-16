@@ -137,7 +137,7 @@ struct CreationPaletteView: View {
       title: "Mates",
       systemImage: "rotate.3d",
       tint: StudioPalette.joint,
-      detail: "1 live · 7 awaiting backend"
+      detail: "10 engine types · 1 draft action"
     ) {
       ForEach(MateCreationToolKind.allCases) { kind in
         CreationToolButton(
@@ -156,12 +156,13 @@ struct CreationPaletteView: View {
   }
 
   private func isMateToolEnabled(_ kind: MateCreationToolKind) -> Bool {
-    kind.isImplemented && workspace.canCreateRevoluteJoint
+    kind.hasLocalDraftAuthoringAction && workspace.canCreateRevoluteJoint
   }
 
   private func mateToolHelp(_ kind: MateCreationToolKind) -> String {
-    guard kind.isImplemented else {
-      return "\(kind.motionSummary) Creation awaits the typed-mate backend."
+    guard kind.hasLocalDraftAuthoringAction else {
+      return
+        "\(kind.motionSummary) Engine-backed inspection is available; canonical document editing is the next authoring packet."
     }
     guard workspace.canCreateRevoluteJoint else {
       return "\(kind.motionSummary) Add two unlocked components before creating this mate."
