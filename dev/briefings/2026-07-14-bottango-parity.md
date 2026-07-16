@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Assets-first startup + self-contained AnimaCore helper repair | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspacePresentationTests.swift`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | new workspaces open in Assets; bundled Python launchers resolve only bundle/system libraries; helper handshake succeeds from the sandboxed root app; Swift tests, Xcode/root-app build/signature/launch, `git diff --check` | active |
 | Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | BR1 Swift AnimaCore client + engine-evaluated viewport proof | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Tests/AnimaCoreClientTests/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,WorkspaceRibbonView}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,RigPoseResolver}.swift`, `app/App/AnimaCoreHelper.entitlements`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, focused Swift tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real helper spawn + hello/load/evaluate/release/shutdown; typed protocol/path errors; explicit `.character.anima` import; engine-evaluated DOF values reach RealityKit preview through transitional pose projection; bundled signed helper for sandboxed app; deterministic client/unit/integration/UI tests; strict claimed-file lint; full Swift tests; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | Swift app half of AnimaCore repository restructure | `studio/**` → `app/**`, `.github/workflows/**`, `.gitignore`, `AGENTS.md`, `CONVENTIONS.md`, `README.md`, `dev/docs/reality/STATUS.md`, `dev/docs/roadmap/Studio_App.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | root contains `animacore/`, `app/`, and `firmware/` with no `studio/`; Swift `AnimaModel` owns data/validation and `AnimaEvaluation` owns evaluation; no Swift `AnimaCore` target/import remains; format lint, full Swift tests, Xcode build, root-app build/signature, `git diff --check` | released 2026-07-15 |
@@ -136,6 +137,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Width + Tangent mates (geometry-constraint category) + mate `category` in the schema hook | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/{test_mates,test_loader,test_kinematics,test_bridge}.py`, `dev/docs/roadmap/{Character_Format,Kinematics,Studio_Bridge}.md`, `examples/geometry_mates_demo.character.anima` (new), `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,CLAUDE}.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` (886 passed, +43) | released 2026-07-15 (verbatim width/tangent schema JSON + category/drivable additions in the handoff entry below; no `app/`/`firmware/` touched; ADDITIVE — the 8 kinematic mates' behavior and shape are unchanged) |
 
+| Claude | Relations bridge hook: relation_types verb + relations in load_character + reverse/distance-per-rev UI conveniences | `animacore/rig.py` (relation schema hooks), `animacore/bridge.py`, `animacore/tests/{test_rig.py,test_bridge.py}`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-16 (901 suite total, +15; ruff clean; no `app/`/`firmware/` touched; verbatim `relation_types` JSON + `describe_relation` gear/rack examples in the handoff entry below) |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -189,6 +192,107 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, Relations bridge hook — `relation_types` verb +
+  `relations` in `load_character`):** The relation twin of the mate
+  hooks, **additive**. The engine already had the full relation model
+  (`Relation`, `RelationKind`, `RELATION_KIND_DOF_KINDS`, validation,
+  dependency-ordered `evaluate_pose`) — the gap was that the bridge did
+  not surface it, so the Swift UI could not see relations. Added, all in
+  `animacore/rig.py` beside the `Relation` model (the mate module does
+  not know relation vocabulary): `relation_type_schema(kind)` /
+  `all_relation_type_schemas()` (static per-kind palette catalog,
+  mirroring `mate_type_schema` / `all_mate_type_schemas`) and
+  `describe_relation(relation)` (per-instance descriptor, mirroring
+  `describe_mate`). `bridge.py` gains the **`relation_types`** verb
+  (in `CAPABILITIES`) and a **`relations`** array in the
+  `load_character` rig summary. Every existing field/verb unchanged;
+  `evaluate_pose`/`project_channels`/loader untouched. 901 suite total
+  (+15), ruff clean, no `app/`/`firmware/` touched. Left uncommitted.
+
+  **Verbatim `relation_types` result** (4 kinds, `RelationKind` order —
+  the palette hook, no handle needed):
+
+  ```json
+  {
+    "relation_types": [
+      {"kind": "gear", "label": "Gear",
+       "driver_kind": "rotation", "driven_kind": "rotation",
+       "ratio_field": {"key": "relation_ratio", "unit": "ratio"},
+       "reverse_supported": true},
+      {"kind": "rack_pinion", "label": "Rack and pinion",
+       "driver_kind": "rotation", "driven_kind": "translation",
+       "ratio_field": {"key": "distance_per_revolution", "unit": "mm"},
+       "reverse_supported": true},
+      {"kind": "screw", "label": "Screw",
+       "driver_kind": "rotation", "driven_kind": "translation",
+       "ratio_field": {"key": "distance_per_revolution", "unit": "mm"},
+       "reverse_supported": true},
+      {"kind": "linear", "label": "Linear",
+       "driver_kind": "translation", "driven_kind": "translation",
+       "ratio_field": {"key": "relation_ratio", "unit": "ratio"},
+       "reverse_supported": true}
+    ]
+  }
+  ```
+
+  **`describe_relation` — gear example** (negative ratio → reverse):
+
+  ```json
+  {"kind": "gear", "driver": "pinion.rotation",
+   "driven": "wheel.rotation", "ratio": -0.5, "offset": 0.0,
+   "reverse": true, "magnitude": 0.5, "ratio_field_value": 0.5,
+   "display": {}}
+  ```
+
+  **`describe_relation` — rack_pinion example** (the rc_car steering
+  rack, from `load_character` on `examples/rc_car.character.anima`):
+
+  ```json
+  {"kind": "rack_pinion", "driver": "steering.rotation",
+   "driven": "rack.travel", "ratio": 0.02, "offset": 0.0,
+   "reverse": false, "magnitude": 0.02,
+   "ratio_field_value": 125.66370614359172,
+   "display": {"pinion_diameter_mm": 40.0}}
+  ```
+
+  **Reverse / ratio-sign convention (what the dialog binds).** The
+  engine stores exactly ONE signed `ratio` (the semantic truth). The UI
+  never edits that sign directly — it shows a positive *magnitude* field
+  plus a "reverse direction" checkbox and sends back the signed ratio.
+  So `describe_relation` reports `reverse = ratio < 0` and
+  `magnitude = abs(ratio)`, keeping the raw signed `ratio` alongside.
+  To build a create/edit payload: `ratio = ±ratio_field_value_in_engine_units`,
+  negated iff reverse is checked.
+
+  **`ratio_field_value` (the number the dialog's one editable field
+  shows), per kind.** GEAR/LINEAR: the unitless `abs(ratio)` directly
+  ("Relation ratio", from Onshape's teeth pairing e.g. 20:40 → 0.5).
+  RACK_PINION/SCREW: **distance-per-revolution in mm** — the engine
+  stores `ratio` as **meters per radian**, one revolution is `2π`
+  radians, so `ratio_field_value = abs(ratio) × 2π × 1000`. The UI
+  inverts to store: `ratio = value_mm / 1000 / (2π)`. Verified
+  round-trip: 25 mm → `ratio ≈ 0.0039789` → back to 25.0 mm.
+
+  **For Codex building the relations palette + dialog:**
+  - Palette: `relation_types` gives the four ribbon tools in order —
+    Gear, Rack and pinion, Screw, Linear (label + kind). `driver_kind`
+    / `driven_kind` (`"rotation"` | `"translation"`) tell you which
+    mates/DOF are selectable on each side of the two-click flow (driver
+    mate → driven mate → DOF picker if a mate has multiple eligible
+    DOF), exactly mirroring `mate_types` for mates.
+  - Dialog: one editable numeric field named by `ratio_field.key`
+    (`relation_ratio` unitless, or `distance_per_revolution` in mm) plus
+    the always-present "reverse direction" checkbox
+    (`reverse_supported: true` for all four). Bind the field to
+    `ratio_field_value` and the checkbox to `reverse`.
+  - Navigator list: iterate the `relations` array from `load_character`
+    (under Mates, per Kinematics §5). Each entry carries `driver` /
+    `driven` DOF paths for highlighting both coupled mates on selection,
+    and the passthrough `display` map (teeth / diameter / lead) for any
+    secondary readout.
+  - No new verb params, no rig mutation verb yet — this packet is the
+    read/catalog side only (create/edit authoring is the app's K6 lane).
 
 - **2026-07-15 (Claude, Width + Tangent mates — geometry-constraint
   category):** Added the two Onshape mates beyond the 8, **additively**

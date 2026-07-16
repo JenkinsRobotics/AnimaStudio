@@ -266,6 +266,25 @@ Rules (deliberately Onshape-faithful):
   conveniences that compute it (persisted alongside for round-trip
   display, but the float is the semantic value).
 
+**Bridge hooks (implemented — `animacore/rig.py`, surfaced by
+`animacore/bridge.py`).** The relation twin of the mate hooks:
+`relation_type_schema` / `all_relation_type_schemas` (the static
+per-kind palette catalog, verb `relation_types`) and `describe_relation`
+(the per-instance descriptor, added as the `relations` array in
+`load_character`). See `Studio_Bridge.md` for the exact shapes. Two
+conventions the hooks encode:
+
+- **Reverse / sign:** the engine stores one signed `ratio`; the UI shows
+  a positive magnitude + a "reverse direction" checkbox. So
+  `describe_relation` reports `reverse = ratio < 0` and
+  `magnitude = abs(ratio)` while keeping the raw signed `ratio`.
+- **mm-per-revolution display (rack_pinion / screw):** `ratio` is meters
+  per radian; one revolution is `2π` radians, so the dialog's
+  distance-per-revolution field is
+  `distance_per_revolution_mm = abs(ratio) × 2π × 1000` (invert to store:
+  `ratio = value_mm / 1000 / (2π)`). Gear/linear show the unitless
+  `abs(ratio)` directly.
+
 **Authoring flow (ribbon → two clicks, mirroring the mate flow):**
 Relations group in the Rig ribbon (Gear, Rack & Pinion, Screw,
 Linear) → click mate 1 → click mate 2 → if a mate has multiple

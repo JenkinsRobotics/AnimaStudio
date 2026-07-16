@@ -26,8 +26,11 @@ from animacore.rig import (
     RigClip,
     RotationDof,
     TranslationDof,
+    all_relation_type_schemas,
+    describe_relation,
     evaluate_pose,
     project_channels,
+    relation_type_schema,
     relations_in_dependency_order,
 )
 from animacore.sim import SimulatedDevice
@@ -1098,3 +1101,131 @@ class TestProjectChannelsEndToEnd:
         assert device.receive_line(line) == "OK"
         assert device.channel_pulse_us(0) == pytest.approx(
             device.channel_pulse_us(1), abs=1.0)
+
+
+class TestRelationTypeSchema:
+    """The static per-kind relation hook (mirror of mate_type_schema)."""
+
+    @pytest.mark.parametrize(
+        "kind, driver_kind, driven_kind, field_key, field_unit",
+        [
+            (RelationKind.GEAR, "rotation", "rotation", "relation_ratio", "ratio"),
+            (
+                RelationKind.RACK_PINION,
+                "rotation",
+                "translation",
+                "distance_per_revolution",
+                "mm",
+            ),
+            (
+                RelationKind.SCREW,
+                "rotation",
+                "translation",
+                "distance_per_revolution",
+                "mm",
+            ),
+            (
+                RelationKind.LINEAR,
+                "translation",
+                "translation",
+                "relation_ratio",
+                "ratio",
+            ),
+        ],
+    )
+    def test_schema_shape_for_every_kind(
+        self, kind, driver_kind, driven_kind, field_key, field_unit
+    ):
+        schema = relation_type_schema(kind)
+        assert schema["kind"] == kind.value
+        assert schema["driver_kind"] == driver_kind
+        assert schema["driven_kind"] == driven_kind
+        assert schema["ratio_field"] == {"key": field_key, "unit": field_unit}
+        assert schema["reverse_supported"] is True
+        assert schema["label"]  # operator-facing, non-empty
+
+    def test_labels_are_operator_facing(self):
+        labels = {
+            relation_type_schema(k)["kind"]: relation_type_schema(k)["label"]
+            for k in RelationKind
+        }
+        assert labels == {
+            "gear": "Gear",
+            "rack_pinion": "Rack and pinion",
+            "screw": "Screw",
+            "linear": "Linear",
+        }
+
+    def test_all_schemas_covers_four_kinds_in_order(self):
+        schemas = all_relation_type_schemas()
+        assert len(schemas) == 4
+        assert [s["kind"] for s in schemas] == [k.value for k in RelationKind]
+
+
+class TestDescribeRelation:
+    """The per-instance relation hook (mirror of describe_mate)."""
+
+    def test_gear_ratio_field_value_is_abs_ratio(self):
+        relation = Relation(
+            kind=RelationKind.GEAR,
+            driver="pinion.rotation",
+            driven="wheel.rotation",
+            ratio=0.5,
+        )
+        described = describe_relation(relation)
+        assert described["kind"] == "gear"
+        assert described["ratio"] == 0.5  # signed semantic truth kept
+        assert described["magnitude"] == 0.5
+        assert described["ratio_field_value"] == 0.5
+        assert described["reverse"] is False
+
+    def test_gear_negative_ratio_sets_reverse_flag(self):
+        relation = Relation(
+            kind=RelationKind.GEAR,
+            driver="pinion.rotation",
+            driven="wheel.rotation",
+            ratio=-0.5,
+        )
+        described = describe_relation(relation)
+        assert described["reverse"] is True
+        assert described["magnitude"] == 0.5
+        assert described["ratio_field_value"] == 0.5
+        assert described["ratio"] == -0.5
+
+    def test_rack_pinion_distance_per_revolution_in_mm(self):
+        # ratio is meters per radian; mm/rev = ratio * 2π * 1000.
+        relation = Relation(
+            kind=RelationKind.RACK_PINION,
+            driver="steering.rotation",
+            driven="rack.travel",
+            ratio=0.02,
+        )
+        described = describe_relation(relation)
+        assert described["ratio_field_value"] == pytest.approx(
+            0.02 * 2 * math.pi * 1000.0
+        )
+        assert described["magnitude"] == 0.02
+
+    def test_distance_per_revolution_round_trips_25mm(self):
+        # UI enters 25 mm/rev → engine ratio → describe → back to 25 mm.
+        ratio = 25.0 / 1000.0 / (2 * math.pi)
+        relation = Relation(
+            kind=RelationKind.RACK_PINION,
+            driver="steering.rotation",
+            driven="rack.travel",
+            ratio=ratio,
+        )
+        described = describe_relation(relation)
+        assert described["ratio_field_value"] == pytest.approx(25.0)
+
+    def test_display_map_passes_through(self):
+        relation = Relation(
+            kind=RelationKind.RACK_PINION,
+            driver="steering.rotation",
+            driven="rack.travel",
+            ratio=0.02,
+            display={"pinion_diameter_mm": 40},
+        )
+        assert describe_relation(relation)["display"] == {
+            "pinion_diameter_mm": 40
+        }

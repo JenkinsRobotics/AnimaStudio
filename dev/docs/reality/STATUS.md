@@ -538,8 +538,15 @@
   (returns a deterministic handle + a rig summary the app mirrors),
   `validate_character`, `evaluate` (DOF values, parameters, projected
   channels, and reported limit violations for one frame), `resolve_pose`
-  (per-part world transforms — see below), `mate_types`, `release`,
-  and `shutdown`. This is the seam that keeps the app a front end: it
+  (per-part world transforms — see below), `mate_types`,
+  `relation_types` (the four relation kinds — Gear, Rack and pinion,
+  Screw, Linear — as a static palette catalog), `release`, and
+  `shutdown`. `load_character` also carries a `relations` array
+  (`describe_relation` per instance: signed semantic `ratio` split into
+  a display `magnitude` + `reverse` flag, plus a `ratio_field_value`
+  that is the unitless ratio for gear/linear or distance-per-revolution
+  in mm — `abs(ratio) × 2π × 1000` — for rack_pinion/screw). This is
+  the seam that keeps the app a front end: it
   holds DTOs that mirror engine results and never redefines what a rig,
   pose, or frame means. Protocol logic is a pure
   `handle_request(session, request)` over dicts (format/protocol errors
@@ -561,7 +568,7 @@
   `{parts:{name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — the
   RealityKit render hook that supersedes the Swift `RigPoseResolver` +
   `MateConnectorMath` (bridge migration step 2, engine side done).
-  843 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  901 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,

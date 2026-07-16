@@ -28,6 +28,8 @@ from animacore.mates import all_mate_type_schemas, describe_mate
 from animacore.rig import (
     LimitViolationError,
     Rig,
+    all_relation_type_schemas,
+    describe_relation,
     evaluate_pose,
     project_channels,
 )
@@ -43,6 +45,7 @@ CAPABILITIES = [
     "evaluate",
     "resolve_pose",
     "mate_types",
+    "relation_types",
     "release",
     "shutdown",
 ]
@@ -111,7 +114,9 @@ def _rig_summary(rig: Rig) -> dict:
     Each joint entry is ``describe_mate(joint)`` — the consistent
     per-mate hook carrying the stable id, the full universal controls,
     and the DOF paths + limits (``min``/``max`` null for an unlimited
-    DOF).
+    DOF). Each relation entry is ``describe_relation(relation)`` — the
+    per-instance relation hook (signed ratio, reverse flag, kind-specific
+    ratio field value); empty for a rig without relations.
     """
     identity = rig.identity
     joints = [describe_mate(joint) for joint in rig.joints.values()]
@@ -152,6 +157,9 @@ def _rig_summary(rig: Rig) -> dict:
         "outputs": [
             {"dof_path": mapping.target, "channel": mapping.channel}
             for mapping in rig.outputs
+        ],
+        "relations": [
+            describe_relation(relation) for relation in rig.relations
         ],
     }
 
@@ -318,6 +326,15 @@ def _mate_types(session: Session, params: dict, request_id: object) -> dict:
     return _ok(request_id, {"mate_types": all_mate_type_schemas()})
 
 
+def _relation_types(session: Session, params: dict, request_id: object) -> dict:
+    # The relations palette/panel hook: the static per-kind schema for
+    # all four relation kinds (Gear, Rack and pinion, Screw, Linear) —
+    # each with its driver/driven DOF kinds, operator label, editable
+    # ratio field, and reverse-supported flag. No rig handle needed — it
+    # is the type catalog (the relation twin of ``mate_types``).
+    return _ok(request_id, {"relation_types": all_relation_type_schemas()})
+
+
 def _release(session: Session, params: dict, request_id: object) -> dict:
     # Idempotent: dropping an unknown handle is not an error, so a client
     # can release freely without tracking exactly what the engine holds.
@@ -337,6 +354,7 @@ _VERBS = {
     "evaluate": _evaluate,
     "resolve_pose": _resolve_pose,
     "mate_types": _mate_types,
+    "relation_types": _relation_types,
     "release": _release,
     "shutdown": _shutdown,
 }

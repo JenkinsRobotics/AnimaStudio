@@ -292,6 +292,73 @@ def test_mate_types_needs_no_handle():
     assert response["ok"]
 
 
+# relation_types --------------------------------------------------------------
+
+
+def test_relation_types_is_a_capability():
+    assert "relation_types" in CAPABILITIES
+
+
+def test_relation_types_returns_four_schemas():
+    response = handle_request(
+        Session(), {"id": 11, "method": "relation_types", "params": {}}
+    )
+    assert response["ok"]
+    schemas = response["result"]["relation_types"]
+    assert [s["kind"] for s in schemas] == [
+        "gear",
+        "rack_pinion",
+        "screw",
+        "linear",
+    ]
+    gear = next(s for s in schemas if s["kind"] == "gear")
+    assert gear["label"] == "Gear"
+    assert gear["driver_kind"] == "rotation"
+    assert gear["driven_kind"] == "rotation"
+    assert gear["ratio_field"] == {"key": "relation_ratio", "unit": "ratio"}
+    assert gear["reverse_supported"] is True
+    rack = next(s for s in schemas if s["kind"] == "rack_pinion")
+    assert rack["driven_kind"] == "translation"
+    assert rack["ratio_field"] == {
+        "key": "distance_per_revolution",
+        "unit": "mm",
+    }
+
+
+def test_relation_types_needs_no_handle():
+    response = handle_request(
+        Session(), {"id": 1, "method": "relation_types", "params": {}}
+    )
+    assert response["ok"]
+
+
+def test_load_character_summary_carries_relations():
+    session = Session()
+    response = handle_request(
+        session,
+        {
+            "id": 12,
+            "method": "load_character",
+            "params": {
+                "text": (
+                    EXAMPLES_DIR / "rc_car.character.anima"
+                ).read_text()
+            },
+        },
+    )
+    relations = response["result"]["rig"]["relations"]
+    assert len(relations) == 1
+    rack = relations[0]
+    assert rack["kind"] == "rack_pinion"
+    assert rack["driver"] == "steering.rotation"
+    assert rack["driven"] == "rack.travel"
+    assert rack["ratio"] == 0.02  # signed semantic truth
+    assert rack["reverse"] is False
+    # meters/radian → mm/revolution = ratio * 2π * 1000.
+    assert rack["ratio_field_value"] == pytest.approx(0.02 * 2 * math.pi * 1000)
+    assert rack["display"] == {"pinion_diameter_mm": 40}
+
+
 # validate_character ----------------------------------------------------------
 
 

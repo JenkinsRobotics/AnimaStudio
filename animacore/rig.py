@@ -83,7 +83,11 @@ __all__ = [
     "RelationKind",
     "RELATION_KIND_DOF_KINDS",
     "RELATION_DISPLAY_KEYS",
+    "RELATION_KIND_LABELS",
     "Relation",
+    "relation_type_schema",
+    "all_relation_type_schemas",
+    "describe_relation",
     "relations_in_dependency_order",
     "RigClip",
     "Identity",
@@ -373,6 +377,114 @@ class Relation:
     def describe(self) -> str:
         """Stable human identity used in validation errors."""
         return f"{self.kind.value} {self.driver} -> {self.driven}"
+
+
+# Relation UI hooks -----------------------------------------------------------
+#
+# The relation equivalents of the mate hooks in ``animacore.mates``
+# (``mate_type_schema`` / ``all_mate_type_schemas`` / ``describe_mate``).
+# They live here, beside the ``Relation`` model, because the mate module
+# does not know the relation vocabulary and ``rig`` already owns it.
+#
+# Reverse / ratio-sign convention (Kinematics.md §5): the engine stores
+# exactly one signed ``ratio``. The UI never edits that sign directly —
+# it shows a *magnitude* field plus a "reverse direction" checkbox and
+# sends back the signed ratio (``reverse`` ⇔ ``ratio < 0``). So
+# ``describe_relation`` splits the stored ratio into ``magnitude`` +
+# ``reverse`` for display while keeping the raw signed ``ratio`` as the
+# semantic truth.
+
+# Operator-facing label per relation kind (the Rig-ribbon / palette name).
+RELATION_KIND_LABELS: dict[RelationKind, str] = {
+    RelationKind.GEAR: "Gear",
+    RelationKind.RACK_PINION: "Rack and pinion",
+    RelationKind.SCREW: "Screw",
+    RelationKind.LINEAR: "Linear",
+}
+
+# The one editable ratio field each kind shows in its dialog. GEAR and
+# LINEAR edit the unitless ratio directly ("Relation ratio"); RACK_PINION
+# and SCREW edit distance-per-revolution in mm (the engine stores meters
+# per radian — see ``_MM_PER_REVOLUTION_FROM_M_PER_RAD``).
+_RELATION_RATIO_FIELDS: dict[RelationKind, dict[str, str]] = {
+    RelationKind.GEAR: {"key": "relation_ratio", "unit": "ratio"},
+    RelationKind.LINEAR: {"key": "relation_ratio", "unit": "ratio"},
+    RelationKind.RACK_PINION: {"key": "distance_per_revolution", "unit": "mm"},
+    RelationKind.SCREW: {"key": "distance_per_revolution", "unit": "mm"},
+}
+
+# meters-per-radian → millimeters-per-revolution: one revolution is 2π
+# radians, and 1 m = 1000 mm. The rack/screw ratio is meters of travel
+# per radian of drive, so a full turn advances ``ratio * 2π`` meters =
+# ``ratio * 2π * 1000`` mm.
+_MM_PER_REVOLUTION_FROM_M_PER_RAD = 2.0 * math.pi * 1000.0
+
+
+def relation_type_schema(kind: RelationKind) -> dict:
+    """The static per-kind relation descriptor the palette/panel reads.
+
+    Mirrors ``mate_type_schema``. ``driver_kind`` / ``driven_kind`` are
+    ``"rotation"`` / ``"translation"`` (from ``RELATION_KIND_DOF_KINDS``)
+    so the UI knows which mates/DOF are selectable on each side.
+    ``ratio_field`` names the kind's one editable field: ``relation_ratio``
+    (unitless) for GEAR/LINEAR, ``distance_per_revolution`` (mm) for
+    RACK_PINION/SCREW. All four support the "reverse direction" checkbox.
+    """
+    driver_kind, driven_kind = RELATION_KIND_DOF_KINDS[kind]
+    return {
+        "kind": kind.value,
+        "label": RELATION_KIND_LABELS[kind],
+        "driver_kind": driver_kind.value,
+        "driven_kind": driven_kind.value,
+        "ratio_field": dict(_RELATION_RATIO_FIELDS[kind]),
+        "reverse_supported": True,
+    }
+
+
+def all_relation_type_schemas() -> list[dict]:
+    """Every relation kind's static schema, in ``RelationKind`` order.
+
+    The four-entry palette hook: Gear, Rack and pinion, Screw, Linear.
+    """
+    return [relation_type_schema(kind) for kind in RelationKind]
+
+
+def _relation_ratio_field_value(kind: RelationKind, ratio: float) -> float:
+    """The UI-facing (positive) number for ``ratio_field``, per kind.
+
+    GEAR/LINEAR: the unitless magnitude. RACK_PINION/SCREW: the
+    distance-per-revolution in mm (``abs(ratio) * 2π * 1000``).
+    """
+    magnitude = abs(ratio)
+    if _RELATION_RATIO_FIELDS[kind]["unit"] == "mm":
+        return magnitude * _MM_PER_REVOLUTION_FROM_M_PER_RAD
+    return magnitude
+
+
+def describe_relation(relation: Relation) -> dict:
+    """The per-instance relation descriptor the bridge surfaces.
+
+    Mirrors ``describe_mate``. Splits the stored signed ``ratio`` into a
+    display ``magnitude`` + ``reverse`` flag (``ratio < 0``) and the
+    kind-specific ``ratio_field_value`` (unitless for gear/linear,
+    mm-per-revolution for rack_pinion/screw), while keeping the raw
+    signed ``ratio`` as the semantic truth. ``display`` passes the
+    round-tripped non-semantic fields (teeth, lead, ...) through
+    unchanged.
+    """
+    return {
+        "kind": relation.kind.value,
+        "driver": relation.driver,
+        "driven": relation.driven,
+        "ratio": relation.ratio,
+        "offset": relation.offset,
+        "reverse": relation.ratio < 0,
+        "magnitude": abs(relation.ratio),
+        "ratio_field_value": _relation_ratio_field_value(
+            relation.kind, relation.ratio
+        ),
+        "display": dict(relation.display),
+    }
 
 
 def relations_in_dependency_order(

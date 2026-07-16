@@ -56,11 +56,12 @@ line — one error surface, never a second parser.
 | Method | params | result |
 |---|---|---|
 | `hello` | `{client, protocol_version}` | `{engine:"animacore", engine_version, protocol_version, capabilities:[…]}` — mismatched `protocol_version` → `protocol_mismatch` error |
-| `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[<describe_mate>…], parameters:[…], clips:[{name,duration_s,loop}], outputs:[{dof_path,channel}]}}` — invalid → `format_error` with `path`. Each joint entry is `describe_mate` (see below). |
+| `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[<describe_mate>…], parameters:[…], clips:[{name,duration_s,loop}], outputs:[{dof_path,channel}], relations:[<describe_relation>…]}}` — invalid → `format_error` with `path`. Each joint entry is `describe_mate`; each relation entry is `describe_relation` (see below). |
 | `validate_character` | `{text}` | `{diagnostics:[…]}` (empty = valid) — no handle allocated |
 | `evaluate` | `{handle, clip?, time_s?}` | `{dof_values:{path:native_units}, parameters:{name:0..1}, channels:{channel:0..1}, limit_violations:[{dof_path,value,min,max}]}` |
 | `resolve_pose` | `{handle, clip?, time_s?}` | `{parts:{part_name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — per-part **world** transforms after forward kinematics. **The RealityKit render hook.** Unknown handle → `unknown_handle`. See below. |
 | `mate_types` | `{}` | `{mate_types:[{type,label,category,drivable,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all **10** mate kinds (the palette / panel-builder hook); no handle needed. See categories below. |
+| `relation_types` | `{}` | `{relation_types:[{kind,label,driver_kind,driven_kind,ratio_field:{key,unit},reverse_supported}]}` — the static per-kind catalog for all **4** relation kinds (Gear, Rack and pinion, Screw, Linear); the relations palette/dialog hook; no handle needed. See relations below. |
 | `release` | `{handle}` | `{}` — drop a loaded rig |
 | `shutdown` | `{}` | `{}` then the helper exits |
 
@@ -112,6 +113,48 @@ app-computed midplanes, its offset inert). `tangent` carries no mate
 connectors: instead of `controls` it reports `tangent:{selection_a,
 selection_b, propagation}` (opaque app-side surface ids + a bool). Both
 are 0-DOF (`dofs: []`).
+
+**Relations (`relation_types` + the `relations` array).** The relation
+twin of the mate hooks (Kinematics.md §5). `relation_types` is the
+static per-kind catalog (the palette / dialog builder); `load_character`
+adds a `relations` array of per-instance `describe_relation` descriptors
+(empty for a rig with no relations). The four kinds, in order:
+
+| kind | label | driver_kind | driven_kind | ratio_field |
+|---|---|---|---|---|
+| `gear` | Gear | rotation | rotation | `{key:"relation_ratio", unit:"ratio"}` |
+| `rack_pinion` | Rack and pinion | rotation | translation | `{key:"distance_per_revolution", unit:"mm"}` |
+| `screw` | Screw | rotation | translation | `{key:"distance_per_revolution", unit:"mm"}` |
+| `linear` | Linear | translation | translation | `{key:"relation_ratio", unit:"ratio"}` |
+
+`driver_kind`/`driven_kind` tell the UI which mates/DOF are selectable
+on each side; `reverse_supported` is `true` for all four (every dialog
+has the "reverse direction" checkbox). Each per-instance descriptor:
+
+```
+{kind, driver, driven, ratio, offset, reverse, magnitude,
+ ratio_field_value, display}
+```
+
+where `driver`/`driven` are DOF paths (`"<joint>.<dof>"`), `ratio` is
+the raw **signed** semantic value (the truth), `offset` is in the driven
+DOF's native units, and `display` passes the round-tripped non-semantic
+fields (teeth, lead, diameter — see the format) through unchanged.
+
+**Reverse / ratio-sign convention.** The engine stores exactly one
+signed `ratio`. The UI never edits that sign directly — it shows a
+positive *magnitude* field plus a "reverse direction" checkbox and sends
+back the signed ratio. So the descriptor splits it for display:
+`reverse = ratio < 0`, `magnitude = abs(ratio)`.
+
+**`ratio_field_value` (the number the dialog's editable field shows).**
+For `gear`/`linear` it is the unitless `abs(ratio)`. For
+`rack_pinion`/`screw` it is **distance-per-revolution in mm**: the engine
+stores `ratio` as **meters per radian**, and one revolution is `2π`
+radians, so `distance_per_revolution_mm = abs(ratio) × 2π × 1000`. The UI
+inverts to store: `ratio = value_mm / 1000 / (2π)`, negated when reverse
+is checked. Example: rc_car's steering rack stores `ratio = 0.02` m/rad →
+`ratio_field_value ≈ 125.664` mm/rev.
 
 **Pose resolution (`resolve_pose`).** Forward kinematics over the joint
 graph: `evaluate` the frame, then walk parents-before-children giving

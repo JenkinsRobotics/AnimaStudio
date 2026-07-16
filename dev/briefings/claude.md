@@ -35,6 +35,29 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (Relations bridge hook): Surfaced the already-implemented
+  relation engine to the UI, **additively** — no existing field/verb
+  changed. Added, all in `animacore/rig.py` beside the `Relation` model
+  (the mate module does not know relation vocabulary):
+  `relation_type_schema` / `all_relation_type_schemas` (static per-kind
+  palette catalog, twin of `mate_type_schema` / `all_mate_type_schemas`)
+  and `describe_relation` (per-instance descriptor, twin of
+  `describe_mate`). `bridge.py` gains the **`relation_types`** verb (in
+  `CAPABILITIES`) and a **`relations`** array in the `load_character`
+  rig summary. Convention: the engine stores one signed `ratio`; the UI
+  shows a positive magnitude + a "reverse direction" checkbox, so
+  `describe_relation` reports `reverse = ratio < 0`,
+  `magnitude = abs(ratio)`, and a kind-specific `ratio_field_value`
+  (unitless for gear/linear; distance-per-revolution in mm =
+  `abs(ratio) × 2π × 1000` for rack_pinion/screw). `evaluate_pose` /
+  `project_channels` / loader untouched. 901 tests (+15), ruff clean, no
+  `app/`/`firmware/` touched. **Codex:** the verbatim `relation_types`
+  JSON, gear + rack_pinion `describe_relation` examples, and everything
+  needed to build the relations palette + dialog (which mates/DOF are
+  selectable per side, the one editable field + reverse checkbox, the
+  navigator list from the `relations` array) are in the briefing handoff
+  entry. Left uncommitted for main-session integration.
+
 - 2026-07-15 (Width + Tangent — geometry-constraint mates): Added the
   two Onshape mates beyond the 8, **additively** — the 8 kinematic
   mates' behavior and their `mate_types`/`describe_mate` shapes are
