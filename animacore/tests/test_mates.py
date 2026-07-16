@@ -36,7 +36,7 @@ class TestMateTypeSchema:
         assert schema["dof_count"] == len(template)
         assert schema["universal_controls"] == EXPECTED_UNIVERSAL
         assert len(schema["dofs"]) == len(template)
-        for slot, (name, kind) in zip(schema["dofs"], template, strict=True):
+        for slot, (name, kind, axis) in zip(schema["dofs"], template, strict=True):
             assert slot["name"] == name
             assert slot["kind"] == kind.value
             assert slot["unit"] == (
@@ -136,3 +136,33 @@ class TestDescribeMate:
         assert described["controls"]["flip_primary_axis"] is True
         assert described["controls"]["secondary_axis_rotation_deg"] == 180
         assert described["controls"]["simulation_connection"] is False
+
+
+class TestDofAxes:
+    """The canonical axis per DOF — the UI needs it to label a Slider's
+    travel as Z but a Pin Slot's as X (both are one bare 'translation')."""
+
+    def test_slider_translates_along_z(self):
+        dofs = mate_type_schema(JointType.PRISMATIC)["dofs"]
+        assert dofs[0]["axis"] == "z"
+
+    def test_pin_slot_translates_along_x_rotates_about_z(self):
+        dofs = mate_type_schema(JointType.PIN_SLOT)["dofs"]
+        by_kind = {d["kind"]: d["axis"] for d in dofs}
+        assert by_kind == {"translation": "x", "rotation": "z"}
+
+    def test_planar_axes(self):
+        dofs = mate_type_schema(JointType.PLANAR)["dofs"]
+        assert [d["axis"] for d in dofs] == ["x", "y", "z"]
+
+    def test_ball_rotates_about_all_three(self):
+        dofs = mate_type_schema(JointType.BALL)["dofs"]
+        assert [d["axis"] for d in dofs] == ["x", "y", "z"]
+
+    def test_every_rotation_is_z_except_ball(self):
+        for jt in JointType:
+            if jt is JointType.BALL:
+                continue
+            for d in mate_type_schema(jt)["dofs"]:
+                if d["kind"] == "rotation":
+                    assert d["axis"] == "z", jt

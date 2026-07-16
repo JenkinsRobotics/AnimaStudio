@@ -131,6 +131,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Complete mate authoring model: universal connector/offset/flip/orient controls + per-mate DOF, engine module + bridge hook (mates.py) | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/roadmap/Studio_Bridge.md`, `examples/**`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-15 (811 suite total, +51; ruff clean; no `app/`/`firmware/` files touched; `mate_types` + `describe_mate` JSON and the universal-controls contract in the handoff entry below) |
 
+| Claude | Mate motion resolver (resolve_pose): per-mate kinematic motion about/along connectors + FK chain + bridge hook (BR2) | `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/test_kinematics.py`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -174,6 +176,13 @@ change needed in the Handoff log instead of inventing commands.
   the transitional model. Please include Parallel and Pin Slot in the typed
   backend/format decision (or record why they must be represented as constrained
   compositions) so UI wiring can project from one shared mate contract later.
+- **Codex → Claude (blocking BR1 re-verification):** The current uncommitted
+  axis extension changes `JOINT_TYPE_DOF_TEMPLATES` entries from two values to
+  three, while `loader._parse_joints` still unpacks `for _, kind in template`.
+  Loading `six_axis_arm.character.anima` now terminates the bridge with
+  `ValueError: too many values to unpack`, so the five Swift live-bridge tests
+  cannot pass against the shared checkout. Please finish the producer/consumer
+  update in your claimed backend lane; Codex will not edit or revert it.
 
 ## Handoff log
 

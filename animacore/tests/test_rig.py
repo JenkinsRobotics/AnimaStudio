@@ -67,7 +67,7 @@ def translation_dof(
 def template_dofs(joint_type: JointType) -> tuple:
     """Build a valid DOF tuple straight from the type's template."""
     dofs = []
-    for default_name, kind in JOINT_TYPE_DOF_TEMPLATES[joint_type]:
+    for default_name, kind, _ in JOINT_TYPE_DOF_TEMPLATES[joint_type]:
         if kind is DofKind.ROTATION:
             dofs.append(rotation_dof(name=default_name))
         else:
@@ -147,21 +147,21 @@ class TestJointTypeDofSets:
         assert JOINT_TYPE_DOF_TEMPLATES[JointType.FASTENED] == ()
 
     def test_revolute_is_one_rotation(self):
-        kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[JointType.REVOLUTE]]
+        kinds = [k for _, k, _ in JOINT_TYPE_DOF_TEMPLATES[JointType.REVOLUTE]]
         assert kinds == [DofKind.ROTATION]
 
     def test_prismatic_is_one_translation(self):
-        kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[JointType.PRISMATIC]]
+        kinds = [k for _, k, _ in JOINT_TYPE_DOF_TEMPLATES[JointType.PRISMATIC]]
         assert kinds == [DofKind.TRANSLATION]
 
     def test_cylindrical_and_pin_slot_are_rotation_plus_translation(self):
         for joint_type in (JointType.CYLINDRICAL, JointType.PIN_SLOT):
-            kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[joint_type]]
+            kinds = [k for _, k, _ in JOINT_TYPE_DOF_TEMPLATES[joint_type]]
             assert kinds == [DofKind.ROTATION, DofKind.TRANSLATION]
 
     def test_parallel_is_three_translations_one_rotation(self):
         template = JOINT_TYPE_DOF_TEMPLATES[JointType.PARALLEL]
-        assert [(n, k) for n, k in template] == [
+        assert [(n, k) for n, k, _ in template] == [
             ("translation_x", DofKind.TRANSLATION),
             ("translation_y", DofKind.TRANSLATION),
             ("translation_z", DofKind.TRANSLATION),
@@ -169,13 +169,13 @@ class TestJointTypeDofSets:
         ]
 
     def test_planar_is_two_translations_one_rotation(self):
-        kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[JointType.PLANAR]]
+        kinds = [k for _, k, _ in JOINT_TYPE_DOF_TEMPLATES[JointType.PLANAR]]
         assert kinds == [
             DofKind.TRANSLATION, DofKind.TRANSLATION, DofKind.ROTATION,
         ]
 
     def test_ball_is_three_rotations(self):
-        kinds = [k for _, k in JOINT_TYPE_DOF_TEMPLATES[JointType.BALL]]
+        kinds = [k for _, k, _ in JOINT_TYPE_DOF_TEMPLATES[JointType.BALL]]
         assert kinds == [DofKind.ROTATION] * 3
 
 

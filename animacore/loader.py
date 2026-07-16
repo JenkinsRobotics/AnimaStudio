@@ -312,9 +312,9 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
             kind = _infer_dof_kind(dof_map, dof_path)
             pending[kind].append((str(dof_name), dof_map))
         dofs = []
-        for _, kind in template:
+        for _, kind, _ in template:
             if not pending[kind]:
-                expected = ", ".join(k for _, k in template)
+                expected = ", ".join(k for _, k, _ in template)
                 raise CharacterFormatError(
                     f"{path}.dofs",
                     f"joint type {joint_type.value!r} defines dof kinds "

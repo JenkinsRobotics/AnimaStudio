@@ -72,37 +72,48 @@ JOINT_TYPE_LABELS: dict[JointType, str] = {
 # Each joint type DEFINES its DOF set: the ordered (default name, kind)
 # pairs a joint of that type must carry. Authors may rename a DOF but
 # cannot add, drop, or re-kind one.
-JOINT_TYPE_DOF_TEMPLATES: dict[JointType, tuple[tuple[str, DofKind], ...]] = {
+# Each entry is (dof name, kind, canonical axis). The axis is the
+# connector-frame axis the DOF acts on — the UI needs it to label a
+# Slider's travel as Z↕ but a Pin Slot's as X↔ (both are one bare
+# "translation" DOF). Matches the Onshape mate dialogs: every rotation
+# is about Z except Ball's three; Slider/Cylindrical translate along Z,
+# Pin Slot along X, Planar/Parallel along X/Y(/Z).
+JOINT_TYPE_DOF_TEMPLATES: dict[JointType, tuple[tuple[str, DofKind, str], ...]] = {
     JointType.FASTENED: (),
     # Parallel keeps the connector axes parallel: free XYZ translation
     # plus rotation about the shared Z axis — no tilting.
     JointType.PARALLEL: (
-        ("translation_x", DofKind.TRANSLATION),
-        ("translation_y", DofKind.TRANSLATION),
-        ("translation_z", DofKind.TRANSLATION),
-        ("rotation", DofKind.ROTATION),
+        ("translation_x", DofKind.TRANSLATION, "x"),
+        ("translation_y", DofKind.TRANSLATION, "y"),
+        ("translation_z", DofKind.TRANSLATION, "z"),
+        ("rotation", DofKind.ROTATION, "z"),
     ),
-    JointType.REVOLUTE: (("rotation", DofKind.ROTATION),),
-    JointType.PRISMATIC: (("translation", DofKind.TRANSLATION),),
+    JointType.REVOLUTE: (("rotation", DofKind.ROTATION, "z"),),
+    JointType.PRISMATIC: (("translation", DofKind.TRANSLATION, "z"),),
     JointType.CYLINDRICAL: (
-        ("rotation", DofKind.ROTATION),
-        ("translation", DofKind.TRANSLATION),
+        ("rotation", DofKind.ROTATION, "z"),
+        ("translation", DofKind.TRANSLATION, "z"),
     ),
     JointType.PIN_SLOT: (
-        ("rotation", DofKind.ROTATION),
-        ("translation", DofKind.TRANSLATION),
+        ("rotation", DofKind.ROTATION, "z"),
+        ("translation", DofKind.TRANSLATION, "x"),
     ),
     JointType.PLANAR: (
-        ("translation_x", DofKind.TRANSLATION),
-        ("translation_y", DofKind.TRANSLATION),
-        ("rotation", DofKind.ROTATION),
+        ("translation_x", DofKind.TRANSLATION, "x"),
+        ("translation_y", DofKind.TRANSLATION, "y"),
+        ("rotation", DofKind.ROTATION, "z"),
     ),
     JointType.BALL: (
-        ("rotation_x", DofKind.ROTATION),
-        ("rotation_y", DofKind.ROTATION),
-        ("rotation_z", DofKind.ROTATION),
+        ("rotation_x", DofKind.ROTATION, "x"),
+        ("rotation_y", DofKind.ROTATION, "y"),
+        ("rotation_z", DofKind.ROTATION, "z"),
     ),
 }
+
+
+def _template_axes(joint_type: JointType) -> tuple[str, ...]:
+    """The canonical axis per DOF, in template order (joint.dofs order)."""
+    return tuple(axis for _, _, axis in JOINT_TYPE_DOF_TEMPLATES[joint_type])
 
 
 def dof_unit(kind: DofKind) -> str:
@@ -410,8 +421,8 @@ UNIVERSAL_CONTROL_IDS: tuple[str, ...] = (
 
 def _dof_slots(joint_type: JointType) -> list[dict]:
     return [
-        {"name": name, "kind": kind.value, "unit": dof_unit(kind)}
-        for name, kind in JOINT_TYPE_DOF_TEMPLATES[joint_type]
+        {"name": name, "kind": kind.value, "unit": dof_unit(kind), "axis": axis}
+        for name, kind, axis in JOINT_TYPE_DOF_TEMPLATES[joint_type]
     ]
 
 
@@ -494,10 +505,11 @@ def describe_mate(joint: Joint) -> dict:
                 "path": f"{joint.name}.{dof.name}",
                 "kind": dof.kind.value,
                 "unit": dof_unit(dof.kind),
+                "axis": axis,
                 "min": dof.minimum,
                 "max": dof.maximum,
                 "neutral": dof.neutral,
             }
-            for dof in joint.dofs
+            for dof, axis in zip(joint.dofs, _template_axes(joint.joint_type))
         ],
     }

@@ -150,7 +150,7 @@ class Joint:
                 f"{self.parent_part!r} to itself"
             )
         template_kinds = tuple(
-            kind for _, kind in JOINT_TYPE_DOF_TEMPLATES[self.joint_type]
+            kind for _, kind, _ in JOINT_TYPE_DOF_TEMPLATES[self.joint_type]
         )
         dof_kinds = tuple(dof.kind for dof in self.dofs)
         if dof_kinds != template_kinds:
