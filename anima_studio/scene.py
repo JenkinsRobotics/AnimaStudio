@@ -274,6 +274,10 @@ class Scene:
     character: str
     variables: Mapping[str, VariableValue]
     sequence: tuple[Action, ...]
+    # Opaque editor metadata (node-canvas layout etc. — see
+    # dev/docs/roadmap/Node_Graph.md). Preserved for round-trip,
+    # NEVER interpreted by the runtime.
+    editor: Mapping[str, object] | None = None
 
 
 # Loading ----------------------------------------------------------------------
@@ -325,11 +329,15 @@ def parse_scene(text: str) -> Scene:
         raise SceneFormatError("character", "must not be empty")
     variables = _parse_variables(document.get("variables"))
     sequence = _parse_actions(document["sequence"], "sequence")
+    editor = document.get("editor")
+    if editor is not None and not isinstance(editor, dict):
+        raise SceneFormatError("editor", "must be a mapping when present")
     return Scene(
         identity=identity,
         character=character,
         variables=variables,
         sequence=sequence,
+        editor=editor,
     )
 
 
@@ -363,6 +371,7 @@ def _check_top_level_fields(document: dict) -> None:
         "character",
         "variables",
         "sequence",
+        "editor",
     }
     for key in document:
         if key == "meta":

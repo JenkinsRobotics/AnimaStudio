@@ -1149,3 +1149,22 @@ class TestPickAndWaveExample:
         finished = runner.emitted_events[-1]
         assert finished.name == "scene_finished"
         assert finished.time_s == pytest.approx(9.1)
+
+
+class TestEditorBlock:
+    """N1 (Node_Graph.md): the runtime tolerates and preserves an
+    opaque `editor:` block — node-canvas layout is never interpreted."""
+
+    def test_editor_block_accepted_and_preserved(self):
+        layout = {"layout": {"nodes": {"start": {"x": 0, "y": 0}}}}
+        scene = make_scene([{"wait": {"seconds": 0.1}}], editor=layout)
+        assert scene.editor == layout
+
+    def test_editor_absent_is_none(self):
+        assert make_scene([{"wait": {"seconds": 0.1}}]).editor is None
+
+    def test_editor_non_mapping_rejected(self):
+        path = error_path(
+            lambda: make_scene([{"wait": {"seconds": 0.1}}], editor=12)
+        )
+        assert path == "editor"
