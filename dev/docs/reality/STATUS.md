@@ -56,7 +56,17 @@
   cached render path when one exists and otherwise show an honest project-type
   preview. Records carry the real project-folder path plus a security-scoped
   bookmark; clicking a card reopens the folder, reads its manifest, and loads
-  its active character through AnimaCore. A
+  its active character through AnimaCore. A standard macOS **Settings** scene
+  is available from the app menu and Command-comma. Its Workspace tab owns the
+  single default project root (`~/Documents/Anima Studio/` initially), supports
+  choosing/revealing/restoring the folder, and persists custom roots with an
+  app-scoped security bookmark. New Project, Open Project, and Save As all
+  resolve this same preference and lazily create the root. Navigation embeds
+  the existing CAD mouse profile, bindings, response, and reverse-wheel
+  controls rather than presenting a separate sheet; Appearance exposes the
+  existing viewport theme/render/lighting/material/reflection preferences. A
+  launch-only invalid Recent Projects SF Symbol that previously prevented
+  window construction for operators with saved recents is also corrected. A
   new project now opens as a genuinely empty project in the first **Assets**
   workspace rather than silently inserting the sample mechanism or jumping
   ahead to Rig. Assets is now a dedicated character-management surface backed
@@ -717,10 +727,34 @@
   isolated below the pure-stdlib FK; verified by FK→IK→FK round-trips (the
   achieved pose matches an FK-generated target for the 2R and 6R arms),
   joint-limit respect, honest unreachable-target residuals, prismatic-slider
-  IK, and determinism. Analytic per-geometry IK (DH4) and the
-  character-format `kinematic_chain` block + bridge verbs (DH3) are later
-  packets and no rig/loader/serialize/bridge code was touched.
-  1013 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  IK, and determinism.
+  The DH chain is now a real **articulated-arm rig type** (DH3): a `Rig`
+  may carry an optional `KinematicChain` (`animacore/rig.py`) — an ordered
+  list of `ChainJoint` DH links (`a_m`/`d_m` metres, `alpha_deg`/`theta_deg`
+  degrees→radians, per-joint-variable `limits`/`neutral`, an optional
+  `part` that rides the link frame), a `base_part` whose rest transform is
+  the chain base frame in character space, an optional `tool_part`, and a
+  tool offset. Declaring the top-level `kinematic_chain` block makes the
+  character that type. Its joints are **drivable DOF** (`"<chain>.<joint>"`)
+  that clips animate, evaluate to neutral otherwise, and may map to bounded
+  output channels; `resolve_pose` places each link/tool part by **DH forward
+  kinematics** (character-space, overriding the rest-transform root
+  placement) while non-chain rigs are unchanged. The loader/serializer
+  round-trip the block losslessly (`load → serialize → load` equal), and the
+  bridge adds two verbs on a loaded arm rig's chain: `forward_kinematics
+  {handle, joint_values:{joint:value}} -> {link_frames:[{position,
+  orientation}...], tool_pose:{position,orientation}}` and `solve_ik
+  {handle, target_pose:{position,orientation}, seed?:{joint:value}} ->
+  {joint_values:{joint:value}, reached, position_error_m,
+  orientation_error_rad, iterations}` (missing joints fall to neutral; no
+  chain → a `no_kinematic_chain` error; FK/IK frames are character-space).
+  `load_character` exposes the chain in its rig summary (null for a general
+  assembly) so the app knows the rig is an arm and can drive it, and
+  `rig_from_dict` reconstructs it for `serialize_character`. Example:
+  `examples/six_axis_arm_dh.character.anima` (UR5-style 6R, alongside the
+  mate-based `six_axis_arm.character.anima`). Analytic per-geometry IK (DH4)
+  is a later packet.
+  1043 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,

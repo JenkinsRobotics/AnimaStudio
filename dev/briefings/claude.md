@@ -35,6 +35,33 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (DH3 — kinematic_chain arm rig type + bridge FK/IK verbs):
+  The DH articulated-arm rig type is **complete** — an arm is now a real
+  savable `.character.anima` rig the app drives via DH FK/IK. **Additive**
+  (rig/kinematics/loader/serialize/bridge), 1013 → **1043 tests** (+28 new
+  `test_kinematic_chain.py` + 2 example-discovered), ruff clean, no
+  `app/`/`firmware/` touched. `Rig.kinematic_chain: KinematicChain | None`
+  wraps `animacore.dh`: `ChainJoint` (DH link as a drivable DOF, optional
+  `part` riding its frame) + `KinematicChain` (`name`, ordered joints,
+  `base_part` → chain base frame, `tool_part`, tool offset). Chain joints
+  are DOF (`"<chain>.<joint>"`): clips drive them, they fall back to
+  neutral, and they map to output channels; `resolve_pose` places the
+  link/tool parts by **DH forward kinematics** (character-space,
+  overriding root placement) — non-chain rigs untouched. Loader/serializer
+  round-trip the block losslessly. **Codex — two new bridge verbs for the
+  arm UI (`load_character.kinematic_chain` is null for a general
+  assembly):** `forward_kinematics {handle, joint_values:{joint:value}} →
+  {link_frames:[{position,orientation}...], tool_pose:{position,
+  orientation}}` and `solve_ik {handle, target_pose:{position,orientation},
+  seed?:{joint:value}} → {joint_values:{joint:value}, reached,
+  position_error_m, orientation_error_rad, iterations}` (missing joints →
+  neutral; non-arm rig → `no_kinematic_chain`; honest non-convergence). New
+  example `examples/six_axis_arm_dh.character.anima` (UR5-style 6R) loads,
+  round-trips, resolves via DH FK, and its bridge FK→IK→FK reaches the
+  target. Verbatim verb JSON, the `KinematicChain`/`ChainJoint` shapes, and
+  the DH4 (analytic IK) note are in the briefing handoff entry. Left
+  uncommitted for main-session integration.
+
 - 2026-07-16 (DH2 — inverse kinematics, damped least-squares, numpy):
   Closed the FK↔IK loop for the DH articulated-arm chains. **Extended**
   `animacore/dh.py` (+ `tests/test_dh.py`, now 34 tests) with

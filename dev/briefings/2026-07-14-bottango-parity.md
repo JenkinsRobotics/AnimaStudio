@@ -50,7 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
-| Codex | Standard Settings scene + persistent workspace root | `app/App/{AnimaStudioApp.swift,AnimaStudio.entitlements}`, `app/Sources/AnimaStudioUI/AppShell/{ProjectLifecycle,StudioWorkspaceView,WorkspaceLocationPreference}.swift`, `app/Sources/AnimaStudioUI/Settings/{AnimaStudioSettingsView,MouseNavigationSettingsView,StudioPreferenceKeys}.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{AppShell,Settings}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/Project_Format.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one resolved/bookmarked workspace root defaults to `~/Documents/Anima Studio`; New/Open/Save As use it and lazily create it; Settings scene opens through standard macOS command/menu and contains Workspace, Navigation, Appearance; old mouse sheet removed; root preference/bookmark tests, full tests/lint/Xcode/root-app build/signature/launch, `git diff --check` | in progress |
+| Codex | Standard Settings scene + persistent workspace root | `app/{project.yml,App/{AnimaStudioApp.swift,AnimaStudio.entitlements}}`, `app/Sources/AnimaStudioUI/AppShell/{ProjectLifecycle,StudioHomeView,StudioWorkspaceView,WorkspaceLocationPreference}.swift`, `app/Sources/AnimaStudioUI/Settings/{AnimaStudioSettingsView,MouseNavigationSettingsView,StudioPreferenceKeys}.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{AppShell,Settings}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/{reality/STATUS.md,roadmap/Project_Format.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one resolved/bookmarked workspace root defaults to `~/Documents/Anima Studio`; New/Open/Save As use it and lazily create it; Settings scene opens through standard macOS command/menu and contains Workspace, Navigation, Appearance; old mouse sheet removed; root preference/bookmark tests, full tests/lint/Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Reusable navigator tree + persistent engine/editor object state | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/AppShell/{NavigatorOrganization,StudioWorkspaceModel,StudioWorkspaceView,ComponentContextActions}.swift`, `app/Sources/AnimaStudioUI/Components/{ProjectNavigatorView,PartTreeRow,NavigatorDropInteraction,ComponentAppearanceEditor,InspectorView}.swift`, new reusable tree files under `app/Sources/AnimaStudioUI/Components/Tree/**`, `app/Sources/RealityKitViewport/{PreviewPartAppearance,RobotPreviewView,CharacterSpaceTransform,EngineResolvedPose}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/{Studio_App,Coordinate_Frames}.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one generic `TreeView`/pure tree model renders Instances and Mate Features; reorder/move/group/filter/drop validation and viewport-to-tree reveal are tested; state badges and context commands work; position/rotation/suppress/ground edit the retained engine DTO and round-trip through serialize/load; material/visibility/locks/disclosure/groups persist in character editor JSON; World→Character→Part remains explicit; full tests/lint/Xcode/root-app build/signature/launch plus move/suppress/material Save+reopen walkthrough and `git diff --check` | released 2026-07-16 (Swift/UI scope complete; engine suppression/output crash recorded in Requests) |
 | Codex | CAD mouse/navigation overhaul + reusable Mouse settings panel | `app/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,RobotPreviewView,SubObjectSelection}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportCameraControls,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, new focused settings views under `app/Sources/AnimaStudioUI/Settings/**`, focused tests under `app/Tests/{RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/Studio_App.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Default/SolidWorks/Onshape/Fusion/Custom mappings match the approved CAD table; Option bindings, click-vs-drag right routing, normalized reversible zoom, precise zoom and middle-double-click frame; reliable selection/empty clear with selection feedback; compact reusable settings window with profile summaries, mouse-button diagram, manual bindings, sensitivity and reverse-wheel persistence; mapping/classifier/UI tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Assets character manager + 3D assembly loading stage | `app/Sources/AnimaCoreClient/AnimaCoreRigDocumentEditor.swift`, `app/Sources/AnimaDocument/{AnimaStudioDocument,ProjectCharacterNaming}.swift`, `app/Sources/RealityKitViewport/ModelHierarchy.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/ModelImportUnitsSheet.swift`, new `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Assets lists indexed characters and selects the active Rig/Animate character; validated 3D-only New Character sheet with disabled honest 2D option; engine-serialized empty character folder; async batch STL/OBJ/USD import with explicit unit preparation, progress, multi-node USD mapping, inline failures, and transition to Rig; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
@@ -159,6 +159,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | DH2: inverse kinematics (damped least-squares, numpy) for articulated-arm rigs | `animacore/dh.py`, `animacore/tests/test_dh.py`, `pyproject.toml` (add numpy) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; IK reaches reachable targets, FK(IK(pose))==pose | released 2026-07-16 (1005 → 1013, +8 IK tests; numpy>=1.26 added; FK→IK→FK round-trip proven for 2R and 6R) |
 
+| Claude | DH3: kinematic_chain character-format block + arm rig type + bridge forward_kinematics/solve_ik verbs | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/test_kinematic_chain.py` (new), `dev/docs/roadmap/{Character_Format,DH_Kinematics}.md`, `dev/docs/reality/STATUS.md`, `examples/six_axis_arm_dh.character.anima` (new) | `.venv/bin/ruff check .` (clean) + `.venv/bin/pytest animacore/tests -q` (1043 passed); arm example round-trips, resolve_pose drives it via DH FK, bridge FK→IK→FK reaches target | released 2026-07-16 (1013 → 1043, +28 chain tests + 2 example-discovered; the DH articulated-arm rig type is complete) |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -224,6 +226,100 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, DH3 — kinematic_chain arm rig type + bridge
+  FK/IK verbs):** The DH articulated-arm rig type is COMPLETE — an arm is
+  now a real savable rig the app drives. **Additive** across
+  rig/kinematics/loader/serialize/bridge; every prior test unchanged
+  (1013 → **1043**, +28 in the new `test_kinematic_chain.py` + 2
+  example-discovered), ruff clean, no `app/`/`firmware/` touched.
+
+  **Model (`animacore/rig.py`).** `Rig` gains
+  `kinematic_chain: KinematicChain | None = None`. New dataclasses
+  (defined in rig.py, wrapping `animacore.dh`):
+  - `ChainJoint` — one DH link as a DOF: `name`, `a_m`/`d_m` (metres),
+    `alpha_rad`/`theta_rad` (radians), `joint_type` (`JointKind`
+    revolute/prismatic), `min`/`max`/`neutral` (the joint variable, rad
+    for revolute / m for prismatic), optional `part` that RIDES the link
+    frame. `.as_dof()` → `RotationDof`/`TranslationDof` (so it validates
+    and clamps exactly like a mate DOF); `.to_dh_link()` → `DHLink`.
+  - `KinematicChain` — `name`, ordered `joints`, optional `base_part`
+    (its rest transform is the chain base frame in character space),
+    optional `tool_part`, `tool_position_m` + `tool_rotation_euler_rad`
+    (tool offset). `.dof_paths()` keys DOF `"<name>.<joint>"`;
+    `.to_dh_chain(base_frame)` builds the `DHChain`.
+  - `Rig.chain_dof_paths()` (chain DOF, separate from mate `dof_paths()`
+    so a suppressed-joint prefix lookup stays valid) and `Rig.dh_chain()`
+    (resolves `base_part`'s rest transform → the full `DHChain`).
+  Chain DOF share the clip-target namespace with mate DOF (a collision is
+  a load/validation error) and may map to output channels. `evaluate_pose`
+  includes chain DOF (drivable, neutral fallback); `resolve_pose`
+  (`animacore/kinematics.py`) places each `ChainJoint.part` on its DH link
+  frame and `tool_part` on the tool pose, **overriding** the rest-transform
+  root placement — non-chain rigs untouched.
+
+  **Format (`loader.py` + `serialize.py`).** New top-level
+  `kinematic_chain` block round-trips losslessly (`load → serialize →
+  load` equal, proven for the example). File units mirror the DOF
+  convention: `a_m`/`d_m` metres, `alpha_deg`/`theta_deg` degrees→radians,
+  per-joint `limits` (`min_deg`/`max_deg` revolute, `min_m`/`max_m`
+  prismatic) + `neutral_deg`/`neutral_m`, optional `part`; chain
+  `base_part`/`tool_part`/`tool{position_m,rotation_euler_deg}`. Typed
+  pathed `CharacterFormatError`s (unknown field, unknown joint type,
+  wrong-unit neutral key, missing part, empty joint list).
+
+  **Bridge (`bridge.py`) — verbatim verb JSON for Codex's arm UI:**
+  - `load_character` rig summary gains `kinematic_chain` (null for a
+    general assembly), joints in native units with `dof_path`;
+    `rig_from_dict` reconstructs it (serialize round-trip proven).
+  - `forward_kinematics` — request
+    `{"handle":"rig1","joint_values":{"j1":0.3,"j2":-0.5,...}}` (missing
+    joints → neutral); response
+    `{"link_frames":[{"position":[x,y,z],"orientation":[x,y,z,w]},...],
+    "tool_pose":{"position":[x,y,z],"orientation":[x,y,z,w]}}`. Frames are
+    **character-space** (base = `base_part`'s rest transform).
+  - `solve_ik` — request
+    `{"handle":"rig1","target_pose":{"position":[x,y,z],
+    "orientation":[x,y,z,w]},"seed":{"j1":0.0,...}}` (`seed` optional →
+    neutral); response
+    `{"joint_values":{"j1":...,"j2":...},"reached":true,
+    "position_error_m":2.0e-5,"orientation_error_rad":...,"iterations":4}`.
+    Reports non-convergence honestly (`reached:false` + residuals, no
+    raise). Both error `no_kinematic_chain` on a non-arm rig,
+    `unknown_handle` on a bad handle, `kinematics_error` on a `DHError`.
+    Added to `CAPABILITIES`.
+
+  **Example.** `examples/six_axis_arm_dh.character.anima` — UR5-style 6R
+  arm as a `kinematic_chain` (link parts ride the DH frames, gripper tool
+  part, a `reach` clip driving the joints, six `arm.j*` output channels).
+  Kept the mate-based `six_axis_arm.character.anima` as the
+  general-assembly counterpart. **Confirmed:** it loads, round-trips,
+  `resolve_pose` places `forearm`/`gripper` at the exact
+  `forward_kinematics` link/tool frames, and a bridge FK→IK→FK loop
+  reaches the target (`reached=true`, pos residual ~2e-5 m, 4 iters).
+
+  DH4 (analytic per-geometry IK) is the only remaining DH packet. Left
+  uncommitted for main-session integration.
+
+- **2026-07-16 (Codex, native Settings + default workspace root):** Added a
+  standard SwiftUI `Settings` scene with Workspace, Navigation, and Appearance
+  tabs. `WorkspaceLocationPreference` is the single filesystem/UI truth:
+  default `~/Documents/Anima Studio/`, optional custom path plus app-scoped
+  security bookmark, lazy directory creation, closest-existing panel fallback,
+  and restore-default support. New/Open/Save As all use it. The existing CAD
+  mouse panel now lives inside Navigation; its viewport shortcut opens Settings
+  directly on that tab. Unit tests cover default resolution, lazy creation,
+  custom persistence, and reset. Verification: recursive format lint; `swift
+  test` = 240 XCTest + 16 Swift Testing, all green; native Xcode build and root
+  app build/deep-sign succeeded; launch registered an enabled standard
+  **Settings…** app-menu command. The real launch audit found an existing invalid
+  Recent Projects SF Symbol (`folder.badge.checkmark`) that aborted SwiftUI
+  window construction for users with recents; replaced it with a validated
+  symbol. The focused Xcode UI-test source was added, but command-line execution
+  remains blocked by the pre-existing Xcode target/product mismatch
+  (`AnimaStudio` target vs `Anima Studio.app` product), which should be repaired
+  as its own project-generation packet rather than changing the app product
+  name in this UI change.
 
 - **2026-07-16 (Claude, DH2 — inverse kinematics, damped least-squares):**
   Closed the FK↔IK loop for the articulated-arm chains. Extended

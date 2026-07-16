@@ -25,7 +25,8 @@ from typing import IO
 import yaml
 
 from animacore import __version__ as ENGINE_VERSION
-from animacore.kinematics import resolve_pose, transform_to_json
+from animacore.dh import DHError, forward_kinematics, solve_ik
+from animacore.kinematics import Transform, resolve_pose, transform_to_json
 from animacore.loader import CharacterFormatError, parse_character
 from animacore.mates import (
     DofKind,
@@ -41,8 +42,11 @@ from animacore.mates import (
     describe_mate,
 )
 from animacore.rig import (
+    ChainJoint,
     Identity,
     Joint,
+    JointKind,
+    KinematicChain,
     LimitViolationError,
     OutputMapping,
     Parameter,
@@ -70,6 +74,8 @@ CAPABILITIES = [
     "validate_character",
     "evaluate",
     "resolve_pose",
+    "forward_kinematics",
+    "solve_ik",
     "mate_types",
     "relation_types",
     "serialize_character",
@@ -214,6 +220,48 @@ def _rig_summary(rig: Rig) -> dict:
         "relations": [
             describe_relation(relation) for relation in rig.relations
         ],
+        # The articulated-arm rig type: null for a general assembly rig,
+        # the DH chain (base/tool parts, ordered joints in native units)
+        # when present, so the app knows it is an arm and can show/drive
+        # the joints. ``rig_from_dict`` reconstructs the rig from exactly
+        # this shape.
+        "kinematic_chain": _chain_summary(rig.kinematic_chain),
+    }
+
+
+def _chain_summary(chain: KinematicChain | None) -> dict | None:
+    """The ``kinematic_chain`` block of the rig DTO (native units).
+
+    ``a_m`` / ``d_m`` metres, ``alpha_rad`` / ``theta_rad`` radians, and
+    each joint's variable ``min`` / ``max`` / ``neutral`` in native units
+    (radians for a revolute joint, metres for a prismatic one — ``min`` /
+    ``max`` null when unbounded). ``dof_path`` is the addressable
+    ``"<chain>.<joint>"`` clip target. ``None`` for a non-chain rig.
+    """
+    if chain is None:
+        return None
+    return {
+        "name": chain.name,
+        "base_part": chain.base_part,
+        "tool_part": chain.tool_part,
+        "tool_position_m": list(chain.tool_position_m),
+        "tool_rotation_euler_rad": list(chain.tool_rotation_euler_rad),
+        "joints": [
+            {
+                "name": joint.name,
+                "dof_path": f"{chain.name}.{joint.name}",
+                "joint_type": joint.joint_type.value,
+                "a_m": joint.a_m,
+                "alpha_rad": joint.alpha_rad,
+                "d_m": joint.d_m,
+                "theta_rad": joint.theta_rad,
+                "min": joint.min,
+                "max": joint.max,
+                "neutral": joint.neutral,
+                "part": joint.part,
+            }
+            for joint in chain.joints
+        ],
     }
 
 
@@ -329,9 +377,12 @@ def rig_from_dict(dto: dict) -> Rig:
         )
         for entry in dto.get("parameters", [])
     }
+    kinematic_chain = _chain_from_dto(dto.get("kinematic_chain"))
     dof_paths: dict[str, object] = {}
     for joint in joints.values():
         dof_paths.update(joint.dof_paths())
+    if kinematic_chain is not None:
+        dof_paths.update(kinematic_chain.dof_paths())
     clips = {
         entry["name"]: _clip_from_dto(entry, dof_paths, parameters)
         for entry in dto.get("clips", [])
@@ -365,6 +416,37 @@ def rig_from_dict(dto: dict) -> Rig:
         clips=clips,
         outputs=outputs,
         relations=relations,
+        kinematic_chain=kinematic_chain,
+    )
+
+
+def _chain_from_dto(dto: dict | None) -> KinematicChain | None:
+    """Reconstruct a ``KinematicChain`` from the rig DTO (native units)."""
+    if dto is None:
+        return None
+    return KinematicChain(
+        name=dto["name"],
+        joints=tuple(
+            ChainJoint(
+                name=joint["name"],
+                a_m=joint.get("a_m", 0.0),
+                alpha_rad=joint.get("alpha_rad", 0.0),
+                d_m=joint.get("d_m", 0.0),
+                theta_rad=joint.get("theta_rad", 0.0),
+                joint_type=JointKind(joint.get("joint_type", "revolute")),
+                min=joint.get("min"),
+                max=joint.get("max"),
+                neutral=joint.get("neutral", 0.0),
+                part=joint.get("part"),
+            )
+            for joint in dto.get("joints", [])
+        ),
+        base_part=dto.get("base_part"),
+        tool_part=dto.get("tool_part"),
+        tool_position_m=tuple(dto.get("tool_position_m", (0.0, 0.0, 0.0))),
+        tool_rotation_euler_rad=tuple(
+            dto.get("tool_rotation_euler_rad", (0.0, 0.0, 0.0))
+        ),
     )
 
 
@@ -637,6 +719,130 @@ def _resolve_pose(session: Session, params: dict, request_id: object) -> dict:
     )
 
 
+def _chain_or_error(
+    session: Session, params: dict, request_id: object
+) -> tuple[Rig, KinematicChain] | dict:
+    """The loaded rig + its chain, or an error envelope to return."""
+    handle = _require_str(params, "handle")
+    rig = session.get(handle)
+    if rig is None:
+        return _error(
+            request_id, "unknown_handle", f"no rig loaded as {handle!r}"
+        )
+    if rig.kinematic_chain is None:
+        return _error(
+            request_id,
+            "no_kinematic_chain",
+            f"rig {handle!r} is not an articulated-arm type "
+            f"(no kinematic_chain); forward_kinematics/solve_ik require one",
+        )
+    return rig, rig.kinematic_chain
+
+
+def _joint_values_in_order(
+    chain: KinematicChain, values: dict, path: str
+) -> list[float]:
+    """Chain joint values in link order, missing ones falling to neutral."""
+    ordered: list[float] = []
+    for joint in chain.joints:
+        value = values.get(joint.name, joint.neutral)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise _BadRequest(f"{path}[{joint.name!r}] must be a number")
+        ordered.append(float(value))
+    return ordered
+
+
+def _forward_kinematics(
+    session: Session, params: dict, request_id: object
+) -> dict:
+    # Articulated-arm FK: place the chain's link frames and tool pose for a
+    # set of joint values (missing joints fall back to their neutral). All
+    # frames are character-space (the chain base is base_part's rest
+    # transform), matching resolve_pose.
+    resolved = _chain_or_error(session, params, request_id)
+    if isinstance(resolved, dict):
+        return resolved
+    rig, chain = resolved
+    joint_values = params.get("joint_values", {})
+    if not isinstance(joint_values, dict):
+        raise _BadRequest("'joint_values' must be an object")
+    values = _joint_values_in_order(chain, joint_values, "joint_values")
+    try:
+        forward = forward_kinematics(rig.dh_chain(), values)
+    except DHError as error:
+        return _error(request_id, "kinematics_error", str(error))
+    return _ok(
+        request_id,
+        {
+            "link_frames": [
+                transform_to_json(frame) for frame in forward.link_frames
+            ],
+            "tool_pose": transform_to_json(forward.tool_pose),
+        },
+    )
+
+
+def _solve_ik(session: Session, params: dict, request_id: object) -> dict:
+    # Articulated-arm IK: joint values putting the tool at a target pose
+    # (damped least-squares; reports non-convergence honestly, never
+    # raises for an unreachable target). The optional seed and returned
+    # joint values are keyed by joint name; residuals are in metres /
+    # radians.
+    resolved = _chain_or_error(session, params, request_id)
+    if isinstance(resolved, dict):
+        return resolved
+    rig, chain = resolved
+    target = params.get("target_pose")
+    if not isinstance(target, dict):
+        raise _BadRequest("'target_pose' must be an object")
+    position = target.get("position")
+    orientation = target.get("orientation")
+    if not _is_number_seq(position, 3):
+        raise _BadRequest("'target_pose.position' must be 3 numbers")
+    if not _is_number_seq(orientation, 4):
+        raise _BadRequest(
+            "'target_pose.orientation' must be 4 numbers (x, y, z, w)"
+        )
+    target_pose = Transform(
+        rotation=tuple(float(c) for c in orientation),
+        translation=tuple(float(c) for c in position),
+    )
+    seed_param = params.get("seed")
+    seed: list[float] | None = None
+    if seed_param is not None:
+        if not isinstance(seed_param, dict):
+            raise _BadRequest("'seed' must be an object or null")
+        seed = _joint_values_in_order(chain, seed_param, "seed")
+    try:
+        result = solve_ik(rig.dh_chain(), target_pose, seed=seed)
+    except DHError as error:
+        return _error(request_id, "kinematics_error", str(error))
+    return _ok(
+        request_id,
+        {
+            "joint_values": {
+                joint.name: value
+                for joint, value in zip(chain.joints, result.joint_values)
+            },
+            "reached": result.reached,
+            "position_error_m": result.position_error_m,
+            "orientation_error_rad": result.orientation_error_rad,
+            "iterations": result.iterations,
+        },
+    )
+
+
+def _is_number_seq(value: object, length: int) -> bool:
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) == length
+        and all(
+            not isinstance(c, bool) and isinstance(c, (int, float))
+            for c in value
+        )
+    )
+
+
 def _mate_types(session: Session, params: dict, request_id: object) -> dict:
     # The palette/panel-builder hook: the static per-kind schema for all
     # ten mate kinds — the eight kinematic mates plus the two
@@ -715,6 +921,8 @@ _VERBS = {
     "validate_character": _validate_character,
     "evaluate": _evaluate,
     "resolve_pose": _resolve_pose,
+    "forward_kinematics": _forward_kinematics,
+    "solve_ik": _solve_ik,
     "mate_types": _mate_types,
     "relation_types": _relation_types,
     "serialize_character": _serialize_character,

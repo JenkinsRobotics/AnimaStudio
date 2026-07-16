@@ -34,6 +34,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from animacore.dh import DHChain, DHLink, JointKind
 from animacore.mates import (
     JOINT_TYPE_DOF_TEMPLATES,
     DegreeOfFreedom,
@@ -91,6 +92,9 @@ __all__ = [
     "relations_in_dependency_order",
     "RigClip",
     "Identity",
+    "JointKind",
+    "ChainJoint",
+    "KinematicChain",
     "Rig",
     "LimitViolation",
     "LimitViolationError",
@@ -648,6 +652,189 @@ class Identity:
 
 
 @dataclass(frozen=True)
+class ChainJoint:
+    """One Denavit-Hartenberg link of an articulated-arm chain, as a DOF.
+
+    Wraps a :class:`animacore.dh.DHLink`'s four standard-DH parameters
+    (``a_m`` / ``d_m`` in metres, ``alpha_rad`` / ``theta_rad`` in
+    radians — the file carries metres and degrees) plus the joint
+    variable's optional ``min`` / ``max`` limits and ``neutral`` (radians
+    for a revolute joint, metres for a prismatic one). ``name`` is the
+    joint's DOF name — its addressable DOF path is
+    ``"<chain_name>.<name>"``, the same namespace clips target. ``part``
+    is the optional rig part that RIDES this link's frame for rendering
+    (``resolve_pose`` places it there via DH forward kinematics).
+
+    The joint variable is a real drivable DOF: it validates and clamps
+    exactly like a mate DOF (see :meth:`as_dof`), so a chain joint's
+    limits and neutral obey the same rules as any other degree of freedom.
+    """
+
+    name: str
+    a_m: float = 0.0
+    alpha_rad: float = 0.0
+    d_m: float = 0.0
+    theta_rad: float = 0.0
+    joint_type: JointKind = JointKind.REVOLUTE
+    min: float | None = None
+    max: float | None = None
+    neutral: float = 0.0
+    part: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValueError("chain joint name must not be empty")
+        if "." in self.name:
+            raise ValueError(
+                f"chain joint name must not contain '.': {self.name!r}"
+            )
+        object.__setattr__(self, "joint_type", JointKind(self.joint_type))
+        # Validate limits/neutral through the DOF rules (raises on a bad
+        # range or an out-of-range neutral) so a chain joint's variable is
+        # governed exactly like any mate DOF.
+        self.as_dof()
+
+    @property
+    def dof_kind(self) -> DofKind:
+        """The DOF kind of this link's variable (rotation / translation)."""
+        return (
+            DofKind.ROTATION
+            if self.joint_type is JointKind.REVOLUTE
+            else DofKind.TRANSLATION
+        )
+
+    def as_dof(self) -> DegreeOfFreedom:
+        """This link's joint variable as a rig ``DegreeOfFreedom``.
+
+        A revolute link is a ``RotationDof`` (radians); a prismatic link
+        a ``TranslationDof`` (metres). This is what makes a chain joint a
+        first-class DOF: clips validate against it and evaluation falls
+        back to its neutral, identical to a mate DOF.
+        """
+        if self.joint_type is JointKind.REVOLUTE:
+            return RotationDof(
+                name=self.name,
+                min_radians=self.min,
+                max_radians=self.max,
+                neutral_radians=self.neutral,
+            )
+        return TranslationDof(
+            name=self.name,
+            min_meters=self.min,
+            max_meters=self.max,
+            neutral_meters=self.neutral,
+        )
+
+    def to_dh_link(self) -> DHLink:
+        """This chain joint as a pure :class:`animacore.dh.DHLink`."""
+        return DHLink(
+            a=self.a_m,
+            alpha=self.alpha_rad,
+            d=self.d_m,
+            theta=self.theta_rad,
+            joint_type=self.joint_type,
+            min=self.min,
+            max=self.max,
+            neutral=self.neutral,
+        )
+
+
+@dataclass(frozen=True)
+class KinematicChain:
+    """A serial Denavit-Hartenberg chain — the articulated-arm rig type.
+
+    A character that declares a ``kinematic_chain`` IS that type: its DH
+    joints are the animatable DOF (``"<name>.<joint>"``), clips drive
+    them, ``resolve_pose`` places the parts by DH forward kinematics, and
+    the bridge can solve inverse kinematics against a target pose. This is
+    distinct from the general parts + typed-mate assembly (see
+    ``dev/docs/roadmap/DH_Kinematics.md``).
+
+    - ``name`` — the chain id; every joint's DOF path is
+      ``"<name>.<joint_name>"``.
+    - ``joints`` — the ordered :class:`ChainJoint` list (link order is
+      the DH chain order).
+    - ``base_part`` — the part the chain is mounted on. The chain's base
+      frame is that part's rest transform in character space (identity
+      when ``None``); see ``dev/docs/roadmap/Coordinate_Frames.md``.
+    - ``tool_part`` — the optional end-effector part, placed at the tool
+      pose.
+    - ``tool_position_m`` / ``tool_rotation_euler_rad`` — the tool frame
+      offset from the last link (file: metres and degrees), default
+      identity.
+    """
+
+    name: str
+    joints: tuple[ChainJoint, ...] = ()
+    base_part: str | None = None
+    tool_part: str | None = None
+    tool_position_m: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    tool_rotation_euler_rad: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "joints", tuple(self.joints))
+        if not self.name:
+            raise ValueError("kinematic_chain name must not be empty")
+        if "." in self.name:
+            raise ValueError(
+                f"kinematic_chain name must not contain '.': {self.name!r}"
+            )
+        if not self.joints:
+            raise ValueError(
+                "kinematic_chain must have at least one joint"
+            )
+        names = [joint.name for joint in self.joints]
+        if len(names) != len(set(names)):
+            raise ValueError(
+                f"kinematic_chain {self.name!r} has duplicate joint names"
+            )
+        object.__setattr__(
+            self,
+            "tool_position_m",
+            _as_vec3(self.tool_position_m, self.name, "tool_position_m"),
+        )
+        object.__setattr__(
+            self,
+            "tool_rotation_euler_rad",
+            _as_vec3(
+                self.tool_rotation_euler_rad,
+                self.name,
+                "tool_rotation_euler_rad",
+            ),
+        )
+
+    def dof_paths(self) -> dict[str, DegreeOfFreedom]:
+        """Each chain joint's DOF, keyed ``"<chain_name>.<joint_name>"``."""
+        return {
+            f"{self.name}.{joint.name}": joint.as_dof()
+            for joint in self.joints
+        }
+
+    def tool_frame(self):
+        """The end-effector offset from the last link as a ``Transform``."""
+        from animacore.kinematics import Transform
+
+        rx, ry, rz = self.tool_rotation_euler_rad
+        rotation = Transform.from_euler_xyz(rx, ry, rz).rotation
+        return Transform(
+            rotation, tuple(float(c) for c in self.tool_position_m)
+        )
+
+    def to_dh_chain(self, base_frame) -> DHChain:
+        """Build the pure :class:`animacore.dh.DHChain` for FK / IK.
+
+        ``base_frame`` places the chain root in character space (the
+        caller resolves it from ``base_part``'s rest transform, or
+        identity). The tool frame comes from this chain's tool offset.
+        """
+        return DHChain(
+            links=tuple(joint.to_dh_link() for joint in self.joints),
+            base_frame=base_frame,
+            tool_frame=self.tool_frame(),
+        )
+
+
+@dataclass(frozen=True)
 class Rig:
     """A mechanism's movable structure: what a clip is evaluated against.
 
@@ -671,6 +858,7 @@ class Rig:
     clips: Mapping[str, RigClip] = field(default_factory=dict)
     outputs: tuple[OutputMapping, ...] = ()
     relations: tuple[Relation, ...] = ()
+    kinematic_chain: KinematicChain | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "outputs", tuple(self.outputs))
@@ -699,6 +887,32 @@ class Rig:
                         f"{part_name!r}"
                     )
         paths = self.dof_paths()
+        chain_paths = self.chain_dof_paths()
+        if self.kinematic_chain is not None:
+            chain = self.kinematic_chain
+            for ref, label in (
+                (chain.base_part, "base_part"),
+                (chain.tool_part, "tool_part"),
+            ):
+                if ref is not None and ref not in self.parts:
+                    raise ValueError(
+                        f"kinematic_chain {label} references undeclared part "
+                        f"{ref!r}"
+                    )
+            for joint in chain.joints:
+                if joint.part is not None and joint.part not in self.parts:
+                    raise ValueError(
+                        f"kinematic_chain joint {joint.name!r} references "
+                        f"undeclared part {joint.part!r}"
+                    )
+            for path in chain_paths:
+                if path in paths:
+                    raise ValueError(
+                        f"chain dof {path!r} collides with a mate dof of the "
+                        f"same path"
+                    )
+        # Chain DOF share the mate DOF namespace for clip targeting.
+        all_paths = {**paths, **chain_paths}
         driven_by: dict[str, Relation] = {}
         for relation in self.relations:
             expected = RELATION_KIND_DOF_KINDS[relation.kind]
@@ -728,7 +942,7 @@ class Rig:
         relations_in_dependency_order(self.relations)  # rejects cycles
         for clip_name, rig_clip in self.clips.items():
             for key in rig_clip.clip.tracks:
-                if key not in paths and key not in self.parameters:
+                if key not in all_paths and key not in self.parameters:
                     raise ValueError(
                         f"clip {clip_name!r} animates unknown target {key!r}"
                     )
@@ -741,7 +955,7 @@ class Rig:
                     )
         seen_channels: set[int] = set()
         for mapping in self.outputs:
-            dof = paths.get(mapping.target)
+            dof = all_paths.get(mapping.target)
             if dof is None and mapping.target not in self.parameters:
                 raise ValueError(
                     f"output mapping references unknown target "
@@ -759,11 +973,47 @@ class Rig:
             seen_channels.add(mapping.channel)
 
     def dof_paths(self) -> dict[str, DegreeOfFreedom]:
-        """Every addressable DOF, keyed by ``"<joint_name>.<dof_name>"``."""
+        """Every addressable mate DOF, keyed ``"<joint_name>.<dof_name>"``.
+
+        Chain-joint DOF are addressed the same way but reported separately
+        by :meth:`chain_dof_paths` (their prefix is the chain name, not a
+        mate joint name, so mate-joint lookups on the prefix stay valid).
+        """
         paths: dict[str, DegreeOfFreedom] = {}
         for joint in self.joints.values():
             paths.update(joint.dof_paths())
         return paths
+
+    def chain_dof_paths(self) -> dict[str, DegreeOfFreedom]:
+        """The kinematic chain's DOF, keyed ``"<chain_name>.<joint_name>"``.
+
+        Empty for a non-chain (general assembly) rig. These share the DOF
+        path namespace with mate DOF for clip targeting; ``Rig`` rejects a
+        collision between the two.
+        """
+        if self.kinematic_chain is None:
+            return {}
+        return self.kinematic_chain.dof_paths()
+
+    def dh_chain(self) -> DHChain:
+        """The pure :class:`animacore.dh.DHChain` for FK / IK.
+
+        The base frame is ``base_part``'s rest transform in character
+        space (identity when no ``base_part``), so FK/IK link frames and
+        the tool pose come out in character space — consistent with
+        ``resolve_pose``. Raises ``ValueError`` when the rig has no chain.
+        """
+        if self.kinematic_chain is None:
+            raise ValueError("rig has no kinematic_chain")
+        from animacore.kinematics import IDENTITY, part_rest_transform
+
+        chain = self.kinematic_chain
+        base_frame = (
+            part_rest_transform(self.parts[chain.base_part])
+            if chain.base_part is not None
+            else IDENTITY
+        )
+        return chain.to_dh_chain(base_frame)
 
 
 @dataclass(frozen=True)
@@ -845,6 +1095,9 @@ def evaluate_pose(
         for path, dof in rig.dof_paths().items()
         if not rig.joints[path.split(".", 1)[0]].suppressed
     }
+    # Chain-joint DOF are always active (a chain has no per-joint
+    # suppression); they drive DH forward kinematics in ``resolve_pose``.
+    paths.update(rig.chain_dof_paths())
     dof_values = {
         path: animated.get(path, dof.neutral) for path, dof in paths.items()
     }

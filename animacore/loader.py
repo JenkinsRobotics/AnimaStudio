@@ -35,11 +35,14 @@ from animacore.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
     RELATION_DISPLAY_KEYS,
     RELATION_KIND_DOF_KINDS,
+    ChainJoint,
     DegreeOfFreedom,
     DofKind,
     Identity,
     Joint,
+    JointKind,
     JointType,
+    KinematicChain,
     OutputMapping,
     Parameter,
     Part,
@@ -112,6 +115,12 @@ def parse_character(text: str) -> Rig:
     dof_paths: dict[str, DegreeOfFreedom] = {}
     for joint in joints.values():
         dof_paths.update(joint.dof_paths())
+    kinematic_chain = _parse_kinematic_chain(
+        document.get("kinematic_chain"), parts
+    )
+    if kinematic_chain is not None:
+        # Chain DOF share the mate DOF namespace so clips can target them.
+        dof_paths.update(kinematic_chain.dof_paths())
     clips = _parse_clips(document.get("clips"), dof_paths, parameters)
     outputs = _parse_outputs(document.get("outputs"), dof_paths, parameters)
     relations = _parse_relations(document.get("relations"), dof_paths)
@@ -125,6 +134,7 @@ def parse_character(text: str) -> Rig:
             clips=clips,
             outputs=outputs,
             relations=relations,
+            kinematic_chain=kinematic_chain,
         )
     except ValueError as error:
         # Rig re-validates cross-references; the checks above should
@@ -167,6 +177,7 @@ def _check_top_level_fields(document: dict) -> None:
         "clips",
         "outputs",
         "relations",
+        "kinematic_chain",
     }
     for key in document:
         if key in _UNSUPPORTED_TOP_LEVEL:
@@ -1173,6 +1184,196 @@ def _parse_relations(
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
     return tuple(relations)
+
+
+# Kinematic chain (the articulated-arm rig type) ------------------------------
+
+# Per-joint-kind limit/neutral keys for a chain joint's variable. Mirrors
+# the DOF ``_DOF_LIMIT_KEYS`` convention: degrees for a revolute joint
+# (radians in the model), metres for a prismatic joint.
+_CHAIN_LIMIT_KEYS: dict[JointKind, tuple[str, str, str]] = {
+    JointKind.REVOLUTE: ("min_deg", "max_deg", "neutral_deg"),
+    JointKind.PRISMATIC: ("min_m", "max_m", "neutral_m"),
+}
+
+
+def _parse_kinematic_chain(
+    raw: object, parts: dict[str, Part]
+) -> KinematicChain | None:
+    """The optional ``kinematic_chain`` block — the articulated-arm type.
+
+    A serial Denavit-Hartenberg chain: an ordered ``joints`` list of DH
+    links (``a_m``/``d_m`` metres, ``alpha_deg``/``theta_deg`` degrees →
+    radians, per-joint variable ``limits`` + ``neutral`` in degrees for a
+    revolute joint / metres for a prismatic one), a ``base_part`` the
+    chain mounts on (its rest transform is the base frame), an optional
+    ``tool_part`` + ``tool`` end-effector offset. Declaring it makes the
+    character the articulated-arm rig type.
+    """
+    if raw is None:
+        return None
+    entry = _mapping(raw, "kinematic_chain")
+    _reject_unknown_fields(
+        entry,
+        "kinematic_chain",
+        {"name", "base_part", "tool_part", "tool", "joints"},
+    )
+    if "name" not in entry:
+        raise CharacterFormatError(
+            "kinematic_chain.name", "missing required field"
+        )
+    name = _string(entry["name"], "kinematic_chain.name")
+    base_part = _chain_part_ref(
+        entry.get("base_part"), "kinematic_chain.base_part", parts
+    )
+    tool_part = _chain_part_ref(
+        entry.get("tool_part"), "kinematic_chain.tool_part", parts
+    )
+    tool_position, tool_rotation = _parse_chain_tool(
+        entry.get("tool"), "kinematic_chain.tool"
+    )
+    joints_raw = entry.get("joints")
+    if not isinstance(joints_raw, list) or not joints_raw:
+        raise CharacterFormatError(
+            "kinematic_chain.joints",
+            "requires a non-empty ordered list of DH joints",
+        )
+    joints = tuple(
+        _parse_chain_joint(
+            joint_raw, f"kinematic_chain.joints[{index}]", parts
+        )
+        for index, joint_raw in enumerate(joints_raw)
+    )
+    try:
+        return KinematicChain(
+            name=name,
+            joints=joints,
+            base_part=base_part,
+            tool_part=tool_part,
+            tool_position_m=tool_position,
+            tool_rotation_euler_rad=tool_rotation,
+        )
+    except ValueError as error:
+        raise CharacterFormatError("kinematic_chain", str(error)) from error
+
+
+def _chain_part_ref(
+    value: object, path: str, parts: dict[str, Part]
+) -> str | None:
+    if value is None:
+        return None
+    part = _string(value, path)
+    if part not in parts:
+        raise CharacterFormatError(path, "references an undeclared part")
+    return part
+
+
+def _parse_chain_tool(
+    raw: object, path: str
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """The optional tool end-effector offset (metres + degrees → radians)."""
+    if raw is None:
+        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+    entry = _mapping(raw, path)
+    _reject_unknown_fields(entry, path, {"position_m", "rotation_euler_deg"})
+    position = _vector3(
+        entry.get("position_m", [0.0, 0.0, 0.0]), f"{path}.position_m"
+    )
+    rotation_deg = _vector3(
+        entry.get("rotation_euler_deg", [0.0, 0.0, 0.0]),
+        f"{path}.rotation_euler_deg",
+    )
+    rotation = tuple(math.radians(angle) for angle in rotation_deg)
+    return position, rotation
+
+
+def _parse_chain_joint(
+    raw: object, path: str, parts: dict[str, Part]
+) -> ChainJoint:
+    entry = _mapping(raw, path)
+    _reject_unknown_fields(
+        entry,
+        path,
+        {
+            "name",
+            "type",
+            "a_m",
+            "alpha_deg",
+            "d_m",
+            "theta_deg",
+            "limits",
+            "neutral_deg",
+            "neutral_m",
+            "part",
+        },
+    )
+    if "name" not in entry:
+        raise CharacterFormatError(f"{path}.name", "missing required field")
+    joint_name = _string(entry["name"], f"{path}.name")
+    joint_type_raw = entry.get("type", JointKind.REVOLUTE.value)
+    try:
+        joint_type = JointKind(joint_type_raw)
+    except ValueError:
+        valid = ", ".join(k.value for k in JointKind)
+        raise CharacterFormatError(
+            f"{path}.type",
+            f"unknown joint type {joint_type_raw!r} (expected one of: "
+            f"{valid})",
+        ) from None
+    a_m = _number(entry.get("a_m", 0.0), f"{path}.a_m")
+    d_m = _number(entry.get("d_m", 0.0), f"{path}.d_m")
+    alpha_rad = math.radians(
+        _number(entry.get("alpha_deg", 0.0), f"{path}.alpha_deg")
+    )
+    theta_rad = math.radians(
+        _number(entry.get("theta_deg", 0.0), f"{path}.theta_deg")
+    )
+    min_key, max_key, neutral_key = _CHAIN_LIMIT_KEYS[joint_type]
+    # Reject the wrong unit family's neutral key (metres on a revolute
+    # joint, degrees on a prismatic) rather than silently ignoring it.
+    wrong_neutral = "neutral_m" if joint_type is JointKind.REVOLUTE else (
+        "neutral_deg"
+    )
+    if wrong_neutral in entry:
+        raise CharacterFormatError(
+            f"{path}.{wrong_neutral}",
+            f"a {joint_type.value} joint's variable uses {neutral_key}, "
+            f"not {wrong_neutral}",
+        )
+    minimum: float | None = None
+    maximum: float | None = None
+    if "limits" in entry:
+        limits_path = f"{path}.limits"
+        limits = _mapping(entry["limits"], limits_path)
+        _reject_unknown_fields(limits, limits_path, {min_key, max_key})
+        for required in (min_key, max_key):
+            if required not in limits:
+                raise CharacterFormatError(
+                    f"{limits_path}.{required}", "missing required field"
+                )
+        minimum = _number(limits[min_key], f"{limits_path}.{min_key}")
+        maximum = _number(limits[max_key], f"{limits_path}.{max_key}")
+    neutral = _number(entry.get(neutral_key, 0.0), f"{path}.{neutral_key}")
+    if joint_type is JointKind.REVOLUTE:
+        minimum = None if minimum is None else math.radians(minimum)
+        maximum = None if maximum is None else math.radians(maximum)
+        neutral = math.radians(neutral)
+    part = _chain_part_ref(entry.get("part"), f"{path}.part", parts)
+    try:
+        return ChainJoint(
+            name=joint_name,
+            a_m=a_m,
+            alpha_rad=alpha_rad,
+            d_m=d_m,
+            theta_rad=theta_rad,
+            joint_type=joint_type,
+            min=minimum,
+            max=maximum,
+            neutral=neutral,
+            part=part,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
 
 
 # Primitive validators --------------------------------------------------------

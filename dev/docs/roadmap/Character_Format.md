@@ -359,6 +359,84 @@ relations:
     suppressed: true        # coupling off; idler.rotation holds neutral
 ```
 
+### Kinematic chain — the articulated-arm rig type (DH3)
+
+A character that declares a top-level `kinematic_chain` block **is** the
+**articulated-arm rig type** — a serial Denavit-Hartenberg manipulator
+(6-axis arm and the like), distinct from the general parts + typed-mate
+assembly. The block's DH joints are the character's animatable DOF, clips
+drive them, `resolve_pose` places the link parts by **DH forward
+kinematics** (not the mate FK walk), and the bridge can solve **inverse
+kinematics** against a target tool pose. See
+[`DH_Kinematics.md`](DH_Kinematics.md) and
+[`Coordinate_Frames.md`](Coordinate_Frames.md) (the chain base sits in
+character space). Standard (distal) DH convention only.
+
+A rig may keep `parts`/`clips`/`outputs`; the arm typically uses the
+chain in place of `joints`/`relations`. Chain DOF share the clip-target
+namespace with mate DOF (a collision is a load error).
+
+| Field | Meaning |
+|---|---|
+| `name` | the chain id; every joint's DOF path is `"<name>.<joint>"` |
+| `base_part` | optional; the part the chain mounts on — its **rest transform** is the chain base frame in character space (identity when absent) |
+| `tool_part` | optional; the end-effector part, placed at the tool pose |
+| `tool` | optional end-effector offset from the last link: `position_m` (metres) + `rotation_euler_deg` (degrees → radians); default identity |
+| `joints` | **ordered** list of DH links (link order is the chain order) |
+
+Each `joints[]` entry:
+
+| Field | Meaning |
+|---|---|
+| `name` | required; the joint's DOF name (DOF path `"<chain>.<name>"`) |
+| `type` | `revolute` (θ is the joint variable, `d` fixed) or `prismatic` (`d` is the variable, θ fixed); default `revolute` |
+| `a_m`, `d_m` | DH link length / offset, **metres** (default 0) |
+| `alpha_deg`, `theta_deg` | DH twist / home angle, **degrees → radians** (default 0) |
+| `limits` | optional joint-variable stops: `min_deg`/`max_deg` for a revolute joint, `min_m`/`max_m` for a prismatic one |
+| `neutral_deg` / `neutral_m` | the variable's rest value; the key must match the joint kind (default 0). Within limits when limits are set. |
+| `part` | optional rig part that **rides** this link's frame for rendering |
+
+The joint variable is a first-class DOF: clips validate against its
+limits, evaluation falls back to its neutral, and it may be mapped to a
+bounded output channel — the same evaluated arm motion routes to
+hardware.
+
+```yaml
+parts:
+  base: {}
+  shoulder: {}
+  gripper: {}
+kinematic_chain:
+  name: arm
+  base_part: base
+  tool_part: gripper
+  tool: { position_m: [0, 0, 0.02] }
+  joints:
+    - name: j1
+      type: revolute
+      alpha_deg: 90
+      d_m: 0.089159
+      limits: { min_deg: -360, max_deg: 360 }
+      part: shoulder
+    - name: reach
+      type: prismatic
+      limits: { min_m: 0.0, max_m: 0.4 }
+      neutral_m: 0.1
+clips:
+  demo:
+    duration_s: 1.0
+    tracks:
+      - time: 0.0
+        values: { arm.j1: 0.0, arm.reach: 0.1 }
+      - time: 1.0
+        values: { arm.j1: 90.0, arm.reach: 0.3 }
+```
+
+See `examples/six_axis_arm_dh.character.anima` for a full UR5-style 6R
+arm (the mate-based `six_axis_arm.character.anima` is the general-assembly
+counterpart). Bridge verbs `forward_kinematics` and `solve_ik` operate on
+a loaded arm rig's chain — see [`Studio_Bridge.md`](Studio_Bridge.md).
+
 ---
 
 ## Format 1.0 (draft) — superseded sections below

@@ -71,10 +71,20 @@ sits in character space, each link frame follows.
 
 | # | Packet | Dep | Dependency |
 |---|---|---|---|
-| DH1 | `dh.py`: `DHLink`/`DHChain` + forward kinematics + tests | — | stdlib (building) |
-| DH2 | Inverse kinematics (damped least-squares, joint-limit clamping) | DH1 | **numpy** |
-| DH3 | Character-format `kinematic_chain` block + loader/serialize + the arm rig type + bridge `forward_kinematics`/`solve_ik` verbs | DH1–2 | — |
+| DH1 | `dh.py`: `DHLink`/`DHChain` + forward kinematics + tests | — | **shipped** |
+| DH2 | Inverse kinematics (damped least-squares, joint-limit clamping) | DH1 | **shipped** (numpy) |
+| DH3 | Character-format `kinematic_chain` block + loader/serialize + the arm rig type + bridge `forward_kinematics`/`solve_ik` verbs | DH1–2 | **shipped** |
 | DH4 | Analytic IK for common arm geometries (spherical wrist) | DH3 | — |
+
+**DH3 shipped (2026-07-16).** `Rig` gains an optional `KinematicChain`
+(ordered `ChainJoint` DH links, `base_part`, `tool_part`, tool offset);
+its joints are drivable DOF (`"<chain>.<joint>"`), `resolve_pose` places
+the link/tool parts by DH forward kinematics, the loader/serializer
+round-trip the `kinematic_chain` block, and the bridge adds
+`forward_kinematics` / `solve_ik` verbs (character-space frames; IK
+reports non-convergence honestly). Example:
+`examples/six_axis_arm_dh.character.anima` (UR5-style 6R). See
+`Character_Format.md` → "Kinematic chain".
 
 ## Open decisions (for Jonathan)
 

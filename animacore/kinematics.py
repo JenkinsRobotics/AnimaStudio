@@ -439,6 +439,15 @@ def resolve_pose(rig, pose) -> dict[str, Transform]:
     transform (default identity) — see
     ``dev/docs/roadmap/Coordinate_Frames.md``.
 
+    **Articulated-arm rig type.** When ``rig.kinematic_chain`` is set the
+    rig's link/tool parts are placed by **DH forward kinematics**, not the
+    mate FK walk: the chain's joint values (from the pose, keyed
+    ``"<chain>.<joint>"``) drive ``dh.forward_kinematics``, and each
+    ``ChainJoint.part`` lands on its link frame with ``tool_part`` at the
+    tool pose. The chain base is ``base_part``'s rest transform. This
+    overrides the root placement of those parts; every other part (and any
+    non-chain rig) is unchanged.
+
     Object states (persistent, per-element — no cascade):
 
     - A **suppressed part** is excluded from the output entirely, and any
@@ -508,7 +517,50 @@ def resolve_pose(rig, pose) -> dict[str, Transform]:
                 )
             break
         pending = still_pending
+
+    # Articulated-arm rig type: a rig that declares a kinematic chain
+    # places its link/tool parts by DH forward kinematics, overriding the
+    # rest-transform (root) placement above. The chain base is
+    # ``base_part``'s rest transform in character space (already in
+    # ``world`` as a root), so link frames and the tool pose come out in
+    # character space. Non-chain rigs are untouched.
+    chain = getattr(rig, "kinematic_chain", None)
+    if chain is not None:
+        _place_kinematic_chain(rig, chain, pose, world, suppressed_parts)
     return world
+
+
+def _place_kinematic_chain(rig, chain, pose, world, suppressed_parts) -> None:
+    """Place a kinematic chain's parts by DH forward kinematics.
+
+    Reads each chain joint's value from ``pose.dof_values`` (keyed
+    ``"<chain>.<joint>"``, falling back to the joint neutral), clamps it
+    into the joint's limits (DH FK rejects out-of-range values), runs
+    ``dh.forward_kinematics``, then writes each ``ChainJoint.part`` at its
+    link frame and ``tool_part`` at the tool pose — all character-space,
+    with the chain base at ``base_part``'s rest transform. Suppressed
+    parts are left out, matching the rest of ``resolve_pose``.
+    """
+    from animacore.dh import forward_kinematics
+
+    dh_chain = rig.dh_chain()
+    values: list[float] = []
+    for chain_joint, link in zip(chain.joints, dh_chain.links):
+        value = pose.dof_values.get(
+            f"{chain.name}.{chain_joint.name}", chain_joint.neutral
+        )
+        if link.min is not None and value < link.min:
+            value = link.min
+        if link.max is not None and value > link.max:
+            value = link.max
+        values.append(float(value))
+    forward = forward_kinematics(dh_chain, values)
+    for chain_joint, frame in zip(chain.joints, forward.link_frames):
+        part = chain_joint.part
+        if part is not None and part not in suppressed_parts:
+            world[part] = frame
+    if chain.tool_part is not None and chain.tool_part not in suppressed_parts:
+        world[chain.tool_part] = forward.tool_pose
 
 
 def transform_to_json(t: Transform) -> dict:

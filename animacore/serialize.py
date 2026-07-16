@@ -44,8 +44,11 @@ from animacore.mates import (
 )
 from animacore.rig import (
     RELATION_KIND_DOF_KINDS,
+    ChainJoint,
     DegreeOfFreedom,
     Joint,
+    JointKind,
+    KinematicChain,
     Rig,
 )
 from animacore.tracks import Interpolation
@@ -67,7 +70,10 @@ def rig_to_dict(rig: Rig) -> dict:
         "type": "character",
         "identity": _identity_dict(rig.identity),
     }
-    dof_paths = rig.dof_paths()
+    # Chain DOF share the clip-target namespace, so clip serialization must
+    # see them to convert a revolute chain joint's track values radians →
+    # degrees (like any rotation DOF).
+    dof_paths = {**rig.dof_paths(), **rig.chain_dof_paths()}
     parts = _parts_dict(rig)
     if parts:
         document["parts"] = parts
@@ -86,6 +92,10 @@ def rig_to_dict(rig: Rig) -> dict:
     outputs = _outputs_list(rig, dof_paths)
     if outputs:
         document["outputs"] = outputs
+    if rig.kinematic_chain is not None:
+        document["kinematic_chain"] = _kinematic_chain_dict(
+            rig.kinematic_chain
+        )
     return document
 
 
@@ -401,6 +411,64 @@ def _outputs_list(rig: Rig, dof_paths: dict[str, DegreeOfFreedom]) -> list:
             entry["range"] = [mapping.value_at_zero, mapping.value_at_one]
         outputs.append(entry)
     return outputs
+
+
+def _kinematic_chain_dict(chain: KinematicChain) -> dict:
+    """Emit the ``kinematic_chain`` block (metres kept, radians→degrees).
+
+    Only non-default fields are written (a zero DH parameter, an absent
+    limit, a zero neutral, an identity tool offset are all omitted) so the
+    round-trip stays clean and lossless.
+    """
+    entry: dict = {"name": chain.name}
+    if chain.base_part is not None:
+        entry["base_part"] = chain.base_part
+    if chain.tool_part is not None:
+        entry["tool_part"] = chain.tool_part
+    tool = _chain_tool_dict(chain)
+    if tool:
+        entry["tool"] = tool
+    entry["joints"] = [_chain_joint_dict(joint) for joint in chain.joints]
+    return entry
+
+
+def _chain_tool_dict(chain: KinematicChain) -> dict:
+    tool: dict = {}
+    if any(chain.tool_position_m):
+        tool["position_m"] = list(chain.tool_position_m)
+    if any(chain.tool_rotation_euler_rad):
+        tool["rotation_euler_deg"] = [
+            math.degrees(angle) for angle in chain.tool_rotation_euler_rad
+        ]
+    return tool
+
+
+def _chain_joint_dict(joint: ChainJoint) -> dict:
+    entry: dict = {"name": joint.name, "type": joint.joint_type.value}
+    if joint.a_m != 0.0:
+        entry["a_m"] = joint.a_m
+    if joint.alpha_rad != 0.0:
+        entry["alpha_deg"] = math.degrees(joint.alpha_rad)
+    if joint.d_m != 0.0:
+        entry["d_m"] = joint.d_m
+    if joint.theta_rad != 0.0:
+        entry["theta_deg"] = math.degrees(joint.theta_rad)
+    if joint.joint_type is JointKind.REVOLUTE:
+        min_key, max_key, neutral_key = "min_deg", "max_deg", "neutral_deg"
+        convert = math.degrees
+    else:
+        min_key, max_key, neutral_key = "min_m", "max_m", "neutral_m"
+        convert = _identity_number
+    if joint.min is not None and joint.max is not None:
+        entry["limits"] = {
+            min_key: convert(joint.min),
+            max_key: convert(joint.max),
+        }
+    if joint.neutral != 0.0:
+        entry[neutral_key] = convert(joint.neutral)
+    if joint.part is not None:
+        entry["part"] = joint.part
+    return entry
 
 
 # Scene serialization ----------------------------------------------------------
