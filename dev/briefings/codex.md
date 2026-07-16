@@ -5,7 +5,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
-- [ ] 2026-07-15 (Jonathan, via Claude): **Swift half of the AnimaCore
+- [x] 2026-07-15 (Jonathan, via Claude): **Swift half of the AnimaCore
   restructure — your lane, do when at a clean commit.** Design settled
   with Jonathan: the **engine** owns the name AnimaCore. I've done the
   Python half — `anima_studio/` → `animacore/` (package `animacore`,
@@ -182,6 +182,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-15 — Swift app restructure complete:** Renamed the complete native
+  application tree from `studio/` to `app/` and updated CI, XcodeGen, packaging,
+  contributor instructions, repository maps, and current-truth documentation.
+  Retired the Swift `AnimaCore` target/import completely: `AnimaModel` now owns
+  identifiers, rigs, mate definitions, animation data, projects, and validation;
+  `AnimaEvaluation` depends on it and owns evaluated frames, interpolation,
+  preview evaluation, and mate transform math. `AnimaDocument` depends only on
+  `AnimaModel`; viewport/UI targets consume the appropriate layers. All 216
+  Swift tests pass, strict format lint is clean, Xcode and packaged app builds
+  succeed, the temporary bundle passes strict code-sign verification, and the
+  launch command succeeds. The Python-vs-Swift parity direction remains
+  unchanged pending Jonathan's explicit policy decision.
 
 - **2026-07-15 — folder name confirmed:** `app/` is the clearest replacement
   for `studio/`: `anima_studio/` remains the importable Python engine package,
