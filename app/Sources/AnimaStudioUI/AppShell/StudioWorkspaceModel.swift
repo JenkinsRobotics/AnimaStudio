@@ -27,7 +27,7 @@ final class StudioWorkspaceModel {
     case failed
   }
 
-  var activeWorkspace: StudioWorkspaceKind = .rig
+  var activeWorkspace: StudioWorkspaceKind
   var workspacePresentations = Dictionary(
     uniqueKeysWithValues: StudioWorkspaceKind.allCases.map {
       ($0, $0.descriptor.defaultPresentation)
@@ -87,10 +87,12 @@ final class StudioWorkspaceModel {
       rig: CharacterRig(joints: []),
       clips: []
     ),
+    startupWorkspace: StudioWorkspaceKind = .assets,
     animaCoreClient: (any AnimaCoreServing)? = nil,
     resolvesDefaultAnimaCoreClient: Bool = true
   ) {
     self.project = project
+    self.activeWorkspace = startupWorkspace
     self.animaCoreClient =
       animaCoreClient
       ?? (resolvesDefaultAnimaCoreClient ? (try? AnimaCoreClient()) : nil)

@@ -4,7 +4,7 @@
 > this file in the same commit — see `CONVENTIONS.md` → "STATUS stays
 > truthful."
 
-## Current state — 2026-07-15
+## Current state — 2026-07-16
 
 - **Repo:** `AnimaStudio` — open-source unified character animation
   system for AI robots (digital avatars + physical animatronics from
@@ -24,7 +24,10 @@
   at the repository root for direct Finder launch. The root bundle now embeds
   a signed Python 3.11 helper, AnimaCore source, and PyYAML dependency; the
   helper inherits the app sandbox and requires no repository path or active
-  virtual environment after the app is assembled. `AnimaModel` defines project
+  virtual environment after the app is assembled. Packaging rewrites both the
+  Homebrew framework launcher and its nested `Python.app` launcher to resolve
+  only the bundled framework, explicitly re-signs that nested app, and fails the
+  build if either launcher still references Homebrew. `AnimaModel` defines project
   assets, stable semantic-part IDs, box/cylinder/sphere/locator rig proxies,
   metre positions, XYZ rest rotations in radians, backward-compatible Codable
   rest transforms, joint parent/child connections, optional part-local mate
@@ -52,8 +55,11 @@
   cached render path when one exists and otherwise show an honest project-type
   preview. Creating the current scratch project records its V1 entry; reopening
   remains visibly unavailable until P0 produces durable project documents. A
-  new project now opens as a genuinely empty Rig rather
-  than silently inserting the sample mechanism. Its Bottango-inspired **Add to
+  new project now opens as a genuinely empty project in the first **Assets**
+  workspace rather than silently inserting the sample mechanism or jumping
+  ahead to Rig. The workspace-model initializer accepts an alternate startup
+  workspace so a future operator preference can choose it without changing
+  workspace semantics. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
   proxy components with their local origin at the workspace origin, then
   creates a Revolute Mate through an explicit two-step placement flow. Orange,

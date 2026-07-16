@@ -50,7 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
-| Codex | Assets-first startup + self-contained AnimaCore helper repair | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspacePresentationTests.swift`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | new workspaces open in Assets; bundled Python launchers resolve only bundle/system libraries; helper handshake succeeds from the sandboxed root app; Swift tests, Xcode/root-app build/signature/launch, `git diff --check` | active |
+| Codex | Assets-first startup + self-contained AnimaCore helper repair | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspacePresentationTests.swift`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | new workspaces open in Assets; bundled Python launchers resolve only bundle/system libraries; helper handshake succeeds from the sandboxed root app; Swift tests, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Fastened mate inspector from AnimaCore `mate_types` + `describe_mate` | `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateInspectorView,MateCreationToolCatalog}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real `mate_types` call; enriched mate DTO decode; imported Fastened mate appears by stable engine id in navigator; one reusable engine-driven inspector renders connectors, offset (mm/deg), axis flip/reorientation, simulation connection, and zero-DOF locked state without Swift mate semantics or authoring mutation; focused/full tests, strict claimed-file lint, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | BR1 Swift AnimaCore client + engine-evaluated viewport proof | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Tests/AnimaCoreClientTests/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,WorkspaceRibbonView}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,RigPoseResolver}.swift`, `app/App/AnimaCoreHelper.entitlements`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, focused Swift tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real helper spawn + hello/load/evaluate/release/shutdown; typed protocol/path errors; explicit `.character.anima` import; engine-evaluated DOF values reach RealityKit preview through transitional pose projection; bundled signed helper for sandboxed app; deterministic client/unit/integration/UI tests; strict claimed-file lint; full Swift tests; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | Swift app half of AnimaCore repository restructure | `studio/**` → `app/**`, `.github/workflows/**`, `.gitignore`, `AGENTS.md`, `CONVENTIONS.md`, `README.md`, `dev/docs/reality/STATUS.md`, `dev/docs/roadmap/Studio_App.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | root contains `animacore/`, `app/`, and `firmware/` with no `studio/`; Swift `AnimaModel` owns data/validation and `AnimaEvaluation` owns evaluation; no Swift `AnimaCore` target/import remains; format lint, full Swift tests, Xcode build, root-app build/signature, `git diff --check` | released 2026-07-15 |
@@ -192,6 +192,21 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Codex, Assets-first startup + self-contained helper):** Changed
+  the default new-project workspace from Rig to Assets and kept the initializer
+  injectable for a later persisted startup preference. Diagnosed both supplied
+  reports as the embedded Python helper: its Homebrew launcher execs a nested
+  `Python.app`, whose load command still escaped to `/opt/homebrew` under the app
+  sandbox. `embed-animacore-helper.sh` now rewrites both launch stages and the
+  framework install id, then rejects remaining Homebrew paths.
+  `build-root-app.sh` explicitly signs and verifies the modified nested Python
+  app before sealing and verifying the outer app. Changed files are exactly the
+  released claim above. Verification: 6 focused presentation tests; full Swift
+  suite 217 XCTest + 7 Swift Testing cases; format lint; Xcode/root-app build;
+  nested and deep strict signature verification; live project launch with a
+  persistent bundled `Python -m animacore.bridge` child and no new crash report;
+  `git diff --check`.
 
 - **2026-07-16 (Claude, Relations bridge hook — `relation_types` verb +
   `relations` in `load_character`):** The relation twin of the mate

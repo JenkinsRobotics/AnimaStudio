@@ -33,6 +33,7 @@ framework_dir="$app_bundle/Contents/Frameworks/Python.framework"
 framework_version_dir="$framework_dir/Versions/$python_version"
 python_resources="$app_bundle/Contents/Resources/AnimaCorePython"
 bundled_python="$helpers_dir/animacore-python"
+nested_python="$framework_version_dir/Resources/Python.app/Contents/MacOS/Python"
 
 mkdir -p "$helpers_dir" "$framework_dir/Versions" "$python_resources"
 ditto "$python_home" "$framework_version_dir"
@@ -54,6 +55,32 @@ install_name_tool \
   -change "$python_dependency" \
   "@executable_path/../Frameworks/Python.framework/Versions/$python_version/Python" \
   "$bundled_python"
+
+# Homebrew's framework launcher execs this nested Python.app binary. Its own
+# load command also points back to Homebrew, which the app sandbox correctly
+# refuses to open. Keep both launch stages entirely inside the app bundle.
+nested_python_dependency="$(
+  otool -L "$nested_python" \
+    | awk 'NR > 1 && /Python.framework.*\/Python/{print $1; exit}'
+)"
+if [[ -z "$nested_python_dependency" ]]; then
+  print -u2 "Could not locate the framework dependency used by $nested_python."
+  exit 1
+fi
+install_name_tool \
+  -change "$nested_python_dependency" \
+  "@executable_path/../../../../Python" \
+  "$nested_python"
+install_name_tool \
+  -id "@rpath/Python.framework/Versions/$python_version/Python" \
+  "$framework_version_dir/Python"
 chmod 755 "$bundled_python"
+
+for executable in "$bundled_python" "$nested_python"; do
+  if otool -L "$executable" | grep -Fq "/opt/homebrew/"; then
+    print -u2 "Embedded Python still links outside the app bundle: $executable"
+    exit 1
+  fi
+done
 
 print "Embedded AnimaCore helper in $app_bundle"

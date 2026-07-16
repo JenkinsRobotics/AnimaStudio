@@ -16,25 +16,35 @@ final class WorkspacePresentationTests: XCTestCase {
 
   func testEachWorkspaceRestoresItsOwnPresentation() {
     let model = StudioWorkspaceModel()
-    XCTAssertEqual(model.activeWorkspace, .rig)
+    XCTAssertEqual(model.activeWorkspace, .assets)
     XCTAssertTrue(model.activePresentation.showsNavigator)
 
     model.toggleNavigator()
     XCTAssertFalse(model.activePresentation.showsNavigator)
 
-    model.switchWorkspace(to: .assets)
+    model.switchWorkspace(to: .rig)
     XCTAssertTrue(model.activePresentation.showsNavigator)
     model.toggleInspector()
     XCTAssertFalse(model.activePresentation.showsInspector)
 
-    model.switchWorkspace(to: .rig)
+    model.switchWorkspace(to: .assets)
     XCTAssertFalse(model.activePresentation.showsNavigator)
     XCTAssertTrue(model.activePresentation.showsInspector)
 
     model.resetActivePresentation()
     XCTAssertEqual(
       model.activePresentation,
-      StudioWorkspaceKind.rig.descriptor.defaultPresentation
+      StudioWorkspaceKind.assets.descriptor.defaultPresentation
+    )
+  }
+
+  func testStartupWorkspaceCanBeProvidedByFuturePreferences() {
+    let model = StudioWorkspaceModel(startupWorkspace: .animate)
+
+    XCTAssertEqual(model.activeWorkspace, .animate)
+    XCTAssertEqual(
+      model.activePresentation,
+      StudioWorkspaceKind.animate.descriptor.defaultPresentation
     )
   }
 

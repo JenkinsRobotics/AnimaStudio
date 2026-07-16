@@ -33,6 +33,8 @@ ditto "$source_app" "$staging_app"
 # Establish signatures for every nested Mach-O first, then give the spawned
 # helper the sandbox-inheritance identity required by macOS. Re-sealing the
 # outer app last preserves the main app's own user-selected-file entitlement.
+python_app="$staging_app/Contents/Frameworks/Python.framework/Versions/Current/Resources/Python.app"
+codesign --force --deep --sign - "$python_app"
 codesign --force --deep --sign - "$staging_app"
 codesign \
   --force \
@@ -44,6 +46,8 @@ codesign \
   --sign - \
   --entitlements "$app_dir/App/AnimaStudio.entitlements" \
   "$staging_app"
+codesign --verify --strict --verbose=2 "$python_app"
+codesign --verify --deep --strict --verbose=2 "$staging_app"
 rm -rf "$destination_app"
 mv "$staging_app" "$destination_app"
 

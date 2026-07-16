@@ -205,6 +205,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — Assets-first startup and root-app crash repaired:** New
+  projects now open in Assets, while `StudioWorkspaceModel` accepts an injected
+  startup workspace for a future user preference. Both supplied reports were
+  the embedded Python process, not the Swift UI: the Homebrew framework's
+  second-stage `Python.app` launcher still linked to `/opt/homebrew`, then its
+  edited binary retained an invalid inner signature. Packaging now rewrites
+  both launcher stages to the app-local framework, rejects remaining Homebrew
+  links, explicitly re-signs/verifies the nested Python app, and verifies the
+  outer bundle. A fresh `--open-studio-project` launch leaves the bundled
+  `Python -m animacore.bridge` child alive and creates no crash report. All 217
+  XCTest cases plus 7 Swift Testing bridge/integration tests pass.
+
 - **2026-07-15 — Fastened mate inspector wired to AnimaCore:** Extended
   `AnimaCoreClient` with the real `mate_types` verb and complete typed
   `describe_mate` DTOs. Studio retains the engine catalog and mate descriptors,
