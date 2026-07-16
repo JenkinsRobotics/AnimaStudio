@@ -143,13 +143,20 @@ connector is `None`) puts motion at the part origin:
 rigid alignment `C_A ∘ ALIGN ∘ Offset ∘ inverse(C_B)`.
 
 **Forward kinematics.** `resolve_pose(rig, pose)` returns every part's
-**world** `Transform`. A part that is no joint's `child_part` is a ROOT
-at identity (parts carry no rest transform). Walking parents before
-children (repeated pass over the acyclic joint graph),
+**character-space** `Transform`. A part that is no active joint's
+`child_part` is a ROOT and resolves at its **rest transform**
+(`part_rest_transform` — `position_m` + `rotation_euler_rad`, identity
+when unauthored; a GROUNDED part likewise sits at its rest transform,
+overriding any incoming joint). Walking parents before children
+(repeated pass over the acyclic joint graph),
 `world[child] = compose(world[parent], child_in_parent(joint, …))`,
-pulling DOF values from `pose.dof_values` (keyed `"<joint>.<dof>"`).
-`transform_to_json(t)` serializes to `{position:[x,y,z],
-orientation:[x,y,z,w]}` for the wire.
+pulling DOF values from `pose.dof_values` (keyed `"<joint>.<dof>"`); a
+mated child is placed by its mate, so its rest transform is not applied
+on top. `transform_to_json(t)` serializes to `{position:[x,y,z],
+orientation:[x,y,z,w]}` for the wire. The rest transform is
+part-in-character and the output is character-space — the World →
+Character → Part frame model and the intrinsic-XYZ Euler convention are
+normative in [`Coordinate_Frames.md`](Coordinate_Frames.md).
 
 > **Connector direction is the source of truth.** A connectorless mate
 > rotates/translates about the *part-origin* canonical axis (Z for every

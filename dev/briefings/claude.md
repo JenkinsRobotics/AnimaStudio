@@ -35,6 +35,37 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (Part rest transform + coordinate-frame model): Parts now
+  carry a **LOCATION** (rest transform) that persists in the
+  `.character.anima` and drives `resolve_pose`, so a part the app moved
+  survives Save. **Additive: defaults = zero transform → identity, every
+  existing file/test byte- and behavior-unchanged (966 → 979, +13).**
+  New normative doc `dev/docs/roadmap/Coordinate_Frames.md` fixes the
+  frame model Jonathan named: **World → Character → Part** (custom named
+  reference frames a future extension; mate connectors are the first
+  instance). **Field shapes** (`Part`, both default zero 3-tuple):
+  `position_m: tuple[float,float,float]` (part origin in **CHARACTER**
+  space, m) and `rotation_euler_rad: tuple[float,float,float]` (XYZ Euler
+  radians, matches the app's `rotationEulerRadians`). This is
+  **part-in-character**, NOT world — Character-in-World is a separate
+  scene-level transform (default identity). **Euler convention Codex MUST
+  match:** **intrinsic XYZ** — `q = qx ⊗ qy ⊗ qz`, `R = Rx·Ry·Rz`, builder
+  `Transform.from_euler_xyz`. **resolve_pose rules (output now
+  character-space):** ROOT → rest transform (was identity); GROUNDED →
+  rest transform (fixed anchor, overrides incoming joint; was identity);
+  MATED child → placed by its mate, rest transform NOT applied on top (no
+  double-apply). File keys `position_m: [x,y,z]` (m) + `rotation_euler_deg:
+  [x,y,z]` (**degrees in file**, radians in model), optional, emitted only
+  when non-zero, typed pathed errors. **Codex:** the `load_character` part
+  DTO additively gains `position_m` (list, m) + `rotation_euler_rad`
+  (list, **native radians** — convert to deg for the inspector); both
+  round-trip through `serialize_character` / `rig_from_dict`. Gizmo edit
+  on a FREE (root/grounded) part writes these back; a MATED part's drag
+  still routes to its DOF. Example `pan_tilt_head` base anchored 0.25 m up
+  + yawed 30°. Field shapes, exact euler convention, and root/grounded/
+  mated rules in the briefing handoff entry. Left uncommitted for
+  main-session integration.
+
 - 2026-07-16 (Persistent object states — suppress + ground): Suppress an
   object (part/joint/relation) or ground a part, save, quit, relaunch —
   it stays that way, because these are now **rig-semantic states in the

@@ -141,6 +141,35 @@ the app copies an imported mesh there on import and sets the part's
 `model`. `parent` is optional assembly-tree metadata — kinematic
 connectivity lives in `joints`, not here.
 
+A part also carries its **rest transform** — its location in
+**character space** (the part-in-character transform, *not* world
+space). Both keys are optional and default to zero (identity), so an
+existing part is unchanged:
+
+- `position_m: [x, y, z]` — the part origin's position in metres.
+- `rotation_euler_deg: [rx, ry, rz]` — the rest orientation as **XYZ
+  Euler degrees** in the file (radians in the model, matching the DOF
+  limit/offset unit convention). The convention is **intrinsic XYZ**
+  (`R = Rx·Ry·Rz`, quaternion `q = qx ⊗ qy ⊗ qz`), aligned with the
+  app's `rotationEulerRadians` — see
+  [`Coordinate_Frames.md`](Coordinate_Frames.md).
+
+The rest transform positions a part when it is a **root** or a
+**grounded** part; a **mated** child is positioned by its mate instead,
+so its rest transform is only its pre-mate placement (not applied on top
+of the mate). `resolve_pose` output is character-space; placing the
+character in the world is a separate scene-level transform (default
+identity). The full frame model is normative in
+[`Coordinate_Frames.md`](Coordinate_Frames.md).
+
+```yaml
+parts:
+  base:
+    model: "assets/base.stl"
+    position_m: [0.0, 0.0, 0.25]     # 0.25 m up in character space
+    rotation_euler_deg: [0, 0, 30]   # yawed 30° about Z (intrinsic XYZ)
+```
+
 ### DOF limits (optional per DOF — K2)
 
 - `limits` is an optional block: `{ min_deg, max_deg }` on a rotation

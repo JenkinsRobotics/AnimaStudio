@@ -176,6 +176,11 @@ def _rig_summary(rig: Rig) -> dict:
                 "model": part.model,
                 "suppressed": part.suppressed,
                 "grounded": part.grounded,
+                # Rest transform (part-in-character), native radians for
+                # the orientation like other DOF descriptors — the app
+                # converts to degrees for display.
+                "position_m": list(part.position_m),
+                "rotation_euler_rad": list(part.rotation_euler_rad),
             }
             for part in rig.parts.values()
         ],
@@ -306,6 +311,10 @@ def rig_from_dict(dto: dict) -> Rig:
             model=entry.get("model", ""),
             suppressed=entry.get("suppressed", False),
             grounded=entry.get("grounded", False),
+            position_m=tuple(entry.get("position_m", (0.0, 0.0, 0.0))),
+            rotation_euler_rad=tuple(
+                entry.get("rotation_euler_rad", (0.0, 0.0, 0.0))
+            ),
         )
         for entry in dto.get("parts", [])
     }

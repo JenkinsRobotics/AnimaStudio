@@ -151,6 +151,10 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Persistent object states: suppress (part/joint/relation) + ground (part) in the rig model, evaluation, and file round-trip | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/mates.py` (`describe_mate` +`suppressed`), `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; suppress->serialize->load stays suppressed | released 2026-07-16 (966 suite total, +22; ruff clean; no `app/`/`firmware/` touched; ADDITIVE bool fields default False; field shapes + exact solve semantics in the handoff entry below) |
 
+| Claude | Part rest transform (location, part-in-character) + coordinate-frame model (world/character/part) | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/test_part_rest_transform.py`, `examples/pan_tilt_head.character.anima`, `dev/docs/roadmap/{Character_Format,Kinematics,Coordinate_Frames}.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` (clean) + `.venv/bin/pytest animacore/tests -q` (979 passed); rest transform round-trips + roots/grounded resolve at rest, mated child not double-applied | released 2026-07-16 |
+
+| Claude | DH1: Denavit-Hartenberg chain model + forward kinematics (standalone module, articulated-arm rig type) | `animacore/dh.py` (new), `animacore/tests/test_dh.py` (new) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; DH FK matches known 2R/6R poses | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -204,6 +208,78 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, part rest transform + coordinate-frame model):**
+  Parts now carry a **LOCATION** (a rest transform) that persists in the
+  `.character.anima` and drives `resolve_pose`, so a part the app moved
+  survives Save. **Additive: defaults are the zero transform → identity,
+  so every existing file/test is byte- and behavior-unchanged (966 → 979,
+  +13).** The frame model Jonathan named is now explicit and normative in
+  the new `dev/docs/roadmap/Coordinate_Frames.md`: **World → Character →
+  Part**, with custom named reference frames as a future extension (mate
+  connectors are the first instance).
+
+  **Rest-transform field shapes** (`animacore/rig.py` `Part`, both
+  default the zero 3-tuple, validated as 3-tuples):
+  - `position_m: tuple[float, float, float]` — the part origin's position
+    in **CHARACTER** space, metres.
+  - `rotation_euler_rad: tuple[float, float, float]` — rest orientation,
+    **XYZ Euler radians** (matches the app's `rotationEulerRadians`).
+
+  This is **part-in-character** (part space → character space), NOT
+  world. World placement of a character is a separate scene-level
+  transform (Character-in-World, default identity when authoring one
+  character; becomes real in the scene format).
+
+  **Euler convention (Codex MUST match it in Swift):** **intrinsic XYZ**
+  Tait-Bryan. Rotate local X by `rx`, then new local Y by `ry`, then new
+  local Z by `rz`. Quaternion (real part last) `q = qx ⊗ qy ⊗ qz`; matrix
+  `R = Rx·Ry·Rz`; a point transforms as `R·p` (Z innermost). Engine
+  builder: `kinematics.Transform.from_euler_xyz(rx, ry, rz)`. Build the
+  same `simd_quatf` product X→Y→Z so a saved orientation renders
+  identically in both. (`# ponytail:` Euler is the interchange shape to
+  match the inspector fields; gimbal-lock ceiling accepted for static
+  rest placement — quaternions stay the internal truth.)
+
+  **`resolve_pose` root/grounded/mated rules** (output is now documented
+  **character-space**):
+  - **ROOT** (no active incoming joint) → resolves at its **rest
+    transform** (was identity).
+  - **GROUNDED** → resolves at its **rest transform**, overriding any
+    incoming joint (was "grounded → identity"; it's a fixed anchor at its
+    authored location).
+  - **MATED child** → positioned by its mate via `child_in_parent`; its
+    own rest transform is pre-mate only and is **NOT** applied on top (no
+    double-apply — proven by a test where two rigs differing only in the
+    mated child's rest position resolve the child identically).
+  - Orphan/unreachable non-suppressed part → root at its rest transform.
+  - Suppressed semantics intact (unchanged).
+
+  **File keys** (`animacore/loader.py` / `serialize.py`): `position_m:
+  [x,y,z]` (metres) and `rotation_euler_deg: [rx,ry,rz]` (**degrees in
+  the file**, radians in the model — consistent with DOF limits/offsets).
+  Both optional, default zero, **emitted only when non-zero** (clean
+  output, lossless round-trip). Typed pathed errors
+  (`parts.<name>.position_m`).
+
+  **Codex — bridge DTO (additive, nothing renamed):** the
+  `load_character` part entry now also carries `position_m` (list, metres)
+  and `rotation_euler_rad` (list, **native radians** like other DOF
+  descriptors — convert to degrees for display in the inspector).
+  `serialize_character` / `rig_from_dict` round-trip both. So: the triad
+  / gizmo edit on a FREE (root/grounded) part writes `position_m` +
+  `rotation_euler_rad` back through `serialize_character`; a MATED part's
+  drag still routes to its DOF (the mate owns placement — the rest
+  transform is not applied while mated). Character-in-World stays a
+  scene-level concern; keep it out of the character DTO.
+
+  **Example:** `examples/pan_tilt_head.character.anima` `base` (the
+  assembly root) now has `position_m: [0,0,0.25]` + `rotation_euler_deg:
+  [0,0,30]`, so the whole head is anchored 0.25 m up and yawed 30°;
+  `resolve_pose` reflects it (asserted). Round-trip proven
+  (set position+rotation → serialize → load → equal, deg↔rad tolerant).
+  979 tests, ruff clean, no `app/`/`firmware/` touched. Left uncommitted
+  for main-session integration.
 
 - **2026-07-16 (Claude, persistent object states — suppress + ground):**
   A user can suppress an object or ground a part, save, quit, relaunch —

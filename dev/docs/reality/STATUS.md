@@ -328,19 +328,33 @@
   only the positive axis directions, and hovering previews the exact clickable
   face, edge, or corner. The viewport also provides trackpad pan/pinch and
   persistent Default, SolidWorks, Onshape, Fusion 360, and Custom mouse
-  profiles. Default and Onshape map right drag to orbit and
-  middle drag to pan; SolidWorks maps middle drag to orbit and Control- or
-  Shift-middle drag to pan; Fusion 360 maps Shift-middle drag to orbit and
-  middle drag to pan. Custom exposes conflict-free rotate and pan bindings.
-  Orbit, pan, and zoom response now have independent persistent Slow through
-  Very Fast presets in Display → Input. Orbit and pan default to Standard;
-  zoom defaults to Reduced so a mouse-wheel notch makes a smaller, more
-  controllable camera move.
-  Discrete mouse-wheel events are consumed as zoom in every profile instead of
-  scrolling vertically; precise trackpad scroll phases still pan, and pinch
-  still zooms. Semantic proxy geometry is
+  profiles. Default now intentionally mirrors SolidWorks: middle drag orbits,
+  Option + middle drag pans, and Shift + middle drag performs precise zoom.
+  Onshape uses right drag to orbit and middle drag to pan; Fusion 360 uses
+  Shift + middle drag to orbit and middle drag to pan. Custom exposes
+  conflict-free orbit, pan, and precise-zoom chords, including Option-based
+  bindings. A dedicated Mouse & Navigation sheet opens from the camera HUD and
+  follows the supplied compact control-panel reference: Scroll, Mouse, Buttons,
+  Keyboard, Exceptions, and Settings icon tabs; a code-native mouse diagram;
+  preset mapping summaries; Custom binding pickers; independent Slow-through-
+  Very-Fast orbit/pan/zoom sliders; reverse-wheel direction; and a reset action.
+  The settings persist through user-local `AppStorage` and never enter a
+  project. Exception-driver integration is visibly labeled Coming later.
+  Discrete wheel acceleration is normalized to one fixed notch and Standard
+  speed changes distance by approximately 13%; precise wheel/trackpad deltas
+  use a smaller clamped coefficient. Trackpad scroll phases still pan, pinch
+  still zooms, and reverse direction applies only to wheel zoom. Right-button
+  events now use one click-vs-drag router: a click opens the pointer-targeted
+  Studio menu, a drag drives the active profile and suppresses the menu, and a
+  double middle click returns to the framed home view. Semantic proxy geometry is
   directly selectable in the viewport and resolves to the same stable part ID
-  used by the Components tree and inspector. The selected component receives
+  used by the Components tree and inspector. Viewport clicks now toggle parts
+  without a modifier, empty clicks clear selection, Option-click walks the
+  RealityKit hit stack to select through overlapping geometry, and a small
+  cursor-adjacent badge reports multi-selection count. Empty-space drag adds
+  directional CAD box selection: left-to-right is a blue solid window requiring
+  full projected enclosure; right-to-left is a yellow dashed crossing selecting
+  projected bounds it touches. The selected component receives
   an orange silhouette highlight plus local XYZ translation arrows and rotation
   rings at its origin; dragging them edits the core-backed rest transform, and
   connector-authored mate rotation composes through parent/child chains. During
@@ -358,7 +372,7 @@
   Overrides are deliberately in-session presentation state until the durable
   project document defines non-destructive material-override persistence, and
   imported source-model materials remain source-owned and read-only. A selected
-  semantic component also has a native, CAD-ordered viewport context menu. It
+  semantic component also has a Studio-owned, CAD-ordered viewport context menu. It
   identifies the body and groups property editing, attached-mate navigation,
   show/hide, reversible isolate and transparency previews, mate-guide
   visibility, select-all/clear, Zoom to Fit and Zoom to Selection, lock/unlock,
@@ -634,8 +648,14 @@
   the parent about/along the **mate connector as the relative origin**
   per its DOF; at zero DOF/offset the child connector coincides with the
   parent connector with primary(Z) axes opposed, unless `flip_primary_axis` aligns
-  them, plus a `secondary_axis_rotation_deg` twist. Roots (no parent
-  joint) sit at identity. The bridge `resolve_pose` verb returns
+  them, plus a `secondary_axis_rotation_deg` twist. A part also carries a
+  **rest transform** (`position_m` + `rotation_euler_rad`, its
+  part-in-character location; intrinsic-XYZ Euler, degrees in the file):
+  roots and grounded parts resolve at their rest transform (identity when
+  unauthored), a mated child is placed by its mate instead, and
+  `resolve_pose` output is character-space (Character-in-World is a
+  scene-level transform, default identity — see
+  `dev/docs/roadmap/Coordinate_Frames.md`). The bridge `resolve_pose` verb returns
   `{parts:{name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — the
   RealityKit render hook. Studio now calls it for imports and every playhead
   update, maps the result to renderer-only part IDs, and applies those world
@@ -652,7 +672,7 @@
   lossless the `load_character` rig summary was additively enriched (clip
   `keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`,
   joint `description`; nothing renamed or removed).
-  927 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  979 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,

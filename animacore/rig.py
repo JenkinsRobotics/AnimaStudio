@@ -128,6 +128,17 @@ def _validate_safe_relative_path(value: str, part_name: str) -> None:
             )
 
 
+def _as_vec3(
+    value: object, part_name: str, field_name: str
+) -> tuple[float, float, float]:
+    """Validate a rest-transform 3-tuple (position/euler), returning floats."""
+    if not isinstance(value, (tuple, list)) or len(value) != 3:
+        raise ValueError(
+            f"part {part_name!r} {field_name} must be a 3-tuple, got {value!r}"
+        )
+    return tuple(float(component) for component in value)
+
+
 @dataclass(frozen=True)
 class Part:
     """A rigid body in the mechanism.
@@ -154,13 +165,30 @@ class Part:
     ``parent`` is optional assembly-tree metadata; kinematic
     connectivity is carried by ``Joint``, not here.
 
+    ``position_m`` and ``rotation_euler_rad`` are the part's **rest
+    transform** — its placement in **CHARACTER space** (the transform
+    from part space to character space), NOT world space. ``position_m``
+    is the part origin's position in metres; ``rotation_euler_rad`` is
+    the rest orientation as XYZ Euler angles in radians (matching the
+    app's ``rotationEulerRadians``; intrinsic XYZ, see
+    ``kinematics.Transform.from_euler_xyz``). This rest transform is the
+    part's placement when it is a **ROOT** or **GROUNDED** part; a
+    **mated** child is positioned instead by its mate
+    (``kinematics.child_in_parent``), so its rest transform is only its
+    pre-mate placement and is not applied on top of the mate. World
+    placement of the whole character is a separate scene-level concern
+    (default identity when authoring one character) — see
+    ``dev/docs/roadmap/Coordinate_Frames.md``. Both default to the zero
+    transform, so an existing rig is unchanged.
+
     ``suppressed`` and ``grounded`` are persistent *rig-semantic* object
     states (round-tripped through the file, unlike the app's transient
     hidden/lock view-state): a **suppressed** part is excluded from the
     solve entirely (its geometry vanishes and any joint touching it goes
-    inactive); a **grounded** part is pinned as a fixed root at identity,
-    overriding any incoming joint. Both default off, so an existing rig
-    is unchanged. See ``kinematics.resolve_pose`` for the exact FK rules.
+    inactive); a **grounded** part is pinned as a fixed root at its rest
+    transform, overriding any incoming joint. Both default off, so an
+    existing rig is unchanged. See ``kinematics.resolve_pose`` for the
+    exact FK rules.
     """
 
     name: str
@@ -170,6 +198,8 @@ class Part:
     model: str = ""
     suppressed: bool = False
     grounded: bool = False
+    position_m: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    rotation_euler_rad: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -178,6 +208,14 @@ class Part:
             raise ValueError(f"part {self.name!r} cannot be its own parent")
         if self.model:
             _validate_safe_relative_path(self.model, self.name)
+        object.__setattr__(
+            self, "position_m", _as_vec3(self.position_m, self.name, "position_m")
+        )
+        object.__setattr__(
+            self,
+            "rotation_euler_rad",
+            _as_vec3(self.rotation_euler_rad, self.name, "rotation_euler_rad"),
+        )
 
 
 @dataclass(frozen=True)

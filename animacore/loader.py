@@ -230,6 +230,8 @@ def _parse_parts(raw: object) -> dict[str, Part]:
                 "model",
                 "suppressed",
                 "grounded",
+                "position_m",
+                "rotation_euler_deg",
             },
         )
         parent = entry.get("parent")
@@ -252,6 +254,17 @@ def _parse_parts(raw: object) -> dict[str, Part]:
             entry.get("suppressed", False), f"{path}.suppressed"
         )
         grounded = _bool(entry.get("grounded", False), f"{path}.grounded")
+        # Rest transform (part-in-character): position in metres, rest
+        # orientation in degrees in the file (radians in the model, like
+        # DOF limits/offsets). Optional, default zero → identity.
+        position_m = _vector3(
+            entry.get("position_m", [0.0, 0.0, 0.0]), f"{path}.position_m"
+        )
+        rotation_deg = _vector3(
+            entry.get("rotation_euler_deg", [0.0, 0.0, 0.0]),
+            f"{path}.rotation_euler_deg",
+        )
+        rotation_euler_rad = tuple(math.radians(a) for a in rotation_deg)
         try:
             parts[str(name)] = Part(
                 name=str(name),
@@ -263,6 +276,8 @@ def _parse_parts(raw: object) -> dict[str, Part]:
                 model=model,
                 suppressed=suppressed,
                 grounded=grounded,
+                position_m=position_m,
+                rotation_euler_rad=rotation_euler_rad,
             )
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error

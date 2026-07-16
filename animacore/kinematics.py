@@ -183,6 +183,32 @@ class Transform:
         return Transform(quat_from_axis_angle(axis_xyz, radians), (0.0, 0.0, 0.0))
 
     @staticmethod
+    def from_euler_xyz(rx: float, ry: float, rz: float) -> Transform:
+        """A pure rotation from **intrinsic XYZ** Tait-Bryan Euler radians.
+
+        Intrinsic XYZ: rotate about the local X axis by ``rx``, then the
+        new local Y by ``ry``, then the new local Z by ``rz``. Composed as
+        the Hamilton product ``q = q_x ⊗ q_y ⊗ q_z`` (real part last), so
+        the resulting rotation matrix is ``R = R_x · R_y · R_z`` and a
+        point transforms as ``R·p`` (Z-rotation applied innermost).
+
+        This is the convention the app / RealityKit use when they build a
+        rest orientation from ``rotationEulerRadians`` (``simd_quatf``
+        multiplied X→Y→Z). Swift and the engine MUST agree here — the
+        choice is documented normatively in
+        ``dev/docs/roadmap/Coordinate_Frames.md``.
+
+        # ponytail: Euler (not a stored quaternion) is the authoring
+        # shape because it matches the app's inspector fields; the
+        # gimbal-lock ceiling is accepted for rest placement (no
+        # interpolation through it) — quaternions stay the internal truth.
+        """
+        qx = quat_from_axis_angle((1.0, 0.0, 0.0), rx)
+        qy = quat_from_axis_angle((0.0, 1.0, 0.0), ry)
+        qz = quat_from_axis_angle((0.0, 0.0, 1.0), rz)
+        return Transform(quat_multiply(quat_multiply(qx, qy), qz))
+
+    @staticmethod
     def compose(a: Transform, b: Transform) -> Transform:
         """``a ∘ b``: apply ``b`` then ``a`` (``a.apply(b.apply(p))``)."""
         rotation = quat_multiply(a.rotation, b.rotation)
@@ -372,29 +398,61 @@ def _is_joint_active(joint, suppressed_parts, grounded_parts) -> bool:
     return True
 
 
-def resolve_pose(rig, pose) -> dict[str, Transform]:
-    """Forward kinematics over the joint graph: each part's world transform.
+def part_rest_transform(part) -> Transform:
+    """A part's **rest transform** — its part-in-CHARACTER placement.
 
-    A part that is no *active* joint's ``child_part`` is a ROOT at
-    ``IDENTITY`` (parts carry no rest transform). For each active joint,
+    Rotate a point by the part's XYZ Euler orientation
+    (``Transform.from_euler_xyz``), then translate to its position:
+    ``apply_point(p) = R(rotation_euler_rad)·p + position_m``. This is the
+    placement used when the part is a ROOT or GROUNDED part (a mate
+    positions a mated child instead). The zero transform (default) reduces
+    to ``IDENTITY``, so a part with no authored rest transform behaves
+    exactly as before. See ``dev/docs/roadmap/Coordinate_Frames.md``.
+    """
+    rx, ry, rz = part.rotation_euler_rad
+    rotation = Transform.from_euler_xyz(rx, ry, rz).rotation
+    translation = (
+        float(part.position_m[0]),
+        float(part.position_m[1]),
+        float(part.position_m[2]),
+    )
+    return Transform(rotation, translation)
+
+
+def resolve_pose(rig, pose) -> dict[str, Transform]:
+    """Forward kinematics over the joint graph: each part's **character-space**
+    transform.
+
+    A part that is no *active* joint's ``child_part`` is a ROOT and
+    resolves at its **rest transform** (``part_rest_transform`` —
+    ``position_m`` + ``rotation_euler_rad``, the part-in-character
+    placement; identity when unauthored). For each active joint,
     ``world[child] = compose(world[parent], child_in_parent(joint, ...))``,
     pulling the joint's DOF values from ``pose.dof_values`` (keyed
-    ``"<joint>.<dof>"``). The graph is acyclic (rig-validated);
-    parents are resolved before children by repeated passes.
-    Deterministic — parts and joints keep their rig order.
+    ``"<joint>.<dof>"``); a mated child is placed by its mate, so its own
+    rest transform is NOT applied on top. The graph is acyclic
+    (rig-validated); parents are resolved before children by repeated
+    passes. Deterministic — parts and joints keep their rig order.
+
+    Output transforms are **character-space** (relative to the character
+    origin); placing the character in the world is a separate scene-level
+    transform (default identity) — see
+    ``dev/docs/roadmap/Coordinate_Frames.md``.
 
     Object states (persistent, per-element — no cascade):
 
     - A **suppressed part** is excluded from the output entirely, and any
       joint touching it (as parent or child) is inactive.
     - A **suppressed joint** is skipped: it does not position its child.
-    - A **grounded part** is a fixed root at ``IDENTITY`` even if a joint
-      feeds into it — ground overrides the incoming joint.
+    - A **grounded part** is a fixed root at its **rest transform** even if
+      a joint feeds into it — ground overrides the incoming joint, pinning
+      the part at its authored character-space location.
     - Orphan rule: a non-suppressed part whose only positioning path runs
       through a suppressed/inactive joint (or a suppressed parent) has no
-      active incoming joint, so it resolves as an identity root (floats to
-      the origin). The UI makes "suppress a folder → everything vanishes"
-      by suppressing the member parts, not by any cascade here.
+      active incoming joint, so it resolves as a root at its rest transform
+      (its authored location, identity when unauthored). The UI makes
+      "suppress a folder → everything vanishes" by suppressing the member
+      parts, not by any cascade here.
     """
     suppressed_parts = {
         name for name, part in rig.parts.items() if part.suppressed
@@ -414,11 +472,11 @@ def resolve_pose(rig, pose) -> dict[str, Transform]:
         joint_by_child.setdefault(joint.child_part, joint)
 
     world: dict[str, Transform] = {}
-    for part_name in rig.parts:
+    for part_name, part in rig.parts.items():
         if part_name in suppressed_parts:
             continue
         if part_name not in joint_by_child:
-            world[part_name] = IDENTITY
+            world[part_name] = part_rest_transform(part)
 
     dof_values = pose.dof_values
     pending = list(active_joints)
@@ -444,7 +502,10 @@ def resolve_pose(rig, pose) -> dict[str, Transform]:
             # parent is another child of an unresolved joint lands here on
             # a later pass; a truly unreachable joint is left at identity).
             for joint in still_pending:
-                world.setdefault(joint.child_part, IDENTITY)
+                world.setdefault(
+                    joint.child_part,
+                    part_rest_transform(rig.parts[joint.child_part]),
+                )
             break
         pending = still_pending
     return world

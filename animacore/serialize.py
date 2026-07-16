@@ -115,6 +115,15 @@ def _parts_dict(rig: Rig) -> dict:
             entry["model"] = part.model
         if part.description:
             entry["description"] = part.description
+        # Rest transform (part-in-character): emitted only when non-zero,
+        # radians→degrees for the orientation (metres kept). A zero
+        # transform stays out of the file and round-trips as identity.
+        if any(part.position_m):
+            entry["position_m"] = list(part.position_m)
+        if any(part.rotation_euler_rad):
+            entry["rotation_euler_deg"] = [
+                math.degrees(angle) for angle in part.rotation_euler_rad
+            ]
         # Persistent rig-semantic states — emitted only when set, so a
         # default part stays clean and the round-trip is lossless.
         if part.suppressed:

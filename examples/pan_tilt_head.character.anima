@@ -21,7 +21,15 @@ identity:
 
 parts:
   # A single-mesh STL: its own file, no node path (model_node null).
-  base: { model: "assets/base.stl", description: "Fixed mounting base" }
+  # `base` is the assembly ROOT, so its rest transform (part-in-character)
+  # anchors the whole head: raised 0.25 m and yawed 30° about Z. `yoke`
+  # and `head` are MATED children — placed by their revolute joints, so
+  # any rest transform on them is pre-mate only and not applied here.
+  base:
+    model: "assets/base.stl"
+    description: "Fixed mounting base"
+    position_m: [0.0, 0.0, 0.25]
+    rotation_euler_deg: [0.0, 0.0, 30.0]
   yoke: { parent: base, model: "assets/yoke.stl" }
   # A node inside a multi-node USD: shared-format file plus model_node.
   head: { parent: yoke, model: "assets/head.usdz", model_node: "head/mesh" }
