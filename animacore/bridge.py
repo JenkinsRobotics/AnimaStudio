@@ -23,8 +23,8 @@ from typing import IO
 
 from animacore import __version__ as ENGINE_VERSION
 from animacore.loader import CharacterFormatError, parse_character
+from animacore.mates import all_mate_type_schemas, describe_mate
 from animacore.rig import (
-    DofKind,
     LimitViolationError,
     Rig,
     evaluate_pose,
@@ -40,6 +40,7 @@ CAPABILITIES = [
     "load_character",
     "validate_character",
     "evaluate",
+    "mate_types",
     "release",
     "shutdown",
 ]
@@ -102,30 +103,16 @@ def _require_str(params: dict, key: str) -> str:
 # Rig → summary DTOs (what Swift mirrors, never redefines) --------------------
 
 
-def _dof_unit(kind: DofKind) -> str:
-    return "radians" if kind is DofKind.ROTATION else "meters"
-
-
 def _rig_summary(rig: Rig) -> dict:
-    """The ``load_character`` result's ``rig`` block (spec shapes)."""
+    """The ``load_character`` result's ``rig`` block (spec shapes).
+
+    Each joint entry is ``describe_mate(joint)`` — the consistent
+    per-mate hook carrying the stable id, the full universal controls,
+    and the DOF paths + limits (``min``/``max`` null for an unlimited
+    DOF).
+    """
     identity = rig.identity
-    joints = []
-    for joint in rig.joints.values():
-        dofs = []
-        for dof in joint.dofs:
-            dofs.append(
-                {
-                    "path": f"{joint.name}.{dof.name}",
-                    "kind": dof.kind.value,
-                    "unit": _dof_unit(dof.kind),
-                    "min": dof.minimum,  # null for an unlimited dof
-                    "max": dof.maximum,
-                    "neutral": dof.neutral,
-                }
-            )
-        joints.append(
-            {"name": joint.name, "type": joint.joint_type.value, "dofs": dofs}
-        )
+    joints = [describe_mate(joint) for joint in rig.joints.values()]
     return {
         "identity": {
             "name": identity.name,
@@ -287,6 +274,13 @@ def _evaluate(session: Session, params: dict, request_id: object) -> dict:
     )
 
 
+def _mate_types(session: Session, params: dict, request_id: object) -> dict:
+    # The palette/panel-builder hook: the static per-kind schema for all
+    # eight mate kinds (label, DOF slots, and the shared universal
+    # controls). No rig handle needed — it is the type catalog.
+    return _ok(request_id, {"mate_types": all_mate_type_schemas()})
+
+
 def _release(session: Session, params: dict, request_id: object) -> dict:
     # Idempotent: dropping an unknown handle is not an error, so a client
     # can release freely without tracking exactly what the engine holds.
@@ -304,6 +298,7 @@ _VERBS = {
     "load_character": _load_character,
     "validate_character": _validate_character,
     "evaluate": _evaluate,
+    "mate_types": _mate_types,
     "release": _release,
     "shutdown": _shutdown,
 }

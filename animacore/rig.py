@@ -33,194 +33,61 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import ClassVar
 
+from animacore.mates import (
+    JOINT_TYPE_DOF_TEMPLATES,
+    DegreeOfFreedom,
+    DofKind,
+    JointType,
+    MateConnector,
+    MateControls,
+    MateOffset,
+    RotationAxis,
+    RotationDof,
+    SecondaryAxisRotation,
+    TranslationDof,
+    all_mate_type_schemas,
+    describe_mate,
+    mate_type_schema,
+)
 from animacore.tracks import Clip, evaluate_clip
 
-
-class DofKind(StrEnum):
-    ROTATION = "rotation"
-    TRANSLATION = "translation"
-
-
-class JointType(StrEnum):
-    """Typed mates, modeled on Onshape mate connectors."""
-
-    FASTENED = "fastened"
-    PARALLEL = "parallel"
-    REVOLUTE = "revolute"
-    PRISMATIC = "prismatic"
-    CYLINDRICAL = "cylindrical"
-    PIN_SLOT = "pin_slot"
-    PLANAR = "planar"
-    BALL = "ball"
-
-
-# Each joint type DEFINES its DOF set: the ordered (default name, kind)
-# pairs a joint of that type must carry. Authors may rename a DOF but
-# cannot add, drop, or re-kind one.
-JOINT_TYPE_DOF_TEMPLATES: dict[JointType, tuple[tuple[str, DofKind], ...]] = {
-    JointType.FASTENED: (),
-    # Parallel keeps the connector axes parallel: free XYZ translation
-    # plus rotation about the shared Z axis — no tilting.
-    JointType.PARALLEL: (
-        ("translation_x", DofKind.TRANSLATION),
-        ("translation_y", DofKind.TRANSLATION),
-        ("translation_z", DofKind.TRANSLATION),
-        ("rotation", DofKind.ROTATION),
-    ),
-    JointType.REVOLUTE: (("rotation", DofKind.ROTATION),),
-    JointType.PRISMATIC: (("translation", DofKind.TRANSLATION),),
-    JointType.CYLINDRICAL: (
-        ("rotation", DofKind.ROTATION),
-        ("translation", DofKind.TRANSLATION),
-    ),
-    JointType.PIN_SLOT: (
-        ("rotation", DofKind.ROTATION),
-        ("translation", DofKind.TRANSLATION),
-    ),
-    JointType.PLANAR: (
-        ("translation_x", DofKind.TRANSLATION),
-        ("translation_y", DofKind.TRANSLATION),
-        ("rotation", DofKind.ROTATION),
-    ),
-    JointType.BALL: (
-        ("rotation_x", DofKind.ROTATION),
-        ("rotation_y", DofKind.ROTATION),
-        ("rotation_z", DofKind.ROTATION),
-    ),
-}
-
-
-def _validate_dof(
-    name: str,
-    minimum: float | None,
-    maximum: float | None,
-    neutral: float,
-    axis: tuple[float, float, float] | None,
-    unit: str,
-) -> None:
-    if not name:
-        raise ValueError("dof name must not be empty")
-    if "." in name:
-        raise ValueError(f"dof name must not contain '.': {name!r}")
-    if (minimum is None) != (maximum is None):
-        raise ValueError(
-            f"dof {name!r} limits must set both min and max or neither "
-            f"(an unlimited dof has no partial range)"
-        )
-    if minimum is not None and maximum is not None:
-        if minimum >= maximum:
-            raise ValueError(
-                f"dof {name!r} has bad range: {minimum} >= {maximum} ({unit})"
-            )
-        if not minimum <= neutral <= maximum:
-            raise ValueError(
-                f"dof {name!r} neutral {neutral} outside range "
-                f"[{minimum}, {maximum}] ({unit})"
-            )
-    if axis is not None:
-        if len(axis) != 3:
-            raise ValueError(f"dof {name!r} axis must have 3 components")
-        if all(component == 0.0 for component in axis):
-            raise ValueError(f"dof {name!r} axis must not be all zero")
-
-
-@dataclass(frozen=True)
-class RotationDof:
-    """One rotational degree of freedom; limits and neutral in radians.
-
-    Limits are optional (``None``/``None`` = continuous rotation, e.g.
-    a wheel); when present they are hard stops. Neutral is always
-    required and, when limits are present, must lie within them.
-    """
-
-    name: str
-    min_radians: float | None = None
-    max_radians: float | None = None
-    neutral_radians: float = 0.0
-    axis: tuple[float, float, float] | None = None
-    description: str = ""
-
-    kind: ClassVar[DofKind] = DofKind.ROTATION
-
-    def __post_init__(self) -> None:
-        if self.axis is not None:
-            object.__setattr__(self, "axis", tuple(self.axis))
-        _validate_dof(
-            self.name,
-            self.min_radians,
-            self.max_radians,
-            self.neutral_radians,
-            self.axis,
-            "radians",
-        )
-
-    @property
-    def has_limits(self) -> bool:
-        return self.min_radians is not None
-
-    @property
-    def minimum(self) -> float | None:
-        return self.min_radians
-
-    @property
-    def maximum(self) -> float | None:
-        return self.max_radians
-
-    @property
-    def neutral(self) -> float:
-        return self.neutral_radians
-
-
-@dataclass(frozen=True)
-class TranslationDof:
-    """One translational degree of freedom; limits and neutral in meters.
-
-    Limits are optional (``None``/``None`` = unbounded travel); when
-    present they are hard stops. Neutral is always required and, when
-    limits are present, must lie within them.
-    """
-
-    name: str
-    min_meters: float | None = None
-    max_meters: float | None = None
-    neutral_meters: float = 0.0
-    axis: tuple[float, float, float] | None = None
-    description: str = ""
-
-    kind: ClassVar[DofKind] = DofKind.TRANSLATION
-
-    def __post_init__(self) -> None:
-        if self.axis is not None:
-            object.__setattr__(self, "axis", tuple(self.axis))
-        _validate_dof(
-            self.name,
-            self.min_meters,
-            self.max_meters,
-            self.neutral_meters,
-            self.axis,
-            "meters",
-        )
-
-    @property
-    def has_limits(self) -> bool:
-        return self.min_meters is not None
-
-    @property
-    def minimum(self) -> float | None:
-        return self.min_meters
-
-    @property
-    def maximum(self) -> float | None:
-        return self.max_meters
-
-    @property
-    def neutral(self) -> float:
-        return self.neutral_meters
-
-
-DegreeOfFreedom = RotationDof | TranslationDof
+# The mate-authoring vocabulary lives in ``animacore.mates``; rig.py
+# re-exports it so ``from animacore.rig import JointType`` (and the
+# other typed-mate names) keeps working.
+__all__ = [
+    "JOINT_TYPE_DOF_TEMPLATES",
+    "DegreeOfFreedom",
+    "DofKind",
+    "JointType",
+    "MateConnector",
+    "MateControls",
+    "MateOffset",
+    "RotationAxis",
+    "RotationDof",
+    "SecondaryAxisRotation",
+    "TranslationDof",
+    "all_mate_type_schemas",
+    "describe_mate",
+    "mate_type_schema",
+    "Part",
+    "Joint",
+    "Parameter",
+    "OutputMapping",
+    "RelationKind",
+    "RELATION_KIND_DOF_KINDS",
+    "RELATION_DISPLAY_KEYS",
+    "Relation",
+    "relations_in_dependency_order",
+    "RigClip",
+    "Identity",
+    "Rig",
+    "LimitViolation",
+    "LimitViolationError",
+    "Pose",
+    "evaluate_pose",
+    "project_channels",
+]
 
 
 @dataclass(frozen=True)
@@ -246,32 +113,6 @@ class Part:
 
 
 @dataclass(frozen=True)
-class JointOffset:
-    """As-mated offset between a joint's two connector frames.
-
-    Kinematics.md §4: translation along the connector frame axes in
-    meters plus a rotation about the connector Z axis in radians,
-    applied before DOF values shift the pose. The headless runtime
-    computes DOF values and channel projections, not spatial part
-    transforms, so it stores the offset for round-trip only; Studio
-    consumes it spatially.
-    """
-
-    translation_meters: tuple[float, float, float] = (0.0, 0.0, 0.0)
-    rotation_radians: float = 0.0
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self, "translation_meters", tuple(self.translation_meters)
-        )
-        if len(self.translation_meters) != 3:
-            raise ValueError(
-                f"offset translation must have 3 components, got "
-                f"{self.translation_meters!r}"
-            )
-
-
-@dataclass(frozen=True)
 class Joint:
     """A typed mate connecting a child part to a parent part.
 
@@ -279,6 +120,13 @@ class Joint:
     ``JOINT_TYPE_DOF_TEMPLATES``); ``dofs`` supplies the named
     instances. A DOF list whose kinds do not match the type is
     rejected. Each DOF is addressable as ``"<joint_name>.<dof_name>"``.
+
+    ``id`` is a stable tracking identity (e.g. ``"Fastened 33"``),
+    distinct from the editable ``name`` and preserved verbatim — empty
+    is allowed (the app assigns it). ``controls`` carries the universal
+    connector/offset/flip/orient controls (``MateControls``); the
+    as-mated offset lives at ``controls.offset``. The headless runtime
+    round-trips connectors and offsets without spatial math.
     """
 
     name: str
@@ -287,7 +135,8 @@ class Joint:
     child_part: str
     dofs: tuple[DegreeOfFreedom, ...] = ()
     description: str = ""
-    offset: JointOffset | None = None
+    id: str = ""
+    controls: MateControls | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dofs", tuple(self.dofs))

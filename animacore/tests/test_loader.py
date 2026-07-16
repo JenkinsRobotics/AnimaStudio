@@ -17,6 +17,7 @@ from animacore.rig import (
     JointType,
     LimitViolationError,
     RelationKind,
+    RotationAxis,
     evaluate_pose,
     project_channels,
 )
@@ -554,35 +555,75 @@ class TestOptionalLimitsLoading:
         assert_rejects(doc, "outputs[0].target")
 
 
-class TestJointOffsetLoading:
+class TestMateControlsLoading:
     def test_offset_block_round_trips(self):
         doc = document(clips={}, outputs=[])
         doc["joints"]["pan"]["offset"] = {
+            "enabled": True,
             "translation_m": [0.01, 0.0, -0.002],
-            "rotation_deg": 15.0,
+            "rotate_about": "z",
+            "angle_deg": 15.0,
         }
-        offset = parse(doc).joints["pan"].offset
-        assert offset.translation_meters == (0.01, 0.0, -0.002)
+        offset = parse(doc).joints["pan"].controls.offset
+        assert offset.enabled is True
+        assert offset.translation_m == (0.01, 0.0, -0.002)
+        assert offset.rotation_axis is RotationAxis.Z
         assert offset.rotation_radians == pytest.approx(math.radians(15.0))
 
-    def test_absent_offset_is_none(self):
-        assert parse(document()).joints["pan"].offset is None
+    def test_absent_controls_is_none(self):
+        assert parse(document()).joints["pan"].controls is None
+
+    def test_id_round_trips_verbatim(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["id"] = "Revolute 7"
+        assert parse(doc).joints["pan"].id == "Revolute 7"
+
+    def test_absent_id_is_empty_string(self):
+        assert parse(document()).joints["pan"].id == ""
+
+    def test_connectors_round_trip(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["connectors"] = {
+            "a": {
+                "part": "base",
+                "origin_m": [0.0, 0.0, 0.05],
+                "primary_axis": [0, 0, 1],
+                "secondary_axis": [1, 0, 0],
+                "feature": "base/top",
+            },
+            "b": {"part": "carriage"},
+        }
+        controls = parse(doc).joints["pan"].controls
+        assert controls.connector_a.part == "base"
+        assert controls.connector_a.origin_m == (0.0, 0.0, 0.05)
+        assert controls.connector_a.feature == "base/top"
+        assert controls.connector_b.part == "carriage"
+
+    def test_flip_and_secondary_and_simulation_round_trip(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["flip_primary_axis"] = True
+        doc["joints"]["pan"]["secondary_axis_rotation_deg"] = 270
+        doc["joints"]["pan"]["simulation_connection"] = False
+        controls = parse(doc).joints["pan"].controls
+        assert controls.flip_primary_axis is True
+        assert controls.secondary_axis_rotation_deg == 270
+        assert controls.simulation_connection is False
+
+    def test_simulation_connection_defaults_true_when_controls_present(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["flip_primary_axis"] = True
+        assert parse(doc).joints["pan"].controls.simulation_connection is True
 
     def test_offset_does_not_change_runtime_output(self):
         # The headless runtime computes DOF values and channel
         # projections, not spatial part transforms; the offset is a
         # round-trip carry Studio consumes spatially.
         doc = document()
-        doc["joints"]["pan"]["offset"] = {"rotation_deg": 15.0}
+        doc["joints"]["pan"]["offset"] = {"enabled": True, "angle_deg": 15.0}
         with_offset = parse(doc)
         plain = parse(document())
         assert evaluate_pose(with_offset, "sweep", 0.5) == evaluate_pose(
             plain, "sweep", 0.5)
-
-    def test_empty_offset_block_rejected(self):
-        doc = document(clips={}, outputs=[])
-        doc["joints"]["pan"]["offset"] = {}
-        assert_rejects(doc, "joints.pan.offset")
 
     def test_offset_bad_translation_shape_rejected(self):
         doc = document(clips={}, outputs=[])
@@ -593,6 +634,49 @@ class TestJointOffsetLoading:
         doc = document(clips={}, outputs=[])
         doc["joints"]["pan"]["offset"] = {"scale": 2.0}
         assert_rejects(doc, "offset.scale")
+
+    def test_offset_bad_rotate_about_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["offset"] = {"rotate_about": "w"}
+        assert_rejects(doc, "offset.rotate_about")
+
+    def test_secondary_axis_rotation_bad_step_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["secondary_axis_rotation_deg"] = 45
+        assert_rejects(doc, "secondary_axis_rotation_deg")
+
+    def test_connector_missing_part_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["connectors"] = {"a": {"origin_m": [0, 0, 0]}}
+        assert_rejects(doc, "connectors.a.part")
+
+    def test_connector_undeclared_part_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["connectors"] = {"a": {"part": "ghost"}}
+        assert_rejects(doc, "connectors.a.part")
+
+    def test_connector_parallel_axes_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["connectors"] = {
+            "a": {
+                "part": "base",
+                "primary_axis": [0, 0, 1],
+                "secondary_axis": [0, 0, 2],
+            }
+        }
+        assert_rejects(doc, "connectors.a")
+
+    def test_connector_unknown_field_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["connectors"] = {
+            "a": {"part": "base", "scale": 2.0}
+        }
+        assert_rejects(doc, "connectors.a.scale")
+
+    def test_connectors_unknown_side_rejected(self):
+        doc = document(clips={}, outputs=[])
+        doc["joints"]["pan"]["connectors"] = {"c": {"part": "base"}}
+        assert_rejects(doc, "connectors.c")
 
 
 def rack_document(**relation_overrides) -> dict:
@@ -869,7 +953,11 @@ class TestExamplesEndToEnd:
         rig = load_character_file(EXAMPLES_DIR / "rc_car.character.anima")
         relation, = rig.relations
         assert relation.kind is RelationKind.RACK_PINION
-        assert rig.joints["steering"].offset is not None
+        steering_offset = rig.joints["steering"].controls.offset
+        assert steering_offset.enabled is True
+        assert steering_offset.rotation_radians == pytest.approx(
+            math.radians(2.5)
+        )
         assert not rig.joints["drive"].dofs[0].has_limits
         # Steering at -25 deg drives the rack through the relation.
         pose = evaluate_pose(rig, "launch_and_swerve", 1.0)

@@ -43,11 +43,27 @@ joints:
   steering:
     type: revolute             # fastened | parallel | revolute | prismatic
                                # | cylindrical | pin_slot | planar | ball
+    id: "Revolute 3"           # optional stable tracking id (distinct
+                               #   from the joint key/name; app-assigned)
     parent: chassis
     child: front_axle
+    connectors:                # optional universal control: the two
+      a:                       #   aligned mate connector frames
+        part: chassis
+        origin_m: [0, 0, 0]
+        primary_axis: [0, 0, 1]     # connector Z (the mated axis)
+        secondary_axis: [1, 0, 0]   # connector X (reorientation ref)
+        flipped: false
+        feature: "chassis/steer_face"   # opaque provenance, optional
+      b: { part: front_axle }
     offset:                    # optional as-mated offset (K9): spatial
-      translation_m: [0, 0, 0] #   only — Studio applies it to the zero
-      rotation_deg: 2.5        #   pose; the headless runtime round-trips it
+      enabled: true            #   only — Studio applies it to the zero
+      translation_m: [0, 0, 0] #   pose; the headless runtime round-trips it
+      rotate_about: z          # x | y | z
+      angle_deg: 2.5
+    flip_primary_axis: false   # flip the whole mate's primary axis
+    secondary_axis_rotation_deg: 0   # 0 | 90 | 180 | 270
+    simulation_connection: true      # Onshape "simulation connection"
     dofs:                      # count/kinds fixed by the joint type
       rotation:
         limits: { min_deg: -30, max_deg: 30 }   # OPTIONAL block (K2)
@@ -109,15 +125,38 @@ outputs:                       # evaluated target → normalized channel
   a silent clamp or default. Continuous actuators lift this later
   (B08).
 
-### Joint offset (K9 — format carry)
+### Mate controls (universal — K4/K9)
 
-`offset` stores the Onshape-style as-mated offset between the two
-connector frames: `translation_m: [x, y, z]` and/or `rotation_deg`
-about connector Z, applied before DOF values. It shifts the zero pose
-spatially and consumes no DOF. The headless runtime computes DOF
-values and channel projections, not spatial part transforms, so it
-stores the block for round-trip only; **Studio consumes it
-spatially.**
+Every mate — all eight kinds — carries the same optional universal
+controls (`animacore/mates.py` `MateControls`); only the DOF set
+differs per kind, so the UI binds one panel and reads the DOF slots
+from the `mate_types` bridge verb. All fields are optional with
+sensible defaults (a mate with none is legal, and the runtime models
+its `controls` as absent):
+
+- `id` — a stable tracking id (e.g. `"Fastened 33"`), distinct from
+  the editable joint key/name and preserved verbatim; empty is allowed
+  (the app assigns it).
+- `connectors: { a: {...}, b: {...} }` — the two aligned mate connector
+  frames. Each is a `part` (must be declared) plus an oriented frame:
+  `origin_m: [x, y, z]`, `primary_axis` (connector Z, the mated axis),
+  `secondary_axis` (connector X, the reorientation reference), a
+  `flipped` bool, and an opaque `feature` provenance string. Axes must
+  be non-zero and non-parallel. Either side may be omitted.
+- `offset` — the Onshape-style as-mated offset applied before DOF
+  values: `enabled` (the dialog checkbox), `translation_m: [x, y, z]`,
+  `rotate_about` (`x`/`y`/`z`), and `angle_deg` (degrees in the file,
+  radians in the model). It shifts the zero pose spatially and consumes
+  no DOF.
+- `flip_primary_axis` — reverse the mate's primary axis.
+- `secondary_axis_rotation_deg` — reorient the secondary axis in 90°
+  steps; must be one of `0 | 90 | 180 | 270`.
+- `simulation_connection` — the Onshape "simulation connection" toggle
+  (default `true`).
+
+The headless runtime computes DOF values and channel projections, not
+spatial part transforms, so it stores connectors and the offset for
+round-trip only; **Studio consumes them spatially.**
 
 ### Relations (K5)
 

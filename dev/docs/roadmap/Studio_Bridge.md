@@ -56,9 +56,10 @@ line — one error surface, never a second parser.
 | Method | params | result |
 |---|---|---|
 | `hello` | `{client, protocol_version}` | `{engine:"animacore", engine_version, protocol_version, capabilities:[…]}` — mismatched `protocol_version` → `protocol_mismatch` error |
-| `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[{name,type,dofs:[{path,kind,unit,min,max,neutral}]}], parameters:[…], clips:[{name,duration_s,loop}], outputs:[{dof_path,channel}]}}` — invalid → `format_error` with `path` |
+| `load_character` | `{text}` (file bytes; `path` variant later) | `{handle, rig:{identity, parts:[…], joints:[<describe_mate>…], parameters:[…], clips:[{name,duration_s,loop}], outputs:[{dof_path,channel}]}}` — invalid → `format_error` with `path`. Each joint entry is `describe_mate` (see below). |
 | `validate_character` | `{text}` | `{diagnostics:[…]}` (empty = valid) — no handle allocated |
 | `evaluate` | `{handle, clip?, time_s?}` | `{dof_values:{path:native_units}, parameters:{name:0..1}, channels:{channel:0..1}, limit_violations:[{dof_path,value,min,max}]}` |
+| `mate_types` | `{}` | `{mate_types:[{type,label,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all 8 mate kinds (the palette / panel-builder hook); no handle needed |
 | `release` | `{handle}` | `{}` — drop a loaded rig |
 | `shutdown` | `{}` | `{}` then the helper exits |
 
@@ -67,6 +68,28 @@ formats to degrees/mm for display. `channels` is exactly
 `project_channels` output; when a mapped DOF is in `limit_violations`
 the channel is omitted (hardware must refuse to arm) rather than erroring
 the whole evaluate.
+
+**Enriched joint summary (`describe_mate`).** Each joint in
+`load_character` is the consistent per-mate hook
+`animacore.mates.describe_mate(joint)`:
+
+```
+{id, name, type, parent_part, child_part,
+ controls: {connectors:{a:<connector|null>, b:<connector|null>},
+            offset:{enabled, translation_m:[x,y,z], rotation_axis:"x|y|z",
+                    rotation_radians},
+            flip_primary_axis, secondary_axis_rotation_deg,
+            simulation_connection},
+ dofs: [{path, kind, unit, min, max, neutral}]}
+```
+
+where each connector is `{part, origin_m:[x,y,z], primary_axis:[…],
+secondary_axis:[…], flipped, feature}`. `id` is a stable tracking id
+distinct from `name` (empty until the app assigns it); `controls` is
+the universal control set every kind shares (only the DOF slots differ
+per kind — see `mate_types`). Offset rotation is native radians here,
+like the DOF descriptors. A mate that declared no controls reports
+null connectors and default control values.
 
 ## Later verbs (reserved, each gated on its engine feature)
 

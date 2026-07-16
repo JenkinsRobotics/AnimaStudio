@@ -10,15 +10,18 @@ from animacore.rig import (
     DofKind,
     Identity,
     Joint,
-    JointOffset,
     JointType,
     LimitViolationError,
+    MateConnector,
+    MateControls,
+    MateOffset,
     OutputMapping,
     Parameter,
     Part,
     Pose,
     Relation,
     RelationKind,
+    RotationAxis,
     Rig,
     RigClip,
     RotationDof,
@@ -499,13 +502,36 @@ class TestProjectChannels:
         assert device.channel_pulse_us(0) == pytest.approx(
             expected_pulse_us, abs=1.0)  # 3-decimal wire quantization
 
-class TestJointOffset:
-    def test_default_is_absent(self):
-        assert pan_joint().offset is None
+class TestMateControls:
+    def test_defaults_absent_id_and_controls(self):
+        joint = pan_joint()
+        assert joint.id == ""
+        assert joint.controls is None
 
-    def test_offset_round_trips_on_the_joint(self):
-        offset = JointOffset(
-            translation_meters=(0.0, 0.0, 0.01), rotation_radians=0.1
+    def test_id_round_trips_verbatim(self):
+        joint = Joint(
+            name="pan",
+            joint_type=JointType.REVOLUTE,
+            parent_part="base",
+            child_part="carriage",
+            dofs=(rotation_dof(),),
+            id="Fastened 33",
+        )
+        assert joint.id == "Fastened 33"
+
+    def test_controls_round_trip_on_the_joint(self):
+        controls = MateControls(
+            connector_a=MateConnector(part="base"),
+            connector_b=MateConnector(part="carriage"),
+            offset=MateOffset(
+                enabled=True,
+                translation_m=(0.0, 0.0, 0.01),
+                rotation_axis=RotationAxis.Z,
+                rotation_radians=0.1,
+            ),
+            flip_primary_axis=True,
+            secondary_axis_rotation_deg=90,
+            simulation_connection=False,
         )
         joint = Joint(
             name="pan",
@@ -513,13 +539,81 @@ class TestJointOffset:
             parent_part="base",
             child_part="carriage",
             dofs=(rotation_dof(),),
-            offset=offset,
+            controls=controls,
         )
-        assert joint.offset == offset
+        assert joint.controls == controls
+        assert joint.controls.offset.translation_m == (0.0, 0.0, 0.01)
+
+    def test_default_offset_is_disabled_zero(self):
+        controls = MateControls()
+        assert controls.offset == MateOffset()
+        assert controls.offset.enabled is False
+        assert controls.offset.rotation_axis is RotationAxis.Z
+        assert controls.simulation_connection is True
+
+
+class TestMateConnector:
+    def test_zero_primary_axis_rejected(self):
+        with pytest.raises(ValueError):
+            MateConnector(part="base", primary_axis=(0.0, 0.0, 0.0))
+
+    def test_zero_secondary_axis_rejected(self):
+        with pytest.raises(ValueError):
+            MateConnector(part="base", secondary_axis=(0.0, 0.0, 0.0))
+
+    def test_parallel_axes_rejected(self):
+        with pytest.raises(ValueError):
+            MateConnector(
+                part="base",
+                primary_axis=(0.0, 0.0, 1.0),
+                secondary_axis=(0.0, 0.0, 2.0),
+            )
+
+    def test_antiparallel_axes_rejected(self):
+        with pytest.raises(ValueError):
+            MateConnector(
+                part="base",
+                primary_axis=(0.0, 0.0, 1.0),
+                secondary_axis=(0.0, 0.0, -1.0),
+            )
+
+    def test_empty_part_rejected(self):
+        with pytest.raises(ValueError):
+            MateConnector(part="")
+
+    def test_perpendicular_axes_accepted(self):
+        connector = MateConnector(
+            part="base",
+            primary_axis=(0.0, 0.0, 1.0),
+            secondary_axis=(1.0, 0.0, 0.0),
+        )
+        assert connector.primary_axis == (0.0, 0.0, 1.0)
+
+
+class TestMateOffset:
+    @pytest.mark.parametrize("axis", list(RotationAxis))
+    def test_each_rotation_axis(self, axis):
+        offset = MateOffset(enabled=True, rotation_axis=axis)
+        assert offset.rotation_axis is axis
+
+    def test_enabled_flag_round_trips(self):
+        assert MateOffset(enabled=True).enabled is True
 
     def test_bad_translation_shape_rejected(self):
         with pytest.raises(ValueError):
-            JointOffset(translation_meters=(0.0, 0.1))
+            MateOffset(translation_m=(0.0, 0.1))
+
+
+class TestSecondaryAxisRotation:
+    @pytest.mark.parametrize("deg", [0, 90, 180, 270])
+    def test_allowed_steps_accepted(self, deg):
+        controls = MateControls(secondary_axis_rotation_deg=deg)
+        assert controls.secondary_axis_rotation_deg == deg
+
+    @pytest.mark.parametrize("deg", [45, 1, 360, -90])
+    def test_other_steps_rejected(self, deg):
+        with pytest.raises(ValueError):
+            MateControls(secondary_axis_rotation_deg=deg)
 
 
 class TestOptionalLimits:

@@ -41,8 +41,8 @@ change needed in the Handoff log instead of inventing commands.
 ## Shared contracts (change only with a handoff note)
 
 - `dev/docs/roadmap/Wire_Protocol.md` — both lanes implement it.
-- Keyframe/curve semantics — AnimaCore (Swift) is the reference; Python
-  mirrors it. Deterministic evaluation, explicit units
+- Keyframe/curve semantics — the Python `animacore` engine is the canonical
+  reference; Swift consumes it through the bridge. Deterministic evaluation, explicit units
   (`timeSeconds`, `angleRadians`).
 - `.anima` format docs in `dev/docs/roadmap/`.
 
@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | BR1 Swift AnimaCore client + engine-evaluated viewport proof | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Tests/AnimaCoreClientTests/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,WorkspaceRibbonView}.swift`, `app/Sources/RealityKitViewport/{RobotPreviewView,RigPoseResolver}.swift`, `app/App/AnimaCoreHelper.entitlements`, `app/Scripts/{build-root-app,embed-animacore-helper}.sh`, focused Swift tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | real helper spawn + hello/load/evaluate/release/shutdown; typed protocol/path errors; explicit `.character.anima` import; engine-evaluated DOF values reach RealityKit preview through transitional pose projection; bundled signed helper for sandboxed app; deterministic client/unit/integration/UI tests; strict claimed-file lint; full Swift tests; Xcode/root-app build/signature/launch; `git diff --check` | active 2026-07-15 |
 | Codex | Swift app half of AnimaCore repository restructure | `studio/**` → `app/**`, `.github/workflows/**`, `.gitignore`, `AGENTS.md`, `CONVENTIONS.md`, `README.md`, `dev/docs/reality/STATUS.md`, `dev/docs/roadmap/Studio_App.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | root contains `animacore/`, `app/`, and `firmware/` with no `studio/`; Swift `AnimaModel` owns data/validation and `AnimaEvaluation` owns evaluation; no Swift `AnimaCore` target/import remains; format lint, full Swift tests, Xcode build, root-app build/signature, `git diff --check` | released 2026-07-15 |
 | Codex | CAD viewport pointer + navigation refinement | `studio/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,SubObjectSelection,RobotPreviewView}.swift`, `studio/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceView,ComponentContextActions}.swift`, `studio/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, `studio/Tests/RealityKitViewportTests/{CADNavigationTests,SubObjectSelectionTests}.swift`, `studio/Tests/AnimaStudioUIUnitTests/{Components/ViewportRenderMenuTests.swift,Workspaces/Rig/ComponentViewportContextMenuTests.swift}`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | persistent orbit/pan/zoom speed settings with slower default zoom; right-drag orbit; body/feature hover and left-click selection with empty-click deselection; pointer-targeted compact empty-space menu vs full selected-component menu; focused/full tests; claimed-file lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 06: icon selector + theme lab | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevIconThemeSelectorView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | reusable hover/select icon dock; themed context menu preview; isolated Light, Dark, Graphite, Midnight, and Neon palette specs; responsive Theme Lab and Template Matrix entry; honest preview-only boundary before app-wide adoption; focused/full tests; claimed-file lint; root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -128,6 +129,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | AnimaCore-canonical policy + Studio↔AnimaCore bridge protocol + engine helper (BR1) | `animacore/bridge.py`, `animacore/tests/test_bridge.py`, `dev/docs/reality/STATUS.md`, `dev/briefings/**` (policy + `Studio_Bridge.md` protocol already written) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; bridge handshake→load example→evaluate frame round-trips | released 2026-07-15 (28 new tests in test_bridge.py; 760 suite total, ruff clean; no `studio/` files touched; request/response examples for every BR1 verb in the handoff entry below) |
 
+| Claude | Complete mate authoring model: universal connector/offset/flip/orient controls + per-mate DOF, engine module + bridge hook (mates.py) | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/roadmap/Studio_Bridge.md`, `examples/**`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-15 (811 suite total, +51; ruff clean; no `app/`/`firmware/` files touched; `mate_types` + `describe_mate` JSON and the universal-controls contract in the handoff entry below) |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -173,6 +176,121 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, mate authoring model — universal controls +
+  `mates.py`):** Shipped the dedicated mate-authoring module
+  `animacore/mates.py` and its two UI hooks; `rig.py` re-exports the
+  moved vocabulary (`JointType`, `DofKind`, `JOINT_TYPE_DOF_TEMPLATES`,
+  `RotationDof`, `TranslationDof`, `DegreeOfFreedom`) so
+  `from animacore.rig import JointType` still works. `Joint` gained a
+  stable `id: str = ""` (verbatim, app-assigns) and
+  `controls: MateControls | None`; the old `offset: JointOffset` field
+  is gone (offset now lives at `controls.offset` as `MateOffset`).
+  `evaluate_pose`/`project_channels` behaviour is byte-identical
+  (connectors/offset are round-trip-only — no spatial math added). New
+  `.character.anima` joint fields (all optional, closed schema, typed
+  pathed errors, degrees→radians): `id`, `connectors:{a,b}`,
+  `offset:{enabled,translation_m,rotate_about,angle_deg}`,
+  `flip_primary_axis`, `secondary_axis_rotation_deg` (0/90/180/270),
+  `simulation_connection`. Bridge: `load_character`'s joint summary is
+  now `describe_mate(joint)`; new **`mate_types`** verb (added to
+  `CAPABILITIES`). 811 suite total (+51), ruff clean, no `app/` /
+  `firmware/` touched, **not committed**. Codex — the three things you
+  build the UI hook against:
+
+  **(a) Universal-controls list** (identical for all 8 kinds; the one
+  shared hook):
+  `["connector_a", "connector_b", "offset", "flip_primary_axis",
+  "secondary_axis_rotation", "simulation_connection"]`. Only the DOF
+  set differs per kind.
+
+  **(b) `mate_types` response** (`result` shape) — the static
+  palette/panel catalog, 8 kinds in `JointType` order. Each entry:
+  ```json
+  {"type": "revolute", "label": "Revolute", "dof_count": 1,
+   "universal_controls": ["connector_a", "connector_b", "offset",
+     "flip_primary_axis", "secondary_axis_rotation",
+     "simulation_connection"],
+   "dofs": [{"name": "rotation", "kind": "rotation", "unit": "radians"}]}
+  ```
+  Full set: `fastened` "Fastened" 0 dofs `[]`; `parallel` "Parallel" 4
+  (translation_x/y/z + rotation); `revolute` "Revolute" 1 (rotation);
+  `prismatic` **"Slider"** 1 (translation); `cylindrical` "Cylindrical"
+  2 (rotation, translation); `pin_slot` "Pin Slot" 2 (rotation,
+  translation); `planar` "Planar" 3 (translation_x/y + rotation);
+  `ball` "Ball" 3 (rotation_x/y/z). Units: rotation→radians,
+  translation→meters.
+
+  **(c) `describe_mate(joint)`** — the per-instance hook, one per joint
+  in the `load_character` `rig.joints` array (native units: radians /
+  meters):
+  ```json
+  {"id": "Revolute 1", "name": "base_yaw", "type": "revolute",
+   "parent_part": "base", "child_part": "shoulder",
+   "controls": {
+     "connectors": {
+       "a": {"part": "base", "origin_m": [0.0, 0.0, 0.05],
+             "primary_axis": [0.0, 0.0, 1.0],
+             "secondary_axis": [1.0, 0.0, 0.0],
+             "flipped": false, "feature": "base/top_face"},
+       "b": {"part": "shoulder", "origin_m": [0.0, 0.0, 0.0],
+             "primary_axis": [0.0, 0.0, 1.0],
+             "secondary_axis": [1.0, 0.0, 0.0],
+             "flipped": false, "feature": ""}},
+     "offset": {"enabled": true, "translation_m": [0.0, 0.0, 0.012],
+                "rotation_axis": "z",
+                "rotation_radians": 0.026179938779914945},
+     "flip_primary_axis": false, "secondary_axis_rotation_deg": 0,
+     "simulation_connection": true},
+   "dofs": [{"path": "base_yaw.rotation", "kind": "rotation",
+             "unit": "radians", "min": -2.9670597283903604,
+             "max": 2.9670597283903604, "neutral": 0.0}]}
+  ```
+  A mate that declared no controls reports
+  `"controls": {"connectors": {"a": null, "b": null},
+  "offset": {"enabled": false, "translation_m": [0.0,0.0,0.0],
+  "rotation_axis": "z", "rotation_radians": 0.0},
+  "flip_primary_axis": false, "secondary_axis_rotation_deg": 0,
+  "simulation_connection": true}` and `"id": ""` (see `shoulder_pitch`,
+  now `id "Revolute 2"` but no connectors).
+
+  **Spec decisions (flag conflicts with the Swift mate model):**
+  (1) file offset keys are `rotate_about` (`x`/`y`/`z`) + `angle_deg`
+  (degrees); the runtime/`describe_mate` reports `rotation_axis` +
+  `rotation_radians` (native, matching the DOF descriptors). (2)
+  `MateConnector.part` must be a **declared** part (pathed error
+  `…connectors.a.part`); connector primary/secondary axes must be
+  non-zero and non-parallel (cross-product magnitude > 1e-9). (3)
+  `controls` is `None` (absent) only when the joint declares no control
+  field at all; if any is present the whole block materializes with
+  defaults. (4) The old `offset:{translation_m,rotation_deg}` shape and
+  `JointOffset` type are **removed** (pre-1.0 replace); `rc_car`
+  migrated to the new offset schema, `six_axis_arm` now carries stable
+  ids on all six joints + connectors + a non-zero offset on `base_yaw`.
+  (5) `prismatic` keeps its raw value but its UI label is `"Slider"`.
+
+- **2026-07-15 (Codex, BR1 — Swift client + engine-evaluated viewport):**
+  Shipped the `AnimaCoreClient` Swift target with typed protocol DTOs and one
+  session-long, serialized newline-JSON process connection. The client covers
+  hello/load/validate/evaluate/release/shutdown, preserves engine field paths in
+  errors, and converts JSON channel keys back to integer indexes. Assets now has
+  a live `.character.anima` import action; the workspace loads the canonical
+  character, evaluates its first clip at `min(duration, 1s)`, and supplies those
+  exact DOF values as the `EvaluatedFrame` consumed by RealityKit. The BR1
+  presentation adapter creates one clearly diagnostic proxy per rotational DOF
+  only; it intentionally does not guess hierarchy, connector frames, or axes
+  before `resolve_pose` lands. The header exposes engine connection/load state.
+
+  `build-root-app.sh` now embeds a normalized Python 3.11 framework, AnimaCore,
+  and PyYAML under the app bundle, rewrites the interpreter load path, removes
+  Homebrew's external site-packages symlink, and signs the helper with sandbox
+  inheritance before resealing the outer app. A direct bundled-helper handshake
+  returned AnimaCore 0.1.0, and strict deep signature verification passes.
+  Verification: 5 focused bridge/integration tests and all 216 pre-existing
+  Swift tests pass; claimed-file strict format lint and Xcode/root-app builds
+  pass. The XCUITest host was stopped by macOS LocalAuthentication before test
+  execution, and clean-state GUI launches hit that same host authentication
+  layer before the workspace task; no entitlement was weakened to bypass it.
 
 - **2026-07-15 (Claude, BR1 — Studio↔AnimaCore bridge engine helper):**
   Shipped `animacore/bridge.py`, the long-running stdio helper that
@@ -269,8 +387,8 @@ change needed in the Handoff log instead of inventing commands.
   (evaluated frames, interpolation/evaluation, mate math); no Swift
   `AnimaCore` target or import remains. All 216 Swift tests, strict format
   lint, native Xcode build, packaged build/signature, launch command, and
-  `git diff --check` pass. Parity reference direction is intentionally
-  unchanged until Jonathan decides it.
+  `git diff --check` pass. Its parity-direction note was subsequently
+  superseded by Jonathan's AnimaCore-canonical policy and BR1.
 
 - **2026-07-15 (Claude, AnimaCore restructure — Python half):** Engine
   now owns the name AnimaCore. `anima_studio/` → `animacore/`

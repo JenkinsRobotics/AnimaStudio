@@ -23,6 +23,13 @@ from pathlib import Path
 
 import yaml
 
+from animacore.mates import (
+    MateConnector,
+    MateControls,
+    MateOffset,
+    RotationAxis,
+    SecondaryAxisRotation,
+)
 from animacore.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
     RELATION_DISPLAY_KEYS,
@@ -31,7 +38,6 @@ from animacore.rig import (
     DofKind,
     Identity,
     Joint,
-    JointOffset,
     JointType,
     OutputMapping,
     Parameter,
@@ -250,7 +256,19 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
         _reject_unknown_fields(
             entry,
             path,
-            {"type", "parent", "child", "dofs", "offset", "description"},
+            {
+                "type",
+                "parent",
+                "child",
+                "dofs",
+                "description",
+                "id",
+                "connectors",
+                "offset",
+                "flip_primary_axis",
+                "secondary_axis_rotation_deg",
+                "simulation_connection",
+            },
         )
         for required in ("type", "parent", "child"):
             if required not in entry:
@@ -307,7 +325,8 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
             dofs.append(
                 _parse_dof(dof_name, kind, dof_map, f"{path}.dofs.{dof_name}")
             )
-        offset = _parse_joint_offset(entry.get("offset"), f"{path}.offset")
+        controls = _parse_mate_controls(entry, path, parts)
+        joint_id = _string(entry.get("id", ""), f"{path}.id")
         try:
             joints[str(name)] = Joint(
                 name=str(name),
@@ -318,47 +337,164 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
                 description=_string(
                     entry.get("description", ""), f"{path}.description"
                 ),
-                offset=offset,
+                id=joint_id,
+                controls=controls,
             )
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
     return joints
 
 
-def _parse_joint_offset(raw: object, path: str) -> JointOffset | None:
-    """The optional per-joint as-mated ``offset`` block (K9 carry).
+# The universal mate controls (Kinematics.md §4) shared by all kinds.
+_CONTROL_KEYS = (
+    "connectors",
+    "offset",
+    "flip_primary_axis",
+    "secondary_axis_rotation_deg",
+    "simulation_connection",
+)
 
-    Translation in meters along the connector frame axes, rotation
-    about connector Z in degrees (radians in the model). The runtime
-    stores it for round-trip; Studio consumes it spatially.
+
+def _parse_mate_controls(
+    entry: dict, path: str, parts: dict[str, Part]
+) -> MateControls | None:
+    """The optional universal controls block on a joint entry.
+
+    Connectors, as-mated offset, primary-axis flip, secondary-axis 90°
+    reorientation, and the simulation-connection toggle — all optional
+    with sensible defaults (a mate with none is legal, so ``None`` when
+    the entry declares no control field at all).
     """
+    if not any(key in entry for key in _CONTROL_KEYS):
+        return None
+    connector_a = None
+    connector_b = None
+    if "connectors" in entry:
+        connectors = _mapping(entry["connectors"], f"{path}.connectors")
+        _reject_unknown_fields(connectors, f"{path}.connectors", {"a", "b"})
+        connector_a = _parse_connector(
+            connectors.get("a"), f"{path}.connectors.a", parts
+        )
+        connector_b = _parse_connector(
+            connectors.get("b"), f"{path}.connectors.b", parts
+        )
+    offset = _parse_mate_offset(entry.get("offset"), f"{path}.offset")
+    flip_primary_axis = _bool(
+        entry.get("flip_primary_axis", False), f"{path}.flip_primary_axis"
+    )
+    secondary_rotation = _secondary_axis_rotation(
+        entry.get("secondary_axis_rotation_deg", 0),
+        f"{path}.secondary_axis_rotation_deg",
+    )
+    simulation_connection = _bool(
+        entry.get("simulation_connection", True),
+        f"{path}.simulation_connection",
+    )
+    try:
+        return MateControls(
+            connector_a=connector_a,
+            connector_b=connector_b,
+            offset=offset,
+            flip_primary_axis=flip_primary_axis,
+            secondary_axis_rotation_deg=secondary_rotation,
+            simulation_connection=simulation_connection,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
+
+
+def _parse_connector(
+    raw: object, path: str, parts: dict[str, Part]
+) -> MateConnector | None:
+    """One side's mate connector frame, or ``None`` when absent."""
     if raw is None:
         return None
     entry = _mapping(raw, path)
-    _reject_unknown_fields(entry, path, {"translation_m", "rotation_deg"})
-    if not entry:
+    _reject_unknown_fields(
+        entry,
+        path,
+        {"part", "origin_m", "primary_axis", "secondary_axis", "flipped",
+         "feature"},
+    )
+    if "part" not in entry:
+        raise CharacterFormatError(f"{path}.part", "missing required field")
+    part = _string(entry["part"], f"{path}.part")
+    if part not in parts:
+        raise CharacterFormatError(f"{path}.part", "references an undeclared part")
+    origin = _vector3(entry.get("origin_m", [0.0, 0.0, 0.0]), f"{path}.origin_m")
+    primary = _vector3(
+        entry.get("primary_axis", [0.0, 0.0, 1.0]), f"{path}.primary_axis"
+    )
+    secondary = _vector3(
+        entry.get("secondary_axis", [1.0, 0.0, 0.0]), f"{path}.secondary_axis"
+    )
+    flipped = _bool(entry.get("flipped", False), f"{path}.flipped")
+    feature = _string(entry.get("feature", ""), f"{path}.feature")
+    try:
+        return MateConnector(
+            part=part,
+            origin_m=origin,
+            primary_axis=primary,
+            secondary_axis=secondary,
+            flipped=flipped,
+            feature=feature,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
+
+
+def _parse_mate_offset(raw: object, path: str) -> MateOffset:
+    """The as-mated ``offset`` block (Kinematics.md §4).
+
+    ``translation_m`` in meters, ``rotate_about`` (``x``/``y``/``z``)
+    plus ``angle_deg`` in degrees (radians in the model), and an
+    ``enabled`` flag mirroring the Onshape dialog. Absent → a disabled
+    zero offset. The runtime round-trips it; Studio consumes it
+    spatially.
+    """
+    if raw is None:
+        return MateOffset()
+    entry = _mapping(raw, path)
+    _reject_unknown_fields(
+        entry, path, {"enabled", "translation_m", "rotate_about", "angle_deg"}
+    )
+    enabled = _bool(entry.get("enabled", False), f"{path}.enabled")
+    translation = _vector3(
+        entry.get("translation_m", [0.0, 0.0, 0.0]), f"{path}.translation_m"
+    )
+    rotate_about = entry.get("rotate_about", RotationAxis.Z.value)
+    try:
+        axis = RotationAxis(rotate_about)
+    except ValueError:
+        valid = ", ".join(a.value for a in RotationAxis)
         raise CharacterFormatError(
-            path, "empty offset block: give translation_m and/or rotation_deg"
+            f"{path}.rotate_about",
+            f"expected one of ({valid}), got {rotate_about!r}",
+        ) from None
+    angle_degrees = _number(entry.get("angle_deg", 0.0), f"{path}.angle_deg")
+    try:
+        return MateOffset(
+            enabled=enabled,
+            translation_m=translation,
+            rotation_axis=axis,
+            rotation_radians=math.radians(angle_degrees),
         )
-    translation = (0.0, 0.0, 0.0)
-    if "translation_m" in entry:
-        raw_translation = entry["translation_m"]
-        if not isinstance(raw_translation, list) or len(raw_translation) != 3:
-            raise CharacterFormatError(
-                f"{path}.translation_m",
-                f"expected a three-number list, got {raw_translation!r}",
-            )
-        translation = tuple(
-            _number(component, f"{path}.translation_m[{index}]")
-            for index, component in enumerate(raw_translation)
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
+
+
+def _secondary_axis_rotation(value: object, path: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise CharacterFormatError(
+            path, f"expected an integer degree step, got {value!r}"
         )
-    rotation_degrees = _number(
-        entry.get("rotation_deg", 0.0), f"{path}.rotation_deg"
-    )
-    return JointOffset(
-        translation_meters=translation,
-        rotation_radians=math.radians(rotation_degrees),
-    )
+    try:
+        return int(SecondaryAxisRotation(value))
+    except ValueError:
+        valid = ", ".join(str(step.value) for step in SecondaryAxisRotation)
+        raise CharacterFormatError(
+            path, f"must be one of ({valid}), got {value}"
+        ) from None
 
 
 def _infer_dof_kind(entry: dict, path: str) -> DofKind:
@@ -846,6 +982,25 @@ def _number(value: object, path: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise CharacterFormatError(path, f"expected a number, got {value!r}")
     return float(value)
+
+
+def _bool(value: object, path: str) -> bool:
+    if not isinstance(value, bool):
+        raise CharacterFormatError(
+            path, f"expected true/false, got {value!r}"
+        )
+    return value
+
+
+def _vector3(value: object, path: str) -> tuple[float, float, float]:
+    if not isinstance(value, list) or len(value) != 3:
+        raise CharacterFormatError(
+            path, f"expected a three-number list, got {value!r}"
+        )
+    return tuple(
+        _number(component, f"{path}[{index}]")
+        for index, component in enumerate(value)
+    )
 
 
 def _number_pair(value: object, path: str) -> tuple[float, float]:

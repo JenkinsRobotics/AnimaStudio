@@ -30,8 +30,10 @@ joints:
     type: revolute
     parent: chassis
     child: front_axle
-    offset:
-      rotation_deg: 2.5   # as-mated trim about connector Z; spatial-only
+    offset:                 # as-mated trim about connector Z; spatial-only
+      enabled: true
+      rotate_about: z
+      angle_deg: 2.5
     dofs:
       rotation:
         limits: { min_deg: -30, max_deg: 30 }

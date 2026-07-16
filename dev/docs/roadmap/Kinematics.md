@@ -123,6 +123,19 @@ operations in the mate dialog:
   dialog's Offset section. Offsets shift the zero pose; they do not
   consume or restrict DOF.
 
+> **Unified in AnimaCore (`animacore/mates.py`).** The connector pair,
+> the flip (§4), the secondary-axis 90° reorientation (§4), the offset
+> (§4), and the simulation-connection toggle are one value —
+> `MateControls` — shared identically across all eight kinds; only the
+> DOF set (§1) differs per kind. Two hooks surface it to the UI so the
+> Swift side binds one consistent panel: `mate_type_schema` /
+> `all_mate_type_schemas` (the static per-kind catalog: label, DOF
+> slots, and the shared `universal_controls` id list) exposed by the
+> bridge `mate_types` verb, and `describe_mate(joint)` (the per-instance
+> descriptor: stable `id`, parts, every control's current value, DOF
+> paths + limits) carried in the `load_character` joint summary. The
+> `.anima` mate fields are documented in `Character_Format.md`.
+
 ## 5. Relations: coupling DOF across mates (advanced kinematics)
 
 One core concept covers gears, racks, screws, and linear links — a

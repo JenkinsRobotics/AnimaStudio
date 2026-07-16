@@ -35,6 +35,31 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (mate authoring model — universal controls + `mates.py`):
+  Shipped the dedicated mate-authoring module `animacore/mates.py`
+  unifying Kinematics §4's flip/reorient/offset into one universal
+  `MateControls` value shared by all eight mate kinds (only the DOF set
+  differs per kind), plus a stable per-mate `id` distinct from the
+  editable name. `rig.py` re-exports the moved vocabulary for
+  back-compat; `Joint.offset` (`JointOffset`) is replaced by
+  `Joint.controls.offset` (`MateOffset`), and `Joint` gains `id`. New
+  `.character.anima` joint fields (all optional): `id`,
+  `connectors:{a,b}` (part-local frames), `offset:{enabled,
+  translation_m, rotate_about, angle_deg}`, `flip_primary_axis`,
+  `secondary_axis_rotation_deg` (0/90/180/270), `simulation_connection`.
+  Two UI hooks for Codex: bridge verb **`mate_types`** (static per-kind
+  catalog — label, DOF slots, universal-controls list) and
+  **`describe_mate`** (per-instance descriptor now carried in every
+  `load_character` joint summary — id + full controls + DOF paths).
+  `evaluate_pose`/`project_channels` unchanged (connectors/offset are
+  round-trip-only, no spatial math). 811 tests (+51), ruff clean, no
+  `app/`/`firmware/` touched. **Codex:** the verbatim `mate_types` +
+  `describe_mate` JSON, the universal-controls list, and five spec
+  decisions (native-unit offset in the descriptor, declared-part
+  connector validation, non-parallel-axis rule, `controls`
+  present/absent rule, `prismatic`→"Slider" label) are in the briefing
+  handoff entry. Left uncommitted for main-session integration.
+
 - 2026-07-15 (BR1 — Studio↔AnimaCore bridge engine helper): Shipped
   `animacore/bridge.py`, the long-running stdio helper (`python -m
   animacore.bridge`) that makes AnimaCore the single canonical engine

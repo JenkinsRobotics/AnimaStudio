@@ -201,6 +201,67 @@ def test_load_character_missing_text_is_bad_request():
     assert response["error"]["code"] == "bad_request"
 
 
+def test_load_character_joint_summary_carries_id_and_controls():
+    session = Session()
+    response = handle_request(
+        session,
+        {"id": 2, "method": "load_character", "params": {"text": ARM}},
+    )
+    joints = {j["name"]: j for j in response["result"]["rig"]["joints"]}
+    base_yaw = joints["base_yaw"]
+    # The enriched summary is describe_mate: id + full universal controls.
+    assert base_yaw["id"] == "Revolute 1"
+    assert base_yaw["parent_part"] == "base"
+    assert base_yaw["child_part"] == "shoulder"
+    controls = base_yaw["controls"]
+    assert controls["connectors"]["a"]["part"] == "base"
+    assert controls["connectors"]["b"]["part"] == "shoulder"
+    assert controls["offset"]["enabled"] is True
+    assert controls["offset"]["translation_m"] == [0.0, 0.0, 0.012]
+    assert controls["simulation_connection"] is True
+    # A joint that declared no controls reports null connectors + defaults.
+    shoulder = joints["shoulder_pitch"]
+    assert shoulder["id"] == "Revolute 2"
+    assert shoulder["controls"]["connectors"] == {"a": None, "b": None}
+    assert shoulder["controls"]["offset"]["enabled"] is False
+
+
+# mate_types ------------------------------------------------------------------
+
+
+def test_mate_types_is_a_capability():
+    assert "mate_types" in CAPABILITIES
+
+
+def test_mate_types_returns_eight_schemas():
+    response = handle_request(
+        Session(), {"id": 9, "method": "mate_types", "params": {}}
+    )
+    assert response["ok"]
+    schemas = response["result"]["mate_types"]
+    assert len(schemas) == 8
+    revolute = next(s for s in schemas if s["type"] == "revolute")
+    assert revolute["label"] == "Revolute"
+    assert revolute["dof_count"] == 1
+    assert revolute["universal_controls"] == [
+        "connector_a",
+        "connector_b",
+        "offset",
+        "flip_primary_axis",
+        "secondary_axis_rotation",
+        "simulation_connection",
+    ]
+    assert revolute["dofs"][0]["name"] == "rotation"
+
+
+def test_mate_types_needs_no_handle():
+    # It is the type catalog, answerable on a fresh session with no rig.
+    response = handle_request(
+        Session(), {"id": 1, "method": "mate_types", "params": {}}
+    )
+    assert response["ok"]
+
+
 # validate_character ----------------------------------------------------------
 
 

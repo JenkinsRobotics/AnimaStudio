@@ -28,8 +28,29 @@ parts:
 joints:
   base_yaw:
     type: revolute
+    id: "Revolute 1"           # stable tracking id, distinct from name
     parent: base
     child: shoulder
+    connectors:                # the two aligned mate connector frames
+      a:
+        part: base
+        origin_m: [0, 0, 0.05]
+        primary_axis: [0, 0, 1]
+        secondary_axis: [1, 0, 0]
+        feature: "base/top_face"
+      b:
+        part: shoulder
+        origin_m: [0, 0, 0]
+        primary_axis: [0, 0, 1]
+        secondary_axis: [1, 0, 0]
+    offset:                    # non-zero as-mated trim (spatial-only)
+      enabled: true
+      translation_m: [0, 0, 0.012]
+      rotate_about: z
+      angle_deg: 1.5
+    flip_primary_axis: false
+    secondary_axis_rotation_deg: 0
+    simulation_connection: true
     dofs:
       rotation:
         limits: { min_deg: -170, max_deg: 170 }
@@ -37,6 +58,7 @@ joints:
         axis: [0, 0, 1]
   shoulder_pitch:
     type: revolute
+    id: "Revolute 2"
     parent: shoulder
     child: upper_arm
     dofs:
@@ -46,6 +68,7 @@ joints:
         axis: [0, 1, 0]
   elbow_pitch:
     type: revolute
+    id: "Revolute 3"
     parent: upper_arm
     child: forearm
     dofs:
@@ -55,6 +78,7 @@ joints:
         axis: [0, 1, 0]
   wrist_pitch:
     type: revolute
+    id: "Revolute 4"
     parent: forearm
     child: wrist_inner
     dofs:
@@ -64,6 +88,7 @@ joints:
         axis: [0, 1, 0]
   wrist_roll:
     type: revolute
+    id: "Revolute 5"
     parent: wrist_inner
     child: wrist_outer
     dofs:
@@ -73,6 +98,7 @@ joints:
         axis: [1, 0, 0]
   wrist_yaw:
     type: revolute
+    id: "Revolute 6"
     parent: wrist_outer
     child: tool_flange
     dofs:

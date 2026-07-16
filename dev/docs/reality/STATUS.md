@@ -21,14 +21,28 @@
   support, an asset-catalog app icon, a launch-level UI-test target, and Xcode
   Canvas previews for the home, complete workspace, and animation timeline.
   `app/Scripts/build-root-app.sh` assembles an ad-hoc-signed development app
-  at the repository root for direct Finder launch. `AnimaModel` defines project
+  at the repository root for direct Finder launch. The root bundle now embeds
+  a signed Python 3.11 helper, AnimaCore source, and PyYAML dependency; the
+  helper inherits the app sandbox and requires no repository path or active
+  virtual environment after the app is assembled. `AnimaModel` defines project
   assets, stable semantic-part IDs, box/cylinder/sphere/locator rig proxies,
   metre positions, XYZ rest rotations in radians, backward-compatible Codable
   rest transforms, joint parent/child connections, optional part-local mate
   connector frames (origin plus primary/secondary axes), connector alignment,
   joint rigs, clips, hold/linear keyframes, and Codable project round-tripping.
-  `AnimaEvaluation` provides deterministic preview evaluation, neutral fallback,
-  time clamping, and joint-limit clamping. The
+  `AnimaEvaluation` still provides the pre-bridge transitional preview evaluator,
+  but new animation meaning belongs in the canonical Python engine rather than
+  this Swift module. A dedicated `AnimaCoreClient` now owns the typed newline-JSON
+  protocol, long-running helper process, handshake, character load/validation,
+  frame evaluation, release, shutdown, engine errors, and channel-index decoding.
+  The Assets ribbon can import a `.character.anima` document, load it through
+  AnimaCore, evaluate its first clip at a deterministic preview time, and pass the
+  returned DOF values into the exact `EvaluatedFrame` consumed by RealityKit.
+  Until the engine exposes `resolve_pose`, Studio presents rotational DOFs as
+  clearly transitional diagnostic proxy parts; it does not infer a second
+  hierarchy, connector frame, or joint axis from the bridge summary. Continuous
+  timeline evaluation, canonical pose resolution, save/open wrapping, scene
+  playback, and hardware output remain subsequent bridge packets. The
   SwiftUI app launches into a Bottango-inspired dark home screen with a working
   New Studio Project action and honestly disabled project-open/templates until
   persistence ships. Its Recent Projects section now uses compact thumbnail
@@ -62,8 +76,17 @@
   joint's typed kind once the typed-mate backend lands. The Python rig model
   carries the same eight-type family (`JointType`, including `parallel`:
   XYZ translation + Z rotation) with per-type DOF templates, optional
-  per-DOF limits, per-joint mate offsets, and gear/rack-and-pinion/
-  screw/linear relations; 732 Python tests pass. Motors, 3D Models & Media, and Events are also
+  per-DOF limits, and gear/rack-and-pinion/screw/linear relations. The
+  mate-authoring model lives in `animacore/mates.py`: every mate exposes
+  one universal `MateControls` set — two flippable connector frames, an
+  as-mated offset, a whole-mate primary-axis flip, a 90°-step
+  secondary-axis reorientation, and a simulation-connection toggle —
+  shared identically across all eight kinds, with only the DOF set
+  differing per kind, plus a stable per-mate `id` distinct from the
+  editable name. Two UI hooks surface it: the `mate_types` bridge verb
+  (static per-kind catalog — label, DOF slots, the shared universal
+  controls) and `describe_mate` (per-instance descriptor carried in the
+  `load_character` joint summary). 811 Python tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
