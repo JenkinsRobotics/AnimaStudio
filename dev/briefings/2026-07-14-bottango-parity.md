@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | UI Dev all-variants comparison board | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevVariantBoardCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevVariantBoardView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevVariantBoardSpecimenView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | preserve existing Template Matrix and labs; add a separate searchable/density-adjustable board; stable family/variant catalog; multiple workspace, panel, inspector, timeline, toolbar, dialog, and status variants visible together; focused/full Swift tests; claimed-file lint; Xcode/root-app build/signature; `git diff --check` | released 2026-07-15 |
 | Codex | Timeline Design B Blender-reference fidelity pass | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBView.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | compact editor chrome; searchable fixed-width channel column; summary lane; frame-number ruler and labeled playhead; dense grid/footer matching supplied reference; focused/full Swift tests; claimed-file lint; Xcode/root-app build/signature; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev Timeline Design B variants | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBModel.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | multiple switchable timeline variants over one state model; multiple addable rows; click-to-create/select keyframes; draggable playhead; motion lines between waypoints; template matrix entry; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 03: material editor | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevMaterialWidgetView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive preview/name/type/color controls; selectable material channels with enablement and values; texture/mix/displacement controls; Node Editor/Assignment/Help feedback; Reference Widgets lab plus matrix entry; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -1076,3 +1077,13 @@ change needed in the Handoff log instead of inventing commands.
   switchable over the same tracks and keys. Ten focused and all 201 Swift tests,
   strict claimed-file format lint, Xcode/root-app build, signature verification,
   and `git diff --check` pass.
+- **2026-07-15 (Codex, UI Dev all-variants comparison board):** Preserved the
+  existing 29-template catalog and all focused labs, then added a separate wide
+  Variant Board based on Jonathan's supplied component-board reference. A typed
+  catalog defines 26 stable specimens across seven families: workspace chrome,
+  docked panels, inspectors, timelines, toolbars/tool rails, dialogs/menus, and
+  status/feedback. The four-column board supports text search, family filtering,
+  50–110% specimen density, and selectable dashed comparison focus; every card
+  names its state and intended production size. Eleven focused and all 202 Swift
+  tests, strict claimed-file format lint, Xcode/root-app build, signature
+  verification, and `git diff --check` pass.

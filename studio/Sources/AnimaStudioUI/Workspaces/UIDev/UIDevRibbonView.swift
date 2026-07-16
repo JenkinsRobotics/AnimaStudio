@@ -18,6 +18,11 @@ struct UIDevRibbonView: View {
             title: "All Templates",
             systemImage: "rectangle.3.group.fill"
           )
+          sectionButton(
+            .variantBoard,
+            title: "Variants",
+            systemImage: "rectangle.grid.3x2.fill"
+          )
           CreationToolButton(
             title: "Agent",
             systemImage: "sparkles",
@@ -117,8 +122,8 @@ struct UIDevRibbonView: View {
 
   private func tint(for section: UIDevSection) -> Color {
     switch section {
-    case .overview, .templateMatrix, .referenceWidgets, .navigator, .inspector, .timeline,
-      .panels, .dialogs, .popovers:
+    case .overview, .templateMatrix, .variantBoard, .referenceWidgets, .navigator, .inspector,
+      .timeline, .panels, .dialogs, .popovers:
       StudioPalette.accent
     case .workspace3D: StudioPalette.semanticPart
     case .buttons, .inputs, .menus: StudioPalette.semanticPart

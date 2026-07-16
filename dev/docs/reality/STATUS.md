@@ -106,8 +106,14 @@
   Projects cards, docked Agent, detached-tool template, and live scaled Mate
   Editor and triad labs alongside Navigator, viewport, timeline, appearance,
   hardware, context-menu, control, and feedback specimens. A stable catalog
-  guarantees every current template ID belongs to one visible section. The
-  ribbon also exposes a dedicated **Reference Widgets** lab for visual patterns
+  guarantees every current template ID belongs to one visible section. A
+  separate **Variant Board** preserves that matrix while adding a wide,
+  component-board comparison of twenty-six states across Workspace Chrome,
+  Docked Panels, Inspectors, Timelines, Toolbars, Dialogs/Menus, and Status.
+  Its search and family filter narrow the visible comparison without mutating
+  the catalog; 50–110% density controls resize the four-column board, and any
+  specimen can be focused with a visible dashed selection outline. The ribbon
+  also exposes a dedicated **Reference Widgets** lab for visual patterns
   being tested before production adoption. Pack 01 implements three interactive
   SwiftUI references: a layered icon list with hierarchy disclosure, selection,
   hover, tags, and trailing state/type icons; a dismissible/restorable

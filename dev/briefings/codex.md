@@ -148,6 +148,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev all-variants board complete:** Preserved the existing
+  29-item Template Matrix, Reference Widgets lab, and every focused editor while
+  adding a separate wide Variant Board modeled on Jonathan's component-board
+  reference. Its typed catalog contains 26 specimens across seven families:
+  workspace chrome, docked panels, inspectors, timelines, toolbars/tool rails,
+  dialogs/menus, and status/feedback. Search and family filters narrow the board;
+  50–110% density controls resize its four-column matrix; selecting a specimen
+  adds a strong dashed comparison outline. All states include intended size,
+  state label, and representative production-density content. Eleven focused
+  tests and all 202 Swift tests, claimed-file strict format lint, native
+  Xcode/root-app build, strict signature verification, and `git diff --check`
+  pass.
+
 - **2026-07-15 — Timeline Design B reference-fidelity pass complete:** Refined
   the UI Dev timeline against Jonathan's compact Blender-style reference while
   preserving Anima's shared theme and the three existing data views. Dopesheet

@@ -45,6 +45,8 @@ struct UIDevWorkspaceView: View {
         selectSection: { selectedSection = $0 },
         showAgentPanel: showAgentPanel
       )
+    } else if selectedSection == .variantBoard {
+      UIDevVariantBoardView()
     } else if selectedSection == .referenceWidgets {
       UIDevReferenceWidgetsView()
     } else if selectedSection == .designKit {
@@ -103,7 +105,7 @@ struct UIDevWorkspaceView: View {
   @ViewBuilder
   private var sectionContent: some View {
     switch selectedSection {
-    case .templateMatrix, .referenceWidgets, .designKit: EmptyView()
+    case .templateMatrix, .variantBoard, .referenceWidgets, .designKit: EmptyView()
     case .navigator, .inspector, .timeline, .workspace3D: EmptyView()
     case .overview: overviewGallery
     case .buttons: buttonGallery

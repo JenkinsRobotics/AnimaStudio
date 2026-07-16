@@ -3,6 +3,7 @@ import Foundation
 enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case overview
   case templateMatrix
+  case variantBoard
   case referenceWidgets
   case designKit
   case navigator
@@ -25,6 +26,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview: "Overview"
     case .templateMatrix: "Template Matrix"
+    case .variantBoard: "Variant Board"
     case .referenceWidgets: "Reference Widgets"
     case .designKit: "Live UI Kit"
     case .navigator: "Navigator Preview"
@@ -47,6 +49,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview: "square.grid.2x2"
     case .templateMatrix: "rectangle.3.group.fill"
+    case .variantBoard: "rectangle.grid.3x2.fill"
     case .referenceWidgets: "square.stack.3d.up"
     case .designKit: "paintbrush.pointed.fill"
     case .navigator: "sidebar.left"
@@ -70,6 +73,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .overview: "The shared interaction and visual rules for every Studio surface."
     case .templateMatrix:
       "Review every current Studio window, panel, inspector, timeline, and control together."
+    case .variantBoard:
+      "Compare related window families and their alternate states on one wide matrix board."
     case .referenceWidgets:
       "Prototype incoming visual references before adopting them in production workspaces."
     case .designKit: "Edit the shared visual tokens and review every production UI family live."
@@ -93,8 +98,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .navigator, .inspector, .timeline, .workspace3D:
       true
-    case .overview, .templateMatrix, .referenceWidgets, .designKit, .buttons, .inputs, .menus,
-      .panels, .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens:
+    case .overview, .templateMatrix, .variantBoard, .referenceWidgets, .designKit, .buttons,
+      .inputs, .menus, .panels, .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens:
       false
     }
   }

@@ -7,9 +7,9 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(
       UIDevSection.allCases,
       [
-        .overview, .templateMatrix, .referenceWidgets, .designKit, .navigator, .inspector,
-        .timeline, .workspace3D, .buttons, .inputs, .menus, .panels, .mateEditor,
-        .triadManipulator, .dialogs, .popovers, .tokens,
+        .overview, .templateMatrix, .variantBoard, .referenceWidgets, .designKit, .navigator,
+        .inspector, .timeline, .workspace3D, .buttons, .inputs, .menus, .panels,
+        .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens,
       ]
     )
 
@@ -25,6 +25,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertTrue(embedded.allSatisfy(\.isEmbeddedWorkspacePreview))
     XCTAssertFalse(UIDevSection.overview.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.templateMatrix.isEmbeddedWorkspacePreview)
+    XCTAssertFalse(UIDevSection.variantBoard.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.referenceWidgets.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.designKit.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.panels.isEmbeddedWorkspacePreview)
@@ -47,6 +48,7 @@ final class UIDevCatalogTests: XCTestCase {
   func testTemplateMatrixCoversEveryCategoryWithStableUniqueTemplates() {
     let templates = UIDevTemplateMatrixCatalog.templates
 
+    XCTAssertEqual(templates.count, 29)
     XCTAssertEqual(Set(templates.map(\.id)).count, templates.count)
     XCTAssertEqual(Set(templates.map(\.id)), Set(UIDevTemplateID.allCases))
     XCTAssertTrue(templates.allSatisfy { !$0.title.isEmpty && !$0.detail.isEmpty })
@@ -54,6 +56,24 @@ final class UIDevCatalogTests: XCTestCase {
 
     for category in UIDevTemplateCategory.allCases {
       XCTAssertFalse(UIDevTemplateMatrixCatalog.templates(in: category).isEmpty)
+    }
+  }
+
+  func testVariantBoardPreservesMultipleStableVariantsPerFamily() {
+    let variants = UIDevVariantBoardCatalog.variants
+
+    XCTAssertEqual(Set(variants.map(\.id)).count, variants.count)
+    XCTAssertEqual(Set(variants.map(\.id)), Set(UIDevWindowVariantID.allCases))
+    XCTAssertEqual(variants.count, 26)
+    XCTAssertTrue(
+      variants.allSatisfy {
+        !$0.title.isEmpty && !$0.detail.isEmpty && !$0.stateLabel.isEmpty
+          && $0.idealWidth > 0 && $0.idealHeight > 0
+      }
+    )
+
+    for family in UIDevVariantFamily.allCases {
+      XCTAssertGreaterThanOrEqual(UIDevVariantBoardCatalog.variants(in: family).count, 3)
     }
   }
 
