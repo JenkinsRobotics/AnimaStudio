@@ -98,8 +98,17 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on a **Live UI Kit** with a resizable Design Inspector beside a
-  production-component catalog. The inspector edits the shared Studio surface
+  UI Dev opens on an **all-surfaces Template Matrix**: twenty-two current app
+  specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
+  Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
+  States. Every specimen is visible together in a responsive board and names
+  its intended production size. The board includes the real reusable Recent
+  Projects cards, docked Agent, detached-tool template, and live scaled Mate
+  Editor and triad labs alongside Navigator, viewport, timeline, appearance,
+  hardware, context-menu, control, and feedback specimens. A stable catalog
+  guarantees every current template ID belongs to one visible section. The
+  separate **Live UI Kit** remains available with a resizable Design Inspector
+  beside a production-component catalog. The inspector edits the shared Studio surface
   and semantic colors, muted/border strength, chrome and ribbon heights, panel
   radius/padding, field and control geometry, and Navigator/Inspector/Agent
   widths. Changes are range-validated, applied immediately through the same
@@ -239,7 +248,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. One hundred seventy tests pass with
+  inspector. One hundred seventy-two tests pass with
   `cd studio && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key

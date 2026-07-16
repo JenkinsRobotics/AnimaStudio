@@ -11,7 +11,7 @@ struct StudioWorkspaceView: View {
   @State private var workspace = StudioWorkspaceModel()
   @State private var isImportingModel = false
   @State private var isUIDevWorkspace = false
-  @State private var uiDevSection = UIDevSection.designKit
+  @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue

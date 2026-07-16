@@ -2,6 +2,7 @@ import Foundation
 
 enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case overview
+  case templateMatrix
   case designKit
   case navigator
   case inspector
@@ -22,6 +23,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .overview: "Overview"
+    case .templateMatrix: "Template Matrix"
     case .designKit: "Live UI Kit"
     case .navigator: "Navigator Preview"
     case .inspector: "Inspector Preview"
@@ -42,6 +44,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .overview: "square.grid.2x2"
+    case .templateMatrix: "rectangle.3.group.fill"
     case .designKit: "paintbrush.pointed.fill"
     case .navigator: "sidebar.left"
     case .inspector: "sidebar.right"
@@ -62,6 +65,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   var purpose: String {
     switch self {
     case .overview: "The shared interaction and visual rules for every Studio surface."
+    case .templateMatrix:
+      "Review every current Studio window, panel, inspector, timeline, and control together."
     case .designKit: "Edit the shared visual tokens and review every production UI family live."
     case .navigator: "Review the real Navigator docked at the left of the production viewport."
     case .inspector: "Review the real Inspector docked at the right of the production viewport."
@@ -83,7 +88,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .navigator, .inspector, .timeline, .workspace3D:
       true
-    case .overview, .designKit, .buttons, .inputs, .menus, .panels, .mateEditor,
+    case .overview, .templateMatrix, .designKit, .buttons, .inputs, .menus, .panels, .mateEditor,
       .triadManipulator, .dialogs, .popovers, .tokens:
       false
     }

@@ -40,7 +40,12 @@ struct UIDevWorkspaceView: View {
 
   @ViewBuilder
   private var workspaceContent: some View {
-    if selectedSection == .designKit {
+    if selectedSection == .templateMatrix {
+      UIDevTemplateMatrixView(
+        selectSection: { selectedSection = $0 },
+        showAgentPanel: showAgentPanel
+      )
+    } else if selectedSection == .designKit {
       UIDevDesignKitView(
         profile: $designProfile,
         selectSurface: { selectedSection = $0 },
@@ -96,7 +101,7 @@ struct UIDevWorkspaceView: View {
   @ViewBuilder
   private var sectionContent: some View {
     switch selectedSection {
-    case .designKit: EmptyView()
+    case .templateMatrix, .designKit: EmptyView()
     case .navigator, .inspector, .timeline, .workspace3D: EmptyView()
     case .overview: overviewGallery
     case .buttons: buttonGallery

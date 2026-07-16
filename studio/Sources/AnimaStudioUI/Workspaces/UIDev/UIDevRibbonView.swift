@@ -11,8 +11,13 @@ struct UIDevRibbonView: View {
           title: "App Surfaces",
           systemImage: "macwindow.on.rectangle",
           tint: StudioPalette.accent,
-          detail: "5 docked · 1 detached"
+          detail: "All templates · 5 docked · 1 detached"
         ) {
+          sectionButton(
+            .templateMatrix,
+            title: "All Templates",
+            systemImage: "rectangle.3.group.fill"
+          )
           CreationToolButton(
             title: "Agent",
             systemImage: "sparkles",
@@ -107,7 +112,8 @@ struct UIDevRibbonView: View {
 
   private func tint(for section: UIDevSection) -> Color {
     switch section {
-    case .overview, .navigator, .inspector, .timeline, .panels, .dialogs, .popovers:
+    case .overview, .templateMatrix, .navigator, .inspector, .timeline, .panels, .dialogs,
+      .popovers:
       StudioPalette.accent
     case .workspace3D: StudioPalette.semanticPart
     case .buttons, .inputs, .menus: StudioPalette.semanticPart

@@ -90,6 +90,21 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev all-surfaces Template Matrix complete:** UI Dev now
+  opens on a responsive specimen board that lays out twenty-two current app
+  templates in seven readable sections. Each card names its ideal production
+  size and shows useful content directly instead of requiring a separate
+  launcher. The board includes the real Recent Projects card, docked Agent,
+  detached utility template, and scaled live Mate/triad labs alongside the
+  Navigator, 3D workspace, timelines, inspectors, panels, dialogs, menus,
+  controls, and feedback states. The editable Live UI Kit and focused labs stay
+  available from the ribbon. Two catalog tests enforce unique, complete
+  template/category coverage; all 172 Swift tests, recursive format lint,
+  Xcode/root-app builds, strict signature verification, and `git diff --check`
+  pass. The rebuilt process launches, but macOS again exposes zero windows to
+  accessibility automation, so the final visual-density pass remains a normal
+  human review in UI Dev → All Templates.
+
 - **2026-07-15 — start-screen Recent Projects gallery complete:** Replaced the
   permanent empty placeholder with compact reusable cards showing a cached
   render (or project-type fallback), project name, real last-opened timestamp,

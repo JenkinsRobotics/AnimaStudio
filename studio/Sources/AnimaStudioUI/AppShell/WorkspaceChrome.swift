@@ -288,18 +288,18 @@ private struct UIDevRibbonTrailingControls: View {
   var body: some View {
     VStack(spacing: 7) {
       Button("Overview", systemImage: "house") {
-        selectedSection = .overview
+        selectedSection = .templateMatrix
       }
       .labelStyle(.iconOnly)
-      .buttonStyle(StudioIconButtonStyle(isSelected: selectedSection == .overview))
-      .help("Return to the UI standards overview")
+      .buttonStyle(StudioIconButtonStyle(isSelected: selectedSection == .templateMatrix))
+      .help("Return to the all-surfaces template matrix")
 
       Button("Reset UI gallery", systemImage: "arrow.counterclockwise") {
-        selectedSection = .overview
+        selectedSection = .templateMatrix
       }
       .labelStyle(.iconOnly)
       .buttonStyle(StudioIconButtonStyle())
-      .help("Reset the UI Dev gallery")
+      .help("Reset the UI Dev gallery to the template matrix")
     }
     .frame(width: 42)
   }
