@@ -62,6 +62,16 @@ struct StudioDocumentBar: View {
         Spacer()
 
         Circle()
+          .fill(animaCoreStatusColor)
+          .frame(width: 7, height: 7)
+        Text(workspace.animaCoreStatusLabel)
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+
+        Divider()
+          .frame(height: 18)
+
+        Circle()
           .fill(Color.secondary)
           .frame(width: 7, height: 7)
         Text("No Driver")
@@ -84,6 +94,15 @@ struct StudioDocumentBar: View {
     .padding(.horizontal, 10)
     .frame(height: StudioMetrics.documentBarHeight)
     .background(StudioPalette.documentChrome)
+  }
+
+  private var animaCoreStatusColor: Color {
+    switch workspace.animaCoreState {
+    case .ready, .loaded: StudioPalette.hardware
+    case .connecting: StudioPalette.accent
+    case .failed: Color.red
+    case .unavailable: Color.secondary
+    }
   }
 }
 
@@ -208,6 +227,7 @@ struct WorkspaceToolBar: View {
   @Binding var isUIDevWorkspace: Bool
   @Binding var uiDevSection: UIDevSection
   let importModel: () -> Void
+  let importAnimaCharacter: () -> Void
   let toggleAgentPanel: () -> Void
 
   var body: some View {
@@ -240,7 +260,11 @@ struct WorkspaceToolBar: View {
           case .rigCreation:
             CreationPaletteView(workspace: workspace)
           case .workspaceTools:
-            WorkspaceRibbonCatalogView(workspace: workspace, importModel: importModel)
+            WorkspaceRibbonCatalogView(
+              workspace: workspace,
+              importModel: importModel,
+              importAnimaCharacter: importAnimaCharacter
+            )
           }
         }
       }

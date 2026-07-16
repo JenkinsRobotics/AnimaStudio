@@ -11,6 +11,7 @@ struct StudioWorkspaceView: View {
 
   @State private var workspace = StudioWorkspaceModel()
   @State private var isImportingModel = false
+  @State private var isImportingAnimaCharacter = false
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
@@ -63,6 +64,7 @@ struct StudioWorkspaceView: View {
         isUIDevWorkspace: $isUIDevWorkspace,
         uiDevSection: $uiDevSection,
         importModel: { isImportingModel = true },
+        importAnimaCharacter: { isImportingAnimaCharacter = true },
         toggleAgentPanel: { showsUIDevAgentPanel.toggle() }
       )
       Divider()
@@ -96,6 +98,22 @@ struct StudioWorkspaceView: View {
         workspace.importErrorMessage = error.localizedDescription
       }
     }
+    .fileImporter(
+      isPresented: $isImportingAnimaCharacter,
+      allowedContentTypes: Self.animaCharacterContentTypes,
+      allowsMultipleSelection: false
+    ) { result in
+      switch result {
+      case .success(let urls):
+        if let url = urls.first {
+          Task { @MainActor in
+            await workspace.importAnimaCharacter(from: url)
+          }
+        }
+      case .failure(let error):
+        workspace.animaCoreErrorMessage = error.localizedDescription
+      }
+    }
     .alert(
       "Could Not Import Model",
       isPresented: Binding(
@@ -107,6 +125,20 @@ struct StudioWorkspaceView: View {
     } message: {
       Text(workspace.importErrorMessage ?? "Unknown model import error")
     }
+    .alert(
+      "AnimaCore Could Not Load the Character",
+      isPresented: Binding(
+        get: { workspace.animaCoreErrorMessage != nil },
+        set: { if !$0 { workspace.animaCoreErrorMessage = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(workspace.animaCoreErrorMessage ?? "Unknown engine error")
+    }
+    .task {
+      await workspace.connectToAnimaCore()
+    }
     .task(id: workspace.isPlaying) {
       guard workspace.isPlaying else { return }
       let clock = ContinuousClock()
@@ -114,6 +146,9 @@ struct StudioWorkspaceView: View {
         try? await clock.sleep(for: .milliseconds(16))
         workspace.advancePlayback(by: 1.0 / 60.0)
       }
+    }
+    .onDisappear {
+      Task { await workspace.shutdownAnimaCore() }
     }
   }
 
@@ -262,6 +297,10 @@ struct StudioWorkspaceView: View {
       viewportTitle
       cameraHUD
 
+      if let engineEvaluationTimeSeconds = workspace.engineEvaluationTimeSeconds {
+        engineFrameBadge(timeSeconds: engineEvaluationTimeSeconds)
+      }
+
       if let matePlacement = workspace.matePlacement {
         MatePlacementOverlay(
           session: matePlacement,
@@ -304,6 +343,30 @@ struct StudioWorkspaceView: View {
     .padding(.vertical, 6)
     .background(.ultraThinMaterial, in: Capsule())
     .padding(.top, 12)
+  }
+
+  private func engineFrameBadge(timeSeconds: Double) -> some View {
+    HStack(spacing: 7) {
+      Image(systemName: "checkmark.seal.fill")
+        .foregroundStyle(StudioPalette.hardware)
+      Text("ANIMACORE FRAME")
+        .font(.caption2.weight(.bold))
+        .tracking(0.8)
+      Text(timeSeconds, format: .number.precision(.fractionLength(3)))
+        .font(.caption.monospacedDigit())
+      Text("s")
+        .font(.caption2)
+        .foregroundStyle(StudioPalette.muted)
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 7)
+    .background(.ultraThinMaterial, in: Capsule())
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+    .padding(.bottom, 16)
+    .allowsHitTesting(false)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("AnimaCore evaluated frame")
+    .accessibilityValue("\(timeSeconds) seconds")
   }
 
   private var cameraHUD: some View {
@@ -533,4 +596,8 @@ struct StudioWorkspaceView: View {
   private static let modelContentTypes: [UTType] = [
     "usd", "usda", "usdc", "usdz", "reality",
   ].compactMap { UTType(filenameExtension: $0) }
+
+  private static let animaCharacterContentTypes: [UTType] = [
+    UTType(filenameExtension: "anima") ?? .data
+  ]
 }

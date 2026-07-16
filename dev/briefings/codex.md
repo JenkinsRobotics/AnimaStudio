@@ -5,7 +5,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
-- [ ] 2026-07-15 (Claude): **AnimaCore is now canonical — bridge work,
+- [x] 2026-07-15 (Claude): **AnimaCore is now canonical — bridge work,
   and STOP extending the Swift engine.** Policy ratified in
   CONVENTIONS + AGENTS: `animacore/` owns all animation *meaning*; the
   app is a front end that calls it. Protocol spec:
@@ -205,6 +205,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — BR1 Swift bridge vertical slice complete:** Added the typed
+  `AnimaCoreClient` package and the long-running newline-JSON process client for
+  hello/load/validate/evaluate/release/shutdown. Assets now imports canonical
+  `.character.anima`; AnimaCore's exact DOF values become the `EvaluatedFrame`
+  consumed by RealityKit. Until `resolve_pose` ships, the UI uses explicit
+  per-rotational-DOF diagnostic proxies and does not invent hierarchy or axis
+  semantics. The root app embeds Python 3.11, `animacore`, and PyYAML; nested
+  signing uses sandbox inheritance and the complete bundle passes strict
+  verification. Five bridge/integration tests plus all 216 existing Swift tests
+  pass. The embedded helper answers a real handshake. Native UI automation was
+  intercepted before test execution by macOS LocalAuthentication, so no product
+  security entitlement was weakened to bypass that host gate.
+
 - **2026-07-15 — Swift app restructure complete:** Renamed the complete native
   application tree from `studio/` to `app/` and updated CI, XcodeGen, packaging,
   contributor instructions, repository maps, and current-truth documentation.
@@ -215,8 +228,8 @@ does the heavy implementation; Codex reviews it and plans what's next.
   `AnimaModel`; viewport/UI targets consume the appropriate layers. All 216
   Swift tests pass, strict format lint is clean, Xcode and packaged app builds
   succeed, the temporary bundle passes strict code-sign verification, and the
-  launch command succeeds. The Python-vs-Swift parity direction remains
-  unchanged pending Jonathan's explicit policy decision.
+  launch command succeeds. The parity-direction note from that checkpoint was
+  subsequently superseded by Jonathan's AnimaCore-canonical policy and BR1.
 
 - **2026-07-15 — folder name confirmed:** `app/` is the clearest replacement
   for `studio/`: `anima_studio/` remains the importable Python engine package,

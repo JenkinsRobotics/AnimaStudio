@@ -29,7 +29,21 @@ xcodebuild \
 
 rm -rf "$staging_app"
 ditto "$source_app" "$staging_app"
+"$app_dir/Scripts/embed-animacore-helper.sh" "$staging_app"
+# Establish signatures for every nested Mach-O first, then give the spawned
+# helper the sandbox-inheritance identity required by macOS. Re-sealing the
+# outer app last preserves the main app's own user-selected-file entitlement.
 codesign --force --deep --sign - "$staging_app"
+codesign \
+  --force \
+  --sign - \
+  --entitlements "$app_dir/App/AnimaCoreHelper.entitlements" \
+  "$staging_app/Contents/Helpers/animacore-python"
+codesign \
+  --force \
+  --sign - \
+  --entitlements "$app_dir/App/AnimaStudio.entitlements" \
+  "$staging_app"
 rm -rf "$destination_app"
 mv "$staging_app" "$destination_app"
 

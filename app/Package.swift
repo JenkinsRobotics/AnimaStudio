@@ -9,6 +9,7 @@ let package = Package(
   ],
   products: [
     .executable(name: "AnimaStudio", targets: ["AnimaStudioApp"]),
+    .library(name: "AnimaCoreClient", targets: ["AnimaCoreClient"]),
     .library(name: "AnimaModel", targets: ["AnimaModel"]),
     .library(name: "AnimaEvaluation", targets: ["AnimaEvaluation"]),
     .library(name: "AnimaDocument", targets: ["AnimaDocument"]),
@@ -17,6 +18,7 @@ let package = Package(
     .library(name: "AnimaStudioUI", targets: ["AnimaStudioUI"]),
   ],
   targets: [
+    .target(name: "AnimaCoreClient"),
     .target(name: "AnimaModel"),
     .target(
       name: "AnimaEvaluation",
@@ -36,13 +38,19 @@ let package = Package(
     ),
     .target(
       name: "AnimaStudioUI",
-      dependencies: ["AnimaModel", "AnimaEvaluation", "RealityKitViewport"]
+      dependencies: [
+        "AnimaCoreClient", "AnimaModel", "AnimaEvaluation", "RealityKitViewport",
+      ]
     ),
     .executableTarget(
       name: "AnimaStudioApp",
       dependencies: ["AnimaStudioUI"],
       path: "App",
-      exclude: ["AnimaStudio.entitlements", "Resources"]
+      exclude: ["AnimaCoreHelper.entitlements", "AnimaStudio.entitlements", "Resources"]
+    ),
+    .testTarget(
+      name: "AnimaCoreClientTests",
+      dependencies: ["AnimaCoreClient"]
     ),
     .testTarget(
       name: "AnimaModelTests",

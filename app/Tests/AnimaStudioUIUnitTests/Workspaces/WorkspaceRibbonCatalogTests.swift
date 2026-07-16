@@ -18,7 +18,7 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
     XCTAssertTrue(groups.flatMap(\.tools).contains { $0.title == "Map Nodes" })
     XCTAssertEqual(
       groups.flatMap(\.tools).filter(\.isImplemented).map(\.title),
-      ["3D Model"]
+      ["Anima Character", "3D Model"]
     )
   }
 

@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkspaceRibbonCatalogView: View {
   @Bindable var workspace: StudioWorkspaceModel
   let importModel: () -> Void
+  let importAnimaCharacter: () -> Void
 
   var body: some View {
     ScrollView(.horizontal) {
@@ -65,6 +66,8 @@ struct WorkspaceRibbonCatalogView: View {
   private func isEnabled(_ tool: WorkspaceRibbonToolDescriptor) -> Bool {
     guard let action = tool.action else { return false }
     return switch action {
+    case .importAnimaCharacter:
+      workspace.animaCoreState != .connecting
     case .importModel:
       !workspace.isLoadingModelHierarchy
     case .frameSelection:
@@ -97,6 +100,8 @@ struct WorkspaceRibbonCatalogView: View {
   private func perform(_ action: WorkspaceRibbonAction?) {
     guard let action else { return }
     switch action {
+    case .importAnimaCharacter:
+      importAnimaCharacter()
     case .importModel:
       importModel()
     case .stopPlayback:

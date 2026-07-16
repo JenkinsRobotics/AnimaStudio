@@ -1,6 +1,7 @@
 import Foundation
 
 enum WorkspaceRibbonAction: String, Sendable {
+  case importAnimaCharacter
   case importModel
   case stopPlayback
   case togglePlayback
@@ -56,6 +57,10 @@ enum WorkspaceRibbonCatalog {
     group(
       "Import", "square.and.arrow.down", .assets,
       [
+        tool(
+          "Anima Character", "figure.stand.line.dotted.figure.stand",
+          "Load and validate a canonical .character.anima file through AnimaCore.",
+          .importAnimaCharacter),
         tool(
           "3D Model", "cube.transparent", "Import a USD, USDZ, or RealityKit model.", .importModel),
         tool("Audio", "waveform", "Import reference or show audio."),

@@ -1,3 +1,4 @@
+import AnimaCoreClient
 import AnimaEvaluation
 import AnimaModel
 import Foundation
@@ -18,6 +19,14 @@ enum NavigatorItem: Hashable {
 @MainActor
 @Observable
 final class StudioWorkspaceModel {
+  enum AnimaCoreState: Equatable, Sendable {
+    case unavailable
+    case connecting
+    case ready(engineVersion: String)
+    case loaded(characterName: String, engineVersion: String)
+    case failed
+  }
+
   var activeWorkspace: StudioWorkspaceKind = .rig
   var workspacePresentations = Dictionary(
     uniqueKeysWithValues: StudioWorkspaceKind.allCases.map {
@@ -51,6 +60,9 @@ final class StudioWorkspaceModel {
   var importedModelHierarchy: ModelHierarchyNode?
   var isLoadingModelHierarchy = false
   var importErrorMessage: String?
+  var animaCoreErrorMessage: String?
+  var animaCoreState: AnimaCoreState = .unavailable
+  var engineEvaluationTimeSeconds: Double?
   var componentGroups: [NavigatorComponentGroup] = []
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
@@ -60,6 +72,10 @@ final class StudioWorkspaceModel {
   var componentInspectorTab = ComponentInspectorTab.properties
   var matePlacement: MatePlacementSession?
   private var storedSelectedFeature: MateConnectorCandidate?
+  @ObservationIgnored private let animaCoreClient: (any AnimaCoreServing)?
+  @ObservationIgnored private var animaCoreHandle: String?
+  @ObservationIgnored private var animaCoreEngineVersion: String?
+  @ObservationIgnored private var engineEvaluation: AnimaCoreEvaluation?
 
   private let evaluator = AnimationEvaluator()
 
@@ -68,9 +84,14 @@ final class StudioWorkspaceModel {
       name: "Untitled Character",
       rig: CharacterRig(joints: []),
       clips: []
-    )
+    ),
+    animaCoreClient: (any AnimaCoreServing)? = nil,
+    resolvesDefaultAnimaCoreClient: Bool = true
   ) {
     self.project = project
+    self.animaCoreClient =
+      animaCoreClient
+      ?? (resolvesDefaultAnimaCoreClient ? (try? AnimaCoreClient()) : nil)
   }
 
   var activeClip: AnimationClip {
@@ -78,7 +99,17 @@ final class StudioWorkspaceModel {
   }
 
   var evaluatedFrame: EvaluatedFrame {
-    evaluator.evaluate(
+    if let engineEvaluation, let engineEvaluationTimeSeconds {
+      return EvaluatedFrame(
+        timeSeconds: engineEvaluationTimeSeconds,
+        jointAnglesRadians: Dictionary(
+          uniqueKeysWithValues: engineEvaluation.degreesOfFreedom.map { path, value in
+            (JointID(rawValue: path), value)
+          }
+        )
+      )
+    }
+    return evaluator.evaluate(
       clip: activeClip,
       rig: project.rig,
       atSeconds: playheadSeconds
@@ -140,6 +171,120 @@ final class StudioWorkspaceModel {
 
   var isRigEmpty: Bool {
     project.rig.parts.isEmpty && project.rig.joints.isEmpty
+  }
+
+  var animaCoreStatusLabel: String {
+    switch animaCoreState {
+    case .unavailable: "Engine unavailable"
+    case .connecting: "Connecting to engine…"
+    case .ready(let version): "AnimaCore \(version)"
+    case .loaded(let characterName, _): "Engine · \(characterName)"
+    case .failed: "Engine error"
+    }
+  }
+
+  var isAnimaCoreReady: Bool {
+    switch animaCoreState {
+    case .ready, .loaded: true
+    case .unavailable, .connecting, .failed: false
+    }
+  }
+
+  func connectToAnimaCore() async {
+    guard let animaCoreClient else {
+      animaCoreState = .unavailable
+      return
+    }
+    guard !isAnimaCoreReady else { return }
+    animaCoreState = .connecting
+    do {
+      let hello = try await animaCoreClient.start()
+      animaCoreEngineVersion = hello.engineVersion
+      animaCoreState = .ready(engineVersion: hello.engineVersion)
+    } catch {
+      animaCoreState = .failed
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  func importAnimaCharacter(from url: URL) async {
+    guard let animaCoreClient else {
+      animaCoreState = .unavailable
+      animaCoreErrorMessage = AnimaCoreClientError.helperNotFound.localizedDescription
+      return
+    }
+    guard url.isFileURL else {
+      animaCoreErrorMessage = "The selected character is not a local file."
+      return
+    }
+
+    let accessedSecurityScope = url.startAccessingSecurityScopedResource()
+    defer {
+      if accessedSecurityScope {
+        url.stopAccessingSecurityScopedResource()
+      }
+    }
+
+    animaCoreState = .connecting
+    animaCoreErrorMessage = nil
+    var pendingHandle: String?
+    do {
+      let text = try String(contentsOf: url, encoding: .utf8)
+      let hello = try await animaCoreClient.start()
+      let loaded = try await animaCoreClient.loadCharacter(text: text)
+      pendingHandle = loaded.handle
+      let clip = loaded.rig.clips.first
+      let evaluationTimeSeconds = min(clip?.durationSeconds ?? 0, 1)
+      let evaluation = try await animaCoreClient.evaluate(
+        handle: loaded.handle,
+        clip: clip?.name,
+        timeSeconds: evaluationTimeSeconds
+      )
+
+      if let previousHandle = animaCoreHandle {
+        try? await animaCoreClient.release(handle: previousHandle)
+      }
+      animaCoreHandle = loaded.handle
+      pendingHandle = nil
+      animaCoreEngineVersion = hello.engineVersion
+      engineEvaluation = evaluation
+      engineEvaluationTimeSeconds = evaluationTimeSeconds
+      project = Self.previewProject(for: loaded.rig)
+      playheadSeconds = evaluationTimeSeconds
+      isPlaying = false
+      selection.removeAll()
+      componentGroups.removeAll()
+      lockedComponentIDs.removeAll()
+      lockedMateIDs.removeAll()
+      componentAppearances.removeAll()
+      importedModelURL = nil
+      importedModelHierarchy = nil
+      cameraViewpoint = .home
+      cameraCommandRevision += 1
+      animaCoreState = .loaded(
+        characterName: loaded.rig.identity.displayName,
+        engineVersion: hello.engineVersion
+      )
+    } catch {
+      if let pendingHandle {
+        try? await animaCoreClient.release(handle: pendingHandle)
+      }
+      animaCoreState = .failed
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  func shutdownAnimaCore() async {
+    guard let animaCoreClient else { return }
+    if let animaCoreHandle {
+      try? await animaCoreClient.release(handle: animaCoreHandle)
+    }
+    await animaCoreClient.shutdown()
+    self.animaCoreHandle = nil
+    animaCoreEngineVersion = nil
+    engineEvaluation = nil
+    engineEvaluationTimeSeconds = nil
+    animaCoreState = .unavailable
   }
 
   var canCreateRevoluteJoint: Bool {
@@ -906,6 +1051,58 @@ final class StudioWorkspaceModel {
     } else {
       playheadSeconds = nextTime
     }
+  }
+
+  /// BR1 presentation adapter: each rotational engine DOF gets a separate
+  /// proxy so RealityKit can visibly consume the exact value returned by the
+  /// bridge. It deliberately does not infer a mechanism hierarchy or axis.
+  /// Canonical per-part transforms arrive with the planned `resolve_pose`
+  /// bridge verb, at which point this diagnostic projection is removed.
+  private static func previewProject(for summary: AnimaCoreRigSummary) -> AnimaProject {
+    let rotationalDegreesOfFreedom = summary.joints.flatMap { joint in
+      joint.degreesOfFreedom
+        .filter { $0.kind == .rotation }
+        .map { (joint, $0) }
+    }
+    let spacingMeters = 0.42
+    let centerOffset = Double(max(rotationalDegreesOfFreedom.count - 1, 0)) / 2
+    let parts = rotationalDegreesOfFreedom.enumerated().map { index, pair in
+      RigPartDefinition(
+        displayName: pair.1.path,
+        primitiveKind: index.isMultiple(of: 2) ? .cylinder : .box,
+        positionMeters: RigVector3(
+          x: (Double(index) - centerOffset) * spacingMeters,
+          y: 0.35,
+          z: 0
+        )
+      )
+    }
+    let joints = zip(rotationalDegreesOfFreedom, parts).map { pair, part in
+      let degreeOfFreedom = pair.1
+      let minimumRadians = degreeOfFreedom.minimum ?? degreeOfFreedom.neutral - 2 * .pi
+      let maximumRadians = degreeOfFreedom.maximum ?? degreeOfFreedom.neutral + 2 * .pi
+      return JointDefinition(
+        id: JointID(rawValue: degreeOfFreedom.path),
+        displayName: pair.0.name,
+        axis: .z,
+        minimumRadians: minimumRadians,
+        maximumRadians: maximumRadians,
+        neutralRadians: degreeOfFreedom.neutral,
+        childPartID: part.id
+      )
+    }
+    let clips = summary.clips.map { clip in
+      AnimationClip(
+        name: clip.name,
+        durationSeconds: clip.durationSeconds,
+        jointTracks: []
+      )
+    }
+    return AnimaProject(
+      name: summary.identity.displayName,
+      rig: CharacterRig(parts: parts, joints: joints),
+      clips: clips
+    )
   }
 
   private func updateActivePresentation(

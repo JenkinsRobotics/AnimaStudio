@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 public struct AnimaStudioRootView: View {
@@ -8,6 +9,9 @@ public struct AnimaStudioRootView: View {
   public init() {
     let profile = StudioDesignPersistence.load()
     StudioDesignRuntime.shared.apply(profile)
+    _hasOpenProject = State(
+      initialValue: ProcessInfo.processInfo.arguments.contains("--open-studio-project")
+    )
     _designProfile = State(initialValue: profile)
     _recentProjects = State(initialValue: RecentProjectsPersistence.load())
   }
