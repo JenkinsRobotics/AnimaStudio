@@ -26,6 +26,7 @@ from animacore.mates import (
     MateConnector,
     MateControls,
     MateOffset,
+    TangentSpec,
 )
 from animacore.rig import (
     Identity,
@@ -477,3 +478,50 @@ def test_resolve_pose_in_capabilities():
     from animacore.bridge import CAPABILITIES
 
     assert "resolve_pose" in CAPABILITIES
+
+
+# Geometry-constraint mates ---------------------------------------------------
+
+
+def test_width_positions_child_rigidly_at_its_connectors():
+    # Width is a 0-DOF geometry-constraint mate: with the app-supplied
+    # midplane connectors it resolves exactly like a 0-DOF rigid mate
+    # (C_A ∘ ALIGN ∘ inverse(C_B)) — the child midplane origin maps onto
+    # the parent midplane origin, the centered/coincidence placement.
+    conn_a = MateConnector(part="frame", origin_m=(0.0, 0.0, 1.0))
+    conn_b = MateConnector(part="tab", origin_m=(0.0, 0.0, 2.0))
+    joint = Joint(
+        name="center",
+        joint_type=JointType.WIDTH,
+        parent_part="frame",
+        child_part="tab",
+        controls=MateControls(conn_a, conn_b),
+    )
+    cip = child_in_parent(joint, {})
+    assert _vclose(cip.apply_point(conn_b.origin_m), conn_a.origin_m)
+
+
+def test_tangent_leaves_child_at_parent_frame():
+    # Tangent is non-driving: no geometry kernel here, so the engine
+    # leaves the child at the parent frame (identity relative).
+    joint = Joint(
+        name="contact",
+        joint_type=JointType.TANGENT,
+        parent_part="cam",
+        child_part="follower",
+        tangent=TangentSpec(selection_a="cam/lobe", selection_b="fol/roller"),
+    )
+    cip = child_in_parent(joint, {})
+    assert _vclose(cip.translation, (0.0, 0.0, 0.0))
+    assert _vclose(cip.rotation, (0.0, 0.0, 0.0, 1.0))
+
+
+def test_resolve_pose_tangent_child_coincides_with_parent():
+    rig = parse_character(
+        (EXAMPLES_DIR / "geometry_mates_demo.character.anima").read_text()
+    )
+    world = resolve_pose(rig, evaluate_pose(rig, "sweep", 0.0))
+    cam = world["cam"]
+    follower = world["follower"]
+    assert _vclose(follower.translation, cam.translation)
+    assert _vclose(follower.rotation, cam.rotation)

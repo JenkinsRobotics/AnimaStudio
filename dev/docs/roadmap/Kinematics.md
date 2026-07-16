@@ -61,6 +61,31 @@ values, same DOF names):
 | planar | translation_x, translation_y, rotation (Z) |
 | ball | rotation_x, rotation_y, rotation_z |
 
+### Mate categories (kinematic vs geometry-constraint)
+
+Mates split into two categories (`mate_type_schema` carries `category`
+and `drivable`; `animacore.mates.mate_category`):
+
+- **Kinematic** (the eight above) — abstract connector frames plus DOF.
+  The engine owns their motion fully: `child_in_parent` resolves them
+  through `C_A ∘ ALIGN ∘ Offset ∘ Motion ∘ inverse(C_B)` (§1a).
+  `drivable: true`.
+- **Geometry-constraint** (`width`, `tangent`) — placement depends on
+  real surface geometry, which lives app-side (RealityKit), not in this
+  abstract engine. The engine **recognizes, round-trips, and catalogs**
+  them but does not compute their geometry. Both are 0-DOF and
+  `drivable: false`.
+  - **`width`** centers a tab between two faces (midplane to midplane),
+    no offset. Once the app supplies the two computed midplane
+    connectors it resolves like a **0-DOF rigid/fastened** mate through
+    the ordinary connector path (`C_A ∘ ALIGN ∘ inverse(C_B)`, no
+    offset, no motion) — the child lands at the centered position.
+  - **`tangent`** keeps two surfaces in contact; no connectors, no
+    offset, geometry-dependent free DOF. **Deferred / non-driving:**
+    there is no geometry kernel here, so `resolve_pose` leaves the
+    child at the parent frame (identity relative) and Studio resolves
+    the actual contact. The engine invents no contact math.
+
 ## 1a. Pose resolution (implemented — `animacore/kinematics.py`)
 
 The forward-kinematics engine that makes every mate actually *move* the

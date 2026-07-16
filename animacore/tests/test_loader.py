@@ -983,3 +983,130 @@ class TestExamplesEndToEnd:
         # 0.1 m over the [0.0, 0.12] m output range.
         assert channels[1] == pytest.approx(0.1 / 0.12, abs=1e-6)
         assert channels[2] == pytest.approx(1.0)  # eye lamp parameter
+
+
+def _geo_doc(joint_entry: dict, joint_name: str = "geo") -> dict:
+    """A minimal 2.0 document carrying one geometry-constraint joint."""
+    return {
+        "anima_version": "2.0",
+        "type": "character",
+        "identity": {"name": "geo"},
+        "parts": {"base": None, "carriage": {"parent": "base"}},
+        "joints": {joint_name: joint_entry},
+    }
+
+
+_WIDTH_JOINT = {
+    "type": "width",
+    "parent": "base",
+    "child": "carriage",
+    "connectors": {"a": {"part": "base"}, "b": {"part": "carriage"}},
+}
+
+_TANGENT_JOINT = {
+    "type": "tangent",
+    "parent": "base",
+    "child": "carriage",
+    "tangent": {
+        "selection_a": "base/face",
+        "selection_b": "carriage/face",
+        "propagation": True,
+    },
+}
+
+
+class TestWidthMateLoading:
+    def test_width_loads_with_connectors_and_no_offset(self):
+        joint = parse(_geo_doc(copy.deepcopy(_WIDTH_JOINT))).joints["geo"]
+        assert joint.joint_type is JointType.WIDTH
+        assert joint.dofs == ()
+        assert joint.tangent is None
+        assert joint.controls.connector_a.part == "base"
+        assert joint.controls.connector_b.part == "carriage"
+        assert joint.controls.offset.enabled is False
+
+    def test_width_id_round_trips(self):
+        entry = copy.deepcopy(_WIDTH_JOINT)
+        entry["id"] = "Width 5"
+        assert parse(_geo_doc(entry)).joints["geo"].id == "Width 5"
+
+    def test_width_rejects_offset(self):
+        entry = copy.deepcopy(_WIDTH_JOINT)
+        entry["offset"] = {"enabled": True, "translation_m": [0.0, 0.0, 0.01]}
+        assert_rejects(_geo_doc(entry), "offset")
+
+    def test_width_rejects_dofs(self):
+        entry = copy.deepcopy(_WIDTH_JOINT)
+        entry["dofs"] = {"rotation": {"neutral_deg": 0}}
+        assert_rejects(_geo_doc(entry), "dofs")
+
+    def test_width_rejects_secondary_axis_rotation(self):
+        entry = copy.deepcopy(_WIDTH_JOINT)
+        entry["secondary_axis_rotation_deg"] = 90
+        assert_rejects(_geo_doc(entry), "secondary_axis_rotation_deg")
+
+    def test_width_allows_flip_and_simulation(self):
+        entry = copy.deepcopy(_WIDTH_JOINT)
+        entry["flip_primary_axis"] = True
+        entry["simulation_connection"] = False
+        controls = parse(_geo_doc(entry)).joints["geo"].controls
+        assert controls.flip_primary_axis is True
+        assert controls.simulation_connection is False
+
+
+class TestTangentMateLoading:
+    def test_tangent_loads_with_tangent_block(self):
+        joint = parse(_geo_doc(copy.deepcopy(_TANGENT_JOINT))).joints["geo"]
+        assert joint.joint_type is JointType.TANGENT
+        assert joint.dofs == ()
+        assert joint.controls is None
+        assert joint.tangent.selection_a == "base/face"
+        assert joint.tangent.selection_b == "carriage/face"
+        assert joint.tangent.propagation is True
+
+    def test_tangent_propagation_defaults_true(self):
+        entry = copy.deepcopy(_TANGENT_JOINT)
+        del entry["tangent"]["propagation"]
+        assert parse(_geo_doc(entry)).joints["geo"].tangent.propagation is True
+
+    def test_tangent_rejects_connectors(self):
+        entry = copy.deepcopy(_TANGENT_JOINT)
+        entry["connectors"] = {"a": {"part": "base"}, "b": {"part": "carriage"}}
+        assert_rejects(_geo_doc(entry), "connectors")
+
+    def test_tangent_rejects_offset(self):
+        entry = copy.deepcopy(_TANGENT_JOINT)
+        entry["offset"] = {"enabled": True}
+        assert_rejects(_geo_doc(entry), "offset")
+
+    def test_tangent_rejects_dofs(self):
+        entry = copy.deepcopy(_TANGENT_JOINT)
+        entry["dofs"] = {"rotation": {"neutral_deg": 0}}
+        assert_rejects(_geo_doc(entry), "dofs")
+
+    def test_tangent_requires_tangent_block(self):
+        entry = copy.deepcopy(_TANGENT_JOINT)
+        del entry["tangent"]
+        assert_rejects(_geo_doc(entry), "tangent")
+
+    def test_tangent_rejects_missing_selection(self):
+        entry = copy.deepcopy(_TANGENT_JOINT)
+        del entry["tangent"]["selection_b"]
+        assert_rejects(_geo_doc(entry), "tangent.selection_b")
+
+
+class TestGeometryConstraintExample:
+    def test_demo_example_loads_and_drives_only_the_revolute(self):
+        rig = load_character_file(
+            EXAMPLES_DIR / "geometry_mates_demo.character.anima"
+        )
+        assert rig.joints["center_tab"].joint_type is JointType.WIDTH
+        assert rig.joints["cam_contact"].joint_type is JointType.TANGENT
+        assert rig.joints["cam_contact"].tangent.selection_a == (
+            "cam/lobe_surface"
+        )
+        # The driven revolute still evaluates; linear -45 -> 45 over 2 s.
+        pose = evaluate_pose(rig, "sweep", 1.0)
+        assert pose.dof_values["aim.rotation"] == pytest.approx(0.0)
+
+

@@ -29,6 +29,7 @@ from animacore.mates import (
     MateOffset,
     RotationAxis,
     SecondaryAxisRotation,
+    TangentSpec,
 )
 from animacore.rig import (
     JOINT_TYPE_DOF_TEMPLATES,
@@ -253,23 +254,6 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
     for name, entry in _mapping(raw, "joints").items():
         path = f"joints.{name}"
         entry = _mapping(entry, path)
-        _reject_unknown_fields(
-            entry,
-            path,
-            {
-                "type",
-                "parent",
-                "child",
-                "dofs",
-                "description",
-                "id",
-                "connectors",
-                "offset",
-                "flip_primary_axis",
-                "secondary_axis_rotation_deg",
-                "simulation_connection",
-            },
-        )
         for required in ("type", "parent", "child"):
             if required not in entry:
                 raise CharacterFormatError(
@@ -284,6 +268,11 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
                 f"unknown joint type {entry['type']!r} "
                 f"(expected one of: {valid})",
             ) from None
+        # The allowed field set is type-specific: geometry-constraint
+        # mates reject the kinematic controls they do not use, so e.g.
+        # an ``offset`` on a width or ``connectors`` on a tangent fails
+        # loudly instead of silently round-tripping.
+        _reject_unknown_fields(entry, path, _joint_allowed_fields(joint_type))
         parent = _string(entry["parent"], f"{path}.parent")
         child = _string(entry["child"], f"{path}.child")
         for field_name, part_name in (("parent", parent), ("child", child)):
@@ -291,6 +280,11 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
                 raise CharacterFormatError(
                     f"{path}.{field_name}", "references an undeclared part"
                 )
+        if joint_type in (JointType.WIDTH, JointType.TANGENT):
+            joints[str(name)] = _parse_geometry_constraint_joint(
+                str(name), joint_type, entry, path, parent, child, parts
+            )
+            continue
         template = JOINT_TYPE_DOF_TEMPLATES[joint_type]
         dofs_raw = _mapping(entry.get("dofs") or {}, f"{path}.dofs")
         if len(dofs_raw) != len(template):
@@ -343,6 +337,170 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
     return joints
+
+
+# Field sets allowed on a joint entry, per type. The eight kinematic
+# mates carry the full universal-control block; geometry-constraint
+# mates (Kinematics.md "Mate categories") carry only the controls their
+# category exposes, so an ``offset`` on a width or ``connectors`` on a
+# tangent is a loud unknown-field error, not a silent round-trip.
+_KINEMATIC_JOINT_FIELDS = {
+    "type",
+    "parent",
+    "child",
+    "dofs",
+    "description",
+    "id",
+    "connectors",
+    "offset",
+    "flip_primary_axis",
+    "secondary_axis_rotation_deg",
+    "simulation_connection",
+}
+_WIDTH_JOINT_FIELDS = {
+    "type",
+    "parent",
+    "child",
+    "description",
+    "id",
+    "connectors",
+    "flip_primary_axis",
+    "simulation_connection",
+}
+_TANGENT_JOINT_FIELDS = {
+    "type",
+    "parent",
+    "child",
+    "description",
+    "id",
+    "tangent",
+}
+
+
+def _joint_allowed_fields(joint_type: JointType) -> set[str]:
+    if joint_type is JointType.WIDTH:
+        return _WIDTH_JOINT_FIELDS
+    if joint_type is JointType.TANGENT:
+        return _TANGENT_JOINT_FIELDS
+    return _KINEMATIC_JOINT_FIELDS
+
+
+def _parse_geometry_constraint_joint(
+    name: str,
+    joint_type: JointType,
+    entry: dict,
+    path: str,
+    parent: str,
+    child: str,
+    parts: dict[str, Part],
+) -> Joint:
+    """A ``width`` or ``tangent`` mate: 0-DOF, geometry app-resolved.
+
+    Width reuses the connector/flip/simulation controls (no offset, no
+    secondary reorientation — both rejected by the width field set);
+    tangent carries a ``tangent`` block of two opaque surface selections
+    and no mate connectors. A ``dofs`` block on either is already an
+    unknown field (the type defines none).
+    """
+    joint_id = _string(entry.get("id", ""), f"{path}.id")
+    description = _string(entry.get("description", ""), f"{path}.description")
+    controls = None
+    tangent = None
+    if joint_type is JointType.WIDTH:
+        controls = _parse_width_controls(entry, path, parts)
+    else:
+        tangent = _parse_tangent_spec(entry.get("tangent"), f"{path}.tangent")
+    try:
+        return Joint(
+            name=name,
+            joint_type=joint_type,
+            parent_part=parent,
+            child_part=child,
+            description=description,
+            id=joint_id,
+            controls=controls,
+            tangent=tangent,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
+
+
+def _parse_width_controls(
+    entry: dict, path: str, parts: dict[str, Part]
+) -> MateControls | None:
+    """A width mate's controls: the two connectors, flip, simulation.
+
+    No offset, no secondary reorientation (Onshape allows none on
+    Width). ``None`` when the entry declares no control field at all.
+    """
+    connector_a = None
+    connector_b = None
+    if "connectors" in entry:
+        connectors = _mapping(entry["connectors"], f"{path}.connectors")
+        _reject_unknown_fields(connectors, f"{path}.connectors", {"a", "b"})
+        connector_a = _parse_connector(
+            connectors.get("a"), f"{path}.connectors.a", parts
+        )
+        connector_b = _parse_connector(
+            connectors.get("b"), f"{path}.connectors.b", parts
+        )
+    has_control = any(
+        key in entry
+        for key in ("connectors", "flip_primary_axis", "simulation_connection")
+    )
+    if not has_control:
+        return None
+    flip = _bool(
+        entry.get("flip_primary_axis", False), f"{path}.flip_primary_axis"
+    )
+    simulation = _bool(
+        entry.get("simulation_connection", True),
+        f"{path}.simulation_connection",
+    )
+    try:
+        return MateControls(
+            connector_a=connector_a,
+            connector_b=connector_b,
+            flip_primary_axis=flip,
+            simulation_connection=simulation,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
+
+
+def _parse_tangent_spec(raw: object, path: str) -> TangentSpec:
+    """A tangent mate's required ``tangent`` block.
+
+    ``selection_a`` / ``selection_b`` are opaque app-side surface
+    identifiers (the engine has no geometry kernel); ``propagation`` is
+    the optional tangent-propagation flag (default ``true``).
+    """
+    if raw is None:
+        raise CharacterFormatError(
+            path,
+            "tangent mate requires a tangent block "
+            "(selection_a, selection_b)",
+        )
+    entry = _mapping(raw, path)
+    _reject_unknown_fields(
+        entry, path, {"selection_a", "selection_b", "propagation"}
+    )
+    for required in ("selection_a", "selection_b"):
+        if required not in entry:
+            raise CharacterFormatError(
+                f"{path}.{required}", "missing required field"
+            )
+    selection_a = _string(entry["selection_a"], f"{path}.selection_a")
+    selection_b = _string(entry["selection_b"], f"{path}.selection_b")
+    propagation = _bool(entry.get("propagation", True), f"{path}.propagation")
+    try:
+        return TangentSpec(
+            selection_a=selection_a,
+            selection_b=selection_b,
+            propagation=propagation,
+        )
+    except ValueError as error:
+        raise CharacterFormatError(path, str(error)) from error
 
 
 # The universal mate controls (Kinematics.md §4) shared by all kinds.

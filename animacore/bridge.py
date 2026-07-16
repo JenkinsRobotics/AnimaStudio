@@ -311,8 +311,10 @@ def _resolve_pose(session: Session, params: dict, request_id: object) -> dict:
 
 def _mate_types(session: Session, params: dict, request_id: object) -> dict:
     # The palette/panel-builder hook: the static per-kind schema for all
-    # eight mate kinds (label, DOF slots, and the shared universal
-    # controls). No rig handle needed — it is the type catalog.
+    # ten mate kinds — the eight kinematic mates plus the two
+    # geometry-constraint mates (width, tangent), each with its
+    # category, drivable flag, DOF slots, and control ids. No rig handle
+    # needed — it is the type catalog.
     return _ok(request_id, {"mate_types": all_mate_type_schemas()})
 
 

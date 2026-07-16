@@ -35,6 +35,33 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (Width + Tangent — geometry-constraint mates): Added the
+  two Onshape mates beyond the 8, **additively** — the 8 kinematic
+  mates' behavior and their `mate_types`/`describe_mate` shapes are
+  unchanged; only a `category` field and the two new types were added
+  (so Codex's in-flight `AnimaCoreClient` decode keeps working). The 8
+  are KINEMATIC (engine owns their motion); `width`/`tangent` are
+  GEOMETRY-CONSTRAINT (geometry lives app-side, RealityKit) — the engine
+  recognizes, round-trips, and catalogs them but does not resolve their
+  geometry. `mate_types` now returns **10** schemas, each with
+  `category` (`kinematic`|`geometry_constraint`) + `drivable`; the
+  geometry pair also carry a `note`. `width` reuses the connector/flip/
+  simulation controls (NO offset, NO secondary reorientation) and, once
+  the app supplies its two midplane connectors, resolves like a 0-DOF
+  fastened at the centered position. `tangent` carries a `tangent`
+  block (`selection_a`/`selection_b`/`propagation`, opaque app-side
+  surface ids) instead of connectors, and is non-driving/deferred (no
+  geometry kernel — `resolve_pose` leaves its child at the parent
+  frame, `# ponytail:`). Loader gives typed pathed errors: width rejects
+  `offset`/`secondary_axis_rotation_deg`/`dofs`; tangent rejects
+  `connectors`/`offset`/`dofs` and requires the `tangent` block. New
+  example `examples/geometry_mates_demo.character.anima` loads
+  end-to-end. 886 tests (+43), ruff clean, no `app/`/`firmware/`
+  touched. **Codex:** the verbatim width + tangent schema JSON, the
+  `category`/`drivable` additions to the kinematic schemas, the
+  `describe_mate` tangent-block shape, and five decisions are in the
+  briefing handoff entry. Left uncommitted for main-session integration.
+
 - 2026-07-15 (BR2 — mate motion resolver / `resolve_pose`): Shipped
   `animacore/kinematics.py` (canonical forward kinematics, stdlib +
   `math` only, no numpy) and the bridge `resolve_pose` verb. Each mate

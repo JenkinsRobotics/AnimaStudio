@@ -158,6 +158,65 @@ The headless runtime computes DOF values and channel projections, not
 spatial part transforms, so it stores connectors and the offset for
 round-trip only; **Studio consumes them spatially.**
 
+### Geometry-constraint mates — `width` and `tangent`
+
+Beyond the eight kinematic mates above there are two **geometry-
+constraint** mates whose placement depends on real surface geometry.
+That geometry lives in the app (RealityKit), not in the abstract
+engine, so the engine recognizes and round-trips them and exposes them
+in the `mate_types` catalog (with `category: geometry_constraint`,
+`drivable: false`), but their geometry is resolved app-side. Both are
+0-DOF — they carry no `dofs` block. See Kinematics.md "Mate categories".
+
+**`width`** — center a tab part symmetrically between two faces of a
+width part (midplane to midplane). Onshape allows **no offset** on it.
+It reuses the connector controls (its two connectors are the app-
+computed midplanes) plus `flip_primary_axis` / `simulation_connection`,
+but **not** `offset` or `secondary_axis_rotation_deg` (both are load
+errors on a width). Once the app supplies the two midplane connectors
+the engine resolves it exactly like a 0-DOF fastened at the centered
+position.
+
+```yaml
+joints:
+  center_tab:
+    type: width
+    id: "Width 1"              # optional stable tracking id
+    parent: frame
+    child: tab
+    connectors:                # the two app-computed midplane frames
+      a: { part: frame }
+      b: { part: tab }
+    flip_primary_axis: false   # optional
+    simulation_connection: true
+    # NO offset, NO secondary_axis_rotation_deg, NO dofs (all rejected)
+```
+
+**`tangent`** — force two surfaces (face/edge/vertex) to stay in
+contact. It uses **no mate connectors** and **no offset**; its free DOF
+are geometry-dependent, and Onshape advises against using it as a
+driving mate. The engine has no geometry kernel, so it is **deferred /
+non-driving**: it round-trips a `tangent` block and, in pose
+resolution, leaves the child at the parent frame (Studio resolves the
+actual contact).
+
+```yaml
+joints:
+  cam_contact:
+    type: tangent
+    id: "Tangent 1"            # optional
+    parent: cam
+    child: follower
+    tangent:                   # required; opaque app-side surface ids
+      selection_a: "cam/lobe_surface"
+      selection_b: "follower/roller_surface"
+      propagation: true        # optional (default true)
+    # NO connectors, NO offset, NO dofs (all rejected)
+```
+
+Worked example: `examples/geometry_mates_demo.character.anima` (a driven
+revolute plus a width and a tangent mate).
+
 ### Relations (K5)
 
 `driven_value = ratio × driver_value + offset`, evaluated after driver

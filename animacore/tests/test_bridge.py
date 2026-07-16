@@ -233,16 +233,19 @@ def test_mate_types_is_a_capability():
     assert "mate_types" in CAPABILITIES
 
 
-def test_mate_types_returns_eight_schemas():
+def test_mate_types_returns_ten_schemas():
     response = handle_request(
         Session(), {"id": 9, "method": "mate_types", "params": {}}
     )
     assert response["ok"]
     schemas = response["result"]["mate_types"]
-    assert len(schemas) == 8
+    # Eight kinematic mates + two geometry-constraint mates.
+    assert len(schemas) == 10
     revolute = next(s for s in schemas if s["type"] == "revolute")
     assert revolute["label"] == "Revolute"
     assert revolute["dof_count"] == 1
+    assert revolute["category"] == "kinematic"
+    assert revolute["drivable"] is True
     assert revolute["universal_controls"] == [
         "connector_a",
         "connector_b",
@@ -252,6 +255,33 @@ def test_mate_types_returns_eight_schemas():
         "simulation_connection",
     ]
     assert revolute["dofs"][0]["name"] == "rotation"
+
+
+def test_mate_types_includes_geometry_constraint_pair():
+    response = handle_request(
+        Session(), {"id": 10, "method": "mate_types", "params": {}}
+    )
+    schemas = response["result"]["mate_types"]
+    width = next(s for s in schemas if s["type"] == "width")
+    tangent = next(s for s in schemas if s["type"] == "tangent")
+    for schema in (width, tangent):
+        assert schema["category"] == "geometry_constraint"
+        assert schema["drivable"] is False
+        assert schema["dof_count"] == 0
+        assert schema["note"]
+    assert "offset" not in width["universal_controls"]
+    assert width["universal_controls"] == [
+        "connector_a",
+        "connector_b",
+        "flip_primary_axis",
+        "simulation_connection",
+    ]
+    assert tangent["universal_controls"] == [
+        "tangent_selection_a",
+        "tangent_selection_b",
+        "tangent_propagation",
+        "simulation_connection",
+    ]
 
 
 def test_mate_types_needs_no_handle():

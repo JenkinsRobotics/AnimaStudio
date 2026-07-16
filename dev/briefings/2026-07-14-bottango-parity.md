@@ -134,7 +134,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Mate motion resolver (resolve_pose): per-mate kinematic motion about/along connectors + FK chain + bridge hook (BR2) | `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/test_kinematics.py`, `dev/docs/roadmap/Studio_Bridge.md`, `dev/docs/roadmap/Kinematics.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-15 (843 suite total, +27; ruff clean; no `app/`/`firmware/` touched; verbatim `resolve_pose` JSON + convention in the handoff entry below) |
 
-| Claude | Width + Tangent mates (geometry-constraint category) + mate `category` in the schema hook | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Kinematics.md`, `examples/**` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` | in progress |
+| Claude | Width + Tangent mates (geometry-constraint category) + mate `category` in the schema hook | `animacore/mates.py`, `animacore/rig.py`, `animacore/loader.py`, `animacore/kinematics.py`, `animacore/bridge.py`, `animacore/tests/{test_mates,test_loader,test_kinematics,test_bridge}.py`, `dev/docs/roadmap/{Character_Format,Kinematics,Studio_Bridge}.md`, `examples/geometry_mates_demo.character.anima` (new), `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,CLAUDE}.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q` (886 passed, +43) | released 2026-07-15 (verbatim width/tangent schema JSON + category/drivable additions in the handoff entry below; no `app/`/`firmware/` touched; ADDITIVE — the 8 kinematic mates' behavior and shape are unchanged) |
 
 ## Requests
 
@@ -189,6 +189,119 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, Width + Tangent mates — geometry-constraint
+  category):** Added the two Onshape mates beyond the 8, **additively**
+  — the eight kinematic mates' behavior and their `mate_types` /
+  `describe_mate` shapes are unchanged; only a `category` field and the
+  two new types were added. Files: `animacore/mates.py` (new
+  `JointType.WIDTH`/`TANGENT`, `MateCategory` StrEnum + `mate_category`
+  helper, `TangentSpec` dataclass, per-type control-id lists, schema
+  `category`/`drivable`/`note`, tangent-aware `describe_mate`),
+  `rig.py` (Joint gains optional `tangent: TangentSpec | None`;
+  geometry-constraint validation), `loader.py` (type-specific field
+  sets + `type: width`/`type: tangent` parse with typed pathed errors),
+  `kinematics.py` (width resolves via the existing 0-DOF connector path;
+  tangent early-returns IDENTITY — `# ponytail:` marks the geometry
+  ceiling), `bridge.py` comment. `examples/geometry_mates_demo.character.anima`
+  loads end-to-end (a driven revolute + a width + a tangent). 886 tests
+  (+43), ruff clean, no `app/`/`firmware/` touched. Left uncommitted.
+
+  **Architecture (confirmed with Jonathan):** the existing 8 are
+  KINEMATIC mates (abstract connector frames + DOF; the engine owns
+  their motion). Width and Tangent are GEOMETRY-CONSTRAINT mates that
+  depend on real surface geometry, which lives in the APP (RealityKit),
+  not the abstract engine. The engine **recognizes, round-trips, and
+  catalogs** them; their geometry is resolved app-side. Width, once the
+  app supplies the two computed midplane connectors, resolves like a
+  0-DOF fastened at the centered position. Tangent is deferred (no
+  geometry kernel) — recognized, round-tripped, marked non-driving.
+
+  **`mate_types` now returns 10** (JointType order: the 8 kinematic,
+  then width, then tangent). **Verbatim width schema JSON:**
+  ```json
+  {
+    "type": "width",
+    "label": "Width",
+    "category": "geometry_constraint",
+    "drivable": false,
+    "dof_count": 0,
+    "universal_controls": ["connector_a", "connector_b",
+                           "flip_primary_axis", "simulation_connection"],
+    "dofs": [],
+    "note": "Geometry-constraint mate: the app selects two faces on a tab part and two faces on a width part and centers the tab symmetrically between them (midplane to midplane). No offset. Once the app supplies the two computed midplane connectors the engine resolves it as a 0-DOF fastened at the centered position."
+  }
+  ```
+  **Verbatim tangent schema JSON:**
+  ```json
+  {
+    "type": "tangent",
+    "label": "Tangent",
+    "category": "geometry_constraint",
+    "drivable": false,
+    "dof_count": 0,
+    "universal_controls": ["tangent_selection_a", "tangent_selection_b",
+                           "tangent_propagation", "simulation_connection"],
+    "dofs": [],
+    "note": "Geometry-constraint mate: forces two surfaces (face/edge/vertex) to stay in contact. No mate connectors, no offset; its free DOF are geometry-dependent. Deferred — the engine has no geometry kernel, so it recognizes and round-trips the mate and marks it non-driving (not for use as a driving mate). Contact is resolved app-side."
+  }
+  ```
+
+  **`category`/`drivable` additions to the kinematic schemas** — every
+  one of the 8 gains exactly these two keys (nothing else changed).
+  Example (revolute):
+  ```json
+  {
+    "type": "revolute", "label": "Revolute",
+    "category": "kinematic", "drivable": true,
+    "dof_count": 1,
+    "universal_controls": ["connector_a", "connector_b", "offset",
+                           "flip_primary_axis", "secondary_axis_rotation",
+                           "simulation_connection"],
+    "dofs": [{"name": "rotation", "kind": "rotation",
+              "unit": "radians", "axis": "z"}]
+  }
+  ```
+  All 8 kinematic schemas: `"category": "kinematic"`, `"drivable": true`,
+  and NO `note` key. Only width/tangent carry `note`.
+
+  **`describe_mate` additions Codex must decode:** every mate now carries
+  a top-level `"category"` (`"kinematic"` | `"geometry_constraint"`).
+  Kinematic mates AND `width` keep the existing `"controls"` block
+  unchanged (width's two connectors are the app-computed midplanes; its
+  offset is inert/default-disabled). `tangent` carries **no** `controls`
+  key — instead `"tangent": {"selection_a": <str>, "selection_b": <str>,
+  "propagation": <bool>}` (opaque app-side surface ids). Both geometry
+  mates have `"dofs": []`.
+
+  **Decisions Codex must know:**
+  1. **Additive only.** No kinematic mate's `universal_controls`, DOF
+     slots, or `describe_mate` shape changed — the Swift
+     `AnimaCoreClient` decode of the 8 keeps working; just add optional
+     `category`/`drivable`/`note` to the schema DTO and a `category`
+     (+ optional `tangent`) to the mate DTO.
+  2. **Width control set** = `[connector_a, connector_b,
+     flip_primary_axis, simulation_connection]` — **no** offset, **no**
+     secondary reorientation (Onshape allows none). The loader REJECTS
+     `offset`, `secondary_axis_rotation_deg`, and `dofs` on a width with
+     a pathed error, and `Joint` rejects a non-zero/enabled offset on a
+     width. The app computes the two midplane connectors and supplies
+     them; the engine then places the child rigidly (coincidence).
+  3. **Tangent control set** = `[tangent_selection_a,
+     tangent_selection_b, tangent_propagation, simulation_connection]` —
+     no connectors, no offset. The loader REJECTS `connectors`,
+     `offset`, `dofs` and REQUIRES a `tangent` block with `selection_a`
+     + `selection_b` (`propagation` optional, default `true`). The two
+     selections are OPAQUE strings the engine never interprets (it has
+     no geometry kernel) — the app owns their meaning.
+  4. **Tangent is non-driving.** `resolve_pose` leaves a tangent child
+     at its parent frame (identity relative). It should NOT be offered
+     as a driving mate in the UI, and it produces no DOF to animate.
+  5. **Width is 0-DOF rigid in FK.** With both connectors present it
+     resolves through the same `C_A ∘ ALIGN ∘ inverse(C_B)` path as a
+     0-DOF fastened (no offset, no motion), so the RealityKit render
+     hook needs no width-specific code — it already positions the child
+     at the centered/coincidence pose.
 
 - **2026-07-15 (Codex, Fastened engine-backed mate inspector):** Added the
   `mate_types` client call and complete typed DTOs for the enriched

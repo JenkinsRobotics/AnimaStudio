@@ -39,15 +39,18 @@ from animacore.mates import (
     DegreeOfFreedom,
     DofKind,
     JointType,
+    MateCategory,
     MateConnector,
     MateControls,
     MateOffset,
     RotationAxis,
     RotationDof,
     SecondaryAxisRotation,
+    TangentSpec,
     TranslationDof,
     all_mate_type_schemas,
     describe_mate,
+    mate_category,
     mate_type_schema,
 )
 from animacore.tracks import Clip, evaluate_clip
@@ -60,15 +63,18 @@ __all__ = [
     "DegreeOfFreedom",
     "DofKind",
     "JointType",
+    "MateCategory",
     "MateConnector",
     "MateControls",
     "MateOffset",
     "RotationAxis",
     "RotationDof",
     "SecondaryAxisRotation",
+    "TangentSpec",
     "TranslationDof",
     "all_mate_type_schemas",
     "describe_mate",
+    "mate_category",
     "mate_type_schema",
     "Part",
     "Joint",
@@ -127,6 +133,14 @@ class Joint:
     connector/offset/flip/orient controls (``MateControls``); the
     as-mated offset lives at ``controls.offset``. The headless runtime
     round-trips connectors and offsets without spatial math.
+
+    Geometry-constraint mates (``width``, ``tangent``) are 0-DOF and
+    app-resolved (``mate_category``). ``width`` reuses ``controls`` (its
+    two connectors are the app-computed midplanes) but carries no
+    offset — Onshape allows none. ``tangent`` uses no mate connectors:
+    it carries ``controls=None`` and a ``tangent`` (``TangentSpec``)
+    block of two opaque surface selections plus a propagation flag,
+    round-tripped for the app.
     """
 
     name: str
@@ -137,6 +151,7 @@ class Joint:
     description: str = ""
     id: str = ""
     controls: MateControls | None = None
+    tangent: TangentSpec | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dofs", tuple(self.dofs))
@@ -163,6 +178,41 @@ class Joint:
         names = [dof.name for dof in self.dofs]
         if len(names) != len(set(names)):
             raise ValueError(f"joint {self.name!r} has duplicate dof names")
+        self._validate_geometry_constraint()
+
+    def _validate_geometry_constraint(self) -> None:
+        """Geometry-constraint invariants (width/tangent are 0-DOF).
+
+        The template-kind check above already forces both to zero DOF.
+        Here: tangent carries a ``tangent`` block and no mate
+        controls/connectors/offset; width reuses ``controls`` but must
+        not set an as-mated offset (Onshape allows none); a kinematic
+        mate must not carry a ``tangent`` block.
+        """
+        if self.joint_type is JointType.TANGENT:
+            if self.controls is not None:
+                raise ValueError(
+                    f"tangent joint {self.name!r} must not carry mate "
+                    f"controls (no connectors/offset — its geometry is "
+                    f"app-resolved)"
+                )
+            return
+        if self.tangent is not None:
+            raise ValueError(
+                f"joint {self.name!r} of type {self.joint_type.value!r} "
+                f"must not carry a tangent block (tangent mates only)"
+            )
+        if self.joint_type is JointType.WIDTH and self.controls is not None:
+            offset = self.controls.offset
+            if (
+                offset.enabled
+                or any(offset.translation_m)
+                or offset.rotation_radians
+            ):
+                raise ValueError(
+                    f"width joint {self.name!r} must not set an as-mated "
+                    f"offset (Onshape allows no offset on Width)"
+                )
 
     def dof_paths(self) -> dict[str, DegreeOfFreedom]:
         """This joint's DOF keyed by ``"<joint_name>.<dof_name>"`` path."""

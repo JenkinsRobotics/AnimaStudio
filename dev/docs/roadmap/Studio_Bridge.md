@@ -60,7 +60,7 @@ line — one error surface, never a second parser.
 | `validate_character` | `{text}` | `{diagnostics:[…]}` (empty = valid) — no handle allocated |
 | `evaluate` | `{handle, clip?, time_s?}` | `{dof_values:{path:native_units}, parameters:{name:0..1}, channels:{channel:0..1}, limit_violations:[{dof_path,value,min,max}]}` |
 | `resolve_pose` | `{handle, clip?, time_s?}` | `{parts:{part_name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — per-part **world** transforms after forward kinematics. **The RealityKit render hook.** Unknown handle → `unknown_handle`. See below. |
-| `mate_types` | `{}` | `{mate_types:[{type,label,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all 8 mate kinds (the palette / panel-builder hook); no handle needed |
+| `mate_types` | `{}` | `{mate_types:[{type,label,category,drivable,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all **10** mate kinds (the palette / panel-builder hook); no handle needed. See categories below. |
 | `release` | `{handle}` | `{}` — drop a loaded rig |
 | `shutdown` | `{}` | `{}` then the helper exits |
 
@@ -91,6 +91,27 @@ the universal control set every kind shares (only the DOF slots differ
 per kind — see `mate_types`). Offset rotation is native radians here,
 like the DOF descriptors. A mate that declared no controls reports
 null connectors and default control values.
+
+**Mate categories (`mate_types` returns 10).** Every schema carries a
+`category` (`"kinematic"` for the eight engine-driven mates,
+`"geometry_constraint"` for `width` and `tangent`) and a `drivable`
+flag (`true` for the eight, `false` for the geometry pair — the engine
+does not drive them; their geometry is app-resolved). The
+geometry-constraint schemas also carry a `note` explaining that and
+advertise their own `universal_controls`:
+
+- **`width`** → `["connector_a","connector_b","flip_primary_axis",
+  "simulation_connection"]` (no offset, no secondary reorientation).
+- **`tangent`** → `["tangent_selection_a","tangent_selection_b",
+  "tangent_propagation","simulation_connection"]` (no connectors, no
+  offset).
+
+`describe_mate` carries `category` on every mate. Kinematic mates and
+`width` keep the `controls` block above (width's two connectors are the
+app-computed midplanes, its offset inert). `tangent` carries no mate
+connectors: instead of `controls` it reports `tangent:{selection_a,
+selection_b, propagation}` (opaque app-side surface ids + a bool). Both
+are 0-DOF (`dofs: []`).
 
 **Pose resolution (`resolve_pose`).** Forward kinematics over the joint
 graph: `evaluate` the frame, then walk parents-before-children giving

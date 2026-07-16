@@ -74,19 +74,29 @@
   Onshape-style menu listing the full eight-mate family with per-kind DOF
   summaries — only implemented kinds are selectable, and it binds to the
   joint's typed kind once the typed-mate backend lands. The Python rig model
-  carries the same eight-type family (`JointType`, including `parallel`:
-  XYZ translation + Z rotation) with per-type DOF templates, optional
-  per-DOF limits, and gear/rack-and-pinion/screw/linear relations. The
-  mate-authoring model lives in `animacore/mates.py`: every mate exposes
-  one universal `MateControls` set — two flippable connector frames, an
-  as-mated offset, a whole-mate primary-axis flip, a 90°-step
-  secondary-axis reorientation, and a simulation-connection toggle —
-  shared identically across all eight kinds, with only the DOF set
-  differing per kind, plus a stable per-mate `id` distinct from the
-  editable name. Two UI hooks surface it: the `mate_types` bridge verb
-  (static per-kind catalog — label, DOF slots, the shared universal
-  controls) and `describe_mate` (per-instance descriptor carried in the
-  `load_character` joint summary). The Swift bridge now mirrors both hooks as
+  carries the same eight-type kinematic family (`JointType`, including
+  `parallel`: XYZ translation + Z rotation) with per-type DOF templates,
+  optional per-DOF limits, and gear/rack-and-pinion/screw/linear
+  relations, plus two 0-DOF **geometry-constraint** mates — `width`
+  (center a tab between two faces, no offset) and `tangent` (keep two
+  surfaces in contact; non-driving, deferred with no geometry kernel).
+  The engine recognizes, round-trips, and catalogs the geometry pair but
+  their geometry is resolved app-side (`mate_category`); `width` resolves
+  like a 0-DOF fastened once the app supplies its two midplane
+  connectors, `tangent` leaves its child at the parent frame. The
+  mate-authoring model lives in `animacore/mates.py`: every kinematic
+  mate exposes one universal `MateControls` set — two flippable
+  connector frames, an as-mated offset, a whole-mate primary-axis flip,
+  a 90°-step secondary-axis reorientation, and a simulation-connection
+  toggle — shared identically across all eight kinds, with only the DOF
+  set differing per kind, plus a stable per-mate `id` distinct from the
+  editable name; `width` reuses that control set minus offset/secondary,
+  and `tangent` carries a two-selection `tangent` block instead of
+  connectors. Two UI hooks surface it: the `mate_types` bridge verb (now
+  ten schemas, each with `category`/`drivable` — static per-kind catalog
+  of label, DOF slots, control ids) and `describe_mate` (per-instance
+  descriptor carried in the `load_character` joint summary, with
+  `category`). The Swift bridge now mirrors both hooks as
   typed DTOs and requests the engine-owned catalog when it connects. Imported
   engine mates are listed in the real Components navigator by their stable
   tracking id, so a zero-DOF Fastened mate remains selectable rather than

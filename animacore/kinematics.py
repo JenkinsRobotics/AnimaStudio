@@ -34,7 +34,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from animacore.mates import JOINT_TYPE_DOF_TEMPLATES, MateOffset
+from animacore.mates import JOINT_TYPE_DOF_TEMPLATES, JointType, MateOffset
 
 Vec3 = tuple[float, float, float]
 Quat = tuple[float, float, float, float]  # (x, y, z, w), w = real part
@@ -298,7 +298,24 @@ def child_in_parent(joint, dof_values) -> Transform:
     No connectors (``controls is None`` or a connector is ``None``):
     motion happens at the part origin, ``Offset ∘ Motion``. Fastened
     with no DOF reduces to the rigid alignment (``Motion == IDENTITY``).
+
+    Geometry-constraint mates (Kinematics.md "Mate categories"):
+    ``WIDTH`` resolves exactly like a 0-DOF rigid mate through the
+    connector path below — its two connectors are the app-computed
+    midplanes, so ``C_A ∘ ALIGN ∘ inverse(C_B)`` places the child at the
+    centered position (no offset, no motion). ``TANGENT`` is
+    non-driving: the engine has no geometry kernel, so it leaves the
+    child at the parent frame and Studio resolves the surface contact.
     """
+    if joint.joint_type is JointType.TANGENT:
+        # ponytail: TANGENT is a geometry-constraint mate whose contact
+        # surfaces live app-side (RealityKit), not in this abstract
+        # engine — there is no geometry kernel here to compute the
+        # contact, and Onshape says don't drive with it. So the engine
+        # does NOT invent contact math: the child sits at the parent
+        # frame (identity relative) and Studio resolves it geometrically.
+        return IDENTITY
+
     controls = joint.controls
     motion = mate_motion(joint, dof_values)
     offset = mate_offset_transform(controls.offset) if controls else IDENTITY

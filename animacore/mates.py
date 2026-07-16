@@ -43,7 +43,16 @@ class DofKind(StrEnum):
 
 
 class JointType(StrEnum):
-    """Typed mates, modeled on Onshape mate connectors."""
+    """Typed mates, modeled on Onshape mate connectors.
+
+    The first eight are *kinematic* mates (abstract connector frames +
+    DOF; the engine owns their motion fully). ``WIDTH`` and ``TANGENT``
+    are *geometry-constraint* mates that depend on real surface geometry
+    — which lives app-side (RealityKit), not in this abstract engine.
+    The engine recognizes and round-trips them and exposes them in the
+    catalog, but their geometry is resolved app-side (see
+    ``MateCategory`` / ``mate_category``).
+    """
 
     FASTENED = "fastened"
     PARALLEL = "parallel"
@@ -53,6 +62,37 @@ class JointType(StrEnum):
     PIN_SLOT = "pin_slot"
     PLANAR = "planar"
     BALL = "ball"
+    # Geometry-constraint mates (app-resolved geometry; see MateCategory).
+    WIDTH = "width"
+    TANGENT = "tangent"
+
+
+class MateCategory(StrEnum):
+    """How a mate's spatial resolution is owned.
+
+    ``KINEMATIC`` — the eight Onshape-style mates: abstract connector
+    frames plus DOF, resolved entirely by the engine's forward
+    kinematics. ``GEOMETRY_CONSTRAINT`` — ``width`` and ``tangent``:
+    their placement depends on real surface geometry, which lives in the
+    app (RealityKit), so the engine recognizes and round-trips them but
+    the geometry is resolved app-side.
+    """
+
+    KINEMATIC = "kinematic"
+    GEOMETRY_CONSTRAINT = "geometry_constraint"
+
+
+# The geometry-constraint mates — everything else is kinematic.
+_GEOMETRY_CONSTRAINT_TYPES: frozenset[JointType] = frozenset(
+    {JointType.WIDTH, JointType.TANGENT}
+)
+
+
+def mate_category(joint_type: JointType) -> MateCategory:
+    """The category a mate kind belongs to (kinematic vs geometry)."""
+    if joint_type in _GEOMETRY_CONSTRAINT_TYPES:
+        return MateCategory.GEOMETRY_CONSTRAINT
+    return MateCategory.KINEMATIC
 
 
 # Operator-facing label per kind (the UI catalog name; ``prismatic`` is
@@ -66,6 +106,8 @@ JOINT_TYPE_LABELS: dict[JointType, str] = {
     JointType.PIN_SLOT: "Pin Slot",
     JointType.PLANAR: "Planar",
     JointType.BALL: "Ball",
+    JointType.WIDTH: "Width",
+    JointType.TANGENT: "Tangent",
 }
 
 
@@ -108,6 +150,11 @@ JOINT_TYPE_DOF_TEMPLATES: dict[JointType, tuple[tuple[str, DofKind, str], ...]] 
         ("rotation_y", DofKind.ROTATION, "y"),
         ("rotation_z", DofKind.ROTATION, "z"),
     ),
+    # Geometry-constraint mates expose no engine-drivable DOF: WIDTH
+    # resolves to a centered 0-DOF fastened once the app supplies the
+    # two midplane connectors; TANGENT's contact is app-resolved.
+    JointType.WIDTH: (),
+    JointType.TANGENT: (),
 }
 
 
@@ -405,7 +452,9 @@ class MateControls:
 
 
 # The shared control ids, in panel order — the one universal-controls
-# list the static schema advertises and the UI builds its hook from.
+# list the kinematic static schema advertises and the UI builds its hook
+# from. (Geometry-constraint mates advertise their own reduced/distinct
+# control lists — see ``_TYPE_CONTROL_IDS``.)
 UNIVERSAL_CONTROL_IDS: tuple[str, ...] = (
     "connector_a",
     "connector_b",
@@ -414,6 +463,79 @@ UNIVERSAL_CONTROL_IDS: tuple[str, ...] = (
     "secondary_axis_rotation",
     "simulation_connection",
 )
+
+
+# The control ids each geometry-constraint mate exposes. WIDTH keeps the
+# two (app-computed midplane) connectors, the whole-mate flip, and the
+# simulation toggle — but NO offset and NO secondary reorientation
+# (Onshape allows no offset on Width). TANGENT uses no mate connectors
+# and no offset; it carries two opaque surface selections plus a
+# propagation flag.
+_WIDTH_CONTROL_IDS: tuple[str, ...] = (
+    "connector_a",
+    "connector_b",
+    "flip_primary_axis",
+    "simulation_connection",
+)
+_TANGENT_CONTROL_IDS: tuple[str, ...] = (
+    "tangent_selection_a",
+    "tangent_selection_b",
+    "tangent_propagation",
+    "simulation_connection",
+)
+
+
+def _type_control_ids(joint_type: JointType) -> tuple[str, ...]:
+    """The control ids a mate kind exposes (kind-specific for geometry)."""
+    if joint_type is JointType.WIDTH:
+        return _WIDTH_CONTROL_IDS
+    if joint_type is JointType.TANGENT:
+        return _TANGENT_CONTROL_IDS
+    return UNIVERSAL_CONTROL_IDS
+
+
+# The app-resolved-geometry note the two geometry-constraint schemas
+# carry so a UI reader knows the engine does not drive them.
+_GEOMETRY_CONSTRAINT_NOTES: dict[JointType, str] = {
+    JointType.WIDTH: (
+        "Geometry-constraint mate: the app selects two faces on a tab "
+        "part and two faces on a width part and centers the tab "
+        "symmetrically between them (midplane to midplane). No offset. "
+        "Once the app supplies the two computed midplane connectors the "
+        "engine resolves it as a 0-DOF fastened at the centered position."
+    ),
+    JointType.TANGENT: (
+        "Geometry-constraint mate: forces two surfaces (face/edge/vertex) "
+        "to stay in contact. No mate connectors, no offset; its free DOF "
+        "are geometry-dependent. Deferred — the engine has no geometry "
+        "kernel, so it recognizes and round-trips the mate and marks it "
+        "non-driving (not for use as a driving mate). Contact is resolved "
+        "app-side."
+    ),
+}
+
+
+@dataclass(frozen=True)
+class TangentSpec:
+    """A tangent mate's two contacting surface selections (round-trip).
+
+    ``selection_a`` / ``selection_b`` are opaque app-side surface
+    identifiers (face/edge/vertex on the two parts) the engine never
+    interprets — it has no geometry kernel. ``propagation`` mirrors
+    Onshape's tangent-propagation option (extend contact across tangent-
+    connected faces). Carried for round-trip only; contact is resolved
+    app-side.
+    """
+
+    selection_a: str
+    selection_b: str
+    propagation: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.selection_a:
+            raise ValueError("tangent selection_a must not be empty")
+        if not self.selection_b:
+            raise ValueError("tangent selection_b must not be empty")
 
 
 # UI hooks --------------------------------------------------------------------
@@ -429,20 +551,35 @@ def _dof_slots(joint_type: JointType) -> list[dict]:
 def mate_type_schema(joint_type: JointType) -> dict:
     """The static per-kind descriptor the palette/panel-builder reads.
 
-    ``universal_controls`` is the same shared id list for every kind;
-    only ``dofs`` (the type's DOF template) and ``dof_count`` vary.
+    Every schema carries a ``category`` (``kinematic`` for the eight
+    engine-driven mates, ``geometry_constraint`` for width/tangent) and
+    a ``drivable`` flag (true for the eight, false for the geometry pair
+    — the engine does not drive them). ``universal_controls`` is the id
+    list *this kind* exposes: the shared six for kinematic kinds, a
+    reduced/distinct list for width/tangent. Geometry-constraint kinds
+    also carry a ``note`` explaining the geometry is app-resolved.
     """
-    return {
+    category = mate_category(joint_type)
+    schema = {
         "type": joint_type.value,
         "label": JOINT_TYPE_LABELS[joint_type],
+        "category": category.value,
+        "drivable": category is MateCategory.KINEMATIC,
         "dof_count": len(JOINT_TYPE_DOF_TEMPLATES[joint_type]),
-        "universal_controls": list(UNIVERSAL_CONTROL_IDS),
+        "universal_controls": list(_type_control_ids(joint_type)),
         "dofs": _dof_slots(joint_type),
     }
+    if joint_type in _GEOMETRY_CONSTRAINT_NOTES:
+        schema["note"] = _GEOMETRY_CONSTRAINT_NOTES[joint_type]
+    return schema
 
 
 def all_mate_type_schemas() -> list[dict]:
-    """Every kind's static schema, in ``JointType`` order (the palette)."""
+    """Every kind's static schema, in ``JointType`` order (the palette).
+
+    Ten schemas: the eight kinematic mates then the two
+    geometry-constraint mates (width, tangent).
+    """
     return [mate_type_schema(joint_type) for joint_type in JointType]
 
 
@@ -486,20 +623,36 @@ def controls_dict(controls: MateControls | None) -> dict:
     }
 
 
+def _tangent_dict(spec: TangentSpec | None) -> dict:
+    """A ``TangentSpec`` (or empty default when absent) as plain JSON."""
+    if spec is None:
+        return {"selection_a": "", "selection_b": "", "propagation": True}
+    return {
+        "selection_a": spec.selection_a,
+        "selection_b": spec.selection_b,
+        "propagation": spec.propagation,
+    }
+
+
 def describe_mate(joint: Joint) -> dict:
     """The per-instance descriptor the bridge surfaces for one mate.
 
     THE consistent per-mate hook: a mate's stable ``id`` (distinct from
-    the editable ``name``), its parts, the current value of every
-    universal control, and its DOF paths + limits in native units.
+    the editable ``name``), its ``category``, parts, DOF paths + limits
+    in native units, and its controls. Kinematic mates and ``width``
+    carry a ``controls`` block (the connector/offset/flip/simulation
+    universal controls — width's two connectors are the app-computed
+    midplanes, its offset inert). ``tangent`` carries no mate connectors;
+    it reports a distinct ``tangent`` block ``{selection_a, selection_b,
+    propagation}`` instead.
     """
-    return {
+    described = {
         "id": joint.id,
         "name": joint.name,
         "type": joint.joint_type.value,
+        "category": mate_category(joint.joint_type).value,
         "parent_part": joint.parent_part,
         "child_part": joint.child_part,
-        "controls": controls_dict(joint.controls),
         "dofs": [
             {
                 "path": f"{joint.name}.{dof.name}",
@@ -513,3 +666,8 @@ def describe_mate(joint: Joint) -> dict:
             for dof, axis in zip(joint.dofs, _template_axes(joint.joint_type))
         ],
     }
+    if joint.joint_type is JointType.TANGENT:
+        described["tangent"] = _tangent_dict(getattr(joint, "tangent", None))
+    else:
+        described["controls"] = controls_dict(joint.controls)
+    return described
