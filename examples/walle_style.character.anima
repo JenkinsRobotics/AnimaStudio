@@ -2,7 +2,7 @@
 # layer: a revolute neck lift, a prismatic neck extension (meters in
 # the file and the model), and two eye-lamp parameters standing in for
 # the digital-face/LED use of generic 0..1 parameters. Loaded by
-# anima_core/tests/test_loader.py; spec in
+# animacore/tests/test_loader.py; spec in
 # dev/docs/roadmap/Character_Format.md.
 
 anima_version: "2.0"

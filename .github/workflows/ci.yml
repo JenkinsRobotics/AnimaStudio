@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build and test Anima Studio
-        working-directory: studio
+        working-directory: app
         run: swift test
 
   python-test:
@@ -34,4 +34,4 @@ jobs:
         run: ruff check .
 
       - name: Test
-        run: pytest anima_core/tests -q
+        run: pytest animacore/tests -q

@@ -3,7 +3,7 @@
 > File extension: `.character.anima`  
 > Format: YAML  
 > Version: 2.0 — the mechanism-rig format the Python runtime loads
-> (`anima_core/loader.py` is the reference implementation). The 1.0
+> (`animacore/loader.py` is the reference implementation). The 1.0
 > draft below it is kept for the expressive-face/voice sections that
 > have not been redesigned yet; its `bones`, `blend_shapes`, and
 > `physical` sections are superseded and rejected by the 2.0 loader.

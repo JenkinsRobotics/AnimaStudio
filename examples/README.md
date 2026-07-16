@@ -2,7 +2,7 @@
 
 Hand-written character files that exercise the mechanism rig format
 (`dev/docs/roadmap/Character_Format.md`). Every file here must load
-through `anima_core.loader` — the test suite iterates them
+through `animacore.loader` — the test suite iterates them
 end-to-end (load → evaluate → project channels → simulated device).
 
 | File | What it exercises |

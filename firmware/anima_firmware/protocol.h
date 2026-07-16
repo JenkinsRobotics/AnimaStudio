@@ -1,6 +1,6 @@
 // Anima Wire Protocol v0 — device-side state machine (core-agnostic).
 // Normative contract: dev/docs/roadmap/Wire_Protocol.md.
-// Reference semantics: anima_core/sim.py (the Python simulator); this
+// Reference semantics: animacore/sim.py (the Python simulator); this
 // implementation mirrors it, including error codes and message tokens.
 #pragma once
 

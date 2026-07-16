@@ -37,7 +37,7 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 - 2026-07-15 (AnimaCore restructure, Python half): Per Jonathan, the
   engine owns the name AnimaCore. Renamed `anima_studio/` →
-  `anima_core/` (package/import `anima_core`, distribution `anima-core`),
+  `animacore/` (package/import `animacore`, distribution `animacore`),
   updated pyproject/CI/firmware comments/all contract+current-truth
   docs; `pip install -e .` and 732 tests green. Swift half (studio/ →
   app/, split AnimaCore → AnimaModel + AnimaEvaluation) speced in

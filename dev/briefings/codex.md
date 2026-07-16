@@ -8,7 +8,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
 - [ ] 2026-07-15 (Jonathan, via Claude): **Swift half of the AnimaCore
   restructure — your lane, do when at a clean commit.** Design settled
   with Jonathan: the **engine** owns the name AnimaCore. I've done the
-  Python half — `anima_studio/` → `anima_core/` (package `anima_core`,
+  Python half — `anima_studio/` → `animacore/` (package `animacore`,
   `pip install -e .`, 732 tests green, all docs/CI/firmware updated).
   Your two moves, ideally one restructure commit each:
   1. **`studio/` → `app/`** — updates `project.yml`, `Package.swift`
@@ -24,7 +24,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
      viewport targets to the right one, the ownership table in
      AGENTS.md, and STATUS.md. There must be exactly one "AnimaCore"
      in the repo when done: the engine.
-  End state: `anima_core/` (engine) · `app/` (Mac app, Sources =
+  End state: `animacore/` (engine) · `app/` (Mac app, Sources =
   AnimaModel + AnimaEvaluation + AnimaDocument + AnimaStudioUI + …) ·
   `firmware/`. Confirm the two Swift module names or propose better.
 

@@ -27,11 +27,11 @@ The current goal is Bottango-level capability, working straight down
 [`dev/docs/roadmap/Bottango_Parity.md`](dev/docs/roadmap/Bottango_Parity.md).
 
 - **Claude Code — backend** (per Jonathan, 2026-07-14, superseding the
-  earlier all-implementation split): the Python runtime
-  (`anima_core/`), the wire protocol and its simulator, `.anima`
+  earlier all-implementation split): the Python AnimaCore engine
+  (`animacore/`), the wire protocol and its simulator, `.anima`
   loading/execution, and the microcontroller firmware
   (`firmware/`, when it exists).
-- **Codex — Swift app GUI** (`studio/`), plus planning + review across
+- **Codex — Swift app GUI** (`app/`), plus planning + review across
   both lanes: reviews commits/diffs, sequences the next checklist
   slices, assigns tasks.
 - Planning is teamwork — either agent may propose; disagreements get a
@@ -60,7 +60,9 @@ IN before working, write your OUT before stopping.**
 
 ## Non-negotiable boundaries
 
-- `AnimaCore` is renderer-, UI-, AI-, and hardware-independent.
+- AnimaCore's model and evaluation layers are renderer-, UI-, AI-, and
+  hardware-independent. The engine also hosts transport modules today; those
+  consume evaluated targets and must not define animation semantics.
 - RealityKit displays evaluated state; it does not define timeline or rig
   semantics.
 - Hardware adapters consume evaluated targets; vendor channel details do not
@@ -76,7 +78,8 @@ IN before working, write your OUT before stopping.**
 
 | Target | Owns | Must not own |
 |---|---|---|
-| `AnimaCore` | rigs, joints, clips, keyframes, curves, evaluation, validation | SwiftUI, RealityKit, file dialogs, hardware SDKs |
+| `AnimaModel` | Swift in-memory projection of rigs, joints, clips, keyframes, projects, validation | evaluation, SwiftUI, RealityKit, file dialogs, hardware SDKs |
+| `AnimaEvaluation` | Swift preview evaluation, curves, evaluated frames, mate transform math | SwiftUI, RealityKit, file dialogs, hardware SDKs |
 | `AnimaDocument` | versioned project-package encoding, migrations, project-relative asset storage and resolution | SwiftUI views, RealityKit, timeline evaluation, hardware SDKs |
 | `AnimaViewport` | renderer-neutral preview contracts | concrete renderer behavior |
 | `RealityKitViewport` | model loading/display, camera, selection, joint gizmos | persisted format semantics, hardware mapping |
@@ -131,14 +134,14 @@ themselves. A commit without a handoff entry is incomplete multi-agent work.
 
 ## Verification
 
-Swift package (Studio), from `studio/`:
+Swift package (Studio), from `app/`:
 
 ```bash
 swift format lint --recursive App AppUITests Sources Tests Package.swift
 swift test
 ```
 
-Native Xcode app, from `studio/`:
+Native Xcode app, from `app/`:
 
 ```bash
 xcodegen generate
@@ -147,11 +150,11 @@ xcodebuild -project AnimaStudio.xcodeproj -scheme AnimaStudio \
 ./Scripts/build-root-app.sh
 ```
 
-Python (Runtime), from the repo root:
+Python (AnimaCore engine), from the repo root:
 
 ```bash
 .venv/bin/ruff check .
-.venv/bin/pytest anima_core/tests
+.venv/bin/pytest animacore/tests
 ```
 
 For a user-facing workspace change, also launch the native app target (or the

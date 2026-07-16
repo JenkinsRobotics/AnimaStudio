@@ -6,7 +6,7 @@ robot. Feature map and milestones: `dev/docs/roadmap/Bottango_Parity.md`.
 
 ## Work split
 
-### Lane A — Studio — Swift, `studio/` — **Codex**
+### Lane A — Studio — Swift, `app/` — **Codex**
 
 Per Jonathan (2026-07-14, latest): Codex owns the Swift app GUI side.
 Claude is backend-only. Codex also keeps planning + cross-lane review.
@@ -25,12 +25,12 @@ When `AnimationOutput` exists, its serial implementation must emit the
 wire protocol in `dev/docs/roadmap/Wire_Protocol.md` — flag any protocol
 change needed in the Handoff log instead of inventing commands.
 
-### Lane B — Runtime + protocol (Claude Code agent) — Python, `anima_studio/`, later `firmware/`
+### Lane B — AnimaCore engine + protocol (Claude Code agent) — Python, `animacore/`, later `firmware/`
 
 1. Wire protocol v0 spec (`dev/docs/roadmap/Wire_Protocol.md`) — the
    host↔microcontroller serial contract (the Bottango-firmware
    equivalent, but ours and open).
-2. Python reference host: `anima_studio/wire.py` (protocol encode/decode,
+2. Python reference host: `animacore/wire.py` (protocol encode/decode,
    handshake, heartbeat) + a loopback simulator + pytest coverage.
 3. Keyframe/curve evaluation in Python mirroring AnimaCore semantics
    (hold/linear now, Bézier when Studio lands it) so the runtime can play
@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Swift app half of AnimaCore repository restructure | `studio/**` → `app/**`, `.github/workflows/**`, `.gitignore`, `AGENTS.md`, `CONVENTIONS.md`, `README.md`, `dev/docs/reality/STATUS.md`, `dev/docs/roadmap/Studio_App.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | root contains `animacore/`, `app/`, and `firmware/` with no `studio/`; Swift `AnimaModel` owns data/validation and `AnimaEvaluation` owns evaluation; no Swift `AnimaCore` target/import remains; format lint, full Swift tests, Xcode build, root-app build/signature, `git diff --check` | active 2026-07-15 |
 | Codex | CAD viewport pointer + navigation refinement | `studio/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,SubObjectSelection,RobotPreviewView}.swift`, `studio/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceView,ComponentContextActions}.swift`, `studio/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, `studio/Tests/RealityKitViewportTests/{CADNavigationTests,SubObjectSelectionTests}.swift`, `studio/Tests/AnimaStudioUIUnitTests/{Components/ViewportRenderMenuTests.swift,Workspaces/Rig/ComponentViewportContextMenuTests.swift}`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | persistent orbit/pan/zoom speed settings with slower default zoom; right-drag orbit; body/feature hover and left-click selection with empty-click deselection; pointer-targeted compact empty-space menu vs full selected-component menu; focused/full tests; claimed-file lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 06: icon selector + theme lab | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevIconThemeSelectorView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | reusable hover/select icon dock; themed context menu preview; isolated Light, Dark, Graphite, Midnight, and Neon palette specs; responsive Theme Lab and Template Matrix entry; honest preview-only boundary before app-wide adoption; focused/full tests; claimed-file lint; root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | FANUC-style structured logic node concepts | `studio/Sources/AnimaStudioUI/Workspaces/Nodes/**`, `studio/Sources/AnimaStudioUI/Workspaces/WorkspaceRibbonCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Nodes/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/WorkspaceRibbonCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | visual IF/ELSE, IF guard, SELECT, CALL, WAIT UNTIL, boolean, I/O/register/flag/position-register, background-monitor, and end-scene nodes; typed ports and manual-syntax properties; JMP/LBL visible only as explicitly unsupported import references so the structured/reducible graph contract stays truthful; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -172,8 +173,8 @@ change needed in the Handoff log instead of inventing commands.
 ## Handoff log
 
 - **2026-07-15 (Claude, AnimaCore restructure — Python half):** Engine
-  now owns the name AnimaCore. `anima_studio/` → `anima_core/`
-  (import + package `anima_core`, distribution `anima-core`);
+  now owns the name AnimaCore. `anima_studio/` → `animacore/`
+  (import + package `animacore`, distribution `animacore`);
   pyproject, CI, firmware comments, and every contract/current-truth
   doc updated; `pip install -e .` re-runs clean, 732 tests pass, ruff
   clean. Swift half (studio/→app/, AnimaCore→AnimaModel+AnimaEvaluation)

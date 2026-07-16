@@ -43,14 +43,14 @@ is a small native stack:
 | Responsibility | Planned technology | Owns |
 |---|---|---|
 | macOS application shell | SwiftUI with AppKit where needed | Windows, panels, commands, documents, inspectors |
-| Anima animation engine | Pure Swift (`AnimaCore`) | Timeline time, curves, clips, blending, state machines, constraints, evaluated frames |
+| App-side animation projection | Pure Swift (`AnimaModel` + `AnimaEvaluation`) | Typed project/rig/clip data plus deterministic preview evaluation conforming to AnimaCore contracts |
 | 3D viewport engine | RealityKit | Model rendering, camera, lights, materials, skeletal pose display, selection/hit testing |
 | GPU layer | Metal, normally through RealityKit | Actual GPU drawing; custom overlays and render passes only when needed |
 | 2D character renderer | Live2D Cubism SDK for Native + Metal adapter | Cubism model loading, parameters, deformation, and drawing |
 | Runtime/hardware bridge | JaegerOS client adapter | Preview commands, telemetry, and live target output |
 
 RealityKit renders the 3D model, but it does **not** define Anima's animation
-semantics. `AnimaCore` evaluates the timeline into a renderer-neutral
+semantics. `AnimaEvaluation` evaluates the timeline into a renderer-neutral
 `EvaluatedFrame`; viewport and output adapters consume that frame. This keeps
 scrubbing, offline export, runtime playback, and physical output consistent.
 
@@ -58,7 +58,7 @@ scrubbing, offline export, runtime playback, and physical output consistent.
 .character.anima + .scene.anima
                │
                ▼
-        AnimaCore evaluator
+        AnimaEvaluation preview evaluator
    time · curves · blend · constraints
                │
                ▼
@@ -74,7 +74,7 @@ scrubbing, offline export, runtime playback, and physical output consistent.
 
 For the first 3D viewport, Studio imports a USD/USDZ asset and builds a mapping
 from Anima joint IDs to the asset's skeleton joint names. RealityKit draws the
-mesh and applies skeletal poses. `AnimaCore` supplies the desired local joint
+mesh and applies skeletal poses. `AnimaEvaluation` supplies the desired local joint
 transforms in radians/metres, and the RealityKit adapter converts those values
 to the model skeleton.
 
@@ -237,7 +237,7 @@ placement; durable rig meaning lives in explicit semantic connector transforms.
 
 Joint editing overlays—axes, limits, pivots, selection outlines, motion trails,
 and constraint warnings—belong to the viewport adapter. Joint definitions,
-limits, units, and animation values belong to `AnimaCore` and the `.anima`
+limits, units, and animation values belong to `AnimaModel` and the `.anima`
 document model.
 
 ### Mate connectors and DOF handles
@@ -246,7 +246,7 @@ The Rig workspace visualizes each typed joint through a mate-connector frame,
 inspired by Onshape's compact assembly relationship model rather than a stack
 of unrelated constraints. The connector establishes an origin and local X/Y/Z
 orientation; the mate type determines which degrees of freedom remain
-interactive. RealityKit draws and hit-tests these guides, while AnimaCore owns
+interactive. RealityKit draws and hit-tests these guides, while AnimaModel owns
 the connector transforms, mate type, DOFs, units, neutral values, and limits.
 
 The first implemented authoring slice uses a two-click CAD convention: select a
@@ -315,7 +315,7 @@ shared typed-joint/DOF contract.
 ## Application Architecture
 
 The app is a local Swift package graph hosted by a thin native Xcode app target.
-The checked-in project is generated from `studio/project.yml`; build settings
+The checked-in project is generated from `app/project.yml`; build settings
 live in `.xcconfig` files rather than being scattered through the project file.
 Dependency arrows point inward, and the document model never imports a renderer
 or hardware SDK.
@@ -323,10 +323,12 @@ or hardware SDK.
 ```text
 AnimaStudioApp            @main lifecycle, resources, signing, entitlements
 └── AnimaStudioUI         app shell, workspaces, panels, timeline presentation
-    ├── AnimaCore         project model, evaluator, curves, constraints
+    ├── AnimaModel        project model, rigs, clips, validation
+    ├── AnimaEvaluation   curves, mate math, evaluated preview frames
     └── RealityKitViewport
         ├── AnimaViewport renderer-neutral viewport contracts
-        └── AnimaCore
+        ├── AnimaModel
+        └── AnimaEvaluation
 ```
 
 The current source tree groups `AnimaStudioUI` by `AppShell`, `Components`,
@@ -336,10 +338,10 @@ complete-workspace, and animation-timeline states; the native app target also
 has a launch-level UI-test target. This keeps the operator-facing GUI editable
 in normal Xcode/SwiftUI workflows while retaining command-line SwiftPM tests.
 
-Future proven boundaries such as `AnimaDocument`, `Live2DViewport`,
+Future proven boundaries such as `Live2DViewport`,
 `AnimaPluginAPI`, and `AnimaRuntimeClient` should become separate targets only
-when their first implementation lands. `AnimaCore` remains usable from unit
-tests and command-line tools without launching AppKit, SwiftUI, RealityKit,
+when their first implementation lands. `AnimaModel` and `AnimaEvaluation`
+remain usable from unit tests without launching AppKit, SwiftUI, RealityKit,
 Cubism, or JaegerOS.
 
 ### Core evaluated frame
@@ -469,7 +471,8 @@ become the Assets workspace without changing project semantics.
   read-only while the document and undo layers are built. Editing key time,
   value, interpolation, tangents, ranges, markers, media, or events must not be
   presented as working until each operation mutates the durable project model.
-- Timeline truth is continuous seconds in AnimaCore. Frame notation is a
+- Timeline truth is continuous seconds in AnimaCore and `AnimaEvaluation`.
+  Frame notation is a
   configurable display/editing grid (for example 24, 25, 30, or 60 fps), never
   a hard-coded evaluation rate or hardware update rate.
 - Hardware visualization is offline by default. Connecting does not arm;
@@ -535,7 +538,7 @@ data; the file format and playback engine never require the generating model.
 - A document produces identical evaluated fixture frames in Studio and Runtime
   within defined numeric tolerances.
 - The same timeline drives a RealityKit preview and a mock physical target
-  without renderer-specific branches in `AnimaCore`.
+  without renderer-specific branches in `AnimaModel` or `AnimaEvaluation`.
 - Missing assets, unmapped joints, invalid limits, and unsupported plugin
   capabilities produce structured diagnostics rather than crashes.
 - Scrubbing is deterministic, undoable edits never mutate saved files until a

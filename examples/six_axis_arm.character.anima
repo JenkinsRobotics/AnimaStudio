@@ -3,7 +3,7 @@
 # rotational DOF its type defines), realistic per-joint limits, one
 # pick gesture clip keyed by DOF path, and channel mappings including a
 # descending (inverted) one. Loaded by
-# anima_core/tests/test_loader.py; spec in
+# animacore/tests/test_loader.py; spec in
 # dev/docs/roadmap/Character_Format.md.
 
 anima_version: "2.0"

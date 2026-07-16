@@ -46,7 +46,7 @@ backend (in flight, Codex) completes it. Each DOF carries:
 | `neutral…` | the pose used for fallback and "home" |
 | `limits` | **optional** — see §2. Absent limits = continuous/unbounded motion (a wheel keeps spinning) |
 
-Per-kind DOF sets (already encoded in `anima_core/rig.py`
+Per-kind DOF sets (already encoded in `animacore/rig.py`
 `JOINT_TYPE_DOF_TEMPLATES` — AnimaCore must match, snake_case raw
 values, same DOF names):
 
