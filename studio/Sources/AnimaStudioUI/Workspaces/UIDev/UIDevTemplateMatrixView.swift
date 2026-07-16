@@ -73,6 +73,9 @@ enum UIDevTemplateCategory: String, CaseIterable, Identifiable, Sendable {
 
 enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case recentProjects
+  case layeredIconList
+  case notificationPopup
+  case layoutStyleControls
   case navigator
   case workspace3D
   case agent
@@ -152,6 +155,9 @@ enum UIDevTemplateMatrixCatalog {
       .triadManipulator, "Triad Manipulator", "Translation, rotation, and plane handles.",
       .panelsAndTools, 440, 440, 390, "move.3d"),
     descriptor(
+      .layeredIconList, "Layered Icon List", "Dense hierarchy, tags, states, and type icons.",
+      .panelsAndTools, 380, 680, 520, "list.bullet.indent"),
+    descriptor(
       .hardwarePanel, "Hardware Monitor", "Connection, safety, channel, and output state.",
       .panelsAndTools, 360, 460, 360, "cable.connector"),
     descriptor(
@@ -170,6 +176,9 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .contextMenu, "Component Menu", "Grouped CAD-style commands and destructive tail.",
       .dialogsAndPopovers, 290, 410, 370, "filemenu.and.selection"),
+    descriptor(
+      .notificationPopup, "Notification Popup", "Dismissible announcement with supporting rows.",
+      .dialogsAndPopovers, 340, 430, 430, "bell.badge"),
 
     descriptor(
       .actionButtons, "Action Buttons", "Primary, secondary, quiet, destructive, and states.",
@@ -180,6 +189,10 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .viewportControls, "Viewport Controls", "View cube, axes, render menu, and camera actions.",
       .controls, 360, 300, 300, "cube.transparent"),
+    descriptor(
+      .layoutStyleControls, "Layout & Style Controls",
+      "Layout, border, spacing, and background inspector groups.",
+      .controls, 980, 620, 520, "rectangle.3.group.bubble"),
 
     descriptor(
       .emptyState, "Empty Workspace", "A clear next action when no rig content exists.",
@@ -352,6 +365,14 @@ struct UIDevTemplateMatrixView: View {
   private func specimen(for id: UIDevTemplateID) -> some View {
     switch id {
     case .recentProjects: recentProjectsTemplate
+    case .layeredIconList:
+      UIDevReferenceWidgetSpecimen(kind: .layeredIconList)
+    case .notificationPopup:
+      UIDevReferenceWidgetSpecimen(kind: .notificationPopup)
+    case .layoutStyleControls:
+      scaledLab(designSize: CGSize(width: 980, height: 620)) {
+        UIDevReferenceWidgetSpecimen(kind: .layoutStyleControls)
+      }
     case .navigator: navigatorTemplate
     case .workspace3D: workspaceTemplate
     case .agent: agentTemplate

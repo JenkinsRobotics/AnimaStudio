@@ -137,6 +137,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev Reference Widgets pack 01 complete:** Added a dedicated
+  Reference Widgets ribbon lab and three reusable, interactive SwiftUI
+  prototypes based on Jonathan's supplied images: a layered icon/tree list, a
+  dismissible notification popup, and a two-column layout/border/spacing/
+  background inspector. The layer list supports disclosure, hover, selection,
+  colored tags, section labels, and trailing type/state symbols. The popup can
+  dismiss/restore and select a primary controller. The layout widgets expose
+  live display, corner, border, box-model spacing, background, and clipping
+  controls. All three also appear in the global matrix, bringing it to 25
+  templates, but remain explicitly UI Dev-only pending review. One new catalog
+  test and all 198 Swift tests, recursive format lint, Xcode/root-app builds,
+  strict signature verification, and `git diff --check` pass. The app process
+  launches, but macOS again reports zero accessible windows for scripted review.
+
 - **2026-07-15 — UI Dev all-surfaces Template Matrix complete:** UI Dev now
   opens on a responsive specimen board that lays out twenty-two current app
   templates in seven readable sections. Each card names its ideal production

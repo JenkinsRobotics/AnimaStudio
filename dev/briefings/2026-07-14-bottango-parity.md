@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | UI Dev reference widgets pack 01 | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive layered icon list; dismissible notification popup; layout/border/spacing/background controls; dedicated Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev all-surfaces Template Matrix | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | default matrix board grouped by windows/workspaces, timelines, inspectors, panels, dialogs/popovers, controls, and status; production-size Recent Projects specimen; stable coverage catalog; focused/full Swift tests; lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Claude | Wire protocol host + loopback simulator | `anima_studio/wire.py`, `anima_studio/sim.py`, `anima_studio/clips.py`, `anima_studio/tests/test_wire.py`, `anima_studio/tests/test_sim.py`, `anima_studio/tests/test_clips.py` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (74 passed) | released 2026-07-14 |
 | Codex | Coordination protocol + detailed Bottango parity plan | `AGENTS.md`, `dev/briefings/README.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md`, `dev/docs/roadmap/Bottango_Parity.md` | `git diff --check`; 6 Swift tests; 74 Python tests; Swift/Ruff lint | released 2026-07-14 |
@@ -962,3 +963,12 @@ change needed in the Handoff log instead of inventing commands.
   recursive format lint, Xcode/root-app builds, signature verification, and
   `git diff --check` pass. The rebuilt app process launches, but accessibility
   reports zero windows, so Jonathan retains the final visual-density review.
+- **2026-07-15 (Codex, UI Dev Reference Widgets pack 01):** Implemented the
+  supplied layered-list, announcement-popup, and layout/style-inspector
+  references as interactive SwiftUI prototypes in one dedicated modular file.
+  Added a Reference Widgets ribbon lab and reused each specimen in the global
+  matrix, which now contains 25 templates. The patterns remain UI Dev-only
+  until individually reviewed for production adoption. One new catalog test
+  brings the full Swift suite to 198; recursive format lint, Xcode/root-app
+  builds, strict signature verification, and `git diff --check` pass. The app
+  launches but exposes no window to accessibility automation in this session.

@@ -98,7 +98,7 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on an **all-surfaces Template Matrix**: twenty-two current app
+  UI Dev opens on an **all-surfaces Template Matrix**: twenty-five current app
   specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
   Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
   States. Every specimen is visible together in a responsive board and names
@@ -107,7 +107,16 @@
   Editor and triad labs alongside Navigator, viewport, timeline, appearance,
   hardware, context-menu, control, and feedback specimens. A stable catalog
   guarantees every current template ID belongs to one visible section. The
-  separate **Live UI Kit** remains available with a resizable Design Inspector
+  ribbon also exposes a dedicated **Reference Widgets** lab for visual patterns
+  being tested before production adoption. Pack 01 implements three interactive
+  SwiftUI references: a layered icon list with hierarchy disclosure, selection,
+  hover, tags, and trailing state/type icons; a dismissible/restorable
+  notification popup with a primary-controller choice; and a two-column layout/
+  style inspector covering display mode, corner and border treatment, editable
+  box-model spacing, background mode, and clipping. The same three reusable
+  specimens appear in the global Template Matrix; none is wired into an
+  operator workflow until it is reviewed and adopted there. The separate
+  **Live UI Kit** remains available with a resizable Design Inspector
   beside a production-component catalog. The inspector edits the shared Studio surface
   and semantic colors, muted/border strength, chrome and ribbon heights, panel
   radius/padding, field and control geometry, and Navigator/Inspector/Agent
@@ -248,7 +257,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. One hundred ninety-seven tests pass with
+  inspector. One hundred ninety-eight tests pass with
   `cd studio && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key

@@ -58,8 +58,13 @@ struct UIDevRibbonView: View {
           title: "Patterns",
           systemImage: "rectangle.3.group",
           tint: StudioPalette.sourceModel,
-          detail: "Gallery"
+          detail: "References · gallery"
         ) {
+          sectionButton(
+            .referenceWidgets,
+            title: "References",
+            systemImage: "square.stack.3d.up"
+          )
           sectionButton(.panels, title: "Panels", systemImage: "macwindow.on.rectangle")
           sectionButton(.dialogs, title: "Dialogs", systemImage: "rectangle.on.rectangle.angled")
           sectionButton(.popovers, title: "Popovers", systemImage: "bubble.left")
@@ -112,8 +117,8 @@ struct UIDevRibbonView: View {
 
   private func tint(for section: UIDevSection) -> Color {
     switch section {
-    case .overview, .templateMatrix, .navigator, .inspector, .timeline, .panels, .dialogs,
-      .popovers:
+    case .overview, .templateMatrix, .referenceWidgets, .navigator, .inspector, .timeline,
+      .panels, .dialogs, .popovers:
       StudioPalette.accent
     case .workspace3D: StudioPalette.semanticPart
     case .buttons, .inputs, .menus: StudioPalette.semanticPart

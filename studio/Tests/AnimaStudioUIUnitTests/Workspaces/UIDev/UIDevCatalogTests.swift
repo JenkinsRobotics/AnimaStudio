@@ -7,9 +7,9 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(
       UIDevSection.allCases,
       [
-        .overview, .templateMatrix, .designKit, .navigator, .inspector, .timeline, .workspace3D,
-        .buttons, .inputs, .menus, .panels, .mateEditor, .triadManipulator, .dialogs,
-        .popovers, .tokens,
+        .overview, .templateMatrix, .referenceWidgets, .designKit, .navigator, .inspector,
+        .timeline, .workspace3D, .buttons, .inputs, .menus, .panels, .mateEditor,
+        .triadManipulator, .dialogs, .popovers, .tokens,
       ]
     )
 
@@ -25,6 +25,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertTrue(embedded.allSatisfy(\.isEmbeddedWorkspacePreview))
     XCTAssertFalse(UIDevSection.overview.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.templateMatrix.isEmbeddedWorkspacePreview)
+    XCTAssertFalse(UIDevSection.referenceWidgets.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.designKit.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.panels.isEmbeddedWorkspacePreview)
   }
@@ -64,5 +65,24 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(recentProjects.category, .windowsAndWorkspaces)
     XCTAssertGreaterThanOrEqual(recentProjects.idealWidth, 400)
     XCTAssertGreaterThanOrEqual(recentProjects.idealHeight, 220)
+  }
+
+  func testReferenceWidgetPackHasStableKindsAndMatrixEntries() {
+    XCTAssertEqual(
+      UIDevReferenceWidgetKind.allCases,
+      [.layeredIconList, .notificationPopup, .layoutStyleControls]
+    )
+
+    let matrixIDs = Set(UIDevTemplateMatrixCatalog.templates.map(\.id))
+    XCTAssertTrue(matrixIDs.contains(.layeredIconList))
+    XCTAssertTrue(matrixIDs.contains(.notificationPopup))
+    XCTAssertTrue(matrixIDs.contains(.layoutStyleControls))
+
+    for widget in UIDevReferenceWidgetKind.allCases {
+      XCTAssertFalse(widget.title.isEmpty)
+      XCTAssertFalse(widget.detail.isEmpty)
+      XCTAssertGreaterThan(widget.idealSize.width, 0)
+      XCTAssertGreaterThan(widget.idealSize.height, 0)
+    }
   }
 }
