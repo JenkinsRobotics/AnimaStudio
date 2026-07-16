@@ -18,14 +18,19 @@ final class CADNavigationTests: XCTestCase {
     )
   }
 
-  func testDefaultProfileUsesTheOnshapeStyleMapping() {
+  func testDefaultProfileMirrorsSolidWorksMapping() {
+    XCTAssertNil(action(button: .right, profile: .default))
     XCTAssertEqual(
-      action(button: .right, profile: .default),
+      action(button: .middle, profile: .default),
       .orbit(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
-      action(button: .middle, profile: .default),
+      action(button: .middle, option: true, profile: .default),
       .pan(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, shift: true, profile: .default),
+      .preciseZoom(delta: -2)
     )
   }
 
@@ -35,12 +40,16 @@ final class CADNavigationTests: XCTestCase {
       .orbit(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
-      action(button: .middle, control: true, profile: .solidWorks),
+      action(button: .middle, option: true, profile: .solidWorks),
       .pan(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
       action(button: .middle, shift: true, profile: .solidWorks),
-      .pan(deltaX: 3, deltaY: -2)
+      .preciseZoom(delta: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, control: true, profile: .solidWorks),
+      .orbit(deltaX: 3, deltaY: -2)
     )
     XCTAssertNil(action(button: .right, profile: .solidWorks))
   }
@@ -59,7 +68,8 @@ final class CADNavigationTests: XCTestCase {
   func testCustomProfileUsesEditableConflictFreeBindings() {
     let mapping = CustomNavigationMapping(
       rotateDrag: .controlRightMouse,
-      panDrag: .shiftMiddleMouse
+      panDrag: .optionMiddleMouse,
+      preciseZoomDrag: .shiftMiddleMouse
     )
 
     XCTAssertEqual(
@@ -67,16 +77,23 @@ final class CADNavigationTests: XCTestCase {
       .orbit(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
-      action(button: .middle, shift: true, profile: .custom, customMapping: mapping),
+      action(button: .middle, option: true, profile: .custom, customMapping: mapping),
       .pan(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, shift: true, profile: .custom, customMapping: mapping),
+      .preciseZoom(delta: -2)
     )
     XCTAssertNil(action(button: .middle, profile: .custom, customMapping: mapping))
 
     let conflict = CustomNavigationMapping(
       rotateDrag: .middleMouse,
-      panDrag: .middleMouse
+      panDrag: .middleMouse,
+      preciseZoomDrag: .middleMouse
     )
     XCTAssertNotEqual(conflict.rotateDrag, conflict.panDrag)
+    XCTAssertNotEqual(conflict.rotateDrag, conflict.preciseZoomDrag)
+    XCTAssertNotEqual(conflict.panDrag, conflict.preciseZoomDrag)
   }
 
   func testNavigationProfileMenuOrderIsStable() {
@@ -116,6 +133,10 @@ final class CADNavigationTests: XCTestCase {
     XCTAssertEqual(
       CADNavigationAction.zoom(delta: 10).scaled(by: sensitivity),
       .zoom(delta: 6.5)
+    )
+    XCTAssertEqual(
+      CADNavigationAction.preciseZoom(delta: 10).scaled(by: sensitivity),
+      .preciseZoom(delta: 2.275)
     )
   }
 
@@ -178,10 +199,87 @@ final class CADNavigationTests: XCTestCase {
     )
   }
 
+  func testDiscreteWheelNormalizesAccelerationToOneNotch() {
+    XCTAssertEqual(
+      CADZoomInputNormalizer.normalizedDelta(
+        rawDeltaY: 1,
+        hasPreciseScrollingDeltas: false,
+        isReversed: false
+      ),
+      1
+    )
+    XCTAssertEqual(
+      CADZoomInputNormalizer.normalizedDelta(
+        rawDeltaY: 48,
+        hasPreciseScrollingDeltas: false,
+        isReversed: false
+      ),
+      1
+    )
+    XCTAssertEqual(
+      CADZoomInputNormalizer.normalizedDelta(
+        rawDeltaY: -22,
+        hasPreciseScrollingDeltas: false,
+        isReversed: true
+      ),
+      1
+    )
+  }
+
+  func testPreciseScrollIsContinuousClampedAndReversible() {
+    XCTAssertEqual(
+      CADZoomInputNormalizer.normalizedDelta(
+        rawDeltaY: 4,
+        hasPreciseScrollingDeltas: true,
+        isReversed: false
+      ),
+      0.14,
+      accuracy: 0.0001
+    )
+    XCTAssertEqual(
+      CADZoomInputNormalizer.normalizedDelta(
+        rawDeltaY: 100,
+        hasPreciseScrollingDeltas: true,
+        isReversed: false
+      ),
+      0.45
+    )
+    XCTAssertEqual(
+      CADZoomInputNormalizer.normalizedDelta(
+        rawDeltaY: 4,
+        hasPreciseScrollingDeltas: true,
+        isReversed: true
+      ),
+      -0.14,
+      accuracy: 0.0001
+    )
+  }
+
+  func testPresetSummariesMatchExecutableMappings() {
+    XCTAssertEqual(PreviewNavigationProfile.default.summary().orbit, "Middle drag")
+    XCTAssertEqual(PreviewNavigationProfile.solidWorks.summary().pan, "Option + middle drag")
+    XCTAssertEqual(PreviewNavigationProfile.onshape.summary().orbit, "Right drag")
+    XCTAssertTrue(PreviewNavigationProfile.fusion360.summary().special.contains("Double"))
+  }
+
+  func testRightMouseSequenceSeparatesClickFromDrag() {
+    var click = CADRightMouseSequence()
+    click.begin(at: CGPoint(x: 10, y: 10))
+    XCTAssertFalse(click.drag(to: CGPoint(x: 11, y: 11)))
+    XCTAssertEqual(click.end(), .openContextMenu)
+
+    var drag = CADRightMouseSequence()
+    drag.begin(at: CGPoint(x: 10, y: 10))
+    XCTAssertTrue(drag.drag(to: CGPoint(x: 14, y: 10)))
+    XCTAssertEqual(drag.end(), .suppressContextMenu)
+    XCTAssertEqual(drag.end(), .ignored)
+  }
+
   private func action(
     button: CADNavigationMouseButton,
     control: Bool = false,
     shift: Bool = false,
+    option: Bool = false,
     profile: PreviewNavigationProfile,
     customMapping: CustomNavigationMapping = CustomNavigationMapping()
   ) -> CADNavigationAction? {
@@ -191,7 +289,8 @@ final class CADNavigationTests: XCTestCase {
         deltaX: 3,
         deltaY: -2,
         isControlDown: control,
-        isShiftDown: shift
+        isShiftDown: shift,
+        isOptionDown: option
       ),
       profile: profile,
       customMapping: customMapping

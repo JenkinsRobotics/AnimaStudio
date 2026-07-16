@@ -5,6 +5,7 @@ enum CADNavigationAction: Equatable {
   case orbit(deltaX: CGFloat, deltaY: CGFloat)
   case pan(deltaX: CGFloat, deltaY: CGFloat)
   case zoom(delta: CGFloat)
+  case preciseZoom(delta: CGFloat)
 }
 
 extension CADNavigationAction {
@@ -18,6 +19,8 @@ extension CADNavigationAction {
       return .pan(deltaX: deltaX * multiplier, deltaY: deltaY * multiplier)
     case .zoom(let delta):
       return .zoom(delta: delta * CGFloat(sensitivity.zoom.multiplier))
+    case .preciseZoom(let delta):
+      return .preciseZoom(delta: delta * CGFloat(sensitivity.zoom.multiplier) * 0.35)
     }
   }
 }
@@ -36,6 +39,7 @@ struct CADNavigationInput {
   let deltaY: CGFloat
   let isControlDown: Bool
   let isShiftDown: Bool
+  let isOptionDown: Bool
 }
 
 enum CADNavigationMapping {
@@ -51,19 +55,22 @@ enum CADNavigationMapping {
       return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
     case .right:
       switch profile {
-      case .default, .onshape:
+      case .onshape:
         return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
       case .custom:
         return customAction(for: input, mapping: customMapping)
-      case .solidWorks, .fusion360:
+      case .default, .solidWorks, .fusion360:
         return nil
       }
     case .middle:
       switch profile {
-      case .default, .onshape:
+      case .onshape:
         return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-      case .solidWorks:
-        if input.isControlDown || input.isShiftDown {
+      case .default, .solidWorks:
+        if input.isShiftDown {
+          return .preciseZoom(delta: input.deltaY)
+        }
+        if input.isOptionDown {
           return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
         }
         return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
@@ -88,6 +95,9 @@ enum CADNavigationMapping {
     if binding == mapping.panDrag {
       return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
     }
+    if binding == mapping.preciseZoomDrag {
+      return .preciseZoom(delta: input.deltaY)
+    }
     return nil
   }
 
@@ -95,10 +105,16 @@ enum CADNavigationMapping {
     for input: CADNavigationInput
   ) -> NavigationDragBinding? {
     switch input.button {
+    case .right where input.isOptionDown:
+      .optionRightMouse
     case .right where input.isControlDown:
       .controlRightMouse
+    case .right where input.isShiftDown:
+      .shiftRightMouse
     case .right:
       .rightMouse
+    case .middle where input.isOptionDown:
+      .optionMiddleMouse
     case .middle where input.isControlDown:
       .controlMiddleMouse
     case .middle where input.isShiftDown:
@@ -108,6 +124,56 @@ enum CADNavigationMapping {
     case .scroll, .trackpadPan, .magnify:
       nil
     }
+  }
+}
+
+enum CADZoomInputNormalizer {
+  /// One normalized unit is one conventional wheel notch. Camera application
+  /// turns that into approximately 13% distance change at Standard speed.
+  static func normalizedDelta(
+    rawDeltaY: CGFloat,
+    hasPreciseScrollingDeltas: Bool,
+    isReversed: Bool
+  ) -> CGFloat {
+    guard rawDeltaY != 0 else { return 0 }
+    let direction: CGFloat = isReversed ? -1 : 1
+    if hasPreciseScrollingDeltas {
+      return min(max(rawDeltaY * 0.035, -0.45), 0.45) * direction
+    }
+    return (rawDeltaY > 0 ? 1 : -1) * direction
+  }
+}
+
+enum CADRightMouseEnd: Equatable {
+  case openContextMenu
+  case suppressContextMenu
+  case ignored
+}
+
+struct CADRightMouseSequence: Equatable {
+  private(set) var start: CGPoint?
+  private(set) var didDrag = false
+
+  mutating func begin(at point: CGPoint) {
+    start = point
+    didDrag = false
+  }
+
+  @discardableResult
+  mutating func drag(to point: CGPoint, threshold: CGFloat = 3) -> Bool {
+    guard let start else { return false }
+    if hypot(point.x - start.x, point.y - start.y) >= threshold {
+      didDrag = true
+    }
+    return didDrag
+  }
+
+  mutating func end() -> CADRightMouseEnd {
+    guard start != nil else { return .ignored }
+    let result: CADRightMouseEnd = didDrag ? .suppressContextMenu : .openContextMenu
+    start = nil
+    didDrag = false
+    return result
   }
 }
 
@@ -195,18 +261,30 @@ struct CADNavigationCapture: NSViewRepresentable {
   let profile: PreviewNavigationProfile
   let customMapping: CustomNavigationMapping
   let sensitivity: PreviewNavigationSensitivity
+  let reversesWheelZoom: Bool
   let onAction: (CADNavigationAction) -> Void
+  let onFrameAll: () -> Void
+  let onContextMenuRequest: (CGPoint) -> Void
+  let onBackgroundClick: (CGPoint, Bool) -> Void
 
   init(
     profile: PreviewNavigationProfile,
     customMapping: CustomNavigationMapping = CustomNavigationMapping(),
     sensitivity: PreviewNavigationSensitivity = PreviewNavigationSensitivity(),
-    onAction: @escaping (CADNavigationAction) -> Void
+    reversesWheelZoom: Bool = false,
+    onAction: @escaping (CADNavigationAction) -> Void,
+    onFrameAll: @escaping () -> Void = {},
+    onContextMenuRequest: @escaping (CGPoint) -> Void = { _ in },
+    onBackgroundClick: @escaping (CGPoint, Bool) -> Void = { _, _ in }
   ) {
     self.profile = profile
     self.customMapping = customMapping
     self.sensitivity = sensitivity
+    self.reversesWheelZoom = reversesWheelZoom
     self.onAction = onAction
+    self.onFrameAll = onFrameAll
+    self.onContextMenuRequest = onContextMenuRequest
+    self.onBackgroundClick = onBackgroundClick
   }
 
   func makeCoordinator() -> Coordinator {
@@ -214,7 +292,11 @@ struct CADNavigationCapture: NSViewRepresentable {
       profile: profile,
       customMapping: customMapping,
       sensitivity: sensitivity,
-      onAction: onAction
+      reversesWheelZoom: reversesWheelZoom,
+      onAction: onAction,
+      onFrameAll: onFrameAll,
+      onContextMenuRequest: onContextMenuRequest,
+      onBackgroundClick: onBackgroundClick
     )
   }
 
@@ -229,7 +311,11 @@ struct CADNavigationCapture: NSViewRepresentable {
     context.coordinator.profile = profile
     context.coordinator.customMapping = customMapping
     context.coordinator.sensitivity = sensitivity
+    context.coordinator.reversesWheelZoom = reversesWheelZoom
     context.coordinator.onAction = onAction
+    context.coordinator.onFrameAll = onFrameAll
+    context.coordinator.onContextMenuRequest = onContextMenuRequest
+    context.coordinator.onBackgroundClick = onBackgroundClick
   }
 
   static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -242,40 +328,51 @@ struct CADNavigationCapture: NSViewRepresentable {
     var profile: PreviewNavigationProfile
     var customMapping: CustomNavigationMapping
     var sensitivity: PreviewNavigationSensitivity
+    var reversesWheelZoom: Bool
     var onAction: (CADNavigationAction) -> Void
+    var onFrameAll: () -> Void
+    var onContextMenuRequest: (CGPoint) -> Void
+    var onBackgroundClick: (CGPoint, Bool) -> Void
     private var eventMonitor: Any?
+    private var rightMouseSequence = CADRightMouseSequence()
+    private var leftMouseStart: CGPoint?
 
     init(
       profile: PreviewNavigationProfile,
       customMapping: CustomNavigationMapping,
       sensitivity: PreviewNavigationSensitivity,
-      onAction: @escaping (CADNavigationAction) -> Void
+      reversesWheelZoom: Bool,
+      onAction: @escaping (CADNavigationAction) -> Void,
+      onFrameAll: @escaping () -> Void,
+      onContextMenuRequest: @escaping (CGPoint) -> Void,
+      onBackgroundClick: @escaping (CGPoint, Bool) -> Void
     ) {
       self.profile = profile
       self.customMapping = customMapping
       self.sensitivity = sensitivity
+      self.reversesWheelZoom = reversesWheelZoom
       self.onAction = onAction
+      self.onFrameAll = onFrameAll
+      self.onContextMenuRequest = onContextMenuRequest
+      self.onBackgroundClick = onBackgroundClick
     }
 
     func installMonitor() {
       guard eventMonitor == nil else { return }
       eventMonitor = NSEvent.addLocalMonitorForEvents(
-        matching: [.rightMouseDragged, .otherMouseDragged, .scrollWheel, .magnify]
+        matching: [
+          .leftMouseDown, .leftMouseDragged, .leftMouseUp,
+          .rightMouseDown, .rightMouseDragged, .rightMouseUp,
+          .otherMouseDown, .otherMouseDragged, .otherMouseUp,
+          .scrollWheel, .magnify,
+        ]
       ) { [weak self] event in
         guard let self,
           let observedView,
           event.window === observedView.window,
-          observedView.bounds.contains(observedView.convert(event.locationInWindow, from: nil)),
-          let input = self.input(from: event),
-          let action = CADNavigationMapping.action(
-            for: input,
-            profile: self.profile,
-            customMapping: self.customMapping
-          )
+          observedView.bounds.contains(observedView.convert(event.locationInWindow, from: nil))
         else { return event }
-
-        self.onAction(action.scaled(by: self.sensitivity))
-        return nil
+        return self.handle(event, in: observedView)
       }
     }
 
@@ -284,6 +381,68 @@ struct CADNavigationCapture: NSViewRepresentable {
         NSEvent.removeMonitor(eventMonitor)
         self.eventMonitor = nil
       }
+    }
+
+    private func handle(_ event: NSEvent, in observedView: NSView) -> NSEvent? {
+      let localPoint = observedView.convert(event.locationInWindow, from: nil)
+      switch event.type {
+      case .leftMouseDown:
+        leftMouseStart = localPoint
+        return event
+      case .leftMouseDragged:
+        return event
+      case .leftMouseUp:
+        defer { leftMouseStart = nil }
+        guard let leftMouseStart,
+          hypot(localPoint.x - leftMouseStart.x, localPoint.y - leftMouseStart.y) < 3
+        else { return event }
+        onBackgroundClick(
+          CGPoint(x: localPoint.x, y: observedView.bounds.height - localPoint.y),
+          event.modifierFlags.contains(.option)
+        )
+        return event
+      case .rightMouseDown:
+        rightMouseSequence.begin(at: localPoint)
+        return nil
+      case .rightMouseDragged:
+        if rightMouseSequence.drag(to: localPoint) {
+          emitNavigationAction(for: event)
+        }
+        return nil
+      case .rightMouseUp:
+        if rightMouseSequence.end() == .openContextMenu {
+          onContextMenuRequest(
+            CGPoint(x: localPoint.x, y: observedView.bounds.height - localPoint.y)
+          )
+        }
+        return nil
+      case .otherMouseDown where event.buttonNumber == 2:
+        if event.clickCount == 2 {
+          onFrameAll()
+        }
+        return nil
+      case .otherMouseDragged where event.buttonNumber == 2:
+        emitNavigationAction(for: event)
+        return nil
+      case .otherMouseUp where event.buttonNumber == 2:
+        return nil
+      case .scrollWheel, .magnify:
+        emitNavigationAction(for: event)
+        return nil
+      default:
+        return event
+      }
+    }
+
+    private func emitNavigationAction(for event: NSEvent) {
+      guard let input = input(from: event),
+        let action = CADNavigationMapping.action(
+          for: input,
+          profile: profile,
+          customMapping: customMapping
+        )
+      else { return }
+      onAction(action.scaled(by: sensitivity))
     }
 
     private func input(from event: NSEvent) -> CADNavigationInput? {
@@ -309,8 +468,15 @@ struct CADNavigationCapture: NSViewRepresentable {
       let deltaX = event.type == .scrollWheel ? event.scrollingDeltaX : event.deltaX
       let deltaY: CGFloat =
         switch event.type {
-        case .scrollWheel: event.scrollingDeltaY
-        case .magnify: event.magnification * 40
+        case .scrollWheel:
+          button == .trackpadPan
+            ? event.scrollingDeltaY
+            : CADZoomInputNormalizer.normalizedDelta(
+              rawDeltaY: event.scrollingDeltaY,
+              hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas,
+              isReversed: reversesWheelZoom
+            )
+        case .magnify: min(max(event.magnification * 4, -0.45), 0.45)
         default: event.deltaY
         }
       return CADNavigationInput(
@@ -318,7 +484,8 @@ struct CADNavigationCapture: NSViewRepresentable {
         deltaX: deltaX,
         deltaY: deltaY,
         isControlDown: event.modifierFlags.contains(.control),
-        isShiftDown: event.modifierFlags.contains(.shift)
+        isShiftDown: event.modifierFlags.contains(.shift),
+        isOptionDown: event.modifierFlags.contains(.option)
       )
     }
   }

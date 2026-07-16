@@ -31,6 +31,8 @@ struct StudioWorkspaceView: View {
   @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
   @State private var viewportPointerTarget = ViewportPointerTarget.canvas
+  @State private var viewportContextMenuRequest: ViewportContextMenuRequest?
+  @State private var showsMouseNavigationSettings = false
   @State private var lifecycleErrorMessage: String?
   @State private var isSavingProject = false
   @State private var didLoadIndexedCharacter = false
@@ -42,12 +44,15 @@ struct StudioWorkspaceView: View {
     NavigationDragBinding.rightMouse.rawValue
   @AppStorage("viewportCustomPanDrag") private var viewportCustomPanDragRawValue =
     NavigationDragBinding.middleMouse.rawValue
+  @AppStorage("viewportCustomPreciseZoomDrag") private var viewportCustomPreciseZoomDragRawValue =
+    NavigationDragBinding.shiftMiddleMouse.rawValue
   @AppStorage("viewportOrbitSpeed") private var viewportOrbitSpeedRawValue =
     PreviewNavigationSpeed.standard.rawValue
   @AppStorage("viewportPanSpeed") private var viewportPanSpeedRawValue =
     PreviewNavigationSpeed.standard.rawValue
   @AppStorage("viewportZoomSpeed") private var viewportZoomSpeedRawValue =
     PreviewNavigationSpeed.reduced.rawValue
+  @AppStorage("viewportReversesWheelZoom") private var viewportReversesWheelZoom = false
   @AppStorage("viewportRenderStyle") private var viewportRenderStyleRawValue =
     ViewportRenderStyle.shaded.rawValue
   @AppStorage("viewportEdgeDisplay") private var viewportEdgeDisplayRawValue =
@@ -372,9 +377,11 @@ struct StudioWorkspaceView: View {
         navigationProfile: viewportNavigationProfile,
         customNavigationMapping: viewportCustomNavigationMapping,
         navigationSensitivity: viewportNavigationSensitivity,
+        reversesWheelZoom: viewportReversesWheelZoom,
         focusedModelPath: workspace.selectedModelPath,
         focusedPartID: workspace.selectedPartID,
         highlightedPartIDs: workspace.viewportHighlightedPartIDs,
+        selectionCount: workspace.selectionCount,
         partAppearances: workspace.viewportPartAppearances,
         focusedPartIsLocked: workspace.selectedPartID.map(workspace.isComponentLocked) ?? false,
         mateCandidatePartIDs: workspace.mateCandidatePartIDs,
@@ -391,17 +398,17 @@ struct StudioWorkspaceView: View {
         showsShadows: viewportShowsShadows,
         fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
         onSelectModelPath: { path in
-          let modifiers = NSEvent.modifierFlags
+          viewportContextMenuRequest = nil
           workspace.selectModelNode(
             at: path,
-            extendingSelection: modifiers.contains(.command) || modifiers.contains(.shift)
+            extendingSelection: true
           )
         },
         onSelectPartID: { id in
-          let modifiers = NSEvent.modifierFlags
+          viewportContextMenuRequest = nil
           workspace.selectPart(
             id: id,
-            extendingSelection: modifiers.contains(.command) || modifiers.contains(.shift)
+            extendingSelection: true
           )
         },
         onSetPartPosition: { id, position in
@@ -418,13 +425,17 @@ struct StudioWorkspaceView: View {
         },
         onPointerTargetChange: { target in
           viewportPointerTarget = target
-        }
+        },
+        onContextMenuRequest: { location, target in
+          viewportContextMenuRequest = ViewportContextMenuRequest(
+            location: location,
+            pointerTarget: target
+          )
+        },
+        onFrameAll: workspace.showHomeView,
+        onBoxSelectPartIDs: workspace.selectParts
       )
       .frame(minWidth: 520, minHeight: 420)
-      .componentViewportContextMenu(
-        workspace: workspace,
-        pointerTarget: viewportPointerTarget
-      )
 
       viewportTitle
       cameraHUD
@@ -460,6 +471,26 @@ struct StudioWorkspaceView: View {
         .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 18)
         .padding(.bottom, 16)
       }
+
+      if let viewportContextMenuRequest {
+        ComponentViewportContextMenuOverlay(
+          workspace: workspace,
+          request: viewportContextMenuRequest,
+          dismiss: { self.viewportContextMenuRequest = nil }
+        )
+      }
+    }
+    .sheet(isPresented: $showsMouseNavigationSettings) {
+      MouseNavigationSettingsView(
+        profile: viewportNavigationProfileBinding,
+        customRotateDrag: viewportCustomRotateDragBinding,
+        customPanDrag: viewportCustomPanDragBinding,
+        customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
+        orbitSpeed: viewportOrbitSpeedBinding,
+        panSpeed: viewportPanSpeedBinding,
+        zoomSpeed: viewportZoomSpeedBinding,
+        reversesWheelZoom: $viewportReversesWheelZoom
+      )
     }
   }
 
@@ -519,9 +550,12 @@ struct StudioWorkspaceView: View {
         navigationProfile: viewportNavigationProfileBinding,
         customRotateDrag: viewportCustomRotateDragBinding,
         customPanDrag: viewportCustomPanDragBinding,
+        customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
         orbitSpeed: viewportOrbitSpeedBinding,
         panSpeed: viewportPanSpeedBinding,
-        zoomSpeed: viewportZoomSpeedBinding
+        zoomSpeed: viewportZoomSpeedBinding,
+        reversesWheelZoom: $viewportReversesWheelZoom,
+        showMouseSettings: { showsMouseNavigationSettings = true }
       )
       .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
@@ -578,8 +612,13 @@ struct StudioWorkspaceView: View {
   private var viewportCustomNavigationMapping: CustomNavigationMapping {
     CustomNavigationMapping(
       rotateDrag: viewportCustomRotateDrag,
-      panDrag: viewportCustomPanDrag
+      panDrag: viewportCustomPanDrag,
+      preciseZoomDrag: viewportCustomPreciseZoomDrag
     )
+  }
+
+  private var viewportCustomPreciseZoomDrag: NavigationDragBinding {
+    NavigationDragBinding(rawValue: viewportCustomPreciseZoomDragRawValue) ?? .shiftMiddleMouse
   }
 
   private var viewportNavigationSensitivity: PreviewNavigationSensitivity {
@@ -630,6 +669,8 @@ struct StudioWorkspaceView: View {
         let previousValue = viewportCustomRotateDrag
         if newValue == viewportCustomPanDrag {
           viewportCustomPanDragRawValue = previousValue.rawValue
+        } else if newValue == viewportCustomPreciseZoomDrag {
+          viewportCustomPreciseZoomDragRawValue = previousValue.rawValue
         }
         viewportCustomRotateDragRawValue = newValue.rawValue
       }
@@ -643,8 +684,24 @@ struct StudioWorkspaceView: View {
         let previousValue = viewportCustomPanDrag
         if newValue == viewportCustomRotateDrag {
           viewportCustomRotateDragRawValue = previousValue.rawValue
+        } else if newValue == viewportCustomPreciseZoomDrag {
+          viewportCustomPreciseZoomDragRawValue = previousValue.rawValue
         }
         viewportCustomPanDragRawValue = newValue.rawValue
+      }
+    )
+  }
+
+  private var viewportCustomPreciseZoomDragBinding: Binding<NavigationDragBinding> {
+    Binding(
+      get: { viewportCustomPreciseZoomDrag },
+      set: { newValue in
+        if newValue == viewportCustomRotateDrag {
+          viewportCustomRotateDragRawValue = viewportCustomPreciseZoomDrag.rawValue
+        } else if newValue == viewportCustomPanDrag {
+          viewportCustomPanDragRawValue = viewportCustomPreciseZoomDrag.rawValue
+        }
+        viewportCustomPreciseZoomDragRawValue = newValue.rawValue
       }
     )
   }

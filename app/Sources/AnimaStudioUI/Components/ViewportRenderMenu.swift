@@ -15,9 +15,11 @@ struct ViewportRenderMenu: View {
   @Binding var navigationProfile: PreviewNavigationProfile
   @Binding var customRotateDrag: NavigationDragBinding
   @Binding var customPanDrag: NavigationDragBinding
+  @Binding var customPreciseZoomDrag: NavigationDragBinding
   @Binding var orbitSpeed: PreviewNavigationSpeed
   @Binding var panSpeed: PreviewNavigationSpeed
   @Binding var zoomSpeed: PreviewNavigationSpeed
+  @Binding var reversesWheelZoom: Bool
   let canFrameSelection: Bool
   let frameSelection: () -> Void
 
@@ -112,6 +114,12 @@ struct ViewportRenderMenu: View {
               Text(binding.title).tag(binding)
             }
           }
+
+          Picker("Precise Zoom", selection: $customPreciseZoomDrag) {
+            ForEach(NavigationDragBinding.allCases) { binding in
+              Text(binding.title).tag(binding)
+            }
+          }
         }
 
         Menu("Navigation Speed", systemImage: "gauge.with.dots.needle.33percent") {
@@ -126,8 +134,13 @@ struct ViewportRenderMenu: View {
           }
         }
 
+        Toggle("Reverse Wheel Zoom", isOn: $reversesWheelZoom)
+
         Label("Select · Left Click", systemImage: "cursorarrow.click")
-        Label("Orbit · Right Drag", systemImage: "rotate.3d")
+        Label(
+          "Orbit · \(navigationProfile.summary(customMapping: CustomNavigationMapping(rotateDrag: customRotateDrag, panDrag: customPanDrag, preciseZoomDrag: customPreciseZoomDrag)).orbit)",
+          systemImage: "rotate.3d"
+        )
         Label("Zoom · Scroll Wheel", systemImage: "computermouse")
       }
     } label: {

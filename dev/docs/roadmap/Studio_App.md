@@ -135,27 +135,43 @@ to be a shader editor or silently rewrite the source file.
 
 ### CAD viewport interaction contract
 
-The default desktop navigation follows the common Onshape/SolidWorks family of
-controls while retaining native macOS trackpad gestures:
+The default desktop navigation follows the SolidWorks convention while
+retaining explicit Onshape and Fusion 360 profiles plus native macOS trackpad
+gestures:
 
-- right-button drag orbits/tilts the camera around its target;
-- middle-button drag pans, with Control + right-button drag as an Onshape-style
-  alternative;
+- Default/SolidWorks use middle-button drag to orbit, Option + middle-button
+  drag to pan, and Shift + middle-button drag for precise zoom;
+- Onshape uses right-button drag to orbit and middle-button drag to pan;
+- Fusion 360 uses Shift + middle-button drag to orbit and middle-button drag to
+  pan;
 - scroll and pinch zoom toward the pointer; the compact camera toolbar retains
   Home while the view cube owns all principal, edge, and corner views;
-- primary-button click selects geometry, and primary-button drag is reserved
-  for a visible transform or DOF handle rather than camera navigation.
+- primary-button click toggles geometry selection, Option-click selects the
+  next hit through transparent/overlapping geometry, and empty click clears;
+- dragging empty space left-to-right performs a blue window selection (fully
+  enclosed), while right-to-left performs a yellow dashed crossing selection
+  (anything touched).
 
 The current RealityKit viewport uses a narrow AppKit input adapter over its
 RealityKit camera so the mapping is explicit and testable. The user-local mouse
-profile offers Default, SolidWorks, Onshape, Fusion 360, and Custom. Default
-uses the Onshape-style right-drag orbit, middle-drag pan, and wheel zoom.
-SolidWorks uses middle-drag orbit plus Control- or Shift-middle-drag pan;
-Fusion 360 uses Shift-middle-drag orbit plus middle-drag pan. Custom exposes
-separate rotate and pan drag bindings and prevents the two actions from owning
-the same chord. Discrete mouse-wheel events are consumed by the viewport as
-zoom. Precise trackpad scroll phases remain pan input, and pinch zooms in every
-profile. Navigation preferences never enter project data.
+profile offers Default, SolidWorks, Onshape, Fusion 360, and Custom. Custom
+exposes conflict-free orbit, pan, and precise-zoom drag chords, including
+Option-based bindings. A right-button state machine consumes handled events and
+separates click from drag: a true click opens the pointer-targeted menu, while
+a drag suppresses the menu after camera movement. Double middle-click frames
+the scene. Discrete wheel acceleration is normalized to one conventional notch
+(about 13% distance at Standard speed); precise scroll deltas use a smaller,
+clamped continuous coefficient. Trackpad scroll phases remain pan, pinch zooms
+in every profile, and a persisted reverse-wheel choice affects wheel zoom only.
+Navigation preferences never enter project data.
+
+The camera HUD's mouse button opens a reusable Mouse & Navigation settings
+sheet. Its icon header provides Scroll, Mouse, Buttons, Keyboard, Exceptions,
+and Settings sections. The live pages expose the profile diagram and read-only
+mapping summary, conflict-safe Custom bindings, independent orbit/pan/zoom
+sensitivity sliders, reverse wheel direction, modifier references, and reset.
+Unavailable exception-driver integration is labeled Coming later rather than
+presented as working behavior.
 
 The viewport camera is represented by one presentation-state contract:
 orientation, look-at target, perspective distance, orthographic scale, and

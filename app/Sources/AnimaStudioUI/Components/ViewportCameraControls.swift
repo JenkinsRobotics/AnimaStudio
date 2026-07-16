@@ -5,6 +5,7 @@ struct ViewportCameraControls<DisplayMenu: View>: View {
   @Bindable var workspace: StudioWorkspaceModel
   let navigationProfile: PreviewNavigationProfile
   let customNavigationMapping: CustomNavigationMapping
+  let showMouseSettings: () -> Void
   let displayMenu: DisplayMenu
 
   var body: some View {
@@ -14,6 +15,10 @@ struct ViewportCameraControls<DisplayMenu: View>: View {
       }
 
       displayMenu
+
+      cameraButton("Mouse settings", systemImage: "computermouse") {
+        showMouseSettings()
+      }
 
       Menu {
         Section("CAD Navigation") {
@@ -52,12 +57,13 @@ struct ViewportCameraControls<DisplayMenu: View>: View {
 
   private var navigationInstructions: [String] {
     switch navigationProfile {
-    case .default, .onshape:
+    case .onshape:
       ["Right-drag — orbit / tilt", "Middle-drag — pan"]
-    case .solidWorks:
+    case .default, .solidWorks:
       [
         "Middle-drag — orbit / tilt",
-        "Control or Shift + middle-drag — pan",
+        "Option + middle-drag — pan",
+        "Shift + middle-drag — precise zoom",
       ]
     case .fusion360:
       ["Shift + middle-drag — orbit / tilt", "Middle-drag — pan"]
@@ -65,6 +71,7 @@ struct ViewportCameraControls<DisplayMenu: View>: View {
       [
         "\(customNavigationMapping.rotateDrag.title) — orbit / tilt",
         "\(customNavigationMapping.panDrag.title) — pan",
+        "\(customNavigationMapping.preciseZoomDrag.title) — precise zoom",
       ]
     }
   }

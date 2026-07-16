@@ -205,6 +205,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — CAD mouse/navigation and reusable settings complete:** The
+  production viewport now implements the agreed SolidWorks-default, Onshape,
+  Fusion 360, and Custom mappings with Option support, precise zoom, normalized
+  reversible wheel input, click-versus-drag context routing, middle-double-click
+  framing, selection toggle/through/count feedback, and directional box select.
+  A camera-HUD mouse button opens the reusable six-page Mouse & Navigation
+  settings sheet with a live mouse diagram, preset summaries, conflict-safe
+  manual bindings, sensitivity, reverse direction, modifier reference, and
+  reset. Right-click menus are now Studio-owned pointer-positioned overlays, so
+  camera drags cannot accidentally open them. All 231 XCTest and 15 real-bridge
+  Swift Testing cases pass; recursive lint, Xcode/root builds, signature,
+  launch, and an Assets/new-character live walkthrough pass. No AnimaCore files
+  or animation semantics were touched.
+
 - **2026-07-16 — Assets character manager + 3D loading stage complete:** Assets
   now renders the real `project.json` character index, selects the active
   Rig/Animate character, and gives empty projects a first-character action.

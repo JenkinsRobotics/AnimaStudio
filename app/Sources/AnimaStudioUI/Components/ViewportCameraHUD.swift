@@ -16,9 +16,12 @@ struct ViewportCameraHUD: View {
   @Binding var navigationProfile: PreviewNavigationProfile
   @Binding var customRotateDrag: NavigationDragBinding
   @Binding var customPanDrag: NavigationDragBinding
+  @Binding var customPreciseZoomDrag: NavigationDragBinding
   @Binding var orbitSpeed: PreviewNavigationSpeed
   @Binding var panSpeed: PreviewNavigationSpeed
   @Binding var zoomSpeed: PreviewNavigationSpeed
+  @Binding var reversesWheelZoom: Bool
+  let showMouseSettings: () -> Void
 
   var body: some View {
     VStack(alignment: .trailing, spacing: 7) {
@@ -38,8 +41,10 @@ struct ViewportCameraHUD: View {
         navigationProfile: navigationProfile,
         customNavigationMapping: CustomNavigationMapping(
           rotateDrag: customRotateDrag,
-          panDrag: customPanDrag
+          panDrag: customPanDrag,
+          preciseZoomDrag: customPreciseZoomDrag
         ),
+        showMouseSettings: showMouseSettings,
         displayMenu: ViewportRenderMenu(
           projection: $projection,
           renderStyle: $renderStyle,
@@ -54,9 +59,11 @@ struct ViewportCameraHUD: View {
           navigationProfile: $navigationProfile,
           customRotateDrag: $customRotateDrag,
           customPanDrag: $customPanDrag,
+          customPreciseZoomDrag: $customPreciseZoomDrag,
           orbitSpeed: $orbitSpeed,
           panSpeed: $panSpeed,
           zoomSpeed: $zoomSpeed,
+          reversesWheelZoom: $reversesWheelZoom,
           canFrameSelection: workspace.canFrameSelection,
           frameSelection: workspace.frameSelection
         )

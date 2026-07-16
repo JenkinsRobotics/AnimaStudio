@@ -853,6 +853,11 @@ final class StudioWorkspaceModel {
     }
   }
 
+  func selectParts(ids: Set<PartID>) {
+    storedSelectedFeature = nil
+    selection = Set(ids.map(NavigatorItem.part))
+  }
+
   func renameAsset(id: AssetID, to name: String) {
     guard let index = project.assets.firstIndex(where: { $0.id == id }) else { return }
     project.assets[index].name = name

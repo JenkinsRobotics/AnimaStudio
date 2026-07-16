@@ -43,4 +43,17 @@ final class ViewportRenderMenuTests: XCTestCase {
       ).allSatisfy { $0.multiplier < $1.multiplier }
     )
   }
+
+  func testMouseSettingsHeaderKeepsTheApprovedControlFamilies() {
+    XCTAssertEqual(
+      MouseSettingsTab.allCases.map(\.title),
+      ["Scroll", "Mouse", "Buttons", "Keyboard", "Exceptions", "Settings"]
+    )
+  }
+
+  func testCustomBindingsExposeOptionBasedCADChords() {
+    XCTAssertTrue(NavigationDragBinding.allCases.contains(.optionMiddleMouse))
+    XCTAssertTrue(NavigationDragBinding.allCases.contains(.optionRightMouse))
+    XCTAssertEqual(NavigationDragBinding.optionMiddleMouse.title, "Option + Middle Mouse Drag")
+  }
 }

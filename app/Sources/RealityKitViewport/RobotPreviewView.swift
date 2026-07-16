@@ -14,6 +14,9 @@ public struct RobotPreviewView: View {
   /// persistent marker treatment.
   @State private var standingFeature: MateConnectorCandidate?
   @State private var pointerTarget = ViewportPointerTarget.canvas
+  @State private var entityTapRevision = 0
+  @State private var lastSelectionPoint: CGPoint?
+  @State private var boxSelectionState: BoxSelectionState?
 
   private let rig: CharacterRig
   private let engineResolvedPartPoses: [PartID: EngineResolvedPartPose]
@@ -27,9 +30,11 @@ public struct RobotPreviewView: View {
   private let navigationProfile: PreviewNavigationProfile
   private let customNavigationMapping: CustomNavigationMapping
   private let navigationSensitivity: PreviewNavigationSensitivity
+  private let reversesWheelZoom: Bool
   private let focusedModelPath: ModelEntityPath?
   private let focusedPartID: PartID?
   private let highlightedPartIDs: Set<PartID>
+  private let selectionCount: Int
   private let partAppearances: [PartID: PreviewPartAppearance]
   private let focusedPartIsLocked: Bool
   private let mateCandidatePartIDs: Set<PartID>
@@ -51,6 +56,9 @@ public struct RobotPreviewView: View {
   private let fieldOfViewDegrees: Float
   private let onCameraStateChange: (PreviewCameraState) -> Void
   private let onPointerTargetChange: (ViewportPointerTarget) -> Void
+  private let onContextMenuRequest: (CGPoint, ViewportPointerTarget) -> Void
+  private let onFrameAll: () -> Void
+  private let onBoxSelectPartIDs: (Set<PartID>) -> Void
 
   public init(
     rig: CharacterRig = CharacterRig(joints: []),
@@ -65,9 +73,11 @@ public struct RobotPreviewView: View {
     navigationProfile: PreviewNavigationProfile = .default,
     customNavigationMapping: CustomNavigationMapping = CustomNavigationMapping(),
     navigationSensitivity: PreviewNavigationSensitivity = PreviewNavigationSensitivity(),
+    reversesWheelZoom: Bool = false,
     focusedModelPath: ModelEntityPath? = nil,
     focusedPartID: PartID? = nil,
     highlightedPartIDs: Set<PartID> = [],
+    selectionCount: Int = 0,
     partAppearances: [PartID: PreviewPartAppearance] = [:],
     focusedPartIsLocked: Bool = false,
     mateCandidatePartIDs: Set<PartID> = [],
@@ -88,7 +98,10 @@ public struct RobotPreviewView: View {
     onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in },
     onSelectMateCandidate: @escaping (ViewportPickEvent) -> Void = { _ in },
     onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in },
-    onPointerTargetChange: @escaping (ViewportPointerTarget) -> Void = { _ in }
+    onPointerTargetChange: @escaping (ViewportPointerTarget) -> Void = { _ in },
+    onContextMenuRequest: @escaping (CGPoint, ViewportPointerTarget) -> Void = { _, _ in },
+    onFrameAll: @escaping () -> Void = {},
+    onBoxSelectPartIDs: @escaping (Set<PartID>) -> Void = { _ in }
   ) {
     self.rig = rig
     self.engineResolvedPartPoses = engineResolvedPartPoses
@@ -102,9 +115,11 @@ public struct RobotPreviewView: View {
     self.navigationProfile = navigationProfile
     self.customNavigationMapping = customNavigationMapping
     self.navigationSensitivity = navigationSensitivity
+    self.reversesWheelZoom = reversesWheelZoom
     self.focusedModelPath = focusedModelPath
     self.focusedPartID = focusedPartID
     self.highlightedPartIDs = highlightedPartIDs
+    self.selectionCount = selectionCount
     self.partAppearances = partAppearances
     self.focusedPartIsLocked = focusedPartIsLocked
     self.mateCandidatePartIDs = mateCandidatePartIDs
@@ -126,6 +141,9 @@ public struct RobotPreviewView: View {
     self.onSelectMateCandidate = onSelectMateCandidate
     self.onCameraStateChange = onCameraStateChange
     self.onPointerTargetChange = onPointerTargetChange
+    self.onContextMenuRequest = onContextMenuRequest
+    self.onFrameAll = onFrameAll
+    self.onBoxSelectPartIDs = onBoxSelectPartIDs
   }
 
   public var body: some View {
@@ -238,8 +256,22 @@ public struct RobotPreviewView: View {
       SpatialTapGesture()
         .targetedToAnyEntity()
         .onEnded { value in
+          entityTapRevision += 1
+          let tappedEntity: Entity = {
+            guard NSEvent.modifierFlags.contains(.option) else { return value.entity }
+            let initialPart = Self.semanticPartAncestor(from: value.entity)
+            return value.entities(at: value.location, in: .local).first { candidate in
+              guard candidate !== value.entity else { return false }
+              let candidatePart = Self.semanticPartAncestor(from: candidate)
+              if let initialPart, let candidatePart {
+                return candidatePart !== initialPart
+              }
+              return candidatePart != nil
+                || Self.ancestor(named: "importedModel", from: candidate) != nil
+            } ?? value.entity
+          }()
           switch SubObjectSelection.outcome(
-            forTapOn: Self.tapTarget(for: value.entity, rig: rig),
+            forTapOn: Self.tapTarget(for: tappedEntity, rig: rig),
             isPlacementActive: isPlacementActive
           ) {
           case .selectFeature(let candidate):
@@ -253,9 +285,9 @@ public struct RobotPreviewView: View {
           case .selectImportedNode:
             standingFeature = nil
             guard let importedHierarchyRootPath,
-              let importedModel = Self.ancestor(named: "importedModel", from: value.entity),
+              let importedModel = Self.ancestor(named: "importedModel", from: tappedEntity),
               let path = Self.modelPath(
-                for: value.entity,
+                for: tappedEntity,
                 below: importedModel,
                 hierarchyRootPath: importedHierarchyRootPath
               )
@@ -330,6 +362,63 @@ public struct RobotPreviewView: View {
         }
     )
     .simultaneousGesture(
+      DragGesture(minimumDistance: 4)
+        .targetedToAnyEntity()
+        .onChanged { value in
+          guard !isPlacementActive,
+            Self.ancestor(named: Self.emptyClickCatcherName, from: value.entity) != nil
+          else {
+            return
+          }
+          let mode: BoxSelectionMode =
+            value.location.x >= value.startLocation.x
+            ? .window : .crossing
+          boxSelectionState = BoxSelectionState(
+            start: value.startLocation,
+            current: value.location,
+            mode: mode
+          )
+          lastSelectionPoint = value.location
+        }
+        .onEnded { value in
+          guard !isPlacementActive,
+            Self.ancestor(named: Self.emptyClickCatcherName, from: value.entity) != nil
+          else {
+            return
+          }
+          let selectionRect = BoxSelectionState.standardizedRect(
+            start: value.startLocation,
+            current: value.location
+          )
+          let mode: BoxSelectionMode =
+            value.location.x >= value.startLocation.x
+            ? .window : .crossing
+          guard let root = Self.ancestor(named: "animaPreviewRoot", from: value.entity) else {
+            boxSelectionState = nil
+            return
+          }
+          let selectedIDs = Set(
+            rig.parts.compactMap { part -> PartID? in
+              guard let partEntity = root.findEntity(named: Self.partEntityName(part.id)) else {
+                return nil
+              }
+              let bounds = partEntity.visualBounds(relativeTo: nil)
+              let points = Self.boundingCorners(bounds).compactMap { point in
+                value.project(point: point, to: .local)
+              }
+              guard let projectedBounds = Self.screenBounds(points) else { return nil }
+              let isSelected =
+                switch mode {
+                case .window: selectionRect.contains(projectedBounds)
+                case .crossing: selectionRect.intersects(projectedBounds)
+                }
+              return isSelected ? part.id : nil
+            })
+          boxSelectionState = nil
+          onBoxSelectPartIDs(selectedIDs)
+        }
+    )
+    .simultaneousGesture(
       SpatialEventGesture()
         .targetedToAnyEntity()
         .onChanged { value in
@@ -344,12 +433,43 @@ public struct RobotPreviewView: View {
       CADNavigationCapture(
         profile: navigationProfile,
         customMapping: customNavigationMapping,
-        sensitivity: navigationSensitivity
+        sensitivity: navigationSensitivity,
+        reversesWheelZoom: reversesWheelZoom
       ) { action in
         navigationAction = action
         navigationCommandRevision += 1
+      } onFrameAll: {
+        onFrameAll()
+      } onContextMenuRequest: { location in
+        onContextMenuRequest(location, pointerTarget)
+      } onBackgroundClick: { location, _ in
+        lastSelectionPoint = location
+        let pendingRevision = entityTapRevision
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) {
+          guard pendingRevision == entityTapRevision, !isPlacementActive else { return }
+          standingFeature = nil
+          pointerTarget = .canvas
+          reportPointerTarget(.canvas)
+          onSelectMateCandidate(.clearAll)
+        }
       }
       .allowsHitTesting(false)
+    }
+    .overlay(alignment: .topLeading) {
+      if let boxSelectionState {
+        BoxSelectionOverlay(state: boxSelectionState)
+      }
+      if selectionCount > 1, let lastSelectionPoint {
+        Text("\(selectionCount) selected")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.white)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 5)
+          .background(.black.opacity(0.78), in: Capsule())
+          .offset(x: lastSelectionPoint.x + 12, y: lastSelectionPoint.y + 12)
+          .allowsHitTesting(false)
+          .accessibilityLabel("\(selectionCount) items selected")
+      }
     }
     .overlay {
       ViewportEscapeCapture { isTextInputActive in
@@ -721,6 +841,28 @@ public struct RobotPreviewView: View {
     RigVector3(x: Double(vector.x), y: Double(vector.y), z: Double(vector.z))
   }
 
+  private static func boundingCorners(_ bounds: BoundingBox) -> [SIMD3<Float>] {
+    let minimum = bounds.min
+    let maximum = bounds.max
+    return [
+      SIMD3(minimum.x, minimum.y, minimum.z),
+      SIMD3(maximum.x, minimum.y, minimum.z),
+      SIMD3(minimum.x, maximum.y, minimum.z),
+      SIMD3(maximum.x, maximum.y, minimum.z),
+      SIMD3(minimum.x, minimum.y, maximum.z),
+      SIMD3(maximum.x, minimum.y, maximum.z),
+      SIMD3(minimum.x, maximum.y, maximum.z),
+      SIMD3(maximum.x, maximum.y, maximum.z),
+    ]
+  }
+
+  private static func screenBounds(_ points: [CGPoint]) -> CGRect? {
+    guard let first = points.first else { return nil }
+    return points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { bounds, point in
+      bounds.union(CGRect(origin: point, size: .zero))
+    }
+  }
+
   private static func orientation(_ eulerRadians: RigVector3) -> simd_quatf {
     let x = simd_quatf(angle: Float(eulerRadians.x), axis: SIMD3<Float>(1, 0, 0))
     let y = simd_quatf(angle: Float(eulerRadians.y), axis: SIMD3<Float>(0, 1, 0))
@@ -785,8 +927,8 @@ public struct RobotPreviewView: View {
       let shift = (-right * Float(deltaX) + up * Float(deltaY)) * scale
       camera.position += shift
       cameraTarget.position += shift
-    case .zoom(let delta):
-      let factor = exp(-Float(delta) * 0.025)
+    case .zoom(let delta), .preciseZoom(let delta):
+      let factor = exp(-Float(delta) * 0.139262)
       if var orthographic = camera.components[OrthographicCameraComponent.self] {
         orthographic.scale = min(max(orthographic.scale * factor, 0.05), 100)
         camera.components.set(orthographic)
@@ -1103,4 +1245,54 @@ private struct TransformDragState {
   let handle: TransformHandleKind
   let startPosition: RigVector3
   let startRotation: RigVector3
+}
+
+private enum BoxSelectionMode {
+  case window
+  case crossing
+}
+
+private struct BoxSelectionState {
+  let start: CGPoint
+  let current: CGPoint
+  let mode: BoxSelectionMode
+
+  var rect: CGRect {
+    Self.standardizedRect(start: start, current: current)
+  }
+
+  static func standardizedRect(start: CGPoint, current: CGPoint) -> CGRect {
+    CGRect(
+      x: min(start.x, current.x),
+      y: min(start.y, current.y),
+      width: abs(current.x - start.x),
+      height: abs(current.y - start.y)
+    )
+  }
+}
+
+private struct BoxSelectionOverlay: View {
+  let state: BoxSelectionState
+
+  var body: some View {
+    let color: Color = state.mode == .window ? .blue : .yellow
+    Rectangle()
+      .fill(color.opacity(0.12))
+      .overlay {
+        Rectangle()
+          .stroke(
+            color.opacity(0.95),
+            style: StrokeStyle(
+              lineWidth: 1.3,
+              dash: state.mode == .crossing ? [6, 4] : []
+            )
+          )
+      }
+      .frame(width: state.rect.width, height: state.rect.height)
+      .offset(x: state.rect.minX, y: state.rect.minY)
+      .allowsHitTesting(false)
+      .accessibilityLabel(
+        state.mode == .window ? "Window selection" : "Crossing selection"
+      )
+  }
 }

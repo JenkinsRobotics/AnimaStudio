@@ -178,6 +178,20 @@ final class ComponentViewportContextMenuTests: XCTestCase {
     XCTAssertEqual(model.cameraViewpoint, .home)
   }
 
+  func testViewportBoxSelectionReplacesTheSemanticPartSelection() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let first = try XCTUnwrap(model.project.rig.parts.first)
+    model.addPart(kind: .sphere)
+    let second = try XCTUnwrap(model.project.rig.parts.last)
+
+    model.selectParts(ids: [first.id, second.id])
+    XCTAssertEqual(Set(model.selectedComponentIDs), [first.id, second.id])
+
+    model.selectParts(ids: [second.id])
+    XCTAssertEqual(model.primarySelection, .part(second.id))
+  }
+
   func testShowAllClearsIsolationAndRestoresUnlockedVisibility() throws {
     let model = StudioWorkspaceModel()
     model.addPart(kind: .box)

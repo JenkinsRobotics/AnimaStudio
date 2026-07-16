@@ -161,3 +161,194 @@ extension View {
     )
   }
 }
+
+struct ViewportContextMenuRequest: Identifiable, Equatable {
+  let id = UUID()
+  let location: CGPoint
+  let pointerTarget: ViewportPointerTarget
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.id == rhs.id
+  }
+}
+
+/// Viewport-owned context presentation. The NSEvent adapter decides whether a
+/// right-button sequence was a click or a camera drag; only true clicks create
+/// this panel, so a completed orbit can never leak into a second menu system.
+struct ComponentViewportContextMenuOverlay: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  let request: ViewportContextMenuRequest
+  let dismiss: () -> Void
+
+  var body: some View {
+    GeometryReader { proxy in
+      ZStack(alignment: .topLeading) {
+        Color.clear
+          .contentShape(Rectangle())
+          .onTapGesture(perform: dismiss)
+
+        menuPanel
+          .frame(width: 258)
+          .position(
+            x: min(max(request.location.x + 129, 137), proxy.size.width - 137),
+            y: min(
+              max(request.location.y + menuHeight / 2, menuHeight / 2 + 8),
+              proxy.size.height - menuHeight / 2 - 8)
+          )
+      }
+    }
+    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .topLeading)))
+    .zIndex(50)
+  }
+
+  private var target: ViewportContextMenuTarget {
+    SubObjectSelection.contextMenuTarget(
+      pointerTarget: request.pointerTarget,
+      selectedPartID: workspace.selectedPartID
+    )
+  }
+
+  private var menuHeight: CGFloat {
+    switch target {
+    case .canvas: 154
+    case .selectedComponent: 430
+    }
+  }
+
+  @ViewBuilder
+  private var menuPanel: some View {
+    switch target {
+    case .canvas:
+      VStack(spacing: 3) {
+        menuButton("Show All", systemImage: "eye") {
+          workspace.showAllComponents()
+        }
+        menuButton("Zoom to Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") {
+          workspace.showHomeView()
+        }
+        menuButton("Isometric", systemImage: "cube") {
+          workspace.showHomeView()
+        }
+      }
+      .studioPopupSurface()
+    case .selectedComponent:
+      if let state = workspace.selectedComponentContextMenuState {
+        ScrollView {
+          VStack(spacing: 3) {
+            HStack(spacing: 8) {
+              Image(systemName: state.primitiveKind.systemImage)
+                .foregroundStyle(StudioPalette.semanticPart)
+              Text(state.displayName)
+                .font(.callout.weight(.semibold))
+              Spacer()
+              Text(state.primitiveKind.displayName)
+                .font(.caption2)
+                .foregroundStyle(StudioPalette.muted)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 6)
+            menuDivider
+            menuButton("Edit Properties…", systemImage: "slider.horizontal.3") {
+              workspace.showComponentInspector(.properties)
+            }
+            ForEach(state.dependencies) { dependency in
+              menuButton(dependency.displayName, systemImage: "link") {
+                workspace.selectAttachedMate(dependency.id)
+              }
+            }
+            menuDivider
+            menuButton(
+              state.isVisible ? "Hide Component" : "Show Component",
+              systemImage: state.isVisible ? "eye.slash" : "eye",
+              isDisabled: state.isLocked
+            ) {
+              workspace.toggleSelectedComponentVisibility()
+            }
+            menuButton(
+              state.isIsolated ? "Show All Components" : "Hide Other Components",
+              systemImage: state.isIsolated ? "square.3.layers.3d.top.filled" : "viewfinder"
+            ) {
+              state.isIsolated
+                ? workspace.showAllComponents()
+                : workspace.toggleSelectedComponentIsolation()
+            }
+            menuButton(
+              state.isTransparent ? "Restore Opacity" : "Make Transparent",
+              systemImage: state.isTransparent ? "circle.fill" : "circle.lefthalf.filled",
+              isDisabled: state.isLocked
+            ) {
+              workspace.toggleSelectedComponentTransparency()
+            }
+            menuButton(
+              workspace.rigGuideVisibility.showsConnectors ? "Hide Mates" : "Show Mates",
+              systemImage: "link"
+            ) {
+              workspace.toggleRigConnectors()
+            }
+            menuDivider
+            menuButton("Select All Components", systemImage: "square.stack.3d.up") {
+              workspace.selectAllComponents()
+            }
+            menuButton("Clear Selection", systemImage: "xmark.circle") {
+              workspace.clearSelection()
+            }
+            menuButton("Zoom to Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") {
+              workspace.showHomeView()
+            }
+            menuButton("Zoom to Selection", systemImage: "viewfinder") {
+              workspace.frameSelection()
+            }
+            menuDivider
+            menuButton(state.lockActionTitle, systemImage: state.lockActionSystemImage) {
+              workspace.toggleSelectedComponentLock()
+            }
+            menuButton(
+              "Reset Position & Rotation",
+              systemImage: "arrow.counterclockwise",
+              isDisabled: state.isLocked
+            ) {
+              workspace.resetSelectedComponentTransform()
+            }
+            menuButton("Edit Appearance…", systemImage: "paintpalette") {
+              workspace.showComponentInspector(.appearance)
+            }
+          }
+        }
+        .frame(height: menuHeight)
+        .studioPopupSurface()
+      }
+    }
+  }
+
+  private var menuDivider: some View {
+    Divider()
+      .overlay(StudioPalette.border)
+      .padding(.vertical, 3)
+  }
+
+  private func menuButton(
+    _ title: String,
+    systemImage: String,
+    isDisabled: Bool = false,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button {
+      action()
+      dismiss()
+    } label: {
+      HStack(spacing: 9) {
+        Image(systemName: systemImage)
+          .frame(width: 17)
+        Text(title)
+          .lineLimit(1)
+        Spacer(minLength: 8)
+      }
+      .font(.callout)
+      .padding(.horizontal, 7)
+      .frame(height: 27)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(isDisabled)
+  }
+}
