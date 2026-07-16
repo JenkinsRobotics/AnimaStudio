@@ -50,7 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
-| Codex | UI Dev reference widgets pack 02: tab views | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTabWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive compact action/settings/theme panel; interactive multi-document tab strip with selection, close, and add; Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | in progress |
+| Codex | UI Dev reference widgets pack 02: tab views | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTabWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive compact action/settings/theme panel; interactive multi-document tab strip with selection, close, and add; Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 01 | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive layered icon list; dismissible notification popup; layout/border/spacing/background controls; dedicated Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev all-surfaces Template Matrix | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | default matrix board grouped by windows/workspaces, timelines, inspectors, panels, dialogs/popovers, controls, and status; production-size Recent Projects specimen; stable coverage catalog; focused/full Swift tests; lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Claude | Wire protocol host + loopback simulator | `anima_studio/wire.py`, `anima_studio/sim.py`, `anima_studio/clips.py`, `anima_studio/tests/test_wire.py`, `anima_studio/tests/test_sim.py`, `anima_studio/tests/test_clips.py` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (74 passed) | released 2026-07-14 |
@@ -157,6 +157,16 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Handoff log
 
+- **2026-07-15 (Codex, UI Dev Reference Widgets pack 02):** Added the two
+  supplied tab references as isolated, reusable SwiftUI specimens. The compact
+  panel has primary/settings commands, visible shortcuts, command feedback, and
+  a live Light/Dark segmented switch. The multi-document strip supports tab
+  selection, hover, close-with-neighbor-selection, and new-tab creation beside
+  macOS traffic-light context. Both are available in UI Dev → References and
+  the 27-template matrix without replacing production navigation. Eight focused
+  catalog tests, all 199 Swift tests, recursive strict format lint, native
+  Xcode/root-app build, strict signature verification, and `git diff --check`
+  pass. The app launches, but accessibility reports zero windows in this session.
 - **2026-07-15 (Claude, `.scene.anima` execution v1 — B10 offline
   playback, backend):** Shipped `anima_studio/scene.py` (123 new tests
   in `anima_studio/tests/test_scene.py`; 583 suite total, ruff clean;

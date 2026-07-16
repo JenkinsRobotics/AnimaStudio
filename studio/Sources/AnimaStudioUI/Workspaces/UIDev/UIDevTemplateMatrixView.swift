@@ -76,6 +76,8 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case layeredIconList
   case notificationPopup
   case layoutStyleControls
+  case compactTabPanel
+  case documentTabStrip
   case navigator
   case workspace3D
   case agent
@@ -130,6 +132,9 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .agent, "Anima Agent", "Docked assistant; never a floating default.",
       .windowsAndWorkspaces, 360, 560, 410, "sparkles"),
+    descriptor(
+      .documentTabStrip, "Document Tab Strip", "Open projects with select, close, and add.",
+      .windowsAndWorkspaces, 980, 88, 150, "rectangle.split.3x1"),
 
     descriptor(
       .animationTimeline, "Animation Timeline", "Tracks, playhead, keys, and transport.",
@@ -193,6 +198,9 @@ enum UIDevTemplateMatrixCatalog {
       .layoutStyleControls, "Layout & Style Controls",
       "Layout, border, spacing, and background inspector groups.",
       .controls, 980, 620, 520, "rectangle.3.group.bubble"),
+    descriptor(
+      .compactTabPanel, "Compact Action Panel", "Primary command, settings, and theme switch.",
+      .controls, 320, 190, 260, "rectangle.3.group"),
 
     descriptor(
       .emptyState, "Empty Workspace", "A clear next action when no rig content exists.",
@@ -373,6 +381,10 @@ struct UIDevTemplateMatrixView: View {
       scaledLab(designSize: CGSize(width: 980, height: 620)) {
         UIDevReferenceWidgetSpecimen(kind: .layoutStyleControls)
       }
+    case .compactTabPanel:
+      UIDevReferenceWidgetSpecimen(kind: .compactTabPanel)
+    case .documentTabStrip:
+      UIDevReferenceWidgetSpecimen(kind: .documentTabStrip)
     case .navigator: navigatorTemplate
     case .workspace3D: workspaceTemplate
     case .agent: agentTemplate

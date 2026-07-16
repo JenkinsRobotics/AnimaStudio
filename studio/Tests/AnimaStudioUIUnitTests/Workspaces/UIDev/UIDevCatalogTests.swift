@@ -70,13 +70,18 @@ final class UIDevCatalogTests: XCTestCase {
   func testReferenceWidgetPackHasStableKindsAndMatrixEntries() {
     XCTAssertEqual(
       UIDevReferenceWidgetKind.allCases,
-      [.layeredIconList, .notificationPopup, .layoutStyleControls]
+      [
+        .layeredIconList, .notificationPopup, .layoutStyleControls, .compactTabPanel,
+        .documentTabStrip,
+      ]
     )
 
     let matrixIDs = Set(UIDevTemplateMatrixCatalog.templates.map(\.id))
     XCTAssertTrue(matrixIDs.contains(.layeredIconList))
     XCTAssertTrue(matrixIDs.contains(.notificationPopup))
     XCTAssertTrue(matrixIDs.contains(.layoutStyleControls))
+    XCTAssertTrue(matrixIDs.contains(.compactTabPanel))
+    XCTAssertTrue(matrixIDs.contains(.documentTabStrip))
 
     for widget in UIDevReferenceWidgetKind.allCases {
       XCTAssertFalse(widget.title.isEmpty)
@@ -84,5 +89,25 @@ final class UIDevCatalogTests: XCTestCase {
       XCTAssertGreaterThan(widget.idealSize.width, 0)
       XCTAssertGreaterThan(widget.idealSize.height, 0)
     }
+  }
+
+  func testTabReferencePackHasReadableDefaultsAndProductionProportions() throws {
+    XCTAssertEqual(UIDevPreviewTheme.allCases, [.light, .dark])
+    XCTAssertEqual(
+      UIDevDocumentTab.samples.map(\.title),
+      ["db1_addresses", "db1_archive", "db1_books", "db1_urgent"]
+    )
+
+    let compact = try XCTUnwrap(
+      UIDevTemplateMatrixCatalog.templates.first { $0.id == .compactTabPanel }
+    )
+    let documents = try XCTUnwrap(
+      UIDevTemplateMatrixCatalog.templates.first { $0.id == .documentTabStrip }
+    )
+
+    XCTAssertEqual(compact.category, .controls)
+    XCTAssertEqual(documents.category, .windowsAndWorkspaces)
+    XCTAssertGreaterThan(documents.idealWidth, compact.idealWidth)
+    XCTAssertLessThan(documents.idealHeight, compact.idealHeight)
   }
 }

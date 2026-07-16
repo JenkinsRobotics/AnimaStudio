@@ -137,6 +137,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev Reference Widgets pack 02 complete:** Added two
+  interactive tab patterns from Jonathan's supplied references. The compact
+  action panel includes New Query and Settings commands, visible keyboard
+  shortcuts, command feedback, and a live Light/Dark segmented switch. The
+  multi-document strip includes macOS window context, selectable and hoverable
+  tabs, per-tab close behavior that preserves a valid selection, horizontal
+  overflow, and new-tab creation. Both live in a dedicated maintainable source
+  file and appear in UI Dev → References plus the global matrix, now at 27
+  templates; production navigation remains unchanged pending review. Eight
+  focused tests and all 199 Swift tests, recursive format lint, Xcode/root-app
+  builds, strict signature verification, and `git diff --check` pass. The app
+  launches, while macOS again reports zero accessibility-visible windows.
+
 - **2026-07-15 — UI Dev Reference Widgets pack 01 complete:** Added a dedicated
   Reference Widgets ribbon lab and three reusable, interactive SwiftUI
   prototypes based on Jonathan's supplied images: a layered icon/tree list, a

@@ -4,6 +4,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
   case layeredIconList
   case notificationPopup
   case layoutStyleControls
+  case compactTabPanel
+  case documentTabStrip
 
   var id: Self { self }
 
@@ -12,6 +14,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .layeredIconList: "Layered Icon List"
     case .notificationPopup: "Notification Popup"
     case .layoutStyleControls: "Layout & Style Controls"
+    case .compactTabPanel: "Compact Action Panel"
+    case .documentTabStrip: "Document Tab Strip"
     }
   }
 
@@ -23,6 +27,10 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
       "A dismissible, focused announcement with compact supporting content."
     case .layoutStyleControls:
       "Composable layout, border, spacing, and background inspector groups."
+    case .compactTabPanel:
+      "Primary and settings actions with shortcuts plus an immediate theme switch."
+    case .documentTabStrip:
+      "Selectable, closable project tabs with macOS window context and new-tab control."
     }
   }
 
@@ -31,6 +39,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .layeredIconList: "list.bullet.indent"
     case .notificationPopup: "bell.badge"
     case .layoutStyleControls: "rectangle.3.group.bubble"
+    case .compactTabPanel: "rectangle.3.group"
+    case .documentTabStrip: "rectangle.split.3x1"
     }
   }
 
@@ -39,6 +49,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .layeredIconList: CGSize(width: 380, height: 680)
     case .notificationPopup: CGSize(width: 340, height: 430)
     case .layoutStyleControls: CGSize(width: 980, height: 620)
+    case .compactTabPanel: CGSize(width: 320, height: 190)
+    case .documentTabStrip: CGSize(width: 980, height: 88)
     }
   }
 }
@@ -64,6 +76,23 @@ struct UIDevReferenceWidgetsView: View {
         }
 
         referenceCard(.layoutStyleControls)
+
+        StudioSectionHeader(
+          title: "Reference Widgets · Pack 02 · Tab Views",
+          detail:
+            "Two interactive tab patterns: a compact command panel and a scalable multi-document strip.",
+          systemImage: "rectangle.split.3x1"
+        )
+
+        LazyVGrid(
+          columns: [GridItem(.adaptive(minimum: 430, maximum: 680), alignment: .top)],
+          alignment: .leading,
+          spacing: 18
+        ) {
+          referenceCard(.compactTabPanel)
+        }
+
+        referenceCard(.documentTabStrip)
       }
       .frame(maxWidth: 1_440, alignment: .topLeading)
       .padding(24)
@@ -117,6 +146,10 @@ struct UIDevReferenceWidgetSpecimen: View {
       UIDevNotificationPopupWidget()
     case .layoutStyleControls:
       UIDevLayoutStyleControlsWidget()
+    case .compactTabPanel:
+      UIDevCompactTabPanelWidget()
+    case .documentTabStrip:
+      UIDevDocumentTabStripWidget()
     }
   }
 }
