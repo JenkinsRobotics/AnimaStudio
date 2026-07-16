@@ -49,7 +49,7 @@ final class UIDevCatalogTests: XCTestCase {
   func testTemplateMatrixCoversEveryCategoryWithStableUniqueTemplates() {
     let templates = UIDevTemplateMatrixCatalog.templates
 
-    XCTAssertEqual(templates.count, 30)
+    XCTAssertEqual(templates.count, 31)
     XCTAssertEqual(Set(templates.map(\.id)).count, templates.count)
     XCTAssertEqual(Set(templates.map(\.id)), Set(UIDevTemplateID.allCases))
     XCTAssertTrue(templates.allSatisfy { !$0.title.isEmpty && !$0.detail.isEmpty })
@@ -95,6 +95,7 @@ final class UIDevCatalogTests: XCTestCase {
         .layeredIconList, .notificationPopup, .layoutStyleControls, .compactTabPanel,
         .documentTabStrip, .materialEditor, .timelineDesignB,
         .conceptTemplateCards,
+        .iconThemeSelector,
       ]
     )
 
@@ -107,6 +108,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertTrue(matrixIDs.contains(.materialEditor))
     XCTAssertTrue(matrixIDs.contains(.timelineDesignB))
     XCTAssertTrue(matrixIDs.contains(.conceptTemplateCards))
+    XCTAssertTrue(matrixIDs.contains(.iconThemeSelector))
 
     for widget in UIDevReferenceWidgetKind.allCases {
       XCTAssertFalse(widget.title.isEmpty)
@@ -114,6 +116,51 @@ final class UIDevCatalogTests: XCTestCase {
       XCTAssertGreaterThan(widget.idealSize.width, 0)
       XCTAssertGreaterThan(widget.idealSize.height, 0)
     }
+  }
+
+  func testIconSelectorThemeLabHasDistinctCompletePalettes() throws {
+    XCTAssertEqual(
+      UIDevIconThemePalette.allCases,
+      [.light, .dark, .graphite, .midnight, .neon]
+    )
+    XCTAssertEqual(
+      UIDevIconSelectorItem.allCases,
+      [.rig, .nodes, .viewport, .show]
+    )
+    XCTAssertEqual(Set(UIDevIconThemePalette.allCases.map { $0.palette.accent.red }).count, 5)
+    XCTAssertTrue(UIDevIconThemePalette.allCases.allSatisfy { !$0.title.isEmpty })
+    XCTAssertTrue(
+      UIDevIconSelectorItem.allCases.allSatisfy { !$0.title.isEmpty && !$0.systemImage.isEmpty }
+    )
+    XCTAssertTrue(
+      UIDevIconThemePalette.allCases.allSatisfy {
+        contrastRatio($0.palette.foreground, $0.palette.canvas) >= 4.5
+          && contrastRatio($0.palette.selectedForeground, $0.palette.accent) >= 4.5
+      }
+    )
+
+    let descriptor = try XCTUnwrap(
+      UIDevTemplateMatrixCatalog.templates.first { $0.id == .iconThemeSelector }
+    )
+    XCTAssertEqual(descriptor.category, .controls)
+    XCTAssertGreaterThanOrEqual(descriptor.idealWidth, 1_000)
+  }
+
+  private func contrastRatio(_ first: StudioColorToken, _ second: StudioColorToken) -> Double {
+    let firstLuminance = relativeLuminance(first)
+    let secondLuminance = relativeLuminance(second)
+    return (max(firstLuminance, secondLuminance) + 0.05)
+      / (min(firstLuminance, secondLuminance) + 0.05)
+  }
+
+  private func relativeLuminance(_ token: StudioColorToken) -> Double {
+    func linear(_ component: Double) -> Double {
+      component <= 0.04045
+        ? component / 12.92
+        : pow((component + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * linear(token.red) + 0.7152 * linear(token.green)
+      + 0.0722 * linear(token.blue)
   }
 
   func testConceptTemplateCardsCoverReusableStartingPointFamilies() throws {

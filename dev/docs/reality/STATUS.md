@@ -120,7 +120,7 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on an **all-surfaces Template Matrix**: thirty current app
+  UI Dev opens on an **all-surfaces Template Matrix**: thirty-one current app
   specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
   Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
   States. Every specimen is visible together in a responsive board and names
@@ -171,8 +171,14 @@
   tools/resources, assembly import, motion sequencing, and character outputs.
   The responsive cards provide purpose-built illustrations, title/detail/action
   hierarchy, hover and selected states, and explicit prototype-action feedback;
-  they are available in both Reference Widgets and the Template Matrix. None of
-  these reference widgets is wired into an
+  they are available in both Reference Widgets and the Template Matrix. Pack 06
+  adds an interactive **Icon Selector & Theme Lab** with a hover/select icon
+  dock and Edit/Duplicate/Delete menu patterns. The same specimen switches
+  among isolated Light, Dark, Graphite, Midnight, and Neon palette specs;
+  selected-icon foreground colors are contrast checked. These palettes remain
+  local to UI Dev until human review and a deliberate refactor of the app's
+  dark-only appearance assumptions. None of these reference widgets is wired
+  into an
   operator workflow until it is reviewed and adopted there. The separate
   **Live UI Kit** remains available with a resizable Design Inspector
   beside a production-component catalog. The inspector edits the shared Studio surface

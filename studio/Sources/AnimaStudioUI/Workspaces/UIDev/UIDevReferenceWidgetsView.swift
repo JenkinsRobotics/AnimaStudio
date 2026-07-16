@@ -9,6 +9,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
   case materialEditor
   case timelineDesignB
   case conceptTemplateCards
+  case iconThemeSelector
 
   var id: Self { self }
 
@@ -22,6 +23,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .materialEditor: "Material Editor"
     case .timelineDesignB: "Timeline Design B"
     case .conceptTemplateCards: "Concept Template Cards"
+    case .iconThemeSelector: "Icon Selector & Theme Lab"
     }
   }
 
@@ -43,6 +45,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
       "Multiple timeline views over shared rows, keyframes, playhead, and connected motion data."
     case .conceptTemplateCards:
       "Selectable starting-point cards with illustrations, descriptions, and clear actions."
+    case .iconThemeSelector:
+      "A hoverable icon dock and context menu rendered across five isolated color themes."
     }
   }
 
@@ -56,6 +60,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .materialEditor: "circle.hexagongrid.fill"
     case .timelineDesignB: "timeline.selection"
     case .conceptTemplateCards: "rectangle.grid.3x2"
+    case .iconThemeSelector: "square.grid.2x2"
     }
   }
 
@@ -69,6 +74,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .materialEditor: CGSize(width: 410, height: 620)
     case .timelineDesignB: CGSize(width: 1_080, height: 560)
     case .conceptTemplateCards: CGSize(width: 1_080, height: 680)
+    case .iconThemeSelector: CGSize(width: 1_040, height: 620)
     }
   }
 }
@@ -144,6 +150,15 @@ struct UIDevReferenceWidgetsView: View {
         )
 
         referenceCard(.conceptTemplateCards)
+
+        StudioSectionHeader(
+          title: "Reference Widgets · Pack 06 · Icon Selector & Theme Lab",
+          detail:
+            "Compare the selected-icon dock and contextual menu through Light, Dark, Graphite, Midnight, and Neon palettes.",
+          systemImage: "square.grid.2x2"
+        )
+
+        referenceCard(.iconThemeSelector)
       }
       .frame(maxWidth: 1_440, alignment: .topLeading)
       .padding(24)
@@ -207,6 +222,8 @@ struct UIDevReferenceWidgetSpecimen: View {
       UIDevTimelineDesignBView()
     case .conceptTemplateCards:
       UIDevConceptTemplateCardsView()
+    case .iconThemeSelector:
+      UIDevIconThemeSelectorView()
     }
   }
 }

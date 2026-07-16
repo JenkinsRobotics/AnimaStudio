@@ -148,6 +148,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev Reference Widgets pack 06 complete:** Added a reusable
+  Icon Selector & Theme Lab with a four-tool dock, hover/selection/glow states,
+  native right-click actions, and a persistent Edit/Duplicate/Delete menu
+  specimen. The responsive lab switches among isolated Light, Dark, Graphite,
+  Midnight, and Neon palette specs and exposes their visual tokens; selected
+  foreground/accent pairs are contrast checked. It appears in Reference Widgets
+  and the now 31-entry Template Matrix. Palette switching remains UI Dev-local
+  until human approval and a deliberate app-wide appearance-token refactor.
+  Thirteen focused and all 209 Swift tests pass with strict claimed-file lint,
+  root-app build/signature, launch, and `git diff --check`.
+
 - **2026-07-15 — FANUC-style structured logic node concepts complete:** Nodes
   now separates Program Logic, Conditions, I/O & Registers, and Background
   Logic. New placeable cards cover IF/ELSE, single-line IF, SELECT, CALL, WAIT

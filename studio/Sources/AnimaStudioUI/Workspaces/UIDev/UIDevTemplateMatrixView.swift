@@ -86,6 +86,7 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case showTimeline
   case timelineDesignB
   case conceptTemplateCards
+  case iconThemeSelector
   case componentInspector
   case appearanceInspector
   case mateEditor
@@ -222,6 +223,10 @@ enum UIDevTemplateMatrixCatalog {
       .conceptTemplateCards, "Concept Template Cards",
       "Starting points for onboarding, empty workspaces, and add-content flows.",
       .statusAndFeedback, 1_080, 680, 520, "rectangle.grid.3x2"),
+    descriptor(
+      .iconThemeSelector, "Icon Selector & Theme Lab",
+      "Selected icons and contextual actions compared across five palettes.",
+      .controls, 1_040, 620, 500, "square.grid.2x2"),
   ]
 
   static func templates(in category: UIDevTemplateCategory) -> [UIDevTemplateDescriptor] {
@@ -410,6 +415,10 @@ struct UIDevTemplateMatrixView: View {
     case .conceptTemplateCards:
       scaledLab(designSize: CGSize(width: 1_080, height: 680)) {
         UIDevReferenceWidgetSpecimen(kind: .conceptTemplateCards)
+      }
+    case .iconThemeSelector:
+      scaledLab(designSize: CGSize(width: 1_040, height: 620)) {
+        UIDevReferenceWidgetSpecimen(kind: .iconThemeSelector)
       }
     case .componentInspector: componentInspectorTemplate
     case .appearanceInspector: appearanceTemplate

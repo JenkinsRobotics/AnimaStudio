@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | UI Dev reference widgets pack 06: icon selector + theme lab | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevIconThemeSelectorView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | reusable hover/select icon dock; themed context menu preview; isolated Light, Dark, Graphite, Midnight, and Neon palette specs; responsive Theme Lab and Template Matrix entry; honest preview-only boundary before app-wide adoption; focused/full tests; claimed-file lint; root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | FANUC-style structured logic node concepts | `studio/Sources/AnimaStudioUI/Workspaces/Nodes/**`, `studio/Sources/AnimaStudioUI/Workspaces/WorkspaceRibbonCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Nodes/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/WorkspaceRibbonCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | visual IF/ELSE, IF guard, SELECT, CALL, WAIT UNTIL, boolean, I/O/register/flag/position-register, background-monitor, and end-scene nodes; typed ports and manual-syntax properties; JMP/LBL visible only as explicitly unsupported import references so the structured/reducible graph contract stays truthful; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 05: concept template cards | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevConceptTemplateCardsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | reusable responsive concept-card component; multiple Anima templates; illustration/title/detail/action hierarchy; selectable, hover, and action feedback states; Reference Widgets lab and Template Matrix entry; focused/full tests; claimed-file lint; root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | Nodes voice/AI/input/output concept pack | `studio/Sources/AnimaStudioUI/Workspaces/Nodes/**`, `studio/Sources/AnimaStudioUI/Workspaces/WorkspaceRibbonCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/Nodes/**`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/WorkspaceRibbonCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | dedicated Inputs, Voice & AI, and Outputs families; STT/TTS/LLM/memory/tool and device I/O concepts; typed visual ports; placeable but explicitly non-runtime concept cards; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -169,6 +170,17 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Handoff log
 
+- **2026-07-15 (Codex, UI Dev Reference Widgets pack 06):** Added a reusable
+  Icon Selector & Theme Lab with a rounded four-tool dock, hover and selected
+  states, selected glow, native context actions, and a persistent themed
+  Edit/Duplicate/Delete menu specimen. The responsive lab switches among
+  isolated Light, Dark, Graphite, Midnight, and Neon palette specs and shows
+  their tokens for comparison; selected foreground/accent pairs are contrast
+  checked. It appears in Reference Widgets and raises the Template Matrix to 31
+  entries. Palette switching is intentionally local to UI Dev pending human
+  approval and an app-wide appearance-token refactor. Thirteen focused and all
+  209 Swift tests pass with claimed-file strict lint, root-app build, signature
+  verification, launch, and `git diff --check`.
 - **2026-07-15 (Codex, FANUC-style structured logic node concepts):** Expanded
   Nodes with Program Logic, Conditions, I/O & Registers, and Background Logic
   families. Placeable cards now cover IF/ELSE, single-line IF, SELECT, CALL,
