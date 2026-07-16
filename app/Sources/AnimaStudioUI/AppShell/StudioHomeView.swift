@@ -3,6 +3,8 @@ import SwiftUI
 struct StudioHomeView: View {
   let recentProjects: [RecentProjectSummary]
   let createProject: () -> Void
+  let openProject: () -> Void
+  let openRecentProject: (RecentProjectSummary) -> Void
 
   var body: some View {
     VStack(spacing: 0) {
@@ -41,9 +43,8 @@ struct StudioHomeView: View {
       homeAction(
         title: "Open A Project",
         systemImage: "folder",
-        isEnabled: false
-      ) {}
-      .help("Project opening will be enabled by the P0 document layer")
+        action: openProject
+      )
 
       HStack {
         Text("Recent Projects")
@@ -66,15 +67,17 @@ struct StudioHomeView: View {
         ScrollView {
           LazyVStack(spacing: 8) {
             ForEach(recentProjects) { project in
-              RecentProjectCard(project: project)
+              RecentProjectCard(project: project) {
+                openRecentProject(project)
+              }
             }
           }
           .padding(.vertical, 2)
         }
 
         Label(
-          "Cards record real recency. Reopening is enabled with project documents.",
-          systemImage: "info.circle"
+          "Project folders reopen from their saved security-scoped locations.",
+          systemImage: "folder.badge.checkmark"
         )
         .font(.caption2)
         .foregroundStyle(StudioPalette.muted)
@@ -146,7 +149,7 @@ struct StudioHomeView: View {
 
   private var bottomResources: some View {
     HStack(spacing: 14) {
-      Label("Project documents in progress", systemImage: "shippingbox")
+      Label("Plain-folder project documents", systemImage: "folder")
       Divider().frame(height: 18)
       Label("Kinematic preview", systemImage: "figure.walk.motion")
       Divider().frame(height: 18)

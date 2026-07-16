@@ -1,3 +1,4 @@
+import AnimaDocument
 import AnimaEvaluation
 import AnimaModel
 import AppKit
@@ -6,16 +7,23 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct StudioWorkspaceView: View {
+  @Binding var session: StudioProjectSession
   let closeProject: () -> Void
+  let newProject: () -> Void
+  let openProject: () -> Void
+  let didPersistProject: (StudioProjectSession) -> Void
   @Binding var designProfile: StudioDesignProfile
 
-  @State private var workspace = StudioWorkspaceModel()
+  @State private var workspace: StudioWorkspaceModel
   @State private var isImportingModel = false
   @State private var isImportingAnimaCharacter = false
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
   @State private var viewportPointerTarget = ViewportPointerTarget.canvas
+  @State private var lifecycleErrorMessage: String?
+  @State private var isSavingProject = false
+  @State private var didLoadIndexedCharacter = false
   @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
@@ -44,17 +52,51 @@ struct StudioWorkspaceView: View {
   @AppStorage("viewportFieldOfViewDegrees") private var viewportFieldOfViewDegrees = 60.0
 
   init(
+    session: Binding<StudioProjectSession>,
+    designProfile: Binding<StudioDesignProfile> = .constant(.standard),
+    newProject: @escaping () -> Void = {},
+    openProject: @escaping () -> Void = {},
+    didPersistProject: @escaping (StudioProjectSession) -> Void = { _ in },
+    closeProject: @escaping () -> Void
+  ) {
+    _session = session
+    _designProfile = designProfile
+    _workspace = State(
+      initialValue: StudioWorkspaceModel(project: session.wrappedValue.document.project)
+    )
+    self.newProject = newProject
+    self.openProject = openProject
+    self.didPersistProject = didPersistProject
+    self.closeProject = closeProject
+  }
+
+  /// Preview/test convenience. Production always supplies a folder-backed
+  /// session from `AnimaStudioRootView`.
+  init(
     designProfile: Binding<StudioDesignProfile> = .constant(.standard),
     closeProject: @escaping () -> Void
   ) {
-    _designProfile = designProfile
-    self.closeProject = closeProject
+    let previewSession = StudioProjectSession(
+      document: ProjectLifecycle.makeEmptyDocument(name: "Untitled Character"),
+      projectURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent("AnimaStudio-Preview", isDirectory: true)
+    )
+    self.init(
+      session: .constant(previewSession),
+      designProfile: designProfile,
+      closeProject: closeProject
+    )
   }
 
   var body: some View {
     VStack(spacing: 0) {
       StudioDocumentBar(
         workspace: workspace,
+        isSaving: isSavingProject,
+        newProject: newProject,
+        openProject: openProject,
+        saveProject: { Task { await saveProject() } },
+        saveProjectAs: { Task { await saveProjectAs() } },
         closeProject: closeProject
       )
       Divider()
@@ -92,6 +134,7 @@ struct StudioWorkspaceView: View {
         if let url = urls.first {
           Task { @MainActor in
             await workspace.importModel(from: url)
+            copyImportedModelIntoActiveCharacter(from: url)
           }
         }
       case .failure(let error):
@@ -108,6 +151,7 @@ struct StudioWorkspaceView: View {
         if let url = urls.first {
           Task { @MainActor in
             await workspace.importAnimaCharacter(from: url)
+            registerLoadedCharacter(markDirty: true)
           }
         }
       case .failure(let error):
@@ -136,8 +180,20 @@ struct StudioWorkspaceView: View {
     } message: {
       Text(workspace.animaCoreErrorMessage ?? "Unknown engine error")
     }
+    .alert(
+      "Project Could Not Be Saved",
+      isPresented: Binding(
+        get: { lifecycleErrorMessage != nil },
+        set: { if !$0 { lifecycleErrorMessage = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(lifecycleErrorMessage ?? "Unknown project error")
+    }
     .task {
       await workspace.connectToAnimaCore()
+      await loadIndexedCharacterIfNeeded()
     }
     .task(id: workspace.isPlaying) {
       guard workspace.isPlaying else { return }
@@ -604,4 +660,167 @@ struct StudioWorkspaceView: View {
   private static let animaCharacterContentTypes: [UTType] = [
     UTType(filenameExtension: "anima") ?? .data
   ]
+
+  @MainActor
+  private func loadIndexedCharacterIfNeeded() async {
+    guard !didLoadIndexedCharacter, let character = session.document.activeCharacter else {
+      return
+    }
+    didLoadIndexedCharacter = true
+    do {
+      let projectURL = try session.resolvedProjectURL()
+      let accessed = projectURL.startAccessingSecurityScopedResource()
+      defer { if accessed { projectURL.stopAccessingSecurityScopedResource() } }
+      await workspace.importAnimaCharacter(
+        from: projectURL.appendingPathComponent(character.characterPath)
+      )
+      workspace.project.name = session.document.displayName
+      registerLoadedCharacter(markDirty: false)
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func registerLoadedCharacter(markDirty: Bool) {
+    guard workspace.animaCoreErrorMessage == nil,
+      let character = workspace.currentCharacterReference
+    else { return }
+    var updated = session
+    let projectName = updated.document.displayName
+    if let index = updated.document.characters.firstIndex(where: {
+      $0.folderName == character.folderName
+    }) {
+      updated.document.characters[index] = character
+    } else {
+      updated.document.characters.append(character)
+    }
+    updated.document.editorState.activeCharacterFolderName = character.folderName
+    updated.document.project = workspace.project
+    updated.document.project.name = projectName
+    workspace.project.name = projectName
+    updated.isDirty = markDirty
+    session = updated
+  }
+
+  @MainActor
+  private func saveProject() async {
+    guard !isSavingProject else { return }
+    isSavingProject = true
+    defer { isSavingProject = false }
+    do {
+      var updated = session
+      updated.document.project.name = workspace.project.name
+      let writes = try await projectFileWrites(updating: &updated.document)
+      let projectURL = try updated.resolvedProjectURL()
+      let accessed = projectURL.startAccessingSecurityScopedResource()
+      defer { if accessed { projectURL.stopAccessingSecurityScopedResource() } }
+      updated.document = try ProjectLifecycle.store.save(
+        updated.document,
+        to: projectURL,
+        fileWrites: writes
+      )
+      updated.projectURL = projectURL
+      updated.bookmarkData = ProjectLifecycle.bookmark(for: projectURL)
+      updated.isDirty = false
+      session = updated
+      didPersistProject(updated)
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func saveProjectAs() async {
+    guard !isSavingProject,
+      let destinationURL = ProjectLifecycle.chooseSaveAsURL(
+        currentName: session.document.displayName
+      )
+    else { return }
+    isSavingProject = true
+    defer { isSavingProject = false }
+    do {
+      var updated = session
+      updated.document.project.name = destinationURL.lastPathComponent
+      workspace.project.name = updated.document.project.name
+      let writes = try await projectFileWrites(updating: &updated.document)
+      let sourceURL = try updated.resolvedProjectURL()
+      let accessedSource = sourceURL.startAccessingSecurityScopedResource()
+      let accessedDestination = destinationURL.startAccessingSecurityScopedResource()
+      defer {
+        if accessedSource { sourceURL.stopAccessingSecurityScopedResource() }
+        if accessedDestination { destinationURL.stopAccessingSecurityScopedResource() }
+      }
+      updated.document = try ProjectLifecycle.store.saveAs(
+        updated.document,
+        from: sourceURL,
+        to: destinationURL,
+        fileWrites: writes
+      )
+      updated.projectURL = destinationURL
+      updated.bookmarkData = ProjectLifecycle.bookmark(for: destinationURL)
+      updated.isDirty = false
+      session = updated
+      didPersistProject(updated)
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func projectFileWrites(
+    updating document: inout AnimaStudioDocument
+  ) async throws -> [ProjectFileWrite] {
+    guard workspace.hasSerializableCharacter else { return [] }
+    guard let character = workspace.currentCharacterReference else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    if let index = document.characters.firstIndex(where: {
+      $0.folderName == character.folderName
+    }) {
+      document.characters[index] = character
+    } else {
+      document.characters.append(character)
+    }
+    document.editorState.activeCharacterFolderName = character.folderName
+    let canonicalText = try await workspace.serializedCharacterText()
+    let editorText = "{\n  \"format_version\" : \"1\"\n}\n"
+    return [
+      ProjectFileWrite(relativePath: character.characterPath, text: canonicalText),
+      ProjectFileWrite(relativePath: character.editorPath, text: editorText),
+    ]
+  }
+
+  @MainActor
+  private func copyImportedModelIntoActiveCharacter(from sourceURL: URL) {
+    guard workspace.importErrorMessage == nil,
+      let character = session.document.activeCharacter
+    else { return }
+    do {
+      var updated = session
+      let projectURL = try updated.resolvedProjectURL()
+      let accessedProject = projectURL.startAccessingSecurityScopedResource()
+      let accessedSource = sourceURL.startAccessingSecurityScopedResource()
+      defer {
+        if accessedProject { projectURL.stopAccessingSecurityScopedResource() }
+        if accessedSource { sourceURL.stopAccessingSecurityScopedResource() }
+      }
+      updated.document = try ProjectLifecycle.store.embedAsset(
+        from: sourceURL,
+        into: projectURL,
+        document: updated.document,
+        characterFolderName: character.folderName,
+        kind: "model3D"
+      )
+      if let asset = updated.document.assets.last,
+        case .embedded(let relativePath) = asset.storage
+      {
+        workspace.importedModelURL = projectURL.appendingPathComponent(relativePath)
+      }
+      updated.isDirty = true
+      session = updated
+    } catch {
+      workspace.importErrorMessage = error.localizedDescription
+    }
+  }
 }

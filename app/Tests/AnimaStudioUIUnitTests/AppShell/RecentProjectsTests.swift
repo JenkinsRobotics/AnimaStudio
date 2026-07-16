@@ -1,3 +1,4 @@
+import AnimaDocument
 import Foundation
 import XCTest
 
@@ -59,13 +60,34 @@ final class RecentProjectsTests: XCTestCase {
       revisionNumber: 12,
       milestoneName: "Stable gait",
       thumbnailKind: .character,
-      thumbnailPath: "/tmp/walker-preview.png"
+      thumbnailPath: "/tmp/walker-preview.png",
+      projectPath: "/tmp/Walker",
+      bookmarkData: Data([1, 2, 3])
     )
 
     RecentProjectsPersistence.save([project], to: defaults)
     let loaded = try XCTUnwrap(RecentProjectsPersistence.load(from: defaults).first)
 
     XCTAssertEqual(loaded, project)
+    XCTAssertTrue(loaded.canOpen)
+  }
+
+  func testProjectSessionProducesStableBookmarkBackedRecent() {
+    let document = ProjectLifecycle.makeEmptyDocument(name: "Walker")
+    let session = StudioProjectSession(
+      document: document,
+      projectURL: URL(fileURLWithPath: "/tmp/Walker", isDirectory: true),
+      bookmarkData: Data([4, 5, 6])
+    )
+    let recent = RecentProjectSummary.project(
+      session,
+      openedAt: Date(timeIntervalSince1970: 900)
+    )
+
+    XCTAssertEqual(recent.id, document.projectID)
+    XCTAssertEqual(recent.projectPath, "/tmp/Walker")
+    XCTAssertEqual(recent.bookmarkData, Data([4, 5, 6]))
+    XCTAssertTrue(recent.canOpen)
   }
 
   func testPersistenceKeepsOnlyTheTwelveMostRecentValidProjects() {

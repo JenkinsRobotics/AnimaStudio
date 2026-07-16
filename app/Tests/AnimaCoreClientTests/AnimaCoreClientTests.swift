@@ -22,6 +22,7 @@ struct AnimaCoreClientTests {
     #expect(hello.capabilities.contains("resolve_pose"))
     #expect(hello.capabilities.contains("mate_types"))
     #expect(hello.capabilities.contains("relation_types"))
+    #expect(hello.capabilities.contains("serialize_character"))
 
     let mateCatalog = try await client.mateTypes()
     #expect(
@@ -86,6 +87,21 @@ struct AnimaCoreClientTests {
     #expect(baseYawControls.offset.translationMeters == [0, 0, 0.012])
     #expect(baseYawControls.offset.rotationAxis == .z)
     #expect(abs(baseYawControls.offset.rotationRadians - .pi / 120) < 1e-12)
+    guard case .object(let rigDocument) = loaded.rigDocument else {
+      Issue.record("load_character.rig must remain a full-fidelity object")
+      return
+    }
+    #expect(rigDocument["clips"] != nil)
+    #expect(rigDocument["outputs"] != nil)
+
+    let serialized = try await client.serializeCharacter(rig: loaded.rigDocument)
+    #expect(serialized.text.contains("six_axis_arm"))
+    let reloaded = try await client.loadCharacter(text: serialized.text)
+    #expect(reloaded.rig.identity == loaded.rig.identity)
+    #expect(reloaded.rig.parts == loaded.rig.parts)
+    #expect(reloaded.rig.joints.map(\.id) == loaded.rig.joints.map(\.id))
+    let reserialized = try await client.serializeCharacter(rig: reloaded.rigDocument)
+    #expect(reserialized.text.contains("base_yaw.rotation"))
 
     let evaluation = try await client.evaluate(
       handle: loaded.handle,
@@ -106,6 +122,7 @@ struct AnimaCoreClientTests {
     #expect(resolvedPose.parts["base"]?.orientation == [0, 0, 0, 1])
 
     try await client.release(handle: loaded.handle)
+    try await client.release(handle: reloaded.handle)
     await client.shutdown()
   }
 

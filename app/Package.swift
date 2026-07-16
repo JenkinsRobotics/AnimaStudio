@@ -39,7 +39,8 @@ let package = Package(
     .target(
       name: "AnimaStudioUI",
       dependencies: [
-        "AnimaCoreClient", "AnimaModel", "AnimaEvaluation", "RealityKitViewport",
+        "AnimaCoreClient", "AnimaDocument", "AnimaModel", "AnimaEvaluation",
+        "RealityKitViewport",
       ]
     ),
     .executableTarget(
@@ -71,7 +72,7 @@ let package = Package(
     ),
     .testTarget(
       name: "AnimaStudioUIUnitTests",
-      dependencies: ["AnimaModel", "AnimaEvaluation", "AnimaStudioUI"]
+      dependencies: ["AnimaDocument", "AnimaModel", "AnimaEvaluation", "AnimaStudioUI"]
     ),
   ]
 )

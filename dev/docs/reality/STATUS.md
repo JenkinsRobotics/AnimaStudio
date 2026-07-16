@@ -46,17 +46,17 @@
   positions and real-last quaternions directly in RealityKit at the playhead;
   it no longer infers a second hierarchy, connector frame, or mate motion in
   Swift. Continuous playhead evaluation is live for imported engine clips.
-  Save/open wrapping, canonical authoring mutation, scene playback, and hardware
-  output remain subsequent bridge packets. The
-  SwiftUI app launches into a Bottango-inspired dark home screen with a working
-  New Studio Project action and honestly disabled project-open/templates until
-  persistence ships. Its Recent Projects section now uses compact thumbnail
+  Canonical character mutation, scene loading/playback, and hardware output
+  remain subsequent bridge packets. The SwiftUI app launches into a
+  Bottango-inspired dark home screen with working New Studio Project and Open
+  Project actions. Its Recent Projects section uses compact thumbnail
   cards with the project name, actual last-opened timestamp, revision badge,
   and optional milestone metadata. Records are recency-sorted, deduplicated,
   capped at twelve, and stored as versioned user-local metadata. Cards load a
   cached render path when one exists and otherwise show an honest project-type
-  preview. Creating the current scratch project records its V1 entry; reopening
-  remains visibly unavailable until P0 produces durable project documents. A
+  preview. Records carry the real project-folder path plus a security-scoped
+  bookmark; clicking a card reopens the folder, reads its manifest, and loads
+  its active character through AnimaCore. A
   new project now opens as a genuinely empty project in the first **Assets**
   workspace rather than silently inserting the sample mechanism or jumping
   ahead to Rig. The workspace-model initializer accepts an alternate startup
@@ -404,31 +404,38 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Two hundred sixteen tests pass with
+  inspector. Two hundred twenty-one tests pass with
   `cd app && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key
   navigation, and loop/non-loop playback. The Swift side also ships the
-  durable document layer as a UI-free `AnimaDocument` package target:
-  `AnimaDocumentStore` saves/loads versioned `.animastudio` directory
-  packages (`project.json` manifest with `format_version` "1", display
-  name, per-save revision counter for the recents V-badge, optional
-  milestone name, ISO-8601 modified date, the encoded AnimaModel project,
-  and an asset table; `Assets/` holds embedded payloads). Saves are
+  durable document layer as a UI-free `AnimaDocument` package target.
+  `AnimaDocumentStore` saves/loads the version-2 **plain folder** layout:
+  `project.json` owns project id/name, dates, revision, milestone,
+  character/scene indices, editor state, and an asset table;
+  `characters/<name>/<name>.character.anima` and
+  `scenes/<name>.scene.anima` remain separate canonical engine documents;
+  character assets live under `characters/<name>/assets/`. The manifest never
+  encodes the Swift rig or clips. Saves are
   atomic (staged temp directory swapped into place — a crashed save never
   corrupts an existing package) and deterministic (sorted keys, stable
   asset ordering: identical input encodes byte-identically). Assets are
   SolidWorks-assembly style: `embedded` copies the payload into the
   package, `linked` records the external absolute path plus a
-  security-scoped bookmark, and resolution returns an explicit
-  needs-relink state for stale/missing links instead of throwing.
-  Corrupt manifests, unsupported versions, duplicate asset names/IDs,
-  missing payloads, and any manifest path escaping the package are
+  security-scoped bookmark, and resolution returns an explicit needs-relink
+  state for stale/missing links instead of throwing. Save accepts canonical
+  text as an opaque write only after `serialize_character`; Open sends the
+  indexed file through `load_character`. Save As copies the source folder,
+  applies dirty files atomically, increments revision, and retargets the open
+  session without modifying the source. Native New/Open/Save/Save As controls
+  are live, and imported models are copied under the active character's assets
+  directory. Corrupt manifests, unsupported versions, duplicate
+  character/scene/asset names or IDs, missing canonical documents/payloads,
+  and any path escaping the project are
   rejected with typed, user-presentable errors (traversal is validated
-  before the path touches the filesystem). Save/open/dirty-state UI
-  wiring on top of this store has not landed yet — reopening from the
-  home screen stays honestly disabled until it does. The Python
-  package skeleton also
+  before the path touches the filesystem). A live integration test proves
+  engine load → engine serialize → atomic project save → project reopen →
+  engine reload. The Python package skeleton also
   installs with `pip install -e ".[dev]"`. The Python runtime now implements
   the Anima Wire Protocol v0 reference host (`animacore/wire.py` — encode
   HELLO/CFG/FRM/EN/STOP/PING, parse ANIMA/OK/ERR/PONG, 3-decimal normalized
@@ -633,15 +640,15 @@
   world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display
   triangle mesh lines, not classified CAD feature edges; hidden-line removal,
   section views, camera roll, and saved named views are not implemented. Typed
-  prismatic/cylindrical/ball/planar/fastened joints
-  and keyframes are not yet editable; project changes are not
-  persisted; imported security-scoped URLs
-  last only for the current session. Project open/save, undo/redo, Home
-  templates, and live hardware controls are intentionally visible but disabled.
-  There is no `.anima` parsing in Studio (the Python runtime loads
-  `.character.anima` and executes the `.scene.anima` v1+v2 subset; Studio
-  parses neither, and the deferred scene actions — speech, expressions,
-  lights/LEDs, AI handoff, goto — execute nowhere), no
+  prismatic/cylindrical/ball/planar/fastened joints and keyframes are not yet
+  editable in the canonical rig DTO. Project folders and imported canonical
+  characters persist, but transitional Swift proxy component/mate edits are
+  not yet projected back into that DTO. Scene Open is deferred because the
+  bridge has no `load_scene` twin. Undo/redo, Home templates, and live hardware
+  controls remain visibly disabled. Studio never parses `.anima` itself:
+  AnimaCore loads and serializes `.character.anima` and executes the
+  `.scene.anima` v1+v2 subset; the deferred scene actions — speech, expressions,
+  lights/LEDs, AI handoff, and goto — execute nowhere. There are no
   editable Bézier curves/handles, audio, screens/LEDs, Live2D, Studio Show
   workspace playback, output
   node, JaegerOS connection, or full 52-blend-shape JP01 character file (a

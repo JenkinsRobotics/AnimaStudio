@@ -6,7 +6,7 @@ import Foundation
 /// reference file inside itself or links to an external file on disk.
 public enum DocumentAssetStorage: Equatable, Sendable {
   /// The payload was copied into the package. The path is package-relative
-  /// (always under `Assets/`).
+  /// (always under `characters/<name>/assets/`).
   case embedded(packageRelativePath: String)
   /// The payload lives outside the package. `externalPath` is the absolute
   /// path recorded at link time; `bookmarkData` is a macOS bookmark so the

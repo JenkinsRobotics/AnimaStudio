@@ -1,4 +1,4 @@
-# Project format — the `.animastudio` project folder (planned)
+# Project format — the Anima Studio plain project folder
 
 > How Anima Studio creates, saves, and reopens a project (Jonathan,
 > 2026-07-16). A project is a **folder**, not one file: canonical engine
@@ -117,7 +117,15 @@ write a broken file. To make the round-trip lossless the engine
 `keyframes`, output ranges, per-DOF `axis_vector`/`name`/`description`,
 joint `description` — nothing renamed/removed).
 
-Remaining app-side work: `AnimaDocument` (the P0A manifest/asset
-machinery) is revised from its flat bundle to this nested folder
-layout — the store logic carries; the layout gets richer. Codex wires
-the folder writing; the engine owns the `.anima` text.
+The Swift app-side P0 lifecycle shipped on 2026-07-16: `AnimaDocument`
+uses `project.json` format version 2, native New/Open/Save/Save As
+dialogs, atomic folder replacement, active-character asset copying,
+and security-scoped bookmark-backed recents. The app retains the full
+`load_character.rig` JSON value and passes it unchanged to
+`serialize_character`; it does not reconstruct or hand-format YAML.
+
+Remaining lifecycle work is scene reopening (`load_scene` does not yet
+exist), thumbnail generation, dirty prompts/undo, milestone UI, and
+project export to a single `.animastudio` archive. Transitional Swift
+proxy component/mate edits also still need a defined projection into
+the full-fidelity rig DTO before those edits can be saved canonically.

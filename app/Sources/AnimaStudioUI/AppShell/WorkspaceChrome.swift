@@ -3,6 +3,11 @@ import SwiftUI
 
 struct StudioDocumentBar: View {
   @Bindable var workspace: StudioWorkspaceModel
+  let isSaving: Bool
+  let newProject: () -> Void
+  let openProject: () -> Void
+  let saveProject: () -> Void
+  let saveProjectAs: () -> Void
   let closeProject: () -> Void
 
   var body: some View {
@@ -13,15 +18,15 @@ struct StudioDocumentBar: View {
         }
         .help("Return to Anima Studio home")
 
-        Button("Projects", systemImage: "square.grid.2x2") {}
-          .disabled(true)
-          .help("Project browser arrives with the document layer")
+        Button("Projects", systemImage: "square.grid.2x2", action: closeProject)
+          .help("Open the project browser")
 
         Menu {
-          Button("New Project", systemImage: "doc.badge.plus") {}
-            .disabled(true)
-          Button("Open Project…", systemImage: "folder") {}
-            .disabled(true)
+          Button("New Project", systemImage: "doc.badge.plus", action: newProject)
+          Button("Open Project…", systemImage: "folder", action: openProject)
+          Divider()
+          Button("Save", systemImage: "square.and.arrow.down", action: saveProject)
+          Button("Save As…", systemImage: "doc.on.doc", action: saveProjectAs)
         } label: {
           Image(systemName: "doc")
         }
@@ -31,9 +36,9 @@ struct StudioDocumentBar: View {
         Divider()
           .frame(height: 18)
 
-        Button("Save", systemImage: "square.and.arrow.down") {}
-          .disabled(true)
-          .help("Project saving arrives with the document layer")
+        Button("Save", systemImage: "square.and.arrow.down", action: saveProject)
+          .disabled(isSaving)
+          .help("Save project through AnimaCore")
         Button("Undo", systemImage: "arrow.uturn.backward") {}
           .disabled(true)
           .help("Undo history arrives with durable projects")

@@ -18,7 +18,9 @@
           thumbnailKind: .character
         ),
       ],
-      createProject: {}
+      createProject: {},
+      openProject: {},
+      openRecentProject: { _ in }
     )
     .frame(width: 1_180, height: 760)
   }

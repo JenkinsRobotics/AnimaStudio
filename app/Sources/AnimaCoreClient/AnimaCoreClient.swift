@@ -81,6 +81,17 @@ public actor AnimaCoreClient {
     )
   }
 
+  /// Asks the canonical engine to validate and author `.character.anima` YAML.
+  public func serializeCharacter(
+    rig: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreSerializedText {
+    _ = try await start()
+    return try request(
+      method: "serialize_character",
+      params: RigParameters(rig: rig)
+    )
+  }
+
   public func mateTypes() async throws -> AnimaCoreMateTypeCatalog {
     _ = try await start()
     return try request(
@@ -257,6 +268,7 @@ public protocol AnimaCoreServing: Actor {
   func start() async throws -> AnimaCoreHello
   func loadCharacter(text: String) async throws -> AnimaCoreCharacterLoad
   func validateCharacter(text: String) async throws -> AnimaCoreValidation
+  func serializeCharacter(rig: AnimaCoreJSONValue) async throws -> AnimaCoreSerializedText
   func mateTypes() async throws -> AnimaCoreMateTypeCatalog
   func relationTypes() async throws -> AnimaCoreRelationTypeCatalog
   func evaluate(
@@ -304,6 +316,10 @@ private struct TextParameters: Encodable {
 
 private struct HandleParameters: Encodable {
   let handle: String
+}
+
+private struct RigParameters: Encodable {
+  let rig: AnimaCoreJSONValue
 }
 
 private struct EvaluationParameters: Encodable {

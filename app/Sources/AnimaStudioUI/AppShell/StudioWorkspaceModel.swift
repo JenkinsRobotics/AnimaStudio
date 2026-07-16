@@ -1,4 +1,5 @@
 import AnimaCoreClient
+import AnimaDocument
 import AnimaEvaluation
 import AnimaModel
 import Foundation
@@ -81,6 +82,8 @@ final class StudioWorkspaceModel {
   private var storedSelectedFeature: MateConnectorCandidate?
   @ObservationIgnored private let animaCoreClient: (any AnimaCoreServing)?
   @ObservationIgnored private var animaCoreHandle: String?
+  @ObservationIgnored private var engineRigDocument: AnimaCoreJSONValue?
+  @ObservationIgnored private var engineRigIdentity: AnimaCoreRigIdentity?
   @ObservationIgnored private var animaCoreEngineVersion: String?
   @ObservationIgnored private var engineEvaluation: AnimaCoreEvaluation?
   @ObservationIgnored private var enginePartIDsByName: [String: PartID] = [:]
@@ -236,6 +239,26 @@ final class StudioWorkspaceModel {
     }
   }
 
+  var hasSerializableCharacter: Bool {
+    engineRigDocument != nil
+  }
+
+  var currentCharacterReference: ProjectCharacterReference? {
+    guard let identity = engineRigIdentity else { return nil }
+    let folderName = Self.safeProjectComponent(identity.name)
+    return ProjectCharacterReference(
+      folderName: folderName,
+      displayName: identity.displayName
+    )
+  }
+
+  func serializedCharacterText() async throws -> String {
+    guard let animaCoreClient, let engineRigDocument else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    return try await animaCoreClient.serializeCharacter(rig: engineRigDocument).text
+  }
+
   func connectToAnimaCore() async {
     guard let animaCoreClient else {
       animaCoreState = .unavailable
@@ -303,6 +326,8 @@ final class StudioWorkspaceModel {
         try? await animaCoreClient.release(handle: previousHandle)
       }
       animaCoreHandle = loaded.handle
+      engineRigDocument = loaded.rigDocument
+      engineRigIdentity = loaded.rig.identity
       pendingHandle = nil
       animaCoreEngineVersion = hello.engineVersion
       engineMateTypes = mateCatalog.mateTypes
@@ -350,6 +375,8 @@ final class StudioWorkspaceModel {
     }
     await animaCoreClient.shutdown()
     self.animaCoreHandle = nil
+    engineRigDocument = nil
+    engineRigIdentity = nil
     animaCoreEngineVersion = nil
     engineEvaluation = nil
     engineEvaluationTimeSeconds = nil
@@ -363,6 +390,17 @@ final class StudioWorkspaceModel {
     engineRelations.removeAll()
     relationDraft = nil
     animaCoreState = .unavailable
+  }
+
+  private static func safeProjectComponent(_ value: String) -> String {
+    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+    let scalars = value.lowercased().unicodeScalars.map { scalar in
+      allowed.contains(scalar) ? Character(String(scalar)) : "-"
+    }
+    let collapsed = String(scalars)
+      .split(separator: "-", omittingEmptySubsequences: true)
+      .joined(separator: "-")
+    return collapsed.isEmpty ? "character" : collapsed
   }
 
   func beginRelationDraft(_ type: AnimaCoreRelationTypeSummary) {

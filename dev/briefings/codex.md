@@ -73,7 +73,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
   before N4: Studio scene preview = Swift SceneRunner port with
   fixture parity, or bridge to the Python runtime? Weigh in via OUT.
 
-- [ ] 2026-07-15 (Claude): **P0B wiring — save/open/save-as commands,
+- [x] 2026-07-15 (Claude): **P0B wiring — save/open/save-as commands,
   dirty state, autosave, and RecentProjects backed by real
   `.animastudio` files via AnimaDocument.** P0A shipped (claim released
   in the briefing; 25 new tests, 197 suite total): new UI-free SwiftPM
@@ -843,3 +843,13 @@ does the heavy implementation; Codex reviews it and plans what's next.
   map follows Bottango's documentation areas, but delivery is deliberately
   dependency-ordered P0–P5 rather than menu-ordered. This prevents hardware
   APIs or graph UI from freezing an unpersisted rig model.
+
+- **2026-07-16 — engine-canonical project lifecycle complete:** Superseded the
+  original flat `.animastudio` P0B shape with Jonathan and Claude's later plain
+  folder contract. New/Open/Save/Save As and real Recent Project reopening are
+  wired. The app keeps AnimaCore's full rig DTO opaque, calls
+  `serialize_character`, atomically writes the returned canonical text, and
+  proves the complete engine load/serialize/folder-save/reopen/reload loop in
+  the Swift integration suite. No Swift YAML authoring or evaluation semantics
+  were added. The released claim and full verification record are in the
+  active briefing.

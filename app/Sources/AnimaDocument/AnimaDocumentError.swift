@@ -15,6 +15,10 @@ public enum AnimaDocumentError: Error, Equatable, Sendable {
   case duplicateAssetName(name: String)
   /// Two assets in the document share the same identifier.
   case duplicateAssetID(id: UUID)
+  case duplicateCharacterName(name: String)
+  case duplicateSceneName(name: String)
+  case unknownCharacter(name: String)
+  case missingCanonicalDocument(path: String)
   /// A manifest path (or asset filename) would escape the package directory.
   case pathTraversal(path: String)
   /// A filesystem operation failed while writing or replacing the package.
@@ -39,6 +43,14 @@ extension AnimaDocumentError: LocalizedError {
       return "The project already contains an asset named \"\(name)\"."
     case .duplicateAssetID(let id):
       return "The project contains two assets with the same identifier \(id.uuidString)."
+    case .duplicateCharacterName(let name):
+      return "The project contains two characters named \"\(name)\"."
+    case .duplicateSceneName(let name):
+      return "The project contains two scenes named \"\(name)\"."
+    case .unknownCharacter(let name):
+      return "The project has no character folder named \"\(name)\"."
+    case .missingCanonicalDocument(let path):
+      return "A canonical AnimaCore document is missing: \(path)"
     case .pathTraversal(let path):
       return "The project manifest contains an unsafe file path and was rejected: \(path)"
     case .writeFailed(let path, let detail):

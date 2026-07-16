@@ -3,7 +3,7 @@ import SwiftUI
 
 struct RecentProjectCard: View {
   let project: RecentProjectSummary
-  var canOpen = false
+  var canOpen: Bool { project.canOpen }
   var open: () -> Void = {}
 
   @State private var isHovering = false
@@ -23,7 +23,7 @@ struct RecentProjectCard: View {
     .help(
       canOpen
         ? "Open \(project.displayName)"
-        : "Recent-project reopening arrives with the project document layer."
+        : "The project folder must be located again before it can be reopened."
     )
     .accessibilityElement(children: .combine)
     .accessibilityLabel(project.displayName)

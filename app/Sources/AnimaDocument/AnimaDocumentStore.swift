@@ -1,11 +1,6 @@
 import AnimaModel
 import Foundation
 
-/// How bookmark data is created and resolved for linked assets.
-///
-/// Production uses `.securityScoped` so links survive sandbox restarts.
-/// The plain style exists as a documented test seam: swiftpm test runners are
-/// not sandboxed, and security-scoped bookmark creation is unreliable there.
 public struct BookmarkStyle: Sendable {
   public var creationOptions: URL.BookmarkCreationOptions
   public var resolutionOptions: URL.BookmarkResolutionOptions
@@ -22,33 +17,22 @@ public struct BookmarkStyle: Sendable {
     creationOptions: [.withSecurityScope],
     resolutionOptions: [.withSecurityScope]
   )
-
   public static let plain = BookmarkStyle(creationOptions: [], resolutionOptions: [])
 }
 
-/// Reads and writes `.animastudio` project packages.
+/// Filesystem owner for a plain-folder Anima Studio project.
 ///
-/// Package layout:
-/// ```
-/// MyRobot.animastudio/
-///   project.json          versioned manifest (deterministic JSON)
-///   Assets/               embedded asset payloads, "<uuid>-<filename>"
-/// ```
-///
-/// Saves are atomic: the whole package is staged in a temporary directory and
-/// swapped into place, so a crash mid-save never corrupts an existing package.
+/// The store never parses or authors `.anima` content. Callers obtain that
+/// text from AnimaCore and pass it as `ProjectFileWrite` values so the engine
+/// document and app manifest land in one atomic directory replacement.
 public struct AnimaDocumentStore: Sendable {
-  static let manifestFilename = "project.json"
-  static let assetsDirectoryName = "Assets"
+  public static let manifestFilename = "project.json"
+  public static let charactersDirectoryName = "characters"
+  public static let scenesDirectoryName = "scenes"
 
   let bookmarkStyle: BookmarkStyle
   let now: @Sendable () -> Date
 
-  /// - Parameters:
-  ///   - bookmarkStyle: bookmark creation/resolution behavior for linked
-  ///     assets. Defaults to security-scoped.
-  ///   - now: clock used to stamp `modified_date` on save. Injectable so
-  ///     tests can assert byte-identical output.
   public init(
     bookmarkStyle: BookmarkStyle = .securityScoped,
     now: @escaping @Sendable () -> Date = Date.init
@@ -57,42 +41,77 @@ public struct AnimaDocumentStore: Sendable {
     self.now = now
   }
 
-  // MARK: - Save / load
-
-  /// Atomically writes `document` to `packageURL`, bumping the revision and
-  /// modified date. Returns the updated document (the caller's new in-memory
-  /// state). A failed save leaves any existing package untouched.
   @discardableResult
   public func save(
     _ document: AnimaStudioDocument,
-    to packageURL: URL
+    to projectURL: URL,
+    fileWrites: [ProjectFileWrite] = []
+  ) throws -> AnimaStudioDocument {
+    try write(
+      document,
+      sourceProjectURL: projectURL,
+      destinationProjectURL: projectURL,
+      fileWrites: fileWrites
+    )
+  }
+
+  /// Copies an existing project to `destinationURL`, applies current dirty
+  /// engine/editor documents, increments revision, and returns the retargeted
+  /// document state. The source project is never modified.
+  @discardableResult
+  public func saveAs(
+    _ document: AnimaStudioDocument,
+    from sourceURL: URL,
+    to destinationURL: URL,
+    fileWrites: [ProjectFileWrite] = []
+  ) throws -> AnimaStudioDocument {
+    try write(
+      document,
+      sourceProjectURL: sourceURL,
+      destinationProjectURL: destinationURL,
+      fileWrites: fileWrites
+    )
+  }
+
+  private func write(
+    _ document: AnimaStudioDocument,
+    sourceProjectURL: URL,
+    destinationProjectURL: URL,
+    fileWrites: [ProjectFileWrite]
   ) throws -> AnimaStudioDocument {
     var updated = document
     updated.metadata.revision += 1
-    // Whole seconds: ISO-8601 has no sub-second precision, and truncating
-    // here keeps save → load round trips exactly equal.
-    let saveDate = Date(
-      timeIntervalSince1970: now().timeIntervalSince1970.rounded(.down)
-    )
+    let saveDate = Self.wholeSecond(now())
+    let createdDate = updated.metadata.createdDate ?? saveDate
+    updated.metadata.createdDate = createdDate
     updated.metadata.modifiedDate = saveDate
-    // Canonical asset order (sorted by ID): the returned in-memory document
-    // always equals what `load(from:)` will produce.
+    updated.characters.sort { $0.folderName < $1.folderName }
+    updated.scenes.sort { $0.name < $1.name }
     updated.assets.sort { $0.id.rawValue.uuidString < $1.id.rawValue.uuidString }
 
-    try Self.validate(assets: updated.assets)
-    let manifest = ManifestV1(document: updated, modifiedDate: saveDate)
+    try Self.validate(document: updated)
+    for fileWrite in fileWrites {
+      try Self.validateProjectRelativePath(fileWrite.relativePath)
+    }
+
+    let manifest = ManifestV2(
+      document: updated,
+      createdDate: createdDate,
+      modifiedDate: saveDate
+    )
     let manifestData: Data
     do {
       manifestData = try ManifestCoding.encoder().encode(manifest)
     } catch {
       throw AnimaDocumentError.writeFailed(
-        path: packageURL.path,
+        path: destinationProjectURL.path,
         detail: "Manifest encoding failed: \(error.localizedDescription)"
       )
     }
 
     let fileManager = FileManager.default
-    let parent = packageURL.deletingLastPathComponent()
+    let parent = destinationProjectURL.deletingLastPathComponent()
+    try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
     let stagingRoot: URL
     do {
       stagingRoot = try fileManager.url(
@@ -103,7 +122,7 @@ public struct AnimaDocumentStore: Sendable {
       )
     } catch {
       throw AnimaDocumentError.writeFailed(
-        path: packageURL.path,
+        path: destinationProjectURL.path,
         detail: error.localizedDescription
       )
     }
@@ -111,54 +130,66 @@ public struct AnimaDocumentStore: Sendable {
 
     do {
       let staging = stagingRoot.appendingPathComponent(
-        packageURL.lastPathComponent,
+        destinationProjectURL.lastPathComponent,
         isDirectory: true
       )
+      if fileManager.fileExists(atPath: sourceProjectURL.path) {
+        try fileManager.copyItem(at: sourceProjectURL, to: staging)
+      } else {
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+      }
       try fileManager.createDirectory(
-        at: staging.appendingPathComponent(Self.assetsDirectoryName, isDirectory: true),
+        at: staging.appendingPathComponent(Self.charactersDirectoryName, isDirectory: true),
         withIntermediateDirectories: true
       )
+      try fileManager.createDirectory(
+        at: staging.appendingPathComponent(Self.scenesDirectoryName, isDirectory: true),
+        withIntermediateDirectories: true
+      )
+      for character in updated.characters {
+        let directory = staging.appendingPathComponent(
+          character.directoryPath,
+          isDirectory: true
+        )
+        try fileManager.createDirectory(
+          at: directory.appendingPathComponent("assets", isDirectory: true),
+          withIntermediateDirectories: true
+        )
+      }
+      for fileWrite in fileWrites {
+        let fileURL = staging.appendingPathComponent(fileWrite.relativePath)
+        try fileManager.createDirectory(
+          at: fileURL.deletingLastPathComponent(),
+          withIntermediateDirectories: true
+        )
+        try fileWrite.data.write(to: fileURL)
+      }
       try manifestData.write(
         to: staging.appendingPathComponent(Self.manifestFilename)
       )
+      try Self.validateIndexedFiles(of: updated, in: staging)
 
-      // Carry embedded payloads from the existing package into the staged one.
-      for asset in updated.assets {
-        guard case .embedded(let relativePath) = asset.storage else { continue }
-        try Self.validatePackageRelativePath(relativePath)
-        let source = packageURL.appendingPathComponent(relativePath)
-        guard fileManager.fileExists(atPath: source.path) else {
-          throw AnimaDocumentError.missingAsset(path: relativePath)
-        }
-        try fileManager.copyItem(
-          at: source,
-          to: staging.appendingPathComponent(relativePath)
-        )
-      }
-
-      if fileManager.fileExists(atPath: packageURL.path) {
-        _ = try fileManager.replaceItemAt(packageURL, withItemAt: staging)
+      if fileManager.fileExists(atPath: destinationProjectURL.path) {
+        _ = try fileManager.replaceItemAt(destinationProjectURL, withItemAt: staging)
       } else {
-        try fileManager.moveItem(at: staging, to: packageURL)
+        try fileManager.moveItem(at: staging, to: destinationProjectURL)
       }
     } catch let error as AnimaDocumentError {
       throw error
     } catch {
       throw AnimaDocumentError.writeFailed(
-        path: packageURL.path,
+        path: destinationProjectURL.path,
         detail: error.localizedDescription
       )
     }
     return updated
   }
 
-  /// Loads a package, validating version, manifest integrity, asset table
-  /// consistency, and embedded payload presence.
-  public func load(from packageURL: URL) throws -> AnimaStudioDocument {
+  public func load(from projectURL: URL) throws -> AnimaStudioDocument {
     let fileManager = FileManager.default
-    let manifestURL = packageURL.appendingPathComponent(Self.manifestFilename)
+    let manifestURL = projectURL.appendingPathComponent(Self.manifestFilename)
     guard fileManager.fileExists(atPath: manifestURL.path) else {
-      throw AnimaDocumentError.packageNotFound(path: packageURL.path)
+      throw AnimaDocumentError.packageNotFound(path: projectURL.path)
     }
 
     let data: Data
@@ -170,72 +201,69 @@ public struct AnimaDocumentStore: Sendable {
         detail: error.localizedDescription
       )
     }
-
     let decoder = ManifestCoding.decoder()
-    let probe: ManifestV1.VersionProbe
+    let probe: ManifestV2.VersionProbe
     do {
-      probe = try decoder.decode(ManifestV1.VersionProbe.self, from: data)
+      probe = try decoder.decode(ManifestV2.VersionProbe.self, from: data)
     } catch {
       throw AnimaDocumentError.corruptManifest(
         path: manifestURL.path,
         detail: Self.describe(decodingError: error)
       )
     }
-    guard ManifestV1.supportedVersions.contains(probe.formatVersion) else {
+    guard ManifestV2.supportedVersions.contains(probe.formatVersion) else {
       throw AnimaDocumentError.unsupportedVersion(
         found: probe.formatVersion,
-        supported: ManifestV1.supportedVersions
+        supported: ManifestV2.supportedVersions
       )
     }
 
-    let manifest: ManifestV1
+    let manifest: ManifestV2
     do {
-      manifest = try decoder.decode(ManifestV1.self, from: data)
+      manifest = try decoder.decode(ManifestV2.self, from: data)
     } catch {
       throw AnimaDocumentError.corruptManifest(
         path: manifestURL.path,
         detail: Self.describe(decodingError: error)
       )
     }
-
     for asset in manifest.assets {
       try Self.validate(manifestAsset: asset, manifestPath: manifestURL.path)
     }
     let document = manifest.document()
-    try Self.validate(assets: document.assets)
+    try Self.validate(document: document)
+    try Self.validateIndexedFiles(of: document, in: projectURL)
     for asset in document.assets {
       guard case .embedded(let relativePath) = asset.storage else { continue }
-      let payload = packageURL.appendingPathComponent(relativePath)
-      guard fileManager.fileExists(atPath: payload.path) else {
+      guard fileManager.fileExists(atPath: projectURL.appendingPathComponent(relativePath).path)
+      else {
         throw AnimaDocumentError.missingAsset(path: relativePath)
       }
     }
     return document
   }
 
-  // MARK: - Assets
-
-  /// Copies the file at `sourceURL` into the package's `Assets/` directory
-  /// and returns the document with the new reference appended. The manifest
-  /// is not persisted until the next `save(_:to:)`.
   public func embedAsset(
     from sourceURL: URL,
-    into packageURL: URL,
+    into projectURL: URL,
     document: AnimaStudioDocument,
+    characterFolderName: String,
     kind: String
   ) throws -> AnimaStudioDocument {
     let fileManager = FileManager.default
     guard fileManager.fileExists(atPath: sourceURL.path) else {
       throw AnimaDocumentError.missingAsset(path: sourceURL.path)
     }
+    guard document.characters.contains(where: { $0.folderName == characterFolderName }) else {
+      throw AnimaDocumentError.unknownCharacter(name: characterFolderName)
+    }
     let filename = sourceURL.lastPathComponent
     try Self.validate(filename: filename)
     try Self.ensureUnique(filename: filename, id: nil, in: document.assets)
-
     let id = AssetID()
     let relativePath =
-      "\(Self.assetsDirectoryName)/\(id.rawValue.uuidString)-\(filename)"
-    let destination = packageURL.appendingPathComponent(relativePath)
+      "characters/\(characterFolderName)/assets/\(id.rawValue.uuidString)-\(filename)"
+    let destination = projectURL.appendingPathComponent(relativePath)
     do {
       try fileManager.createDirectory(
         at: destination.deletingLastPathComponent(),
@@ -248,7 +276,6 @@ public struct AnimaDocumentStore: Sendable {
         detail: error.localizedDescription
       )
     }
-
     var updated = document
     updated.assets.append(
       DocumentAssetReference(
@@ -261,9 +288,6 @@ public struct AnimaDocumentStore: Sendable {
     return updated
   }
 
-  /// Records a link to an external file (SolidWorks-style reference part):
-  /// the manifest keeps the absolute path plus bookmark data so the link
-  /// survives sandbox restarts. The payload is not copied.
   public func linkAsset(
     at externalURL: URL,
     into document: AnimaStudioDocument,
@@ -275,53 +299,36 @@ public struct AnimaDocumentStore: Sendable {
     let filename = externalURL.lastPathComponent
     try Self.validate(filename: filename)
     try Self.ensureUnique(filename: filename, id: nil, in: document.assets)
-
-    // A failed bookmark still records the absolute path; resolution then
-    // reports .needsRelink(.missingBookmark) instead of losing the asset.
     let bookmarkData = try? externalURL.bookmarkData(
       options: bookmarkStyle.creationOptions,
       includingResourceValuesForKeys: nil,
       relativeTo: nil
     )
-
     var updated = document
     updated.assets.append(
       DocumentAssetReference(
         originalFilename: filename,
         kind: kind,
-        storage: .linked(
-          externalPath: externalURL.path,
-          bookmarkData: bookmarkData
-        )
+        storage: .linked(externalPath: externalURL.path, bookmarkData: bookmarkData)
       )
     )
     return updated
   }
 
-  /// Resolves an asset reference to a readable file URL.
-  ///
-  /// Embedded assets throw typed errors on structural problems (traversal,
-  /// missing payload). Linked assets never throw for a broken link — a stale,
-  /// missing, or unresolvable bookmark is an expected user-fixable state and
-  /// comes back as `.needsRelink` with the reason.
   public func resolveAsset(
     _ asset: DocumentAssetReference,
-    packageURL: URL
+    projectURL: URL
   ) throws -> AssetResolution {
-    let fileManager = FileManager.default
     switch asset.storage {
     case .embedded(let relativePath):
-      try Self.validatePackageRelativePath(relativePath)
-      let url = packageURL.appendingPathComponent(relativePath)
-      guard fileManager.fileExists(atPath: url.path) else {
+      try Self.validateProjectRelativePath(relativePath)
+      let url = projectURL.appendingPathComponent(relativePath)
+      guard FileManager.default.fileExists(atPath: url.path) else {
         throw AnimaDocumentError.missingAsset(path: relativePath)
       }
       return .resolved(url)
-
     case .linked(_, let bookmarkData):
-      guard let bookmarkData else {
-        return .needsRelink(.missingBookmark)
-      }
+      guard let bookmarkData else { return .needsRelink(.missingBookmark) }
       var isStale = false
       let resolved: URL
       do {
@@ -332,21 +339,39 @@ public struct AnimaDocumentStore: Sendable {
           bookmarkDataIsStale: &isStale
         )
       } catch {
-        return .needsRelink(
-          .unresolvableBookmark(detail: error.localizedDescription)
-        )
+        return .needsRelink(.unresolvableBookmark(detail: error.localizedDescription))
       }
-      if isStale {
-        return .needsRelink(.staleBookmark)
-      }
-      guard fileManager.fileExists(atPath: resolved.path) else {
+      if isStale { return .needsRelink(.staleBookmark) }
+      guard FileManager.default.fileExists(atPath: resolved.path) else {
         return .needsRelink(.fileMissing(path: resolved.path))
       }
       return .resolved(resolved)
     }
   }
 
-  // MARK: - Validation
+  static func validate(document: AnimaStudioDocument) throws {
+    try validate(assets: document.assets)
+    var characterNames: Set<String> = []
+    for character in document.characters {
+      guard characterNames.insert(character.folderName).inserted else {
+        throw AnimaDocumentError.duplicateCharacterName(name: character.folderName)
+      }
+      try validate(filename: character.folderName)
+      try validate(filename: character.characterFilename)
+      try validate(filename: character.editorFilename)
+      try validateProjectRelativePath(character.characterPath)
+      try validateProjectRelativePath(character.editorPath)
+    }
+    var sceneNames: Set<String> = []
+    for scene in document.scenes {
+      guard sceneNames.insert(scene.name).inserted else {
+        throw AnimaDocumentError.duplicateSceneName(name: scene.name)
+      }
+      try validate(filename: scene.name)
+      try validate(filename: scene.filename)
+      try validateProjectRelativePath(scene.scenePath)
+    }
+  }
 
   static func validate(assets: [DocumentAssetReference]) throws {
     var seenIDs: Set<UUID> = []
@@ -360,15 +385,20 @@ public struct AnimaDocumentStore: Sendable {
       }
       try validate(filename: asset.originalFilename)
       if case .embedded(let relativePath) = asset.storage {
-        try validatePackageRelativePath(relativePath)
+        try validateProjectRelativePath(relativePath)
+        let parts = relativePath.split(separator: "/")
+        guard
+          parts.count >= 4,
+          parts[0] == "characters",
+          parts[2] == "assets"
+        else {
+          throw AnimaDocumentError.pathTraversal(path: relativePath)
+        }
       }
     }
   }
 
-  static func validate(
-    manifestAsset: ManifestV1.ManifestAsset,
-    manifestPath: String
-  ) throws {
+  static func validate(manifestAsset: ManifestV2.ManifestAsset, manifestPath: String) throws {
     switch manifestAsset.mode {
     case "embedded":
       guard let path = manifestAsset.packagePath, !path.isEmpty else {
@@ -392,32 +422,43 @@ public struct AnimaDocumentStore: Sendable {
     }
   }
 
-  /// Rejects any manifest path that could escape the package. Called before
-  /// the path ever touches the filesystem.
-  static func validatePackageRelativePath(_ path: String) throws {
+  static func validateIndexedFiles(of document: AnimaStudioDocument, in projectURL: URL) throws {
+    for character in document.characters {
+      let path = character.characterPath
+      guard FileManager.default.fileExists(atPath: projectURL.appendingPathComponent(path).path)
+      else { throw AnimaDocumentError.missingCanonicalDocument(path: path) }
+    }
+    for scene in document.scenes {
+      let path = scene.scenePath
+      guard FileManager.default.fileExists(atPath: projectURL.appendingPathComponent(path).path)
+      else { throw AnimaDocumentError.missingCanonicalDocument(path: path) }
+    }
+  }
+
+  static func validateProjectRelativePath(_ path: String) throws {
     guard !path.isEmpty, !path.hasPrefix("/") else {
       throw AnimaDocumentError.pathTraversal(path: path)
     }
     let components = path.split(separator: "/", omittingEmptySubsequences: false)
     guard
-      !components.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." })
+      !components.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }),
+      components.first == "characters" || components.first == "scenes"
     else {
-      throw AnimaDocumentError.pathTraversal(path: path)
-    }
-    guard components.count >= 2, components.first == "Assets" else {
       throw AnimaDocumentError.pathTraversal(path: path)
     }
   }
 
-  /// Asset filenames must be a single, plain path component.
+  /// Compatibility spelling retained for the existing security tests.
+  static func validatePackageRelativePath(_ path: String) throws {
+    try validateProjectRelativePath(path)
+  }
+
   static func validate(filename: String) throws {
     guard
       !filename.isEmpty,
       filename != ".", filename != "..",
       !filename.contains("/"), !filename.contains("\0")
-    else {
-      throw AnimaDocumentError.pathTraversal(path: filename)
-    }
+    else { throw AnimaDocumentError.pathTraversal(path: filename) }
   }
 
   static func ensureUnique(
@@ -431,6 +472,10 @@ public struct AnimaDocumentStore: Sendable {
     if assets.contains(where: { $0.originalFilename == filename }) {
       throw AnimaDocumentError.duplicateAssetName(name: filename)
     }
+  }
+
+  static func wholeSecond(_ date: Date) -> Date {
+    Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down))
   }
 
   static func describe(decodingError error: any Error) -> String {

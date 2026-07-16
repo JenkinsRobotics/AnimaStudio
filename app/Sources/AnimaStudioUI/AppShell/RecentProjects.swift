@@ -22,6 +22,8 @@ struct RecentProjectSummary: Codable, Equatable, Identifiable, Sendable {
   var milestoneName: String?
   var thumbnailKind: RecentProjectThumbnailKind
   var thumbnailPath: String?
+  var projectPath: String?
+  var bookmarkData: Data?
 
   init(
     id: UUID = UUID(),
@@ -30,7 +32,9 @@ struct RecentProjectSummary: Codable, Equatable, Identifiable, Sendable {
     revisionNumber: Int,
     milestoneName: String? = nil,
     thumbnailKind: RecentProjectThumbnailKind = .rig,
-    thumbnailPath: String? = nil
+    thumbnailPath: String? = nil,
+    projectPath: String? = nil,
+    bookmarkData: Data? = nil
   ) {
     self.id = id
     self.displayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -39,10 +43,29 @@ struct RecentProjectSummary: Codable, Equatable, Identifiable, Sendable {
     self.milestoneName = milestoneName
     self.thumbnailKind = thumbnailKind
     self.thumbnailPath = thumbnailPath
+    self.projectPath = projectPath
+    self.bookmarkData = bookmarkData
   }
 
   var revisionLabel: String {
     "V\(revisionNumber)"
+  }
+
+  var canOpen: Bool {
+    projectPath != nil || bookmarkData != nil
+  }
+
+  static func project(_ session: StudioProjectSession, openedAt: Date = Date()) -> Self {
+    Self(
+      id: session.document.projectID,
+      displayName: session.document.displayName,
+      lastOpenedAt: openedAt,
+      revisionNumber: session.document.metadata.revision,
+      milestoneName: session.document.metadata.milestoneName,
+      thumbnailKind: .rig,
+      projectPath: session.projectURL.path,
+      bookmarkData: session.bookmarkData
+    )
   }
 
   static func scratch(lastOpenedAt: Date = Date()) -> Self {
@@ -58,10 +81,11 @@ struct RecentProjectSummary: Codable, Equatable, Identifiable, Sendable {
 
 enum RecentProjectsPersistence {
   static let maximumCount = 12
-  static let storageKey = "animaStudio.recentProjects.v1"
+  static let storageKey = "animaStudio.recentProjects.v2"
+  static let legacyStorageKey = "animaStudio.recentProjects.v1"
 
   static func load(from defaults: UserDefaults = .standard) -> [RecentProjectSummary] {
-    guard let data = defaults.data(forKey: storageKey),
+    guard let data = defaults.data(forKey: storageKey) ?? defaults.data(forKey: legacyStorageKey),
       let decoded = try? JSONDecoder().decode([RecentProjectSummary].self, from: data)
     else { return [] }
     return normalized(decoded)

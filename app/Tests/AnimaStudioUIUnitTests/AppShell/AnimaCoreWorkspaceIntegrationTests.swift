@@ -1,4 +1,5 @@
 import AnimaCoreClient
+import AnimaDocument
 import AnimaModel
 import Foundation
 import Testing
@@ -8,6 +9,56 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct AnimaCoreWorkspaceIntegrationTests {
+  @Test
+  func engineSerializedCharacterSavesAndReopensThroughPlainProjectFolder() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    defer { Task { await client.shutdown() } }
+    let sourceText = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "examples/six_axis_arm.character.anima"
+      ),
+      encoding: .utf8
+    )
+    let loaded = try await client.loadCharacter(text: sourceText)
+    let canonicalText = try await client.serializeCharacter(rig: loaded.rigDocument).text
+    let character = ProjectCharacterReference(
+      folderName: loaded.rig.identity.name,
+      displayName: loaded.rig.identity.displayName
+    )
+    let projectURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("AnimaProjectRoundTrip-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: projectURL) }
+    var document = ProjectLifecycle.makeEmptyDocument(name: "Robot Cell")
+    document.characters = [character]
+    document.editorState.activeCharacterFolderName = character.folderName
+    let store = AnimaDocumentStore(bookmarkStyle: .plain)
+    _ = try store.save(
+      document,
+      to: projectURL,
+      fileWrites: [
+        ProjectFileWrite(relativePath: character.characterPath, text: canonicalText)
+      ]
+    )
+
+    let reopenedDocument = try store.load(from: projectURL)
+    let reopenedCharacter = try #require(reopenedDocument.activeCharacter)
+    let reopenedText = try String(
+      contentsOf: projectURL.appendingPathComponent(reopenedCharacter.characterPath),
+      encoding: .utf8
+    )
+    let engineReload = try await client.loadCharacter(text: reopenedText)
+
+    #expect(reopenedDocument.displayName == "Robot Cell")
+    #expect(engineReload.rig.identity == loaded.rig.identity)
+    #expect(engineReload.rig.joints.map(\.id) == loaded.rig.joints.map(\.id))
+  }
+
   @Test
   func engineEvaluationBecomesTheFrameConsumedByTheViewport() async throws {
     let repositoryRoot = try repositoryRootURL()
@@ -36,6 +87,10 @@ struct AnimaCoreWorkspaceIntegrationTests {
     #expect(workspace.project.rig.joints.isEmpty)
     #expect(workspace.engineResolvedPartPoses.count == 7)
     #expect(workspace.engineEvaluationTimeSeconds == 1)
+    #expect(workspace.hasSerializableCharacter)
+    #expect(workspace.currentCharacterReference?.folderName == "six_axis_arm")
+    let serialized = try await workspace.serializedCharacterText()
+    #expect(serialized.contains("six_axis_arm"))
     #expect(
       workspace.evaluatedFrame.jointAnglesRadians["base_yaw.rotation"]
         == .pi / 3

@@ -14,9 +14,82 @@ public struct AnimaCoreHello: Codable, Equatable, Sendable {
   }
 }
 
-public struct AnimaCoreCharacterLoad: Codable, Equatable, Sendable {
+/// A lossless JSON value used for bridge-owned authoring documents.
+///
+/// Swift views may project typed summaries from the same response, but Save
+/// sends this value back to AnimaCore unchanged. That keeps the engine the
+/// sole author of `.anima` semantics and prevents additive engine fields from
+/// being dropped by an older app build.
+public enum AnimaCoreJSONValue: Codable, Equatable, Sendable {
+  case null
+  case bool(Bool)
+  case number(Double)
+  case string(String)
+  case array([AnimaCoreJSONValue])
+  case object([String: AnimaCoreJSONValue])
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if container.decodeNil() {
+      self = .null
+    } else if let value = try? container.decode(Bool.self) {
+      self = .bool(value)
+    } else if let value = try? container.decode(Double.self) {
+      self = .number(value)
+    } else if let value = try? container.decode(String.self) {
+      self = .string(value)
+    } else if let value = try? container.decode([AnimaCoreJSONValue].self) {
+      self = .array(value)
+    } else if let value = try? container.decode([String: AnimaCoreJSONValue].self) {
+      self = .object(value)
+    } else {
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Unsupported AnimaCore JSON value."
+      )
+    }
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    switch self {
+    case .null:
+      try container.encodeNil()
+    case .bool(let value):
+      try container.encode(value)
+    case .number(let value):
+      try container.encode(value)
+    case .string(let value):
+      try container.encode(value)
+    case .array(let value):
+      try container.encode(value)
+    case .object(let value):
+      try container.encode(value)
+    }
+  }
+}
+
+public struct AnimaCoreCharacterLoad: Decodable, Equatable, Sendable {
   public let handle: String
   public let rig: AnimaCoreRigSummary
+  /// Full-fidelity rig DTO accepted verbatim by `serialize_character`.
+  public let rigDocument: AnimaCoreJSONValue
+
+  enum CodingKeys: String, CodingKey {
+    case handle
+    case rig
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.handle = try container.decode(String.self, forKey: .handle)
+    self.rig = try container.decode(AnimaCoreRigSummary.self, forKey: .rig)
+    self.rigDocument = try container.decode(AnimaCoreJSONValue.self, forKey: .rig)
+  }
+}
+
+public struct AnimaCoreSerializedText: Codable, Equatable, Sendable {
+  public let text: String
 }
 
 public struct AnimaCoreRigSummary: Codable, Equatable, Sendable {
