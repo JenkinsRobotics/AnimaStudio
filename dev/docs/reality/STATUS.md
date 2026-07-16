@@ -486,7 +486,22 @@
   the whole v1 surface and `examples/patrol_and_greet.scene.anima`
   through the v2 surface (input-gated wait_until, select, a twice-
   called subroutine, an estop monitor).
-  732 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
+  The runtime also exposes AnimaCore as the single canonical engine
+  behind a stdio bridge (`animacore/bridge.py`, protocol
+  `dev/docs/roadmap/Studio_Bridge.md`, BR1 slice): the Swift app spawns
+  `python -m animacore.bridge` once per session and speaks
+  newline-delimited JSON to it — `hello` handshake, `load_character`
+  (returns a deterministic handle + a rig summary the app mirrors),
+  `validate_character`, `evaluate` (DOF values, parameters, projected
+  channels, and reported limit violations for one frame), `release`,
+  and `shutdown`. This is the seam that keeps the app a front end: it
+  holds DTOs that mirror engine results and never redefines what a rig,
+  pose, or frame means. Protocol logic is a pure
+  `handle_request(session, request)` over dicts (format/protocol errors
+  become typed `{ok:false,error:{code,message,path}}` envelopes, never a
+  loop crash); an `evaluate` response's DOF values equal a direct
+  `evaluate_pose` call, tested as a faithful passthrough.
+  760 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,

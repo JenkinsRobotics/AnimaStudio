@@ -126,7 +126,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Scene v2 — the scripting-engine standard (FANUC-inspired: conditions, select, call, wait_until, inputs, background monitors) | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py`, `examples/patrol_and_greet.scene.anima` (new), `dev/docs/roadmap/Scene_Format.md`, `dev/docs/roadmap/Node_Graph.md` (taxonomy + Show-workspace toggle spec) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (732 passed; 146 new in test_scene.py, all 126 prior scene tests unmodified) | released 2026-07-15 |
 
-| Claude | AnimaCore-canonical policy + Studio↔AnimaCore bridge protocol + engine helper (BR1) | `dev/docs/roadmap/Studio_Bridge.md`, `animacore/bridge.py`, `animacore/tests/test_bridge.py`, `CONVENTIONS.md`, `AGENTS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; bridge handshake→load example→evaluate frame round-trips | in progress |
+| Claude | AnimaCore-canonical policy + Studio↔AnimaCore bridge protocol + engine helper (BR1) | `animacore/bridge.py`, `animacore/tests/test_bridge.py`, `dev/docs/reality/STATUS.md`, `dev/briefings/**` (policy + `Studio_Bridge.md` protocol already written) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; bridge handshake→load example→evaluate frame round-trips | released 2026-07-15 (28 new tests in test_bridge.py; 760 suite total, ruff clean; no `studio/` files touched; request/response examples for every BR1 verb in the handoff entry below) |
 
 ## Requests
 
@@ -173,6 +173,93 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, BR1 — Studio↔AnimaCore bridge engine helper):**
+  Shipped `animacore/bridge.py`, the long-running stdio helper that
+  makes AnimaCore the single canonical engine (28 new tests in
+  `animacore/tests/test_bridge.py`; 760 suite total; ruff clean; no
+  `studio/` files touched; **not committed** — left for main-session
+  integration). Protocol logic is a pure `handle_request(session,
+  request) -> response` over dicts (fully unit-testable without stdio);
+  `main(stdin, stdout)` is the thin newline-JSON loop. `Session` holds
+  rigs by deterministic monotonic handle (`rig1`, `rig2`, … — no
+  uuid/random). `PROTOCOL_VERSION = 1`. Format/protocol/shape errors
+  become typed `{ok:false,error:{code,message,path}}` envelopes and
+  never crash the loop; only a truly unexpected engine bug propagates.
+  The passthrough is proven: an `evaluate` response's `dof_values`
+  equal a direct `evaluate_pose(rig, clip, t)` call.
+
+  **Invocation (Codex's Swift client):** spawn once per session,
+  `python -m animacore.bridge`, keep alive; write one compact JSON
+  object per line to its stdin, read one JSON object per line from its
+  stdout, flush per line, match on echoed `id`. EOF or a `shutdown`
+  response ends the process cleanly.
+
+  **Verbatim request/response examples** (values from
+  `examples/six_axis_arm.character.anima`):
+
+  `hello` —
+  req `{"id":1,"method":"hello","params":{"client":"AnimaStudio","protocol_version":1}}`
+  res `{"id":1,"ok":true,"result":{"engine":"animacore","engine_version":"0.1.0","protocol_version":1,"capabilities":["hello","load_character","validate_character","evaluate","release","shutdown"]}}`
+  (a mismatched `protocol_version` → `{"id":1,"ok":false,"error":{"code":"protocol_mismatch","message":"…","path":null}}`).
+
+  `load_character` —
+  req `{"id":2,"method":"load_character","params":{"text":"<file bytes>"}}`
+  res `{"id":2,"ok":true,"result":{"handle":"rig1","rig":{"identity":{"name":"six_axis_arm","display_name":"Six-axis arm","description":"…","version":"0.1.0","author":"…"},"parts":[{"name":"base","parent":null,"model_node":null,"description":"…"},…],"joints":[{"name":"base_yaw","type":"revolute","dofs":[{"path":"base_yaw.rotation","kind":"rotation","unit":"radians","min":-2.9670597283903604,"max":2.9670597283903604,"neutral":0.0}]},…],"parameters":[{"name":"…","neutral":0.0,"description":"…"}],"clips":[{"name":"pick","duration_s":3.0,"loop":false}],"outputs":[{"dof_path":"base_yaw.rotation","channel":0},…]}}}`.
+  Invalid file → `{"id":2,"ok":false,"error":{"code":"format_error","message":"<loader message>","path":"joints.bad.type"}}` (`path` is the loader's field path verbatim; `null` when there is none). `min`/`max` are `null` for an unlimited DOF (e.g. rc_car `drive.spin`).
+
+  `validate_character` —
+  req `{"id":3,"method":"validate_character","params":{"text":"<file bytes>"}}`
+  res `{"id":3,"ok":true,"result":{"diagnostics":[]}}` (valid; **no handle allocated**), or on failure still `ok:true` with `{"diagnostics":[{"code":"format_error","message":"…","path":"joints.bad.type"}]}`.
+
+  `evaluate` —
+  req `{"id":4,"method":"evaluate","params":{"handle":"rig1","clip":"pick","time_s":1.0}}` (`clip` optional/null → neutral pose; `time_s` optional, default `0.0`)
+  res `{"id":4,"ok":true,"result":{"dof_values":{"base_yaw.rotation":1.0471975511965976,…},"parameters":{},"channels":{"0":0.676…,"1":0.305…},"limit_violations":[]}}`.
+  Units are native (radians/meters); `channels` is exactly
+  `project_channels` output, **keyed by channel-index-as-string** (JSON
+  object keys). When a mapped DOF is in `limit_violations`
+  (`[{"dof_path":…,"value":…,"min":…,"max":…}]`) its channel is omitted
+  and evaluate still succeeds — hardware refuses to arm, evaluate never
+  fails on a violation. Unknown handle → `error.code
+  "unknown_handle"`; unknown clip name → `bad_request`.
+
+  `release` —
+  req `{"id":5,"method":"release","params":{"handle":"rig1"}}`
+  res `{"id":5,"ok":true,"result":{}}`. **Idempotent** — releasing an
+  unknown handle also returns `ok` `{}` (a client can release freely).
+
+  `shutdown` —
+  req `{"id":6,"method":"shutdown"}`
+  res `{"id":6,"ok":true,"result":{}}`, then the process exits.
+
+  Unknown method or missing/mistyped params → `bad_request` with a
+  human message. A non-JSON stdin line → best-effort
+  `{"id":null,"ok":false,"error":{"code":"bad_request","message":"invalid JSON: …","path":null}}`.
+
+  **Spec deviations / decisions (for Codex review):**
+  1. `evaluate` `channels` object is keyed by the channel index as a
+     **string** (`"0"`, `"1"`) — JSON object keys must be strings; the
+     Swift client parses back to `Int`. The spec wrote `{channel:0..1}`;
+     this is the faithful JSON encoding of `project_channels`'
+     `dict[int,float]`.
+  2. `release` of an **unknown handle returns ok** (idempotent drop)
+     rather than `unknown_handle` — chosen so a client teardown never
+     needs to track exactly what the engine still holds.
+  3. Summary field-name choices the spec left as `[…]`: `parts` entries
+     are `{name,parent,model_node,description}`; `parameters` entries are
+     `{name,neutral,description}` (`neutral` = the model's
+     `neutral_value`); `outputs` use the spec's `dof_path` key even
+     though the target may be a parameter name (parameters carry no
+     `.`). Adjust names freely on your side — these are DTOs the app
+     mirrors, not engine truth.
+  4. An **unknown clip name** maps to `bad_request` (the spec defines no
+     dedicated code); `evaluate_pose`'s `KeyError` is caught and never
+     propagates.
+  5. `# ponytail:` — the `load_character` `{path}` variant is deferred
+     (spec says "later"); only `{text}` is implemented. Later verbs
+     (`resolve_pose`, scene/`SceneRunner`, `open_output`/`send_frame`,
+     `compile_graph`) are not started — each is gated on its engine
+     feature per the migration order.
 
 - **2026-07-15 (Codex, AnimaCore restructure — Swift app half):** Renamed
   `studio/` to `app/`; updated XcodeGen, CI, the packaging script, repository

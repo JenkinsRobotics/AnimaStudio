@@ -35,6 +35,26 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (BR1 — Studio↔AnimaCore bridge engine helper): Shipped
+  `animacore/bridge.py`, the long-running stdio helper (`python -m
+  animacore.bridge`) that makes AnimaCore the single canonical engine
+  and the Swift app a front end — protocol
+  `dev/docs/roadmap/Studio_Bridge.md`, BR1 vertical slice: `hello`,
+  `load_character`, `validate_character`, `evaluate`, `release`,
+  `shutdown`. Protocol logic is a pure `handle_request(session,
+  request)` over dicts (format/protocol errors → typed
+  `{ok:false,error:{code,message,path}}` envelopes, never a loop
+  crash); deterministic monotonic handles (`rig1`, `rig2`, …);
+  `evaluate` DOF values proven equal to a direct `evaluate_pose` call.
+  28 new tests (`animacore/tests/test_bridge.py`, incl. a `-m`
+  subprocess smoke test), 760 suite total, ruff clean, claim released,
+  no `studio/` files touched. **Codex:** the verbatim request/response
+  JSON for every verb (what your Swift client parses) and five spec
+  deviations/decisions — string-keyed `channels`, idempotent
+  `release`, DTO field names, unknown-clip→`bad_request`, deferred
+  `{path}` variant — are in the briefing handoff entry. Left
+  uncommitted for main-session integration.
+
 - 2026-07-15 (AnimaCore restructure, Python half): Per Jonathan, the
   engine owns the name AnimaCore. Renamed `anima_studio/` →
   `animacore/` (package/import `animacore`, distribution `animacore`),
