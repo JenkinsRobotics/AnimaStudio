@@ -76,6 +76,7 @@ struct AnimaCoreClientTests {
     #expect(loaded.handle == "rig1")
     #expect(loaded.rig.identity.name == "six_axis_arm")
     #expect(loaded.rig.joints.count == 6)
+    #expect(loaded.rig.parts.first?.model == "")
     let baseYaw = try #require(loaded.rig.joints.first)
     let baseYawControls = try #require(baseYaw.controls)
     #expect(baseYaw.id == "Revolute 1")
@@ -103,6 +104,15 @@ struct AnimaCoreClientTests {
     let reserialized = try await client.serializeCharacter(rig: reloaded.rigDocument)
     #expect(reserialized.text.contains("base_yaw.rotation"))
 
+    let rigWithAsset = try AnimaCoreRigDocumentEditor.assigningModel(
+      "assets/base.stl",
+      toPartNamed: "base",
+      in: loaded.rigDocument
+    )
+    let assetText = try await client.serializeCharacter(rig: rigWithAsset).text
+    let assetReloaded = try await client.loadCharacter(text: assetText)
+    #expect(assetReloaded.rig.parts.first { $0.name == "base" }?.model == "assets/base.stl")
+
     let evaluation = try await client.evaluate(
       handle: loaded.handle,
       clip: "pick",
@@ -123,7 +133,71 @@ struct AnimaCoreClientTests {
 
     try await client.release(handle: loaded.handle)
     try await client.release(handle: reloaded.handle)
+    try await client.release(handle: assetReloaded.handle)
     await client.shutdown()
+  }
+
+  @Test
+  func rigDocumentEditorAddsAndAssignsSafePartModelReferences() throws {
+    let source: AnimaCoreJSONValue = .object([
+      "identity": .object(["name": .string("assembly")]),
+      "parts": .array([
+        .object([
+          "name": .string("base"),
+          "parent": .null,
+          "model": .string(""),
+          "model_node": .null,
+          "description": .string(""),
+        ])
+      ]),
+      "joints": .array([]),
+      "parameters": .array([]),
+      "clips": .array([]),
+      "outputs": .array([]),
+      "relations": .array([]),
+    ])
+
+    let assigned = try AnimaCoreRigDocumentEditor.assigningModel(
+      "assets/base.stl",
+      toPartNamed: "base",
+      in: source
+    )
+    let addition = try AnimaCoreRigDocumentEditor.addingPart(
+      suggestedName: "Pan/Tilt Head",
+      model: "assets/head.usdz",
+      modelNode: "Robot/Head",
+      to: assigned
+    )
+
+    #expect(addition.partName == "pan_tilt_head")
+    guard case .object(let root) = addition.document,
+      case .array(let parts) = root["parts"]
+    else {
+      Issue.record("Edited rig must retain a parts array")
+      return
+    }
+    #expect(parts.count == 2)
+    guard case .object(let base) = parts[0], case .object(let head) = parts[1] else {
+      Issue.record("Every edited part must remain an object")
+      return
+    }
+    #expect(base["model"] == .string("assets/base.stl"))
+    #expect(head["model"] == .string("assets/head.usdz"))
+    #expect(head["model_node"] == .string("Robot/Head"))
+  }
+
+  @Test
+  func rigDocumentEditorRejectsEscapingAndAbsoluteModelPaths() {
+    let source: AnimaCoreJSONValue = .object(["parts": .array([])])
+    for unsafe in ["../head.stl", "/tmp/head.stl", "assets/../head.stl"] {
+      #expect(throws: AnimaCoreRigDocumentEditingError.self) {
+        _ = try AnimaCoreRigDocumentEditor.addingPart(
+          suggestedName: "head",
+          model: unsafe,
+          to: source
+        )
+      }
+    }
   }
 
   @Test

@@ -78,7 +78,7 @@ character is portable.
 
 - **New Project** → create `~/Documents/Anima Studio/<name>/` with an
   empty `project.json` (revision 1) and empty `characters/` / `scenes/`.
-- **Import model** → copy the STL/OBJ/STEP/USD into the active
+- **Import model** → copy the STL/OBJ/USD into the active
   character's `assets/`, and set the imported part's `model` to the
   copied file's path **relative to the character folder**
   (`assets/<file>`), plus a `model_node` when the part is one node of a
@@ -86,7 +86,11 @@ character is portable.
   are opaque to the engine — it round-trips the strings and never parses
   the mesh (see the Parts section of `Character_Format.md`). A multi-file
   assembly gives each part its own `model`; a single multi-node USD gives
-  several parts a shared `model` with distinct `model_node`s.
+  several parts a shared `model` with distinct `model_node`s. STL and OBJ
+  are unitless, so Studio records the operator's mm/cm/m interpretation in
+  `<character>.editor.json` and converts positions to metres for rendering.
+  STEP is not advertised as natively loadable: selecting `.step`/`.stp`
+  presents conversion guidance to export STL or USD from the source CAD tool.
 - **Save** → for each dirty character/scene, the app hands its rig/scene
   to the engine to **serialize** into canonical text (the engine owns
   `.anima` *writing*, so the format has one author), writes the file,

@@ -399,14 +399,20 @@
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
   optional reference plane, and a highlighted limit arc with independent layer
   toggles on every created mate. Project and asset names are also editable in
-  memory. Users can select a
-  RealityKit-supported USD/Reality model; it loads asynchronously, is normalized
-  for preview framing, and appears in the project asset tree. Its complete
-  RealityKit entity hierarchy is projected into value-only nodes with unique
-  sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. Two hundred twenty-one tests pass with
-  `cd app && swift test`, including real USD hierarchy loading/projection
-  through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
+  memory. Users can import USD/Reality, STL, and OBJ models. USD loads natively;
+  ModelIO converts STL/OBJ geometry into RealityKit meshes after an explicit
+  mm/cm/m prompt (STL defaults to mm). STEP selection displays truthful
+  conversion guidance. Imports are copied into the active character's portable
+  `assets/` directory, authored into AnimaCore's full rig DTO as safe relative
+  per-part `model` references, serialized and reloaded by the engine, and
+  rendered at each part's `resolve_pose` transform. A multi-node USD can create
+  persistent semantic parts sharing the same model with distinct `model_node`
+  paths. Unitless-file scale lives in `<character>.editor.json`, so save/reopen
+  restores the same metre-sized rendering. The complete entity hierarchy is
+  projected into value-only nodes with unique sibling paths, shown as a
+  selectable Structure outline, and described in the inspector. Package tests
+  include real USD hierarchy loading/projection and real STL/OBJ metre-scaling
+  bounds, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key
   navigation, and loop/non-loop playback. The Swift side also ships the
   durable document layer as a UI-free `AnimaDocument` package target.
@@ -627,10 +633,10 @@
 - **What's stubbed:** every `*.example` file under `animacore/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
-- **Known gaps:** imported model hierarchies can be inspected and filtered but
-  still use temporary sibling-index paths; durable source identity, security
-  bookmarks, reimport reconciliation, collapse, and mapping to persistent
-  semantic parts are not implemented. Source nodes are intentionally locked,
+- **Known gaps:** imported model hierarchies can be inspected, filtered, and
+  mapped to persistent semantic parts, but still use temporary sibling-index
+  paths; durable source identity, reimport reconciliation, collapse, and
+  topology remapping are not implemented. Source nodes are intentionally locked,
   and semantic-part drag reparenting waits for the persistent part/undo model.
   Proxy connector inference and two-click Revolute Mate placement are live,
   but connector orientation flip/reorientation controls, persistent custom

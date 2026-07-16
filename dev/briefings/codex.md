@@ -205,6 +205,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — portable rigid-part model import complete:** The Swift app now
+  consumes AnimaCore's per-part `model`/`model_node` contract end to end. USD
+  remains native; STL and OBJ load through ModelIO with an explicit mm/cm/m
+  sheet and metre conversion; STEP selection gives honest CAD conversion
+  guidance. Assets copy to readable collision-safe paths in the active
+  character, the full rig DTO is edited then serialized/reloaded by AnimaCore,
+  hierarchy nodes can create persistent semantic Parts, and every imported
+  mesh follows `resolve_pose`. Unitless import settings persist in app-only
+  character editor metadata and restore on reopen. Verification passed: 216
+  XCTest cases plus 14 real-bridge Swift Testing cases, recursive format lint,
+  native Xcode build, rebuilt/deep-signed root bundle, and live app/helper
+  launch. Direct STEP tessellation and reimport/topology reconciliation remain
+  future adapter work.
+
 - **2026-07-16 — Relations UI wired to AnimaCore:** Studio now consumes the
   four-type relation catalog and imported relation descriptors. The Rig ribbon
   exposes Gear, Rack and pinion, Screw, and Linear; one generic draft dialog

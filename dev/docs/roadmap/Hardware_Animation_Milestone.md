@@ -88,9 +88,14 @@ and output consume the same `EvaluatedFrame`.
 
 ## Model import contract
 
-The first native import path accepts RealityKit-supported USD assets:
-`.usd`, `.usda`, `.usdc`, `.usdz`, and `.reality`. USD/USDZ is the preferred
-interchange from Blender or a CAD conversion pipeline.
+The native import path accepts RealityKit-supported USD assets (`.usd`,
+`.usda`, `.usdc`, `.usdz`, and `.reality`) plus STL and OBJ through ModelIO.
+USD/USDZ is the preferred interchange from Blender or a CAD conversion
+pipeline because it carries hierarchy and units. STL and OBJ are unitless;
+Studio prompts for mm/cm/m, converts vertex positions to metres, and persists
+that interpretation in app-only character editor metadata. STEP has no native
+macOS mesh loader, so Studio presents an explicit export-to-STL-or-USD message
+instead of pretending the file can render.
 
 Import must:
 
@@ -101,8 +106,8 @@ Import must:
 4. Show structured diagnostics when an asset cannot be loaded.
 5. Keep asset identity separate from an instance placed in the character.
 
-Direct OBJ, FBX, glTF/GLB, VRM, and URDF support are importer-adapter work, not
-requirements for the first native slice.
+Direct STEP, FBX, glTF/GLB, VRM, and URDF support requires future importer
+adapters and is not part of the native slice.
 
 ## Core document concepts
 
@@ -135,16 +140,20 @@ requirements for the first native slice.
 - Contextual inspector.
 - Timeline with transport and track rows.
 
-### Slice 2 — model import (basic loading shipped; hierarchy work planned)
+### Slice 2 — model import (portable rigid-part path shipped)
 
-- Asynchronous USD-family file import.
+- Asynchronous USD-family, STL, and OBJ file import.
+- Explicit STL/OBJ unit conversion to metres; honest STEP conversion guidance.
 - Imported asset list and load diagnostics.
 - Model hierarchy inspection and selection.
+- Engine-authored per-part `model`/`model_node` references, portable asset copy,
+  and restored per-part rendering after project reopen.
 - Camera frame/reset controls.
 
 ### Slice 3 — mechanical rigging
 
-- Create part instances from imported hierarchy nodes.
+- Create part instances from imported hierarchy nodes. (Basic persistent
+  mapping shipped; reimport identity and topology reconciliation remain.)
 - Configure pivot, axis, joint type, neutral pose, and limits.
 - Manipulation gizmos and numeric inspector editing.
 - Undo/redo for every structural edit.

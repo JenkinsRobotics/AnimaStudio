@@ -29,6 +29,11 @@ public struct ModelEntityPath: Hashable, Sendable {
       .joined(separator: " / ")
   }
 
+  /// Opaque node path written to AnimaCore's `model_node` field.
+  public var modelNodeReference: String {
+    components.map(\.name).filter { !$0.isEmpty }.joined(separator: "/")
+  }
+
   fileprivate func appending(
     name: String,
     siblingIndex: Int
@@ -80,8 +85,14 @@ public struct ModelHierarchyNode: Identifiable, Equatable, Sendable {
 
 @MainActor
 public enum RealityKitModelHierarchy {
-  public static func load(contentsOf url: URL) async throws -> ModelHierarchyNode {
-    let entity = try await Entity(contentsOf: url)
+  public static func load(
+    contentsOf url: URL,
+    unitScaleToMeters: Double = 1
+  ) async throws -> ModelHierarchyNode {
+    let entity = try await RealityKitModelLoader.load(
+      contentsOf: url,
+      unitScaleToMeters: unitScaleToMeters
+    )
     return inspect(entity)
   }
 

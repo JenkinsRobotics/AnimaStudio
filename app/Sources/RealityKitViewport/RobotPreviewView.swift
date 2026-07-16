@@ -17,6 +17,7 @@ public struct RobotPreviewView: View {
 
   private let rig: CharacterRig
   private let engineResolvedPartPoses: [PartID: EngineResolvedPartPose]
+  private let partModelSources: [PartID: PartModelSource]
   private let modelURL: URL?
   private let showsGrid: Bool
   private let projection: PreviewCameraProjection
@@ -54,6 +55,7 @@ public struct RobotPreviewView: View {
   public init(
     rig: CharacterRig = CharacterRig(joints: []),
     engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:],
+    partModelSources: [PartID: PartModelSource] = [:],
     modelURL: URL? = nil,
     showsGrid: Bool = true,
     projection: PreviewCameraProjection = .perspective,
@@ -90,6 +92,7 @@ public struct RobotPreviewView: View {
   ) {
     self.rig = rig
     self.engineResolvedPartPoses = engineResolvedPartPoses
+    self.partModelSources = partModelSources
     self.modelURL = modelURL
     self.showsGrid = showsGrid
     self.projection = projection
@@ -135,13 +138,14 @@ public struct RobotPreviewView: View {
         lightingPreset: lightingPreset,
         materialFinish: materialFinish,
         partAppearances: partAppearances,
+        partModelSources: partModelSources,
         reflectionMode: reflectionMode,
         showsShadows: showsShadows
       )
       content.add(root)
       content.cameraTarget = root.findEntity(named: "previewCameraTarget")
 
-      if let modelURL,
+      if partModelSources.isEmpty, let modelURL,
         let importedModel = try? await Entity(contentsOf: modelURL)
       {
         importedModel.name = "importedModel"
@@ -398,7 +402,7 @@ public struct RobotPreviewView: View {
     let partIDs = rig.parts.map { $0.id.rawValue.uuidString }.joined(separator: ",")
     let jointIDs = rig.joints.map { $0.id.rawValue }.joined(separator: ",")
     return
-      "\(modelURL?.absoluteString ?? "none")|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(showsShadows)|\(partIDs)|\(jointIDs)"
+      "\(modelURL?.absoluteString ?? "none")|\(partModelSources.values.map { "\($0.partID.rawValue):\($0.fileURL.path):\($0.modelNode ?? ""):\($0.unitScaleToMeters)" }.sorted().joined(separator: ","))|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(showsShadows)|\(partIDs)|\(jointIDs)"
   }
 
   private static func makeScene(
@@ -409,6 +413,7 @@ public struct RobotPreviewView: View {
     lightingPreset: ViewportLightingPreset,
     materialFinish: ViewportMaterialFinish,
     partAppearances: [PartID: PreviewPartAppearance],
+    partModelSources: [PartID: PartModelSource],
     reflectionMode: ViewportReflectionMode,
     showsShadows: Bool
   ) async -> Entity {
@@ -418,16 +423,34 @@ public struct RobotPreviewView: View {
     root.addChild(makeGrid(appearance: appearance))
 
     for part in rig.parts {
-      root.addChild(
-        makePart(
-          part,
-          renderStyle: renderStyle,
-          edgeDisplay: edgeDisplay,
-          materialFinish: materialFinish,
-          appearance: partAppearances[part.id],
-          showsShadows: showsShadows
+      if let source = partModelSources[part.id],
+        let imported = try? await RealityKitModelLoader.load(
+          contentsOf: source.fileURL,
+          unitScaleToMeters: source.unitScaleToMeters,
+          modelNode: source.modelNode
         )
-      )
+      {
+        root.addChild(
+          makeImportedPart(
+            part,
+            imported: imported,
+            renderStyle: renderStyle,
+            edgeDisplay: edgeDisplay,
+            showsShadows: showsShadows
+          )
+        )
+      } else {
+        root.addChild(
+          makePart(
+            part,
+            renderStyle: renderStyle,
+            edgeDisplay: edgeDisplay,
+            materialFinish: materialFinish,
+            appearance: partAppearances[part.id],
+            showsShadows: showsShadows
+          )
+        )
+      }
     }
 
     for joint in rig.joints {
@@ -535,6 +558,25 @@ public struct RobotPreviewView: View {
       to: entity
     )
     return entity
+  }
+
+  private static func makeImportedPart(
+    _ part: RigPartDefinition,
+    imported: Entity,
+    renderStyle: ViewportRenderStyle,
+    edgeDisplay: ViewportEdgeDisplay,
+    showsShadows: Bool
+  ) -> Entity {
+    let container = Entity()
+    container.name = partEntityName(part.id)
+    imported.name = "importedGeometry"
+    prepareForSelection(imported)
+    ViewportRenderStyleApplier.apply(renderStyle, edgeDisplay: edgeDisplay, to: imported)
+    applyShadowParticipation(showsShadows, to: imported)
+    container.addChild(imported)
+    container.position = simdPosition(part.positionMeters)
+    container.orientation = orientation(part.rotationEulerRadians)
+    return container
   }
 
   private static func applyPartAppearances(

@@ -42,6 +42,61 @@ final class RealityKitModelLoadingTests: XCTestCase {
     let head = try XCTUnwrap(nodes.first { $0.name == "Head" })
     XCTAssertEqual(hierarchy.node(at: head.id), head)
     XCTAssertTrue(head.id.displayString.contains("Head"))
+    XCTAssertTrue(head.id.modelNodeReference.hasSuffix("HeadYaw/Head"))
+  }
+
+  @MainActor
+  func testModelIOLoadsSTLAndScalesMillimetersToMeters() async throws {
+    let modelURL = try XCTUnwrap(
+      Bundle.module.url(
+        forResource: "MillimeterTriangle",
+        withExtension: "stl",
+        subdirectory: "Fixtures"
+      )
+    )
+
+    let model = try await RealityKitModelLoader.load(
+      contentsOf: modelURL,
+      unitScaleToMeters: 0.001
+    )
+    let bounds = model.visualBounds(relativeTo: nil)
+
+    XCTAssertEqual(bounds.extents.x, 1, accuracy: 0.0001)
+    XCTAssertEqual(bounds.extents.y, 1, accuracy: 0.0001)
+  }
+
+  @MainActor
+  func testModelIOLoadsOBJAndScalesCentimetersToMeters() async throws {
+    let modelURL = try XCTUnwrap(
+      Bundle.module.url(
+        forResource: "CentimeterTriangle",
+        withExtension: "obj",
+        subdirectory: "Fixtures"
+      )
+    )
+
+    let model = try await RealityKitModelLoader.load(
+      contentsOf: modelURL,
+      unitScaleToMeters: 0.01
+    )
+    let bounds = model.visualBounds(relativeTo: nil)
+
+    XCTAssertEqual(bounds.extents.x, 1, accuracy: 0.0001)
+    XCTAssertEqual(bounds.extents.y, 1, accuracy: 0.0001)
+  }
+
+  @MainActor
+  func testModelLoaderRejectsSTEPInsteadOfPretendingItIsRenderable() async {
+    do {
+      _ = try await RealityKitModelLoader.load(
+        contentsOf: URL(fileURLWithPath: "/tmp/model.step")
+      )
+      XCTFail("Expected STEP to remain an honest unsupported format")
+    } catch let RealityKitModelLoadingError.unsupportedFileType(fileExtension) {
+      XCTAssertEqual(fileExtension, "step")
+    } catch {
+      XCTFail("Unexpected error: \(error)")
+    }
   }
 
   @MainActor

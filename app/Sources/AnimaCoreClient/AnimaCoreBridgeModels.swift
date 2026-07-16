@@ -121,12 +121,14 @@ public struct AnimaCoreRigIdentity: Codable, Equatable, Sendable {
 public struct AnimaCorePartSummary: Codable, Equatable, Sendable {
   public let name: String
   public let parent: String?
+  public let model: String
   public let modelNode: String?
   public let description: String
 
   enum CodingKeys: String, CodingKey {
     case name
     case parent
+    case model
     case modelNode = "model_node"
     case description
   }

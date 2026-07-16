@@ -16,6 +16,10 @@ struct StudioWorkspaceView: View {
 
   @State private var workspace: StudioWorkspaceModel
   @State private var isImportingModel = false
+  @State private var pendingUnitlessModelURL: URL?
+  @State private var stepConversionMessage: String?
+  @State private var characterEditorMetadata = CharacterEditorMetadata()
+  @State private var activeImportedModelReference: String?
   @State private var isImportingAnimaCharacter = false
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
@@ -132,14 +136,42 @@ struct StudioWorkspaceView: View {
       switch result {
       case .success(let urls):
         if let url = urls.first {
-          Task { @MainActor in
-            await workspace.importModel(from: url)
-            copyImportedModelIntoActiveCharacter(from: url)
-          }
+          beginModelImport(from: url)
         }
       case .failure(let error):
         workspace.importErrorMessage = error.localizedDescription
       }
+    }
+    .sheet(
+      isPresented: Binding(
+        get: { pendingUnitlessModelURL != nil },
+        set: { if !$0 { pendingUnitlessModelURL = nil } }
+      )
+    ) {
+      if let pendingUnitlessModelURL {
+        ModelImportUnitsSheet(
+          filename: pendingUnitlessModelURL.lastPathComponent,
+          defaultUnit: pendingUnitlessModelURL.pathExtension.lowercased() == "stl"
+            ? .millimeters : .meters,
+          cancel: { self.pendingUnitlessModelURL = nil },
+          importModel: { unit in
+            let url = pendingUnitlessModelURL
+            self.pendingUnitlessModelURL = nil
+            Task { await importModel(from: url, sourceUnit: unit) }
+          }
+        )
+      }
+    }
+    .alert(
+      "STEP Needs Conversion",
+      isPresented: Binding(
+        get: { stepConversionMessage != nil },
+        set: { if !$0 { stepConversionMessage = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(stepConversionMessage ?? "Export this model as STL or USD from your CAD tool.")
     }
     .fileImporter(
       isPresented: $isImportingAnimaCharacter,
@@ -276,8 +308,13 @@ struct StudioWorkspaceView: View {
         Spacer(minLength: 320)
 
         if showsInspector {
-          InspectorView(workspace: workspace)
-            .frame(width: StudioMetrics.inspectorWidth)
+          InspectorView(
+            workspace: workspace,
+            mapModelNode: { node in
+              Task { await createRigidPart(from: node) }
+            }
+          )
+          .frame(width: StudioMetrics.inspectorWidth)
         }
       }
       .padding(16)
@@ -291,6 +328,7 @@ struct StudioWorkspaceView: View {
       RobotPreviewView(
         rig: workspace.project.rig,
         engineResolvedPartPoses: workspace.engineResolvedPartPoses,
+        partModelSources: workspace.enginePartModelSources,
         modelURL: workspace.importedModelURL,
         showsGrid: workspace.showsPreviewGrid,
         projection: workspace.cameraProjection,
@@ -654,7 +692,7 @@ struct StudioWorkspaceView: View {
   }
 
   private static let modelContentTypes: [UTType] = [
-    "usd", "usda", "usdc", "usdz", "reality",
+    "usd", "usda", "usdc", "usdz", "reality", "stl", "obj", "step", "stp",
   ].compactMap { UTType(filenameExtension: $0) }
 
   private static let animaCharacterContentTypes: [UTType] = [
@@ -673,6 +711,21 @@ struct StudioWorkspaceView: View {
       defer { if accessed { projectURL.stopAccessingSecurityScopedResource() } }
       await workspace.importAnimaCharacter(
         from: projectURL.appendingPathComponent(character.characterPath)
+      )
+      let editorURL = projectURL.appendingPathComponent(character.editorPath)
+      if let data = try? Data(contentsOf: editorURL),
+        let metadata = try? CharacterEditorMetadata.decode(data)
+      {
+        characterEditorMetadata = metadata
+      } else {
+        characterEditorMetadata = CharacterEditorMetadata()
+      }
+      workspace.configurePartModelSources(
+        characterDirectoryURL: projectURL.appendingPathComponent(
+          character.directoryPath,
+          isDirectory: true
+        ),
+        editorMetadata: characterEditorMetadata
       )
       workspace.project.name = session.document.displayName
       registerLoadedCharacter(markDirty: false)
@@ -784,18 +837,41 @@ struct StudioWorkspaceView: View {
     }
     document.editorState.activeCharacterFolderName = character.folderName
     let canonicalText = try await workspace.serializedCharacterText()
-    let editorText = "{\n  \"format_version\" : \"1\"\n}\n"
     return [
       ProjectFileWrite(relativePath: character.characterPath, text: canonicalText),
-      ProjectFileWrite(relativePath: character.editorPath, text: editorText),
+      ProjectFileWrite(
+        relativePath: character.editorPath,
+        data: try characterEditorMetadata.encodedData()
+      ),
     ]
   }
 
   @MainActor
-  private func copyImportedModelIntoActiveCharacter(from sourceURL: URL) {
-    guard workspace.importErrorMessage == nil,
-      let character = session.document.activeCharacter
-    else { return }
+  private func beginModelImport(from url: URL) {
+    let fileExtension = url.pathExtension.lowercased()
+    if fileExtension == "step" || fileExtension == "stp" {
+      stepConversionMessage =
+        "Anima Studio does not have a native STEP mesh loader. Export \(url.lastPathComponent) as STL or USD from SolidWorks, Onshape, Fusion 360, or your CAD tool, then import that file."
+    } else if fileExtension == "stl" || fileExtension == "obj" {
+      pendingUnitlessModelURL = url
+    } else {
+      Task { await importModel(from: url, sourceUnit: .meters) }
+    }
+  }
+
+  @MainActor
+  private func importModel(from sourceURL: URL, sourceUnit: ModelImportUnit) async {
+    guard let character = session.document.activeCharacter else {
+      workspace.importErrorMessage =
+        "Import or create a .character.anima character before adding rigid-part models."
+      return
+    }
+    await workspace.importModel(
+      from: sourceURL,
+      unitScaleToMeters: sourceUnit.scaleToMeters
+    )
+    guard workspace.importErrorMessage == nil else { return }
+    let importedHierarchy = workspace.importedModelHierarchy
     do {
       var updated = session
       let projectURL = try updated.resolvedProjectURL()
@@ -815,8 +891,65 @@ struct StudioWorkspaceView: View {
       if let asset = updated.document.assets.last,
         case .embedded(let relativePath) = asset.storage
       {
-        workspace.importedModelURL = projectURL.appendingPathComponent(relativePath)
+        let prefix = character.directoryPath + "/"
+        guard relativePath.hasPrefix(prefix) else {
+          throw AnimaDocumentError.pathTraversal(path: relativePath)
+        }
+        let modelReference = String(relativePath.dropFirst(prefix.count))
+        let copiedURL = projectURL.appendingPathComponent(relativePath)
+        characterEditorMetadata.modelImports[modelReference] = ModelImportMetadata(
+          unitName: sourceUnit.rawValue,
+          unitScaleToMeters: sourceUnit.scaleToMeters
+        )
+        _ = try await workspace.authorImportedModel(
+          modelReference: modelReference,
+          suggestedPartName: sourceURL.deletingPathExtension().lastPathComponent
+        )
+        activeImportedModelReference = modelReference
+        workspace.importedModelURL = copiedURL
+        workspace.importedModelHierarchy = importedHierarchy
+        workspace.configurePartModelSources(
+          characterDirectoryURL: projectURL.appendingPathComponent(
+            character.directoryPath,
+            isDirectory: true
+          ),
+          editorMetadata: characterEditorMetadata
+        )
       }
+      updated.isDirty = true
+      session = updated
+    } catch {
+      workspace.importErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func createRigidPart(from node: ModelHierarchyNode) async {
+    guard let character = session.document.activeCharacter,
+      let modelReference = activeImportedModelReference
+    else {
+      workspace.importErrorMessage = "Import a model before mapping one of its nodes."
+      return
+    }
+    let hierarchy = workspace.importedModelHierarchy
+    let importedURL = workspace.importedModelURL
+    do {
+      _ = try await workspace.authorImportedModel(
+        modelReference: modelReference,
+        modelNode: node.id.modelNodeReference,
+        suggestedPartName: node.displayName
+      )
+      workspace.importedModelHierarchy = hierarchy
+      workspace.importedModelURL = importedURL
+      let projectURL = try session.resolvedProjectURL()
+      workspace.configurePartModelSources(
+        characterDirectoryURL: projectURL.appendingPathComponent(
+          character.directoryPath,
+          isDirectory: true
+        ),
+        editorMetadata: characterEditorMetadata
+      )
+      var updated = session
       updated.isDirty = true
       session = updated
     } catch {

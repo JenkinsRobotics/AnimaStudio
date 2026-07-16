@@ -5,6 +5,7 @@ import SwiftUI
 
 struct InspectorView: View {
   @Bindable var workspace: StudioWorkspaceModel
+  var mapModelNode: ((ModelHierarchyNode) -> Void)? = nil
 
   var body: some View {
     VStack(spacing: 0) {
@@ -231,9 +232,11 @@ struct InspectorView: View {
     }
 
     Section("Source Actions") {
-      Button("Map to Semantic Part", systemImage: "arrow.triangle.branch") {}
-        .disabled(true)
-        .help("Available after persistent semantic parts are implemented")
+      Button("Create Rigid Part from Node", systemImage: "arrow.triangle.branch") {
+        mapModelNode?(node)
+      }
+      .disabled(mapModelNode == nil)
+      .help("Create an Anima part that references this node inside the imported model file")
       Button("Reimport from Source", systemImage: "arrow.clockwise") {}
         .disabled(true)
         .help("Available after durable asset identity and source bookmarks are implemented")

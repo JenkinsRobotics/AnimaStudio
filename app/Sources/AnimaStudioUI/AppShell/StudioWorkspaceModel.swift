@@ -66,6 +66,8 @@ final class StudioWorkspaceModel {
   var animaCoreState: AnimaCoreState = .unavailable
   var engineEvaluationTimeSeconds: Double?
   var engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:]
+  var enginePartModelSources: [PartID: PartModelSource] = [:]
+  var engineParts: [AnimaCorePartSummary] = []
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
   var engineMates: [AnimaCoreJointSummary] = []
   var engineRelationTypes: [AnimaCoreRelationTypeSummary] = []
@@ -281,7 +283,7 @@ final class StudioWorkspaceModel {
   }
 
   func importAnimaCharacter(from url: URL) async {
-    guard let animaCoreClient else {
+    guard animaCoreClient != nil else {
       animaCoreState = .unavailable
       animaCoreErrorMessage = AnimaCoreClientError.helperNotFound.localizedDescription
       return
@@ -300,9 +302,21 @@ final class StudioWorkspaceModel {
 
     animaCoreState = .connecting
     animaCoreErrorMessage = nil
-    var pendingHandle: String?
     do {
       let text = try String(contentsOf: url, encoding: .utf8)
+      try await loadAnimaCharacter(text: text)
+    } catch {
+      animaCoreState = .failed
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  private func loadAnimaCharacter(text: String) async throws {
+    guard let animaCoreClient else {
+      throw AnimaCoreClientError.helperNotFound
+    }
+    var pendingHandle: String?
+    do {
       let hello = try await animaCoreClient.start()
       let mateCatalog = try await animaCoreClient.mateTypes()
       let relationCatalog = try await animaCoreClient.relationTypes()
@@ -331,6 +345,7 @@ final class StudioWorkspaceModel {
       pendingHandle = nil
       animaCoreEngineVersion = hello.engineVersion
       engineMateTypes = mateCatalog.mateTypes
+      engineParts = loaded.rig.parts
       engineMates = loaded.rig.joints
       engineRelationTypes = relationCatalog.relationTypes
       engineRelations = loaded.rig.relations
@@ -351,6 +366,7 @@ final class StudioWorkspaceModel {
       lockedMateIDs.removeAll()
       relationDraft = nil
       componentAppearances.removeAll()
+      enginePartModelSources.removeAll()
       importedModelURL = nil
       importedModelHierarchy = nil
       cameraViewpoint = .home
@@ -363,9 +379,78 @@ final class StudioWorkspaceModel {
       if let pendingHandle {
         try? await animaCoreClient.release(handle: pendingHandle)
       }
-      animaCoreState = .failed
-      animaCoreErrorMessage = error.localizedDescription
+      throw error
     }
+  }
+
+  /// Adds or assigns one renderer asset in the full-fidelity engine DTO, then
+  /// asks AnimaCore to serialize, validate, and reload the result. Swift never
+  /// writes `.anima` text or accepts an unvalidated part edit.
+  @discardableResult
+  func authorImportedModel(
+    modelReference: String,
+    modelNode: String? = nil,
+    suggestedPartName: String
+  ) async throws -> String {
+    guard let animaCoreClient, let engineRigDocument else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    let selectedEnginePartName = selectedPartID.flatMap { selectedPartID in
+      enginePartIDsByName.first(where: { $0.value == selectedPartID })?.key
+    }.flatMap { selectedName in
+      engineParts.first(where: { part in
+        guard part.name == selectedName else { return false }
+        if part.model.isEmpty { return true }
+        return modelNode != nil && part.model == modelReference && part.modelNode == nil
+      })?.name
+    }
+    let edited: AnimaCoreJSONValue
+    let partName: String
+    if let selectedEnginePartName {
+      edited = try AnimaCoreRigDocumentEditor.assigningModel(
+        modelReference,
+        modelNode: modelNode,
+        toPartNamed: selectedEnginePartName,
+        in: engineRigDocument
+      )
+      partName = selectedEnginePartName
+    } else {
+      let addition = try AnimaCoreRigDocumentEditor.addingPart(
+        suggestedName: suggestedPartName,
+        model: modelReference,
+        modelNode: modelNode,
+        to: engineRigDocument
+      )
+      edited = addition.document
+      partName = addition.partName
+    }
+    let text = try await animaCoreClient.serializeCharacter(rig: edited).text
+    try await loadAnimaCharacter(text: text)
+    if let partID = enginePartIDsByName[partName] {
+      selection = [.part(partID)]
+    }
+    return partName
+  }
+
+  func configurePartModelSources(
+    characterDirectoryURL: URL,
+    editorMetadata: CharacterEditorMetadata
+  ) {
+    enginePartModelSources = Dictionary(
+      uniqueKeysWithValues: engineParts.compactMap { part in
+        guard !part.model.isEmpty, let partID = enginePartIDsByName[part.name] else { return nil }
+        let metadata = editorMetadata.modelImports[part.model]
+        return (
+          partID,
+          PartModelSource(
+            partID: partID,
+            fileURL: characterDirectoryURL.appendingPathComponent(part.model),
+            modelNode: part.modelNode,
+            unitScaleToMeters: metadata?.unitScaleToMeters ?? 1
+          )
+        )
+      }
+    )
   }
 
   func shutdownAnimaCore() async {
@@ -381,6 +466,8 @@ final class StudioWorkspaceModel {
     engineEvaluation = nil
     engineEvaluationTimeSeconds = nil
     engineResolvedPartPoses.removeAll()
+    enginePartModelSources.removeAll()
+    engineParts.removeAll()
     enginePartIDsByName.removeAll()
     engineClipName = nil
     engineFrameRequestRevision += 1
@@ -501,20 +588,28 @@ final class StudioWorkspaceModel {
     return Set(eligible.map(\.id))
   }
 
-  func importModel(from url: URL) async {
+  func importModel(from url: URL, unitScaleToMeters: Double = 1) async {
     guard url.isFileURL else {
       importErrorMessage = "The selected model is not a local file."
       return
     }
 
-    _ = url.startAccessingSecurityScopedResource()
+    let accessedSecurityScope = url.startAccessingSecurityScopedResource()
+    defer {
+      if accessedSecurityScope {
+        url.stopAccessingSecurityScopedResource()
+      }
+    }
     isLoadingModelHierarchy = true
     importErrorMessage = nil
     defer { isLoadingModelHierarchy = false }
 
     let hierarchy: ModelHierarchyNode
     do {
-      hierarchy = try await RealityKitModelHierarchy.load(contentsOf: url)
+      hierarchy = try await RealityKitModelHierarchy.load(
+        contentsOf: url,
+        unitScaleToMeters: unitScaleToMeters
+      )
     } catch {
       importErrorMessage = "\(url.lastPathComponent): \(error.localizedDescription)"
       return

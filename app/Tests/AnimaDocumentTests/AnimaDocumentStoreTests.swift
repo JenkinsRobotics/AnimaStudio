@@ -239,11 +239,62 @@ final class AnimaDocumentStoreTests: XCTestCase {
     guard case .embedded(let path) = asset.storage else {
       return XCTFail("Expected embedded asset")
     }
-    XCTAssertTrue(path.hasPrefix("characters/jp01/assets/"))
+    XCTAssertEqual(path, "characters/jp01/assets/head.usdz")
     guard case .resolved(let resolved) = try store.resolveAsset(asset, projectURL: url) else {
       return XCTFail("Expected resolved asset")
     }
     XCTAssertEqual(try String(contentsOf: resolved, encoding: .utf8), "mesh")
+  }
+
+  func testRepeatedAssetFilenameGetsPortableCollisionSuffix() throws {
+    let url = projectURL()
+    var saved = try store.save(
+      document(characters: [character]),
+      to: url,
+      fileWrites: [canonicalWrite()]
+    )
+    let source = workDirectory.appendingPathComponent("head.stl")
+    try Data("first".utf8).write(to: source)
+    saved = try store.embedAsset(
+      from: source,
+      into: url,
+      document: saved,
+      characterFolderName: "jp01",
+      kind: "model3D"
+    )
+    try Data("second".utf8).write(to: source)
+    saved = try store.embedAsset(
+      from: source,
+      into: url,
+      document: saved,
+      characterFolderName: "jp01",
+      kind: "model3D"
+    )
+
+    let paths = saved.assets.compactMap { asset -> String? in
+      guard case .embedded(let path) = asset.storage else { return nil }
+      return path
+    }
+    XCTAssertEqual(
+      Set(paths),
+      ["characters/jp01/assets/head.stl", "characters/jp01/assets/head-2.stl"]
+    )
+    XCTAssertNoThrow(try store.save(saved, to: url))
+  }
+
+  func testCharacterEditorMetadataRoundTripsUnitlessModelScale() throws {
+    let metadata = CharacterEditorMetadata(
+      modelImports: [
+        "assets/head.stl": ModelImportMetadata(
+          unitName: "millimeters",
+          unitScaleToMeters: 0.001
+        )
+      ]
+    )
+
+    let decoded = try CharacterEditorMetadata.decode(metadata.encodedData())
+
+    XCTAssertEqual(decoded, metadata)
   }
 
   func testLinkedAssetBookmarkRoundTrips() throws {

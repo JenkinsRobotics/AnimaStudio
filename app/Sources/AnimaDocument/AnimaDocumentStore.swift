@@ -257,12 +257,16 @@ public struct AnimaDocumentStore: Sendable {
     guard document.characters.contains(where: { $0.folderName == characterFolderName }) else {
       throw AnimaDocumentError.unknownCharacter(name: characterFolderName)
     }
-    let filename = sourceURL.lastPathComponent
-    try Self.validate(filename: filename)
-    try Self.ensureUnique(filename: filename, id: nil, in: document.assets)
+    let requestedFilename = sourceURL.lastPathComponent
+    try Self.validate(filename: requestedFilename)
+    let filename = Self.availableAssetFilename(
+      requestedFilename,
+      characterFolderName: characterFolderName,
+      document: document,
+      projectURL: projectURL
+    )
     let id = AssetID()
-    let relativePath =
-      "characters/\(characterFolderName)/assets/\(id.rawValue.uuidString)-\(filename)"
+    let relativePath = "characters/\(characterFolderName)/assets/\(filename)"
     let destination = projectURL.appendingPathComponent(relativePath)
     do {
       try fileManager.createDirectory(
@@ -280,12 +284,44 @@ public struct AnimaDocumentStore: Sendable {
     updated.assets.append(
       DocumentAssetReference(
         id: id,
-        originalFilename: filename,
+        originalFilename: requestedFilename,
         kind: kind,
         storage: .embedded(packageRelativePath: relativePath)
       )
     )
     return updated
+  }
+
+  private static func availableAssetFilename(
+    _ requestedFilename: String,
+    characterFolderName: String,
+    document: AnimaStudioDocument,
+    projectURL: URL
+  ) -> String {
+    let requestedURL = URL(fileURLWithPath: requestedFilename)
+    let stem = requestedURL.deletingPathExtension().lastPathComponent
+    let pathExtension = requestedURL.pathExtension
+    let prefix = "characters/\(characterFolderName)/assets/"
+    let occupied = Set(
+      document.assets.compactMap { asset -> String? in
+        guard case .embedded(let path) = asset.storage, path.hasPrefix(prefix) else { return nil }
+        return String(path.dropFirst(prefix.count))
+      }
+    )
+    func exists(_ filename: String) -> Bool {
+      occupied.contains(filename)
+        || FileManager.default.fileExists(
+          atPath: projectURL.appendingPathComponent(prefix + filename).path
+        )
+    }
+    guard exists(requestedFilename) else { return requestedFilename }
+    var sequence = 2
+    while true {
+      let suffix = pathExtension.isEmpty ? "" : ".\(pathExtension)"
+      let candidate = "\(stem)-\(sequence)\(suffix)"
+      if !exists(candidate) { return candidate }
+      sequence += 1
+    }
   }
 
   public func linkAsset(
@@ -375,16 +411,16 @@ public struct AnimaDocumentStore: Sendable {
 
   static func validate(assets: [DocumentAssetReference]) throws {
     var seenIDs: Set<UUID> = []
-    var seenNames: Set<String> = []
+    var seenEmbeddedPaths: Set<String> = []
     for asset in assets {
       guard seenIDs.insert(asset.id.rawValue).inserted else {
         throw AnimaDocumentError.duplicateAssetID(id: asset.id.rawValue)
       }
-      guard seenNames.insert(asset.originalFilename).inserted else {
-        throw AnimaDocumentError.duplicateAssetName(name: asset.originalFilename)
-      }
       try validate(filename: asset.originalFilename)
       if case .embedded(let relativePath) = asset.storage {
+        guard seenEmbeddedPaths.insert(relativePath).inserted else {
+          throw AnimaDocumentError.duplicateAssetName(name: relativePath)
+        }
         try validateProjectRelativePath(relativePath)
         let parts = relativePath.split(separator: "/")
         guard
