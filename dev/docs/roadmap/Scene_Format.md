@@ -2,11 +2,15 @@
 
 > File extension: `.scene.anima`  
 > Format: YAML  
-> Version: execution v1 — the show-playback subset the Python runtime
-> executes (`anima_studio/scene.py` is the reference implementation).
-> The 1.0 draft below it is kept for the speech/expression/lights/AI
-> sections that have not been redesigned yet; those action types are
-> spec'd-but-deferred and rejected by the v1 loader.
+> Version: execution v1 + v2 — the show-playback subset the Python
+> runtime executes (`anima_studio/scene.py` is the reference
+> implementation). v2 adds the FANUC-inspired scripting constructs
+> (condition trees, `select`, `call`/`subroutines`, `inputs`,
+> `wait_until`, background `monitors`) additively within
+> `anima_version: "2.0"` — every v1 scene loads unchanged. The 1.0
+> draft below is kept for the speech/expression/lights/AI sections
+> that have not been redesigned yet; those action types are
+> spec'd-but-deferred and rejected by the loader.
 
 A scene file describes a complete performance — an ordered action
 sequence with timing and logic gates that drives one character. This is
@@ -65,17 +69,180 @@ Every variable referenced by `set`/`if`/`loop` must be declared under
 `variables:`; clip names and pose targets are validated against the
 loaded character at load time.
 
+### Execution v2 — the scripting constructs (shipped)
+
+The v2 layer is the show-control scripting standard, modeled on FANUC
+Teach Pendant logic (IF with rich conditions, SELECT, CALL, WAIT on
+I/O, AND/OR/XOR, BG Logic). It is additive within `anima_version:
+"2.0"`: three new optional top-level sections (`inputs:`,
+`subroutines:`, `monitors:`), three new actions (`wait_until`,
+`select`, `call`), one extension to `if:` (`when:`), and one
+monitor-only action (`end_scene`). The worked example is
+[`examples/patrol_and_greet.scene.anima`](../../../examples/patrol_and_greet.scene.anima).
+
+#### Condition trees
+
+Structured YAML, deliberately **not** string expressions: every node
+maps 1:1 onto a canvas node
+([`Node_Graph.md`](Node_Graph.md)) and no expression parser exists.
+Used by `if: {when}`, `wait_until`, and `monitors`. Nesting is
+unlimited.
+
+```yaml
+when:
+  all:                                  # AND — 1+ operands
+    - { input: door_open, op: eq, value: true }
+    - any:                              # OR — 1+ operands
+        - { var: zone, op: eq, value: 1 }
+        - { var: zone, op: ge, value: 2 }
+    - not: { var: paused, op: eq, value: true }
+  # xor: [<c>, <c>]  — exactly two operands (the FANUC binary XOR)
+```
+
+A **leaf** is `{var: <name> | input: <name>, op: eq|ne|lt|le|gt|ge,
+value: <literal-or-var-name>}` — exactly one of `var`/`input` (the
+namespaces stay explicit; `var:` never falls through to an input).
+`value` follows `set:` discipline: a string naming a declared variable
+copies it at evaluation time, anything else is the literal. Typing:
+`eq`/`ne` compare **same-kind** values only — numbers compare
+numerically (`1 == 1.0`), `true != 1` per the v1 discipline, and
+mismatched kinds are simply unequal; the ordering operators require
+numbers on **both** sides — anything else is a typed runtime error
+naming the leaf's path.
+
+#### `if:` with `when:`
+
+`if:` takes exactly one guard: the v1 `var`+`equals` literal form
+(unchanged) or `when: <condition-tree>`:
+
+```yaml
+- if:
+    when: { all: [ { var: mood, op: eq, value: happy },
+                   { input: battery_pct, op: ge, value: 20 } ] }
+    then: [ { clip: wave } ]
+    else: [ { event: { emit: too_tired } } ]
+```
+
+#### `select:` — multi-way branch (FANUC SELECT)
+
+```yaml
+- select:
+    var: mode
+    cases:
+      - equals: "wave"
+        then: [ { call: wave } ]
+      - equals: "pick"
+        then: [ { clip: pick } ]
+    default:                    # optional; no match + no default = skip
+      - wait: { seconds: 1.0 }
+```
+
+The **first** case whose literal equals the variable runs (document
+order, same equality discipline as `if`, no fallthrough). Duplicate
+case literals are load errors (`1` and `1.0` are duplicates; `true`
+and `1` are distinct).
+
+#### `call:` + `subroutines:` (FANUC CALL)
+
+```yaml
+subroutines:
+  wave:                         # may contain anything a sequence may,
+    - loop:                     # including call
+        count: 2
+        body: [ { pose: { wrist_roll.rotation: 45.0 }, duration_s: 0.25 },
+                { pose: { wrist_roll.rotation: -45.0 }, duration_s: 0.25 } ]
+
+sequence:
+  - call: wave                  # runs the body, then resumes here
+```
+
+Subroutines share the scene's variable scope (registers are global on
+a Teach Pendant too). Recursion — direct or indirect — is rejected at
+load with the cycle named (`recursive subroutine call: a -> b -> a`).
+
+#### `inputs:` — the DI/RI analog
+
+```yaml
+inputs:                         # optional; scalar initial values
+  door_open: false
+  visitor_zone: 0
+```
+
+Inputs are externally driven and **read-only to the scene** — a
+namespace distinct from `variables:` (`set:` targeting an input is a
+load error). The host drives them with `runner.set_input(name, value)`
+(unknown name = typed runtime error); a change takes effect at the
+**next tick boundary** for determinism. Conditions read them with the
+explicit `input:` leaf key.
+
+#### `wait_until:` — condition gate (FANUC WAIT)
+
+```yaml
+- wait_until:
+    when: { all: [ { input: door_open, op: eq, value: true },
+                   { input: visitor_zone, op: ge, value: 1 } ] }
+    timeout_s: 6.0              # optional; on_timeout: skip (default) | end
+    on_timeout: skip
+```
+
+**Level-triggered**, unlike `wait_for`'s edge-triggered events: the
+condition is sampled the moment the action starts and then at every
+tick; the gate passes at the first sample where it holds (already
+true = never waits). A deadline that passed before the condition was
+first observed true wins; a deadline tied with a true sample loses.
+`on_timeout: end` ends the scene as `ended_by_gate_timeout`, exactly
+like `wait_for`.
+
+#### `monitors:` — background interlocks (FANUC BG Logic)
+
+```yaml
+monitors:
+  - name: estop
+    when: { input: estop, op: eq, value: true }
+    do:
+      - event: { emit: estop_tripped }
+      - end_scene: { result: "estop" }
+```
+
+Scanned **every tick**, in declaration order, **before** the main
+sequence — regardless of what the main sequence is doing.
+**Edge-triggered**: a monitor fires when its condition transitions
+false → true (a condition already true at the first tick fires; the
+prior state starts false) and re-arms after the condition goes false.
+Monitor bodies are restricted to instantaneous interlock actions —
+`set:`, `event: {emit}`, and `end_scene: {result: <string>}` — any
+motion/timing/flow action is a load error (background logic is a PLC,
+not a second choreography track). `end_scene` — legal **only** inside
+monitors — e-stops the adapter (all motion stops) and finishes the
+run with the given result string (`runner.result == "estop"`).
+Monitors never keep a finished scene alive.
+
+#### Why there is no JMP/LBL
+
+FANUC TP programs jump (`JMP`/`LBL`); Anima scenes deliberately do
+not, and the draft `goto`/`label` actions stay rejected. Structured
+programs only: `select` + `call` + the two loop forms replace every
+legitimate jump pattern, and the node canvas requires reducible
+control flow (see `Node_Graph.md` — arbitrary jump edges cannot
+round-trip through a structured graph). This is a permanent design
+decision, not a deferral.
+
 ### Deferred past v1 (spec'd below, rejected loudly)
 
 `speak`, `expression`, `blend_shapes`, `lights`, `ai_response`, and
 `goto`/`label` parse as typed errors naming the action — a scene using
-them refuses to load rather than playing back incompletely. The 1.0
+them refuses to load rather than playing back incompletely
+(`goto`/`label` are not deferred but permanently rejected; see "Why
+there is no JMP/LBL" above). The 1.0
 draft's `meta:` block is superseded by `identity:`, its scalar
 `wait: 1.5` form by `wait: {seconds: 1.5}`, and its
 `character: {file: ...}` mapping by the plain `character:` path.
-`wait_for`'s condition-expression triggers (`user_speech_contains`,
-`and`/`or`, ...) are deferred with the JaegerOS bus integration; v1
-gates are plain named events.
+`wait_for`'s draft condition-expression triggers
+(`user_speech_contains`, ...) are deferred with the JaegerOS bus
+integration; `wait_for` gates are plain named events, and the shipped
+structured replacement for condition waits is v2's `wait_until` over
+variables/inputs (the bus adapter's job stays translating topics into
+posted events and `set_input` calls).
 
 ### Execution model (shipped)
 
@@ -86,13 +253,18 @@ adapter seam is proven adapter-agnostic):
 ```
 load_scene_file(path)        -> (Scene, Rig)   # resolves character:
 SceneRunner(scene, rig, adapter, frame_interval_ms=33, on_event=None)
-runner.advance(now_s)        # tick: execute due actions at exact
+runner.advance(now_s)        # tick: apply pending inputs, scan the
+                             # monitors, execute due actions at exact
                              # timestamps, evaluate the pose, send one
                              # frame; returns None or the result
 runner.post_event(name)      # deliver a gate event, between ticks
+runner.set_input(name, val)  # drive a declared input, between ticks;
+                             # effective at the next tick boundary
 runner.stop()                # e-stop the adapter, result = stopped
-runner.result                # finished | ended_by_gate_timeout | stopped
+runner.result                # finished | ended_by_gate_timeout |
+                             # stopped | a monitor's end_scene string
 runner.emitted_events        # ((name, time_s), ...) outbound log
+runner.variables / .inputs   # observability snapshots
 ```
 
 There is no wall clock and no threads: the caller drives scene-local

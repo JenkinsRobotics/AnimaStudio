@@ -63,7 +63,7 @@
   carries the same eight-type family (`JointType`, including `parallel`:
   XYZ translation + Z rotation) with per-type DOF templates, optional
   per-DOF limits, per-joint mate offsets, and gear/rack-and-pinion/
-  screw/linear relations; 583 Python tests pass. Motors, 3D Models & Media, and Events are also
+  screw/linear relations; 732 Python tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
@@ -256,6 +256,10 @@
   middle drag to pan; SolidWorks maps middle drag to orbit and Control- or
   Shift-middle drag to pan; Fusion 360 maps Shift-middle drag to orbit and
   middle drag to pan. Custom exposes conflict-free rotate and pan bindings.
+  Orbit, pan, and zoom response now have independent persistent Slow through
+  Very Fast presets in Display → Input. Orbit and pan default to Standard;
+  zoom defaults to Reduced so a mouse-wheel notch makes a smaller, more
+  controllable camera move.
   Discrete mouse-wheel events are consumed as zoom in every profile instead of
   scrolling vertically; precise trackpad scroll phases still pan, and pinch
   still zooms. Semantic proxy geometry is
@@ -264,7 +268,11 @@
   an orange silhouette highlight plus local XYZ translation arrows and rotation
   rings at its origin; dragging them edits the core-backed rest transform, and
   connector-authored mate rotation composes through parent/child chains. During
-  any inspectable selection, Studio now restores the right-side Inspector if
+  pointer inspection, semantic proxy bodies and imported model surfaces use a
+  cyan preselection glow before left-click commit. Selected proxy components
+  continue to expose quiet face-center, edge-midpoint, corner, axis, and origin
+  markers whose own hover effect previews the exact inferred feature target.
+  During any inspectable selection, Studio now restores the right-side Inspector if
   the operator had hidden it. A selected semantic proxy component exposes
   **Properties** and **Appearance** tabs. Appearance provides a 40-color
   industrial palette, an RGB/ColorPicker mixer, editable six-digit hex color,
@@ -276,8 +284,13 @@
   imported source-model materials remain source-owned and read-only. A selected
   semantic component also has a native, CAD-ordered viewport context menu. It
   identifies the body and groups property editing, attached-mate navigation,
-  show/hide, reversible isolate and transparency previews, select-all/clear,
-  Home and Zoom to Selection, lock/unlock, transform reset, and Appearance.
+  show/hide, reversible isolate and transparency previews, mate-guide
+  visibility, select-all/clear, Zoom to Fit and Zoom to Selection, lock/unlock,
+  transform reset, and Appearance. Context routing now follows the pointer:
+  right-clicking the selected component or one of its feature markers opens
+  that full menu, while right-clicking empty space opens a compact Show All /
+  Zoom to Fit / Isometric canvas menu. Right-drag remains camera orbit rather
+  than a selection gesture.
   Isolation and transparency are renderer-only overlays that leave the saved
   rig and underlying appearance override unchanged. Menu commands use the same
   model-owned lock guards as the Inspector and transform gizmo. During
@@ -325,7 +338,7 @@
   for preview framing, and appears in the project asset tree. Its complete
   RealityKit entity hierarchy is projected into value-only nodes with unique
   sibling paths, shown as a selectable Structure outline, and described in the
-  inspector. One hundred ninety-eight tests pass with
+  inspector. Two hundred sixteen tests pass with
   `cd studio && swift test`, including real USD hierarchy loading/projection
   through RealityKit, duplicate/unnamed entity identity coverage, hierarchy
   filtering/ancestor retention, frame timecode and stepping, adjacent-key
@@ -444,24 +457,43 @@
   deterministic `parallel` (timestamp order, ties by track order), and
   outbound `event` emission — with the deferred spec actions (`speak`,
   `expression`, `blend_shapes`, `lights`, `ai_response`, `goto`)
-  rejected loudly at load. The `character:` path resolves relative to
+  rejected loudly at load. Scene execution v2 adds the FANUC-inspired
+  scripting constructs, additively within format 2.0: structured
+  condition trees (`var`/`input` compare leaves with typed
+  `eq/ne/lt/le/gt/ge`, `all`/`any`/`xor` (exactly two)/`not`
+  combinators, unlimited nesting — data, never string expressions),
+  `if: {when}` guards, `select` multi-way branches (first match, no
+  fallthrough, duplicate literals rejected), `call` + top-level
+  `subroutines:` (shared variable scope; recursion rejected at load
+  with the cycle named), read-only externally driven `inputs:`
+  (`runner.set_input` applies at the next tick boundary),
+  level-triggered `wait_until` condition gates with `wait_for`-style
+  timeouts, and background `monitors:` (BG-Logic interlocks scanned
+  every tick before the main sequence, edge-triggered with re-arm,
+  bodies restricted to `set`/`event`/the monitor-only `end_scene`,
+  which e-stops the adapter and finishes with a result string such as
+  `"estop"`). The `character:` path resolves relative to
   the scene file; `SceneRunner` has no wall clock (caller-driven
-  `advance(now_s)` ticks plus `post_event(name)` gates, mirroring the
+  `advance(now_s)` ticks plus `post_event(name)` gates and
+  `set_input(name, value)` between ticks, mirroring the
   simulator's explicit-time discipline), merges active motion sources
   over held values, recomputes relation-driven DOF each frame with the
   same refuse-to-arm limit semantics, streams frames through any
   `OutputAdapter`, and reports `finished` /
-  `ended_by_gate_timeout` / `stopped` plus an emitted-events log.
+  `ended_by_gate_timeout` / `stopped` / a monitor's result string,
+  plus an emitted-events log.
   `examples/pick_and_wave.scene.anima` drives the six-axis arm through
-  the whole v1 surface.
-  583 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  the whole v1 surface and `examples/patrol_and_greet.scene.anima`
+  through the v2 surface (input-gated wait_until, select, a twice-
+  called subroutine, an estop monitor).
+  732 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,
   rig evaluation → `OutputAdapter.send_frame` → simulated/UDP output
   tests, rig evaluation → serial bytes → simulated servo tests, and
   scene file → `SceneRunner` → simulated servo values at exact
-  timestamps with logic-gate branching.
+  timestamps with logic-gate branching and monitor-driven e-stop.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
@@ -490,7 +522,7 @@
   last only for the current session. Project open/save, undo/redo, Home
   templates, and live hardware controls are intentionally visible but disabled.
   There is no `.anima` parsing in Studio (the Python runtime loads
-  `.character.anima` and executes the `.scene.anima` v1 subset; Studio
+  `.character.anima` and executes the `.scene.anima` v1+v2 subset; Studio
   parses neither, and the deferred scene actions — speech, expressions,
   lights/LEDs, AI handoff, goto — execute nowhere), no
   editable Bézier curves/handles, audio, screens/LEDs, Live2D, Studio Show

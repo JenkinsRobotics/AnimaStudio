@@ -1,4 +1,9 @@
-"""`.scene.anima` v1: schema, rig validation, executor semantics."""
+"""`.scene.anima`: schema, rig validation, executor semantics.
+
+Covers execution v1 (clip/pose/wait/wait_for/set/if/loop/parallel/
+event) and the v2 scripting constructs (condition trees, select,
+call/subroutines, inputs, wait_until, background monitors).
+"""
 
 from pathlib import Path
 
@@ -1168,3 +1173,1133 @@ class TestEditorBlock:
             lambda: make_scene([{"wait": {"seconds": 0.1}}], editor=12)
         )
         assert path == "editor"
+
+
+# v2 — the FANUC-inspired scripting constructs -----------------------------------
+
+
+def make_v2_runner(sequence, variables=None, rig=RIG, **scene_overrides):
+    adapter = RecordingAdapter()
+    runner = SceneRunner(
+        make_scene(sequence, variables, **scene_overrides), rig, adapter
+    )
+    return runner, adapter
+
+
+def validate_error(sequence, variables=None, rig=RIG, **overrides):
+    scene = make_scene(sequence, variables, **overrides)
+    with pytest.raises(SceneFormatError) as info:
+        validate_scene(scene, rig)
+    return info.value
+
+
+class TestConditionParsing:
+    """Condition trees are structured data — closed schema, pathed."""
+
+    def parse_when(self, when):
+        return make_scene([{"wait_until": {"when": when}}])
+
+    WHEN = "sequence[0].wait_until.when"
+
+    @pytest.mark.parametrize("op", ["eq", "ne", "lt", "le", "gt", "ge"])
+    def test_every_comparison_operator_parses(self, op):
+        self.parse_when({"var": "x", "op": op, "value": 1})
+
+    def test_unknown_operator(self):
+        path = error_path(
+            lambda: self.parse_when(
+                {"var": "x", "op": "contains", "value": 1}
+            )
+        )
+        assert path == f"{self.WHEN}.op"
+
+    @pytest.mark.parametrize("missing", ["op", "value"])
+    def test_leaf_requires_op_and_value(self, missing):
+        leaf = {"var": "x", "op": "eq", "value": 1}
+        del leaf[missing]
+        path = error_path(lambda: self.parse_when(leaf))
+        assert path == f"{self.WHEN}.{missing}"
+
+    @pytest.mark.parametrize(
+        "leaf",
+        [
+            {"op": "eq", "value": 1},  # neither operand name
+            {"var": "x", "input": "y", "op": "eq", "value": 1},  # both
+        ],
+    )
+    def test_leaf_names_exactly_one_of_var_or_input(self, leaf):
+        with pytest.raises(SceneFormatError) as info:
+            self.parse_when(leaf)
+        assert info.value.path == self.WHEN
+        assert "exactly one" in info.value.message
+
+    def test_leaf_rejects_unknown_field(self):
+        path = error_path(
+            lambda: self.parse_when(
+                {"var": "x", "op": "eq", "value": 1, "hysteresis": 2}
+            )
+        )
+        assert path == f"{self.WHEN}.hysteresis"
+
+    def test_leaf_value_must_be_scalar(self):
+        path = error_path(
+            lambda: self.parse_when({"var": "x", "op": "eq", "value": [1]})
+        )
+        assert path == f"{self.WHEN}.value"
+
+    @pytest.mark.parametrize("operand", ["var", "input"])
+    def test_leaf_operand_name_must_not_be_empty(self, operand):
+        path = error_path(
+            lambda: self.parse_when({operand: "", "op": "eq", "value": 1})
+        )
+        assert path == f"{self.WHEN}.{operand}"
+
+    @pytest.mark.parametrize("combinator", ["all", "any"])
+    def test_combinator_requires_a_list(self, combinator):
+        path = error_path(lambda: self.parse_when({combinator: 5}))
+        assert path == f"{self.WHEN}.{combinator}"
+
+    @pytest.mark.parametrize("combinator", ["all", "any"])
+    def test_combinator_requires_at_least_one_condition(self, combinator):
+        path = error_path(lambda: self.parse_when({combinator: []}))
+        assert path == f"{self.WHEN}.{combinator}"
+
+    @pytest.mark.parametrize("count", [0, 1, 3])
+    def test_xor_takes_exactly_two_operands(self, count):
+        leaf = {"var": "x", "op": "eq", "value": 1}
+        with pytest.raises(SceneFormatError) as info:
+            self.parse_when({"xor": [dict(leaf) for _ in range(count)]})
+        assert info.value.path == f"{self.WHEN}.xor"
+        assert "exactly two" in info.value.message
+
+    def test_not_operand_must_be_a_mapping(self):
+        path = error_path(lambda: self.parse_when({"not": "x"}))
+        assert path == f"{self.WHEN}.not"
+
+    def test_two_combinators_in_one_node(self):
+        with pytest.raises(SceneFormatError) as info:
+            self.parse_when({"all": [], "any": []})
+        assert info.value.path == self.WHEN
+        assert "more than one combinator" in info.value.message
+
+    def test_combinator_rejects_sibling_leaf_keys(self):
+        leaf = {"var": "x", "op": "eq", "value": 1}
+        path = error_path(
+            lambda: self.parse_when({"all": [leaf], "var": "x"})
+        )
+        assert path == f"{self.WHEN}.var"
+
+    def test_nested_tree_parses_and_errors_carry_deep_paths(self):
+        leaf = {"var": "x", "op": "eq", "value": 1}
+        self.parse_when(
+            {"all": [
+                {"any": [dict(leaf), {"not": dict(leaf)}]},
+                {"xor": [dict(leaf), dict(leaf)]},
+            ]}
+        )
+        path = error_path(
+            lambda: self.parse_when(
+                {"all": [{"any": [{"not": {"var": "x", "op": "??",
+                                           "value": 1}}]}]}
+            )
+        )
+        assert path == f"{self.WHEN}.all[0].any[0].not.op"
+
+
+class TestIfWhen:
+    """`if:` gains a `when:` condition tree — exactly one guard form."""
+
+    LEAF = {"var": "mood", "op": "eq", "value": "happy"}
+
+    @pytest.mark.parametrize(
+        "block",
+        [
+            {"then": []},  # no guard at all
+            {"var": "x", "equals": 1,
+             "when": {"var": "x", "op": "eq", "value": 1}, "then": []},
+            {"var": "x",
+             "when": {"var": "x", "op": "eq", "value": 1}, "then": []},
+            {"equals": 1,
+             "when": {"var": "x", "op": "eq", "value": 1}, "then": []},
+        ],
+    )
+    def test_exactly_one_guard_form(self, block):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene([{"if": block}])
+        assert info.value.path == "sequence[0].if"
+        assert "exactly one guard" in info.value.message
+
+    def test_when_true_takes_then(self):
+        runner, _ = make_v2_runner(
+            [{"if": {"when": dict(self.LEAF),
+                     "then": [{"event": {"emit": "yes"}}],
+                     "else": [{"event": {"emit": "no"}}]}}],
+            variables={"mood": "happy"},
+        )
+        runner.advance(0.0)
+        assert event_log(runner) == [("yes", 0.0)]
+
+    def test_when_false_takes_else(self):
+        runner, _ = make_v2_runner(
+            [{"if": {"when": dict(self.LEAF),
+                     "then": [{"event": {"emit": "yes"}}],
+                     "else": [{"event": {"emit": "no"}}]}}],
+            variables={"mood": "sad"},
+        )
+        runner.advance(0.0)
+        assert event_log(runner) == [("no", 0.0)]
+
+    def test_when_condition_variables_are_validated(self):
+        error = validate_error(
+            [{"if": {"when": {"var": "ghost", "op": "eq", "value": 1},
+                     "then": []}}]
+        )
+        assert error.path == "sequence[0].if.when.var"
+
+
+class TestConditionSemantics:
+    """Typed comparison discipline, evaluated through `if: {when}`."""
+
+    def holds(self, when, variables=None, inputs=None):
+        overrides = {} if inputs is None else {"inputs": inputs}
+        runner, _ = make_v2_runner(
+            [{"if": {"when": when,
+                     "then": [{"event": {"emit": "yes"}}],
+                     "else": [{"event": {"emit": "no"}}]}}],
+            variables,
+            **overrides,
+        )
+        runner.advance(0.0)
+        return event_log(runner) == [("yes", 0.0)]
+
+    def test_numbers_compare_numerically_across_int_and_float(self):
+        assert self.holds(
+            {"var": "n", "op": "eq", "value": 1.0}, {"n": 1}
+        )
+
+    def test_bool_true_does_not_equal_int_one(self):
+        assert not self.holds(
+            {"var": "flag", "op": "eq", "value": 1}, {"flag": True}
+        )
+        assert self.holds(
+            {"var": "flag", "op": "ne", "value": 1}, {"flag": True}
+        )
+
+    def test_mismatched_kinds_are_simply_unequal(self):
+        assert not self.holds(
+            {"var": "s", "op": "eq", "value": 3}, {"s": "3"}
+        )
+        assert self.holds(
+            {"var": "s", "op": "ne", "value": 3}, {"s": "3"}
+        )
+
+    @pytest.mark.parametrize(
+        ("op", "value", "expected"),
+        [
+            ("lt", 3, True), ("lt", 2, False),
+            ("le", 2, True), ("gt", 1, True),
+            ("ge", 2, True), ("ge", 3, False),
+        ],
+    )
+    def test_ordering_operators_on_numbers(self, op, value, expected):
+        held = self.holds({"var": "n", "op": op, "value": value}, {"n": 2})
+        assert held is expected
+
+    @pytest.mark.parametrize(
+        ("variables", "value"),
+        [
+            ({"x": "text"}, 3),     # string left operand
+            ({"x": 3}, "text"),     # string right operand
+            ({"x": True}, 1),       # bool is not a number here
+        ],
+    )
+    def test_ordering_on_non_numbers_is_a_typed_runtime_error(
+        self, variables, value
+    ):
+        runner, _ = make_v2_runner(
+            [{"if": {"when": {"var": "x", "op": "lt", "value": value},
+                     "then": []}}],
+            variables,
+        )
+        with pytest.raises(SceneRuntimeError, match="requires numbers"):
+            runner.advance(0.0)
+
+    def test_value_naming_a_variable_copies_it(self):
+        assert self.holds(
+            {"var": "b", "op": "lt", "value": "a"}, {"a": 5, "b": 1}
+        )
+
+    def test_value_string_not_naming_a_variable_is_a_literal(self):
+        assert self.holds(
+            {"var": "s", "op": "eq", "value": "hello"}, {"s": "hello"}
+        )
+
+    def test_input_leaf_reads_the_input_namespace(self):
+        assert self.holds(
+            {"input": "sensor", "op": "ge", "value": 2},
+            inputs={"sensor": 3},
+        )
+
+    @pytest.mark.parametrize(
+        ("first", "second", "expected"),
+        [(True, True, False), (True, False, True),
+         (False, True, True), (False, False, False)],
+    )
+    def test_xor_is_exactly_one(self, first, second, expected):
+        when = {"xor": [
+            {"var": "a", "op": "eq", "value": True},
+            {"var": "b", "op": "eq", "value": True},
+        ]}
+        assert self.holds(when, {"a": first, "b": second}) is expected
+
+    def test_not_inverts(self):
+        when = {"not": {"var": "a", "op": "eq", "value": True}}
+        assert self.holds(when, {"a": False})
+        assert not self.holds(when, {"a": True})
+
+    def test_nested_all_any_tree(self):
+        when = {"all": [
+            {"var": "armed", "op": "eq", "value": True},
+            {"any": [
+                {"var": "zone", "op": "eq", "value": 1},
+                {"var": "zone", "op": "ge", "value": 2},
+            ]},
+        ]}
+        assert self.holds(when, {"armed": True, "zone": 2})
+        assert not self.holds(when, {"armed": True, "zone": 0})
+        assert not self.holds(when, {"armed": False, "zone": 1})
+
+
+class TestSelectParsing:
+    def case(self, equals, emit):
+        return {"equals": equals, "then": [{"event": {"emit": emit}}]}
+
+    @pytest.mark.parametrize("missing", ["var", "cases"])
+    def test_select_requires_var_and_cases(self, missing):
+        block = {"var": "x", "cases": [self.case(1, "a")]}
+        del block[missing]
+        path = error_path(lambda: make_scene([{"select": block}]))
+        assert path == f"sequence[0].select.{missing}"
+
+    @pytest.mark.parametrize("cases", [{}, []])
+    def test_cases_must_be_a_non_empty_list(self, cases):
+        path = error_path(
+            lambda: make_scene([{"select": {"var": "x", "cases": cases}}])
+        )
+        assert path == "sequence[0].select.cases"
+
+    @pytest.mark.parametrize("missing", ["equals", "then"])
+    def test_case_requires_equals_and_then(self, missing):
+        case = self.case(1, "a")
+        del case[missing]
+        path = error_path(
+            lambda: make_scene([{"select": {"var": "x", "cases": [case]}}])
+        )
+        assert path == f"sequence[0].select.cases[0].{missing}"
+
+    def test_case_rejects_unknown_field(self):
+        case = {**self.case(1, "a"), "fallthrough": True}
+        path = error_path(
+            lambda: make_scene([{"select": {"var": "x", "cases": [case]}}])
+        )
+        assert path == "sequence[0].select.cases[0].fallthrough"
+
+    def test_duplicate_case_literals_are_rejected(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene(
+                [{"select": {"var": "x",
+                             "cases": [self.case(1, "a"),
+                                       self.case(1, "b")]}}]
+            )
+        assert info.value.path == "sequence[0].select.cases[1].equals"
+        assert "duplicate" in info.value.message
+
+    def test_int_and_float_case_literals_are_duplicates(self):
+        # Numbers compare numerically, so 1.0 could never run after 1.
+        path = error_path(
+            lambda: make_scene(
+                [{"select": {"var": "x",
+                             "cases": [self.case(1, "a"),
+                                       self.case(1.0, "b")]}}]
+            )
+        )
+        assert path == "sequence[0].select.cases[1].equals"
+
+    def test_bool_and_int_case_literals_are_distinct(self):
+        # true != 1: both cases are reachable, this must parse.
+        make_scene(
+            [{"select": {"var": "x",
+                         "cases": [self.case(True, "a"),
+                                   self.case(1, "b")]}}]
+        )
+
+    def test_select_rejects_unknown_field(self):
+        path = error_path(
+            lambda: make_scene(
+                [{"select": {"var": "x", "cases": [self.case(1, "a")],
+                             "otherwise": []}}]
+            )
+        )
+        assert path == "sequence[0].select.otherwise"
+
+    def test_select_var_must_be_declared(self):
+        error = validate_error(
+            [{"select": {"var": "ghost", "cases": [self.case(1, "a")]}}]
+        )
+        assert error.path == "sequence[0].select.var"
+
+    def test_validation_reaches_case_and_default_bodies(self):
+        error = validate_error(
+            [{"select": {"var": "x",
+                         "cases": [{"equals": 1,
+                                    "then": [{"clip": "moonwalk"}]}]}}],
+            variables={"x": 1},
+        )
+        assert error.path == "sequence[0].select.cases[0].then[0].clip"
+
+
+class TestSelectSemantics:
+    def run_select(self, variables, cases, default=None):
+        block = {"var": "mode", "cases": cases}
+        if default is not None:
+            block["default"] = default
+        runner, _ = make_v2_runner(
+            [{"select": block}, {"event": {"emit": "after"}}], variables
+        )
+        runner.advance(0.0)
+        return event_log(runner)
+
+    def case(self, equals, emit):
+        return {"equals": equals, "then": [{"event": {"emit": emit}}]}
+
+    def test_first_matching_case_runs_no_fallthrough(self):
+        events = self.run_select(
+            {"mode": "b"},
+            [self.case("a", "took_a"), self.case("b", "took_b")],
+            default=[{"event": {"emit": "took_default"}}],
+        )
+        assert events == [("took_b", 0.0), ("after", 0.0)]
+
+    def test_default_runs_when_nothing_matches(self):
+        events = self.run_select(
+            {"mode": "z"},
+            [self.case("a", "took_a")],
+            default=[{"event": {"emit": "took_default"}}],
+        )
+        assert events == [("took_default", 0.0), ("after", 0.0)]
+
+    def test_no_match_and_no_default_skips(self):
+        events = self.run_select({"mode": "z"}, [self.case("a", "took_a")])
+        assert events == [("after", 0.0)]
+
+    def test_bool_variable_matches_the_bool_case_not_int(self):
+        events = self.run_select(
+            {"mode": True},
+            [self.case(1, "took_int"), self.case(True, "took_bool")],
+        )
+        assert events == [("took_bool", 0.0), ("after", 0.0)]
+
+    def test_numeric_match_across_int_and_float(self):
+        events = self.run_select({"mode": 1}, [self.case(1.0, "took_num")])
+        assert events == [("took_num", 0.0), ("after", 0.0)]
+
+
+class TestSubroutineParsing:
+    def test_unknown_call_target_from_the_sequence(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene([{"call": "ghost"}], subroutines={})
+        assert info.value.path == "sequence[0].call"
+        assert "unknown subroutine" in info.value.message
+
+    def test_unknown_call_target_from_a_subroutine(self):
+        path = error_path(
+            lambda: make_scene(
+                [], subroutines={"a": [{"call": "ghost"}]}
+            )
+        )
+        assert path == "subroutines.a[0].call"
+
+    def test_direct_recursion_names_the_cycle(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene([], subroutines={"a": [{"call": "a"}]})
+        assert info.value.path == "subroutines.a[0].call"
+        assert "a -> a" in info.value.message
+
+    def test_indirect_recursion_names_the_cycle_path(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene(
+                [{"call": "a"}],
+                subroutines={
+                    "a": [{"call": "b"}],
+                    "b": [{"wait": {"seconds": 1.0}}, {"call": "a"}],
+                },
+            )
+        assert info.value.path == "subroutines.b[1].call"
+        assert "a -> b -> a" in info.value.message
+
+    def test_recursion_hidden_in_a_branch_is_found(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene(
+                [],
+                subroutines={
+                    "a": [{"if": {"var": "x", "equals": 1,
+                                  "then": [{"call": "a"}]}}],
+                },
+            )
+        assert "a -> a" in info.value.message
+
+    def test_call_must_be_a_non_empty_string(self):
+        assert error_path(
+            lambda: make_scene([{"call": 5}], subroutines={})
+        ) == "sequence[0].call"
+        assert error_path(
+            lambda: make_scene([{"call": ""}], subroutines={})
+        ) == "sequence[0].call"
+
+    def test_subroutines_must_be_a_mapping(self):
+        path = error_path(lambda: make_scene([], subroutines=[1]))
+        assert path == "subroutines"
+
+    def test_subroutine_name_must_be_non_empty(self):
+        path = error_path(lambda: make_scene([], subroutines={"": []}))
+        assert path == "subroutines."
+
+    def test_subroutine_body_errors_carry_the_path(self):
+        path = error_path(
+            lambda: make_scene([], subroutines={"a": [{"dance": 1}]})
+        )
+        assert path == "subroutines.a[0].dance"
+
+    def test_end_scene_is_rejected_inside_a_subroutine(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene(
+                [],
+                subroutines={"a": [{"end_scene": {"result": "x"}}]},
+            )
+        assert info.value.path == "subroutines.a[0].end_scene"
+        assert "only inside" in info.value.message
+
+    def test_end_scene_is_rejected_in_the_main_sequence(self):
+        with pytest.raises(SceneFormatError) as info:
+            make_scene([{"end_scene": {"result": "x"}}])
+        assert info.value.path == "sequence[0].end_scene"
+        assert "only inside" in info.value.message
+
+    def test_rig_validation_reaches_subroutines(self):
+        error = validate_error(
+            [{"call": "a"}], subroutines={"a": [{"clip": "moonwalk"}]}
+        )
+        assert error.path == "subroutines.a[0].clip"
+
+
+class TestSubroutineSemantics:
+    BEEP = {"beep": [{"wait": {"seconds": 0.5}},
+                     {"event": {"emit": "beep"}}]}
+
+    def test_call_runs_the_body_then_resumes(self):
+        runner, _ = make_v2_runner(
+            [{"call": "beep"}, {"event": {"emit": "after"}}],
+            subroutines=self.BEEP,
+        )
+        assert runner.advance(1.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("beep", 0.5), ("after", 0.5)]
+
+    def test_two_call_sites_run_independently(self):
+        runner, _ = make_v2_runner(
+            [{"call": "beep"}, {"call": "beep"}], subroutines=self.BEEP
+        )
+        assert runner.advance(1.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("beep", 0.5), ("beep", 1.0)]
+
+    def test_nested_calls_resume_in_order(self):
+        runner, _ = make_v2_runner(
+            [{"call": "outer"}, {"event": {"emit": "all"}}],
+            subroutines={
+                "outer": [{"call": "inner"},
+                          {"event": {"emit": "outer_done"}}],
+                "inner": [{"wait": {"seconds": 0.5}},
+                          {"event": {"emit": "inner_done"}}],
+            },
+        )
+        assert runner.advance(1.0) is SceneResult.FINISHED
+        assert event_log(runner) == [
+            ("inner_done", 0.5), ("outer_done", 0.5), ("all", 0.5)
+        ]
+
+    def test_subroutines_share_the_scene_variable_scope(self):
+        runner, _ = make_v2_runner(
+            [
+                {"call": "bump"},
+                {"if": {"var": "n", "equals": 5,
+                        "then": [{"event": {"emit": "shared"}}]}},
+            ],
+            variables={"n": 0},
+            subroutines={"bump": [{"set": {"var": "n", "value": 5}}]},
+        )
+        runner.advance(0.0)
+        assert event_log(runner) == [("shared", 0.0)]
+        assert runner.variables["n"] == 5
+
+    def test_subroutine_motion_drives_channels(self):
+        runner, adapter = make_v2_runner(
+            [{"call": "point"}],
+            subroutines={
+                "point": [{"pose": {"pan.rotation": 45.0},
+                           "duration_s": 1.0}]
+            },
+        )
+        assert runner.advance(1.0) is SceneResult.FINISHED
+        assert channel(adapter, 0) == pytest.approx(1.0)
+
+
+class TestInputs:
+    def test_input_scalars_accepted(self):
+        scene = make_scene(
+            [], inputs={"a": True, "b": 3, "c": 1.5, "d": "text"}
+        )
+        assert scene.inputs == {"a": True, "b": 3, "c": 1.5, "d": "text"}
+
+    @pytest.mark.parametrize("value", [None, [1]])
+    def test_non_scalar_input_rejected(self, value):
+        path = error_path(lambda: make_scene([], inputs={"a": value}))
+        assert path == "inputs.a"
+
+    def test_set_targeting_an_input_is_rejected(self):
+        error = validate_error(
+            [{"set": {"var": "door", "value": True}}],
+            inputs={"door": False},
+        )
+        assert error.path == "sequence[0].set.var"
+        assert "read-only" in error.message
+
+    def test_name_in_both_namespaces_sets_the_variable(self):
+        # Namespaces are distinct and every reference is explicit, so
+        # an overlapping name is legal; `set` targets the variable.
+        runner, _ = make_v2_runner(
+            [{"set": {"var": "door", "value": "opened"}}],
+            variables={"door": "closed"},
+            inputs={"door": False},
+        )
+        runner.advance(0.0)
+        assert runner.variables["door"] == "opened"
+        assert runner.inputs["door"] is False
+
+    def test_condition_input_must_be_declared(self):
+        error = validate_error(
+            [{"if": {"when": {"input": "ghost", "op": "eq", "value": 1},
+                     "then": []}}]
+        )
+        assert error.path == "sequence[0].if.when.input"
+        assert "undeclared input" in error.message
+
+    def test_condition_var_never_resolves_to_an_input(self):
+        # `var:` reads variables only — an input needs an input: leaf.
+        error = validate_error(
+            [{"if": {"when": {"var": "door", "op": "eq", "value": 1},
+                     "then": []}}],
+            inputs={"door": False},
+        )
+        assert error.path == "sequence[0].if.when.var"
+
+    def test_set_input_unknown_name_is_a_typed_error(self):
+        runner, _ = make_v2_runner([], inputs={"door": False})
+        with pytest.raises(SceneRuntimeError, match="unknown input"):
+            runner.set_input("ghost", True)
+
+    def test_set_input_value_must_be_scalar(self):
+        runner, _ = make_v2_runner([], inputs={"door": False})
+        with pytest.raises(SceneRuntimeError, match="boolean, number"):
+            runner.set_input("door", [1])
+
+    def test_set_input_applies_at_the_next_tick_boundary(self):
+        runner, _ = make_v2_runner(
+            [
+                {"wait_until": {"when": {"input": "go", "op": "eq",
+                                         "value": True}}},
+                {"event": {"emit": "passed"}},
+            ],
+            inputs={"go": False},
+        )
+        assert runner.advance(1.0) is None
+        runner.set_input("go", True)
+        assert runner.inputs["go"] is False  # pending until the tick
+        assert runner.advance(2.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("passed", 2.0)]
+        assert runner.inputs["go"] is True
+
+    def test_last_set_input_before_the_tick_wins(self):
+        runner, _ = make_v2_runner(
+            [{"wait": {"seconds": 5.0}}], inputs={"zone": 0}
+        )
+        runner.advance(0.0)
+        runner.set_input("zone", 1)
+        runner.set_input("zone", 2)
+        runner.advance(1.0)
+        assert runner.inputs["zone"] == 2
+
+
+class TestWaitUntil:
+    GO = {"input": "go", "op": "eq", "value": True}
+
+    def test_requires_when(self):
+        path = error_path(lambda: make_scene([{"wait_until": {}}]))
+        assert path == "sequence[0].wait_until.when"
+
+    def test_timeout_must_be_positive(self):
+        path = error_path(
+            lambda: make_scene(
+                [{"wait_until": {"when": dict(self.GO), "timeout_s": 0}}]
+            )
+        )
+        assert path == "sequence[0].wait_until.timeout_s"
+
+    def test_on_timeout_requires_a_timeout(self):
+        path = error_path(
+            lambda: make_scene(
+                [{"wait_until": {"when": dict(self.GO),
+                                 "on_timeout": "skip"}}]
+            )
+        )
+        assert path == "sequence[0].wait_until.on_timeout"
+
+    def test_on_timeout_value_is_closed(self):
+        path = error_path(
+            lambda: make_scene(
+                [{"wait_until": {"when": dict(self.GO), "timeout_s": 1.0,
+                                 "on_timeout": "retry"}}]
+            )
+        )
+        assert path == "sequence[0].wait_until.on_timeout"
+
+    def test_rejects_unknown_field(self):
+        path = error_path(
+            lambda: make_scene(
+                [{"wait_until": {"when": dict(self.GO), "event": "go"}}]
+            )
+        )
+        assert path == "sequence[0].wait_until.event"
+
+    def test_already_true_condition_never_waits(self):
+        # Level-triggered: unlike wait_for's edge-triggered events, a
+        # condition that already holds passes the moment it is reached.
+        runner, _ = make_v2_runner(
+            [
+                {"wait": {"seconds": 0.5}},
+                {"wait_until": {"when": dict(self.GO)}},
+                {"event": {"emit": "passed"}},
+            ],
+            inputs={"go": True},
+        )
+        assert runner.advance(0.5) is SceneResult.FINISHED
+        assert event_log(runner) == [("passed", 0.5)]
+
+    def test_passes_at_the_tick_where_the_condition_holds(self):
+        runner, _ = make_v2_runner(
+            [{"parallel": {"tracks": [
+                [{"wait": {"seconds": 0.5}},
+                 {"set": {"var": "flag", "value": True}}],
+                [{"wait_until": {"when": {"var": "flag", "op": "eq",
+                                          "value": True}}},
+                 {"event": {"emit": "woke"}}],
+            ]}}],
+            variables={"flag": False},
+        )
+        assert runner.advance(0.5) is SceneResult.FINISHED
+        assert event_log(runner) == [("woke", 0.5)]
+
+    def test_coarse_tick_samples_at_the_tick_time(self):
+        # The condition became true at 0.5 scene time, but conditions
+        # are sampled per tick: a single coarse advance observes it at
+        # the tick's time (documented ceiling).
+        runner, _ = make_v2_runner(
+            [{"parallel": {"tracks": [
+                [{"wait": {"seconds": 0.5}},
+                 {"set": {"var": "flag", "value": True}}],
+                [{"wait_until": {"when": {"var": "flag", "op": "eq",
+                                          "value": True}}},
+                 {"event": {"emit": "woke"}}],
+            ]}}],
+            variables={"flag": False},
+        )
+        assert runner.advance(2.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("woke", 2.0)]
+
+    def test_without_timeout_waits_indefinitely(self):
+        runner, _ = make_v2_runner(
+            [{"wait_until": {"when": dict(self.GO)}}],
+            inputs={"go": False},
+        )
+        assert runner.advance(100.0) is None
+
+    def test_timeout_skip_continues_at_the_deadline(self):
+        runner, _ = make_v2_runner(
+            [
+                {"wait_until": {"when": dict(self.GO), "timeout_s": 1.0}},
+                {"event": {"emit": "after"}},
+            ],
+            inputs={"go": False},
+        )
+        assert runner.advance(2.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("after", 1.0)]
+
+    def test_timeout_end_ends_the_scene(self):
+        runner, _ = make_v2_runner(
+            [{"wait_until": {"when": dict(self.GO), "timeout_s": 1.0,
+                             "on_timeout": "end"}}],
+            inputs={"go": False},
+        )
+        assert runner.advance(0.5) is None
+        assert runner.advance(2.0) is SceneResult.ENDED_BY_GATE_TIMEOUT
+
+    def test_deadline_that_passed_earlier_beats_a_late_condition(self):
+        # The deadline (1.0) precedes the tick (2.0) where the input
+        # change is first observable — the timeout wins.
+        runner, _ = make_v2_runner(
+            [{"wait_until": {"when": dict(self.GO), "timeout_s": 1.0,
+                             "on_timeout": "end"}}],
+            inputs={"go": False},
+        )
+        assert runner.advance(0.5) is None
+        runner.set_input("go", True)
+        assert runner.advance(2.0) is SceneResult.ENDED_BY_GATE_TIMEOUT
+
+    def test_condition_wins_a_tie_with_the_deadline(self):
+        runner, _ = make_v2_runner(
+            [
+                {"wait_until": {"when": dict(self.GO), "timeout_s": 1.0,
+                                "on_timeout": "end"}},
+                {"event": {"emit": "passed"}},
+            ],
+            inputs={"go": False},
+        )
+        assert runner.advance(0.5) is None
+        runner.set_input("go", True)
+        assert runner.advance(1.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("passed", 1.0)]
+
+
+class TestMonitorParsing:
+    def monitor(self, **overrides):
+        entry = {
+            "name": "estop",
+            "when": {"input": "estop", "op": "eq", "value": True},
+            "do": [{"set": {"var": "x", "value": 1}}],
+        }
+        entry.update(overrides)
+        return entry
+
+    def build(self, monitors, sequence=(), **overrides):
+        return make_scene(list(sequence), monitors=monitors, **overrides)
+
+    def test_monitors_must_be_a_list(self):
+        assert error_path(lambda: self.build({})) == "monitors"
+
+    @pytest.mark.parametrize("missing", ["name", "when", "do"])
+    def test_monitor_required_fields(self, missing):
+        entry = self.monitor()
+        del entry[missing]
+        path = error_path(lambda: self.build([entry]))
+        assert path == f"monitors[0].{missing}"
+
+    def test_monitor_rejects_unknown_field(self):
+        path = error_path(
+            lambda: self.build([self.monitor(priority=1)])
+        )
+        assert path == "monitors[0].priority"
+
+    def test_monitor_do_must_not_be_empty(self):
+        path = error_path(lambda: self.build([self.monitor(do=[])]))
+        assert path == "monitors[0].do"
+
+    def test_duplicate_monitor_names_rejected(self):
+        with pytest.raises(SceneFormatError) as info:
+            self.build([self.monitor(), self.monitor()])
+        assert info.value.path == "monitors[1].name"
+        assert "duplicate" in info.value.message
+
+    @pytest.mark.parametrize(
+        "action",
+        [
+            {"clip": "sweep"},
+            {"pose": {"pan.rotation": 1.0}, "duration_s": 1.0},
+            {"wait": {"seconds": 1.0}},
+            {"wait_for": {"event": "go"}},
+            {"wait_until": {"when": {"var": "x", "op": "eq", "value": 1}}},
+            {"if": {"var": "x", "equals": 1, "then": []}},
+            {"select": {"var": "x", "cases": [{"equals": 1, "then": []}]}},
+            {"loop": {"count": 1, "body": [{"wait": {"seconds": 1.0}}]}},
+            {"parallel": {"tracks": [[]]}},
+            {"call": "wave"},
+        ],
+    )
+    def test_motion_and_flow_actions_rejected_in_monitor_bodies(
+        self, action
+    ):
+        key = next(iter(action))
+        with pytest.raises(SceneFormatError) as info:
+            self.build([self.monitor(do=[action])])
+        assert info.value.path == f"monitors[0].do[0].{key}"
+        assert "not allowed in a monitor body" in info.value.message
+        assert "PLC" in info.value.message
+
+    def test_deferred_actions_also_named_in_monitor_bodies(self):
+        path = error_path(
+            lambda: self.build([self.monitor(do=[{"speak": "hi"}])])
+        )
+        assert path == "monitors[0].do[0].speak"
+
+    def test_unknown_action_in_monitor_body(self):
+        with pytest.raises(SceneFormatError) as info:
+            self.build([self.monitor(do=[{"dance": 1}])])
+        assert info.value.path == "monitors[0].do[0].dance"
+        assert "monitor bodies allow" in info.value.message
+
+    def test_two_actions_in_one_monitor_entry(self):
+        path = error_path(
+            lambda: self.build(
+                [self.monitor(do=[{"set": {"var": "x", "value": 1},
+                                   "event": {"emit": "y"}}])]
+            )
+        )
+        assert path == "monitors[0].do[0]"
+
+    def test_end_scene_requires_a_non_empty_result_string(self):
+        for block in ({}, {"result": ""}, {"result": 5}):
+            path = error_path(
+                lambda b=block: self.build(
+                    [self.monitor(do=[{"end_scene": b}])]
+                )
+            )
+            assert path == "monitors[0].do[0].end_scene.result"
+
+    def test_monitor_condition_and_set_are_validated(self):
+        error = validate_error(
+            [],
+            monitors=[{
+                "name": "m",
+                "when": {"var": "ghost", "op": "eq", "value": 1},
+                "do": [{"set": {"var": "x", "value": 1}}],
+            }],
+        )
+        assert error.path == "monitors[0].when.var"
+        error = validate_error(
+            [],
+            inputs={"estop": False},
+            monitors=[{
+                "name": "m",
+                "when": {"input": "estop", "op": "eq", "value": True},
+                "do": [{"set": {"var": "estop", "value": 1}}],
+            }],
+        )
+        assert error.path == "monitors[0].do[0].set.var"
+        assert "read-only" in error.message
+
+
+class TestMonitorSemantics:
+    def alarm_runner(self, do, sequence=None, variables=None):
+        return make_v2_runner(
+            sequence if sequence is not None
+            else [{"wait": {"seconds": 100.0}}],
+            variables,
+            inputs={"alarm": False},
+            monitors=[{
+                "name": "watch",
+                "when": {"input": "alarm", "op": "eq", "value": True},
+                "do": do,
+            }],
+        )
+
+    def test_edge_trigger_fires_once_then_rearms(self):
+        runner, _ = self.alarm_runner([{"event": {"emit": "ding"}}])
+        runner.advance(1.0)
+        assert event_log(runner) == []
+        runner.set_input("alarm", True)
+        runner.advance(2.0)
+        runner.advance(3.0)  # still true: no refire
+        assert event_log(runner) == [("ding", 2.0)]
+        runner.set_input("alarm", False)
+        runner.advance(4.0)  # goes false: re-arms
+        runner.set_input("alarm", True)
+        runner.advance(5.0)
+        assert event_log(runner) == [("ding", 2.0), ("ding", 5.0)]
+
+    def test_condition_true_at_the_first_tick_fires(self):
+        runner, _ = make_v2_runner(
+            [{"wait": {"seconds": 1.0}}],
+            inputs={"alarm": True},
+            monitors=[{
+                "name": "watch",
+                "when": {"input": "alarm", "op": "eq", "value": True},
+                "do": [{"event": {"emit": "ding"}}],
+            }],
+        )
+        runner.advance(0.0)
+        assert event_log(runner) == [("ding", 0.0)]
+
+    def test_monitor_set_applies_before_the_main_sequence(self):
+        # The monitor clears the loop variable at the top of the tick,
+        # so the loop's 1.0 s boundary check already sees it.
+        runner, _ = self.alarm_runner(
+            [{"set": {"var": "run", "value": False}}],
+            sequence=[
+                {"loop": {"while_var": "run",
+                          "body": [{"wait": {"seconds": 1.0}}]}},
+                {"event": {"emit": "done"}},
+            ],
+            variables={"run": True},
+        )
+        assert runner.advance(0.5) is None
+        runner.set_input("alarm", True)
+        assert runner.advance(1.0) is SceneResult.FINISHED
+        assert event_log(runner) == [("done", 1.0)]
+        assert runner.variables["run"] is False
+
+    def test_end_scene_stops_motion_mid_clip(self):
+        runner, adapter = self.alarm_runner(
+            [{"event": {"emit": "bang"}},
+             {"end_scene": {"result": "estop"}}],
+            sequence=[{"clip": "sweep"}],
+        )
+        assert runner.advance(0.25) is None
+        assert not adapter.stopped
+        frames = len(adapter.frames)
+        runner.set_input("alarm", True)
+        assert runner.advance(0.5) == "estop"
+        assert runner.result == "estop"
+        assert adapter.stopped
+        assert len(adapter.frames) == frames  # ending sends no frame
+        assert event_log(runner) == [("bang", 0.5)]
+        assert runner.advance(1.0) == "estop"  # sticky, still no frames
+        assert len(adapter.frames) == frames
+
+    def test_actions_after_end_scene_do_not_run(self):
+        runner, _ = self.alarm_runner(
+            [{"end_scene": {"result": "estop"}},
+             {"event": {"emit": "never"}}]
+        )
+        runner.set_input("alarm", True)
+        assert runner.advance(0.0) == "estop"
+        assert event_log(runner) == []
+
+    def test_monitors_do_not_keep_the_scene_alive(self):
+        runner, _ = self.alarm_runner([{"event": {"emit": "ding"}}],
+                                      sequence=[])
+        assert runner.advance(0.0) is SceneResult.FINISHED
+
+    def test_monitor_events_reach_the_on_event_callback(self):
+        calls: list[tuple[str, float]] = []
+        adapter = RecordingAdapter()
+        runner = SceneRunner(
+            make_scene(
+                [{"wait": {"seconds": 5.0}}],
+                inputs={"alarm": False},
+                monitors=[{
+                    "name": "watch",
+                    "when": {"input": "alarm", "op": "eq", "value": True},
+                    "do": [{"event": {"emit": "ding"}}],
+                }],
+            ),
+            RIG,
+            adapter,
+            on_event=lambda name, time_s: calls.append((name, time_s)),
+        )
+        runner.set_input("alarm", True)
+        runner.advance(1.0)
+        assert calls == [("ding", 1.0)]
+
+
+class TestPatrolAndGreetExample:
+    """End-to-end: the v2 example through the simulator adapter."""
+
+    SCENE_PATH = EXAMPLES_DIR / "patrol_and_greet.scene.anima"
+
+    def make_runner(self):
+        scene, rig = load_scene_file(self.SCENE_PATH)
+        adapter = SimulatorOutput(SimulatedDevice(channel_count=8))
+        adapter.open(
+            [
+                ChannelConfig(
+                    channel=index,
+                    pin=2 + index,
+                    min_us=600,
+                    max_us=2400,
+                    failsafe_ms=60_000,
+                )
+                for index in range(6)
+            ]
+        )
+        return SceneRunner(scene, rig, adapter), adapter
+
+    @staticmethod
+    def drive(runner, adapter, time_s):
+        result = runner.advance(time_s)
+        adapter.device.tick(int(round(time_s * 1000)) + 33)
+        return result
+
+    def test_scene_and_character_load(self):
+        scene, rig = load_scene_file(self.SCENE_PATH)
+        assert scene.identity.name == "patrol_and_greet"
+        assert rig.identity.name == "six_axis_arm"
+        assert scene.variables == {"mode": "wave"}
+        assert scene.inputs == {
+            "door_open": False, "visitor_zone": 0, "estop": False
+        }
+        assert set(scene.subroutines) == {"wave", "park"}
+        assert [monitor.name for monitor in scene.monitors] == ["estop"]
+
+    def test_no_visitor_runs_the_show_after_the_gate_timeout(self):
+        runner, adapter = self.make_runner()
+        wrist = adapter.device.channel_value  # ch4: (deg+180)/360
+
+        assert self.drive(runner, adapter, 5.0) is None  # still gated
+        assert wrist(4) == pytest.approx(0.5, abs=1e-3)
+
+        # The gate times out (skip) at 6.0; the first wave call's
+        # first pose peaks at 45 deg at 6.25.
+        assert self.drive(runner, adapter, 6.25) is None
+        assert wrist(4) == pytest.approx(225.0 / 360.0, abs=1e-3)
+
+        # The second call site's first peak: 7.0 + 0.25.
+        assert self.drive(runner, adapter, 7.25) is None
+        assert wrist(4) == pytest.approx(225.0 / 360.0, abs=1e-3)
+
+        # Park (0.5 s from 8.0) finishes the show at 8.5.
+        assert self.drive(runner, adapter, 8.5) is SceneResult.FINISHED
+        assert wrist(4) == pytest.approx(0.5, abs=1e-3)
+        assert adapter.device.channel_value(0) == pytest.approx(
+            0.5, abs=1e-3
+        )
+        events = [(event.name, event.time_s)
+                  for event in runner.emitted_events]
+        assert events == [("scene_started", 0.0), ("scene_finished", 8.5)]
+
+    def test_visitor_inputs_open_the_gate(self):
+        runner, adapter = self.make_runner()
+        assert self.drive(runner, adapter, 1.0) is None
+        runner.set_input("door_open", True)
+        runner.set_input("visitor_zone", 2)
+
+        # Inputs apply at the 2.0 tick; the level-triggered gate
+        # passes there and the first wave peak lands at 2.25.
+        assert self.drive(runner, adapter, 2.0) is None
+        assert self.drive(runner, adapter, 2.25) is None
+        assert adapter.device.channel_value(4) == pytest.approx(
+            225.0 / 360.0, abs=1e-3
+        )
+
+        # wave (2.0-3.0) + wave (3.0-4.0) + park (4.0-4.5).
+        assert self.drive(runner, adapter, 4.5) is SceneResult.FINISHED
+        finished = runner.emitted_events[-1]
+        assert finished.name == "scene_finished"
+        assert finished.time_s == pytest.approx(4.5)
+
+    def test_estop_monitor_ends_the_show(self):
+        runner, adapter = self.make_runner()
+        assert self.drive(runner, adapter, 1.0) is None
+        runner.set_input("estop", True)
+        assert runner.advance(1.5) == "estop"
+        assert runner.result == "estop"
+        events = [(event.name, event.time_s)
+                  for event in runner.emitted_events]
+        assert events == [("scene_started", 0.0), ("estop_tripped", 1.5)]
+        assert runner.advance(2.0) == "estop"
