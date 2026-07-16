@@ -148,6 +148,16 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — Timeline Design B reference-fidelity pass complete:** Refined
+  the UI Dev timeline against Jonathan's compact Blender-style reference while
+  preserving Anima's shared theme and the three existing data views. Dopesheet
+  is now the default; the editor uses denser chrome, a working channel search,
+  an aggregate Summary lane, a 0–240 frame ruler at 30 fps, a labeled blue
+  playhead, matching dense grid divisions, compact start/end fields, and a
+  frame-aware status footer. Reset restores the whole preview state. Ten focused
+  tests and all 201 Swift tests, claimed-file strict format lint, root-app Xcode
+  build, strict signature verification, and `git diff --check` pass.
+
 - **2026-07-15 — UI Dev Timeline Design B variants complete:** Added a dedicated
   interactive comparison lab with Dopesheet, Motion Curves, and Waypoint Lanes
   views projected from one shared track/keyframe model. It begins with four

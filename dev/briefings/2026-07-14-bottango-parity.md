@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Timeline Design B Blender-reference fidelity pass | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBView.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | compact editor chrome; searchable fixed-width channel column; summary lane; frame-number ruler and labeled playhead; dense grid/footer matching supplied reference; focused/full Swift tests; claimed-file lint; Xcode/root-app build/signature; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev Timeline Design B variants | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBModel.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTimelineDesignBView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | multiple switchable timeline variants over one state model; multiple addable rows; click-to-create/select keyframes; draggable playhead; motion lines between waypoints; template matrix entry; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 03: material editor | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevMaterialWidgetView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive preview/name/type/color controls; selectable material channels with enablement and values; texture/mix/displacement controls; Node Editor/Assignment/Help feedback; Reference Widgets lab plus matrix entry; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev reference widgets pack 02: tab views | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTabWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive compact action/settings/theme panel; interactive multi-document tab strip with selection, close, and add; Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
@@ -1065,3 +1066,13 @@ change needed in the Handoff log instead of inventing commands.
   brings the full Swift suite to 198; recursive format lint, Xcode/root-app
   builds, strict signature verification, and `git diff --check` pass. The app
   launches but exposes no window to accessibility automation in this session.
+- **2026-07-15 (Codex, Timeline Design B reference fidelity):** Applied the
+  supplied compact Blender-style timeline proportions to the existing UI Dev
+  prototype without changing its shared model or the production Animate
+  workspace. Dopesheet now opens by default with dense header chrome, searchable
+  channels, an aggregate Summary lane, a 0–240 frame ruler at 30 fps, compact
+  start/end fields, labeled blue playhead, matching frame grid, frame-aware
+  footer, and full-state reset. Motion Curves and Waypoint Lanes remain
+  switchable over the same tracks and keys. Ten focused and all 201 Swift tests,
+  strict claimed-file format lint, Xcode/root-app build, signature verification,
+  and `git diff --check` pass.

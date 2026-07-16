@@ -2,16 +2,27 @@ import Foundation
 import SwiftUI
 
 struct UIDevTimelineDesignBView: View {
-  @State private var variant: UIDevTimelineBVariant = .motionCurves
+  @State private var variant: UIDevTimelineBVariant = .dopeSheet
   @State private var tracks = UIDevTimelineBSamples.tracks
   @State private var selectedTrackID = UIDevTimelineBSamples.tracks[0].id
   @State private var selectedKeyframeID: UUID?
   @State private var playhead = 2.4
   @State private var isPlaying = false
   @State private var nextTrackNumber = 1
+  @State private var trackSearch = ""
   @State private var status = "Click any row to create a keyframe"
 
   private let duration = UIDevTimelineBSamples.duration
+  private let framesPerSecond = 30
+
+  private var filteredTracks: [UIDevTimelineBTrack] {
+    guard !trackSearch.isEmpty else { return tracks }
+    return tracks.filter { $0.name.localizedCaseInsensitiveContains(trackSearch) }
+  }
+
+  private var frameCount: Int {
+    Int((duration * Double(framesPerSecond)).rounded())
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -37,14 +48,22 @@ struct UIDevTimelineDesignBView: View {
   }
 
   private var header: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 6) {
+      Menu {
+        Button("Reset Preview") { resetPreview() }
+      } label: {
+        Image(systemName: "clock.arrow.circlepath")
+      }
+      .menuStyle(.borderlessButton)
+      .frame(width: 24)
+
       Menu("Playback") {
         Button("Play / Pause", action: togglePlayback)
         Button("Jump to Start") { playhead = 0 }
         Button("Jump to End") { playhead = duration }
       }
       .menuStyle(.borderlessButton)
-      .frame(width: 84)
+      .frame(width: 74)
 
       Menu("View") {
         ForEach(UIDevTimelineBVariant.allCases) { option in
@@ -52,7 +71,7 @@ struct UIDevTimelineDesignBView: View {
         }
       }
       .menuStyle(.borderlessButton)
-      .frame(width: 58)
+      .frame(width: 48)
 
       Button("Marker") {
         addKeyframeAtPlayhead()
@@ -70,15 +89,11 @@ struct UIDevTimelineDesignBView: View {
 
       Spacer()
 
-      Text("START 0")
-        .font(.system(size: 9, weight: .medium, design: .monospaced))
-        .foregroundStyle(StudioPalette.muted)
-      Text("END \(Int(duration * 30))")
-        .font(.system(size: 9, weight: .medium, design: .monospaced))
-        .foregroundStyle(StudioPalette.muted)
+      compactFrameField(label: "START", value: "0")
+      compactFrameField(label: "END", value: "\(frameCount)")
     }
-    .padding(.horizontal, 12)
-    .frame(height: 40)
+    .padding(.horizontal, 8)
+    .frame(height: 32)
     .background(StudioPalette.chrome)
   }
 
@@ -125,7 +140,7 @@ struct UIDevTimelineDesignBView: View {
       .help("Delete selected keyframe")
     }
     .padding(.horizontal, 12)
-    .frame(height: 54)
+    .frame(height: 48)
     .background(StudioPalette.ribbonChrome)
   }
 
@@ -133,16 +148,25 @@ struct UIDevTimelineDesignBView: View {
     ScrollView([.horizontal, .vertical]) {
       VStack(spacing: 0) {
         HStack(spacing: 0) {
-          HStack {
-            Text("CHANNELS")
-              .font(.system(size: 9, weight: .bold, design: .monospaced))
+          HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+              .font(.system(size: 9))
               .foregroundStyle(StudioPalette.muted)
-            Spacer()
-            Text("\(tracks.count) ROWS")
-              .font(.system(size: 8, design: .monospaced))
+            TextField("Search channels", text: $trackSearch)
+              .textFieldStyle(.plain)
+              .font(.system(size: 9))
+            if !trackSearch.isEmpty {
+              Button {
+                trackSearch = ""
+              } label: {
+                Image(systemName: "xmark.circle.fill")
+              }
+              .buttonStyle(.plain)
               .foregroundStyle(StudioPalette.muted)
+              .help("Clear channel search")
+            }
           }
-          .padding(.horizontal, 10)
+          .padding(.horizontal, 8)
           .frame(width: 170, height: 28)
           .background(StudioPalette.panelInset)
 
@@ -153,8 +177,25 @@ struct UIDevTimelineDesignBView: View {
             .frame(height: 28)
         }
 
-        ForEach(tracks) { track in
+        timelineSummaryRow
+
+        ForEach(filteredTracks) { track in
           timelineRow(track)
+        }
+
+        if filteredTracks.isEmpty {
+          HStack(spacing: 0) {
+            Text("No matching channels")
+              .font(.caption2)
+              .foregroundStyle(StudioPalette.muted)
+              .padding(.horizontal, 10)
+              .frame(width: 170, height: 44, alignment: .leading)
+              .background(StudioPalette.panelInset)
+            Divider()
+            Rectangle()
+              .fill(Color.black.opacity(0.11))
+              .frame(minWidth: 720, minHeight: 44)
+          }
         }
       }
       .frame(minWidth: 890, alignment: .topLeading)
@@ -166,23 +207,36 @@ struct UIDevTimelineDesignBView: View {
     GeometryReader { proxy in
       ZStack(alignment: .topLeading) {
         StudioPalette.panelInset
-        ForEach(0...8, id: \.self) { second in
-          let x = proxy.size.width * CGFloat(Double(second) / duration)
+        ForEach(0...24, id: \.self) { tick in
+          let frame = tick * 10
+          let x = proxy.size.width * CGFloat(Double(frame) / Double(frameCount))
           Rectangle()
-            .fill(second == 0 ? StudioPalette.accent : StudioPalette.border)
+            .fill(frame == 0 ? StudioPalette.accent : StudioPalette.border)
             .frame(width: 1, height: 28)
             .offset(x: x)
-          Text("\(second)s")
-            .font(.system(size: 8, design: .monospaced))
+          Text("\(frame)")
+            .font(.system(size: 7, design: .monospaced))
             .foregroundStyle(StudioPalette.muted)
-            .offset(x: min(x + 4, proxy.size.width - 24), y: 5)
+            .offset(x: min(x + 3, proxy.size.width - 22), y: 5)
         }
 
         let playheadX = proxy.size.width * CGFloat(playhead / duration)
+        Text("\(frame(at: playhead))")
+          .font(.system(size: 7, weight: .bold, design: .monospaced))
+          .foregroundStyle(Color.white)
+          .padding(.horizontal, 4)
+          .frame(height: 15)
+          .background(StudioPalette.accent)
+          .clipShape(RoundedRectangle(cornerRadius: 3))
+          .position(
+            x: min(max(playheadX, 12), proxy.size.width - 12),
+            y: 8
+          )
+
         Path { path in
-          path.move(to: CGPoint(x: playheadX - 5, y: 0))
-          path.addLine(to: CGPoint(x: playheadX + 5, y: 0))
-          path.addLine(to: CGPoint(x: playheadX, y: 8))
+          path.move(to: CGPoint(x: playheadX - 4, y: 14))
+          path.addLine(to: CGPoint(x: playheadX + 4, y: 14))
+          path.addLine(to: CGPoint(x: playheadX, y: 20))
           path.closeSubpath()
         }
         .fill(StudioPalette.accent)
@@ -194,6 +248,34 @@ struct UIDevTimelineDesignBView: View {
             playhead = time(at: gesture.location.x, width: proxy.size.width)
           }
       )
+    }
+  }
+
+  private var timelineSummaryRow: some View {
+    HStack(spacing: 0) {
+      HStack(spacing: 7) {
+        Image(systemName: "chevron.down")
+          .font(.system(size: 8, weight: .bold))
+          .foregroundStyle(StudioPalette.muted)
+        Text("Summary")
+          .font(.caption.weight(.semibold))
+        Spacer()
+        Text("\(tracks.reduce(0) { $0 + $1.keyframes.count })")
+          .font(.caption2.monospaced())
+          .foregroundStyle(StudioPalette.muted)
+      }
+      .padding(.horizontal, 10)
+      .frame(width: 170, height: 26)
+      .background(StudioPalette.chrome)
+
+      Divider()
+
+      UIDevTimelineBSummaryCanvas(
+        keyframeTimes: tracks.flatMap { $0.keyframes.map(\.time) },
+        duration: duration,
+        playhead: playhead
+      )
+      .frame(minWidth: 720, minHeight: 26, maxHeight: 26)
     }
   }
 
@@ -267,7 +349,7 @@ struct UIDevTimelineDesignBView: View {
       Spacer()
       Text(status)
         .lineLimit(1)
-      Text(timecode(playhead))
+      Text("TIME \(timecode(playhead))  FRAME \(frame(at: playhead))/\(frameCount)")
         .font(.caption2.monospaced().weight(.bold))
         .foregroundStyle(StudioPalette.accent)
     }
@@ -289,6 +371,24 @@ struct UIDevTimelineDesignBView: View {
     }
     .buttonStyle(.plain)
     .foregroundStyle(StudioPalette.muted)
+  }
+
+  private func compactFrameField(label: String, value: String) -> some View {
+    HStack(spacing: 4) {
+      Text(label)
+        .foregroundStyle(StudioPalette.muted)
+      Text(value)
+        .foregroundStyle(Color.primary)
+    }
+    .font(.system(size: 8, weight: .medium, design: .monospaced))
+    .padding(.horizontal, 6)
+    .frame(height: 18)
+    .background(StudioPalette.panelInset)
+    .clipShape(RoundedRectangle(cornerRadius: 4))
+    .overlay {
+      RoundedRectangle(cornerRadius: 4)
+        .stroke(StudioPalette.border, lineWidth: 1)
+    }
   }
 
   private func insertKeyframe(trackID: UUID, time: Double, value: Double) {
@@ -342,6 +442,17 @@ struct UIDevTimelineDesignBView: View {
     status = isPlaying ? "Playback preview armed" : "Playback preview paused"
   }
 
+  private func resetPreview() {
+    tracks = UIDevTimelineBSamples.tracks
+    selectedTrackID = tracks[0].id
+    selectedKeyframeID = nil
+    playhead = 0
+    isPlaying = false
+    trackSearch = ""
+    nextTrackNumber = 1
+    status = "Timeline preview reset"
+  }
+
   private func time(at x: CGFloat, width: CGFloat) -> Double {
     min(max(Double(x / max(width, 1)) * duration, 0), duration)
   }
@@ -349,6 +460,10 @@ struct UIDevTimelineDesignBView: View {
   private func timecode(_ time: Double) -> String {
     let frame = Int((time * 30).rounded())
     return String(format: "%02d:%02d  F%03d", Int(time) / 60, Int(time) % 60, frame)
+  }
+
+  private func frame(at time: Double) -> Int {
+    min(max(Int((time * Double(framesPerSecond)).rounded()), 0), frameCount)
   }
 
   private func trackColor(_ index: Int) -> Color {
@@ -361,6 +476,52 @@ struct UIDevTimelineDesignBView: View {
       Color.pink,
     ]
     return colors[index % colors.count]
+  }
+}
+
+private struct UIDevTimelineBSummaryCanvas: View {
+  let keyframeTimes: [Double]
+  let duration: Double
+  let playhead: Double
+
+  var body: some View {
+    GeometryReader { proxy in
+      ZStack {
+        Canvas { context, size in
+          for tick in 0...24 {
+            let x = size.width * CGFloat(tick) / 24
+            var path = Path()
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x, y: size.height))
+            context.stroke(
+              path,
+              with: .color(Color.white.opacity(tick.isMultiple(of: 3) ? 0.10 : 0.045)),
+              lineWidth: 1
+            )
+          }
+        }
+
+        ForEach(Array(keyframeTimes.enumerated()), id: \.offset) { _, time in
+          Image(systemName: "diamond.fill")
+            .font(.system(size: 6, weight: .bold))
+            .foregroundStyle(StudioPalette.muted)
+            .position(
+              x: proxy.size.width * CGFloat(min(max(time / duration, 0), 1)),
+              y: proxy.size.height / 2
+            )
+        }
+
+        Rectangle()
+          .fill(StudioPalette.accent)
+          .frame(width: 1)
+          .offset(
+            x: proxy.size.width * CGFloat(min(max(playhead / duration, 0), 1))
+              - proxy.size.width / 2
+          )
+      }
+      .background(Color.black.opacity(0.14))
+    }
+    .allowsHitTesting(false)
   }
 }
 
@@ -410,14 +571,14 @@ private struct UIDevTimelineBTrackCanvas: View {
 
   private func backgroundGrid(size: CGSize) -> some View {
     Canvas { context, canvasSize in
-      for tick in 0...16 {
-        let x = canvasSize.width * CGFloat(tick) / 16
+      for tick in 0...24 {
+        let x = canvasSize.width * CGFloat(tick) / 24
         var path = Path()
         path.move(to: CGPoint(x: x, y: 0))
         path.addLine(to: CGPoint(x: x, y: canvasSize.height))
         context.stroke(
           path,
-          with: .color(Color.white.opacity(tick.isMultiple(of: 2) ? 0.10 : 0.045)),
+          with: .color(Color.white.opacity(tick.isMultiple(of: 3) ? 0.10 : 0.045)),
           lineWidth: 1
         )
       }

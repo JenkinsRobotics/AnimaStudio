@@ -132,7 +132,12 @@
   key at the playhead, scrub the ruler, and switch presentations without losing
   state. Every variant draws the authored motion connection between waypoints;
   Motion Curves uses a smooth value-aware path while the other variants use
-  direct readable segments. This remains a UI Dev comparison and does not
+  direct readable segments. The Dopesheet is the default reference presentation
+  and now follows the supplied compact editor more closely: its chrome is denser,
+  the channel column is searchable, a Summary lane aggregates authored keys, the
+  ruler uses 0–240 frame numbers at 30 fps, and the blue playhead reports its
+  current frame in both the ruler and status footer. This remains a UI Dev
+  comparison and does not
   replace the production Animate timeline yet. None of these reference widgets is wired into an
   operator workflow until it is reviewed and adopted there. The separate
   **Live UI Kit** remains available with a resizable Design Inspector
