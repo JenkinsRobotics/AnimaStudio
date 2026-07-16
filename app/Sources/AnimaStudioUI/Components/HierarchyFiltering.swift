@@ -15,6 +15,11 @@ extension ModelHierarchyNode {
     }
     guard !matchingChildren.isEmpty else { return nil }
 
-    return ModelHierarchyNode(id: id, name: name, children: matchingChildren)
+    return ModelHierarchyNode(
+      id: id,
+      name: name,
+      hasRenderableGeometry: hasRenderableGeometry,
+      children: matchingChildren
+    )
   }
 }

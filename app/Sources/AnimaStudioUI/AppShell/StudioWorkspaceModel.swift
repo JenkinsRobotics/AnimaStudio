@@ -261,6 +261,19 @@ final class StudioWorkspaceModel {
     return try await animaCoreClient.serializeCharacter(rig: engineRigDocument).text
   }
 
+  func serializedEmptyCharacterText(name: String, displayName: String) async throws -> String {
+    guard let animaCoreClient else { throw AnimaCoreClientError.helperNotFound }
+    let document = AnimaCoreRigDocumentEditor.emptyCharacter(
+      name: name,
+      displayName: displayName
+    )
+    return try await animaCoreClient.serializeCharacter(rig: document).text
+  }
+
+  func loadSerializedCharacter(text: String) async throws {
+    try await loadAnimaCharacter(text: text)
+  }
+
   func connectToAnimaCore() async {
     guard let animaCoreClient else {
       animaCoreState = .unavailable

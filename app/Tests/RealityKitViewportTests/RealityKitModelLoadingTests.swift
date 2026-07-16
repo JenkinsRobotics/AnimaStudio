@@ -126,4 +126,22 @@ final class RealityKitModelLoadingTests: XCTestCase {
     XCTAssertEqual(unnamedNode.displayName, "Unnamed Entity")
     XCTAssertEqual(hierarchy.nodeCount, 4)
   }
+
+  @MainActor
+  func testHierarchyMarksNodesThatOwnRenderableGeometry() throws {
+    let root = Entity()
+    root.name = "Root"
+    let renderable = ModelEntity(
+      mesh: .generateBox(size: 0.1),
+      materials: [SimpleMaterial()]
+    )
+    renderable.name = "Renderable Part"
+    root.addChild(renderable)
+
+    let hierarchy = RealityKitModelHierarchy.inspect(root)
+    let part = try XCTUnwrap(hierarchy.flattened.first { $0.name == "Renderable Part" })
+
+    XCTAssertFalse(hierarchy.hasRenderableGeometry)
+    XCTAssertTrue(part.hasRenderableGeometry)
+  }
 }

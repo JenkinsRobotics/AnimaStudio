@@ -24,25 +24,39 @@ enum ModelImportUnit: String, CaseIterable, Identifiable, Sendable {
   }
 }
 
-struct ModelImportUnitsSheet: View {
-  let filename: String
-  let defaultUnit: ModelImportUnit
-  let cancel: () -> Void
-  let importModel: (ModelImportUnit) -> Void
+struct ModelImportRequest: Identifiable, Equatable, Sendable {
+  let url: URL
+  var unit: ModelImportUnit
 
-  @State private var selectedUnit: ModelImportUnit
+  var id: URL { url }
+  var isUnitless: Bool {
+    ["stl", "obj"].contains(url.pathExtension.lowercased())
+  }
+}
+
+struct ModelImportUnitsSheet: View {
+  let urls: [URL]
+  let cancel: () -> Void
+  let importModels: ([ModelImportRequest]) -> Void
+
+  @State private var requests: [ModelImportRequest]
 
   init(
-    filename: String,
-    defaultUnit: ModelImportUnit,
+    urls: [URL],
     cancel: @escaping () -> Void,
-    importModel: @escaping (ModelImportUnit) -> Void
+    importModels: @escaping ([ModelImportRequest]) -> Void
   ) {
-    self.filename = filename
-    self.defaultUnit = defaultUnit
+    self.urls = urls
     self.cancel = cancel
-    self.importModel = importModel
-    _selectedUnit = State(initialValue: defaultUnit)
+    self.importModels = importModels
+    _requests = State(
+      initialValue: urls.map { url in
+        ModelImportRequest(
+          url: url,
+          unit: url.pathExtension.lowercased() == "stl" ? .millimeters : .meters
+        )
+      }
+    )
   }
 
   var body: some View {
@@ -51,38 +65,61 @@ struct ModelImportUnitsSheet: View {
         .font(.title3.weight(.semibold))
 
       Text(
-        "STL and OBJ files do not declare physical units. Choose the units used when \(filename) was exported. Anima converts geometry to meters."
+        "Review the files before loading. STL and OBJ do not declare physical units, so choose the units used when each file was exported. Anima converts geometry to meters."
       )
       .font(.callout)
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
 
-      Picker("Source units", selection: $selectedUnit) {
-        ForEach(ModelImportUnit.allCases) { unit in
-          Text(unit.label).tag(unit)
+      ScrollView {
+        VStack(spacing: 8) {
+          ForEach($requests) { $request in
+            HStack(spacing: 12) {
+              Image(systemName: request.isUnitless ? "ruler" : "cube.transparent")
+                .foregroundStyle(request.isUnitless ? .orange : StudioPalette.sourceModel)
+                .frame(width: 20)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(request.url.lastPathComponent)
+                  .font(.callout.weight(.medium))
+                  .lineLimit(1)
+                Text(request.isUnitless ? "Unitless mesh" : "Units embedded in file")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              Spacer()
+              if request.isUnitless {
+                Picker("Source units", selection: $request.unit) {
+                  ForEach(ModelImportUnit.allCases) { unit in
+                    Text(unit.label).tag(unit)
+                  }
+                }
+                .labelsHidden()
+                .frame(width: 175)
+              } else {
+                Text("Meters")
+                  .font(.caption.weight(.semibold))
+                  .foregroundStyle(.secondary)
+              }
+            }
+            .padding(10)
+            .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 8))
+          }
         }
       }
-      .pickerStyle(.radioGroup)
-
-      HStack {
-        Text("Scale to meters")
-          .foregroundStyle(.secondary)
-        Spacer()
-        Text(selectedUnit.scaleToMeters.formatted(.number.precision(.fractionLength(3...6))))
-          .monospacedDigit()
-      }
-      .font(.caption)
+      .frame(maxHeight: 300)
 
       HStack {
         Spacer()
         Button("Cancel", role: .cancel, action: cancel)
           .keyboardShortcut(.cancelAction)
-        Button("Import") { importModel(selectedUnit) }
-          .buttonStyle(.borderedProminent)
-          .keyboardShortcut(.defaultAction)
+        Button("Import \(requests.count) File\(requests.count == 1 ? "" : "s")") {
+          importModels(requests)
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.defaultAction)
       }
     }
     .padding(24)
-    .frame(width: 430)
+    .frame(width: 560)
   }
 }

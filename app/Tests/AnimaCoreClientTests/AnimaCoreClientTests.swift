@@ -113,6 +113,20 @@ struct AnimaCoreClientTests {
     let assetReloaded = try await client.loadCharacter(text: assetText)
     #expect(assetReloaded.rig.parts.first { $0.name == "base" }?.model == "assets/base.stl")
 
+    let emptyText = try await client.serializeCharacter(
+      rig: AnimaCoreRigDocumentEditor.emptyCharacter(
+        name: "new_character",
+        displayName: "New Character"
+      )
+    ).text
+    let emptyReloaded = try await client.loadCharacter(text: emptyText)
+    #expect(emptyReloaded.rig.identity.name == "new_character")
+    #expect(emptyReloaded.rig.parts.isEmpty)
+    let emptyEvaluation = try await client.evaluate(handle: emptyReloaded.handle)
+    let emptyPose = try await client.resolvePose(handle: emptyReloaded.handle)
+    #expect(emptyEvaluation.degreesOfFreedom.isEmpty)
+    #expect(emptyPose.parts.isEmpty)
+
     let evaluation = try await client.evaluate(
       handle: loaded.handle,
       clip: "pick",
@@ -134,6 +148,7 @@ struct AnimaCoreClientTests {
     try await client.release(handle: loaded.handle)
     try await client.release(handle: reloaded.handle)
     try await client.release(handle: assetReloaded.handle)
+    try await client.release(handle: emptyReloaded.handle)
     await client.shutdown()
   }
 
@@ -184,6 +199,26 @@ struct AnimaCoreClientTests {
     #expect(base["model"] == .string("assets/base.stl"))
     #expect(head["model"] == .string("assets/head.usdz"))
     #expect(head["model_node"] == .string("Robot/Head"))
+  }
+
+  @Test
+  func rigDocumentEditorBuildsEmptyRigidPartsCharacterDTO() {
+    let document = AnimaCoreRigDocumentEditor.emptyCharacter(
+      name: "walle",
+      displayName: "WALL-E"
+    )
+    guard case .object(let root) = document,
+      case .object(let identity) = root["identity"],
+      case .array(let parts) = root["parts"]
+    else {
+      Issue.record("Empty character must be a full engine rig DTO")
+      return
+    }
+    #expect(identity["name"] == .string("walle"))
+    #expect(identity["display_name"] == .string("WALL-E"))
+    #expect(parts.isEmpty)
+    #expect(root["joints"] == .array([]))
+    #expect(root["clips"] == .array([]))
   }
 
   @Test

@@ -49,15 +49,18 @@ public struct ModelEntityPath: Hashable, Sendable {
 public struct ModelHierarchyNode: Identifiable, Equatable, Sendable {
   public let id: ModelEntityPath
   public let name: String
+  public let hasRenderableGeometry: Bool
   public let children: [ModelHierarchyNode]
 
   public init(
     id: ModelEntityPath,
     name: String,
+    hasRenderableGeometry: Bool = false,
     children: [ModelHierarchyNode]
   ) {
     self.id = id
     self.name = name
+    self.hasRenderableGeometry = hasRenderableGeometry
     self.children = children
   }
 
@@ -115,6 +118,11 @@ public enum RealityKitModelHierarchy {
         path: path.appending(name: child.name, siblingIndex: index)
       )
     }
-    return ModelHierarchyNode(id: path, name: entity.name, children: children)
+    return ModelHierarchyNode(
+      id: path,
+      name: entity.name,
+      hasRenderableGeometry: entity.components[ModelComponent.self] != nil,
+      children: children
+    )
   }
 }

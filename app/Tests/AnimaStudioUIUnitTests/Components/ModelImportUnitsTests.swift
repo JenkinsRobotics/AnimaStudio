@@ -13,4 +13,23 @@ final class ModelImportUnitsTests: XCTestCase {
     XCTAssertEqual(Set(ModelImportUnit.allCases.map(\.label)).count, 3)
     XCTAssertTrue(ModelImportUnit.millimeters.label.contains("mm"))
   }
+
+  func testBatchRequestsOnlyAskForUnitsOnSTLAndOBJ() {
+    let stl = ModelImportRequest(
+      url: URL(fileURLWithPath: "/tmp/head.stl"),
+      unit: .millimeters
+    )
+    let obj = ModelImportRequest(
+      url: URL(fileURLWithPath: "/tmp/arm.obj"),
+      unit: .centimeters
+    )
+    let usd = ModelImportRequest(
+      url: URL(fileURLWithPath: "/tmp/robot.usdz"),
+      unit: .meters
+    )
+
+    XCTAssertTrue(stl.isUnitless)
+    XCTAssertTrue(obj.isUnitless)
+    XCTAssertFalse(usd.isUnitless)
+  }
 }

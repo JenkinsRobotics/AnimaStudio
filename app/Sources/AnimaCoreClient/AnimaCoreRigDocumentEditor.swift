@@ -32,6 +32,29 @@ extension AnimaCoreRigDocumentEditingError: LocalizedError {
 /// `serialize_character` and reload it; AnimaCore remains the validator and
 /// sole `.character.anima` author.
 public enum AnimaCoreRigDocumentEditor {
+  /// Builds the engine DTO for a newly-created empty rigid-parts character.
+  /// The DTO is not a file; callers must pass it to `serialize_character` so
+  /// AnimaCore validates and authors the canonical document text.
+  public static func emptyCharacter(
+    name: String,
+    displayName: String
+  ) -> AnimaCoreJSONValue {
+    .object([
+      "identity": .object([
+        "name": .string(name),
+        "display_name": .string(displayName),
+        "description": .string("Rigid-parts 3D character"),
+        "version": .string("0.1.0"),
+      ]),
+      "parts": .array([]),
+      "joints": .array([]),
+      "parameters": .array([]),
+      "clips": .array([]),
+      "outputs": .array([]),
+      "relations": .array([]),
+    ])
+  }
+
   public static func assigningModel(
     _ model: String,
     modelNode: String? = nil,

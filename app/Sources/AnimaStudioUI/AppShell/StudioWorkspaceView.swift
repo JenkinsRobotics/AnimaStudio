@@ -16,8 +16,14 @@ struct StudioWorkspaceView: View {
 
   @State private var workspace: StudioWorkspaceModel
   @State private var isImportingModel = false
-  @State private var pendingUnitlessModelURL: URL?
+  @State private var pendingModelImportURLs: [URL] = []
   @State private var stepConversionMessage: String?
+  @State private var showsNewCharacterSheet = false
+  @State private var isCreatingCharacter = false
+  @State private var showsCharacterLoadingStage = false
+  @State private var characterImportProgress: CharacterImportProgress?
+  @State private var characterImportErrorMessage: String?
+  @State private var isSwitchingCharacter = false
   @State private var characterEditorMetadata = CharacterEditorMetadata()
   @State private var activeImportedModelReference: String?
   @State private var isImportingAnimaCharacter = false
@@ -131,36 +137,39 @@ struct StudioWorkspaceView: View {
     .fileImporter(
       isPresented: $isImportingModel,
       allowedContentTypes: Self.modelContentTypes,
-      allowsMultipleSelection: false
+      allowsMultipleSelection: true
     ) { result in
       switch result {
       case .success(let urls):
-        if let url = urls.first {
-          beginModelImport(from: url)
-        }
+        beginModelImport(from: urls)
       case .failure(let error):
-        workspace.importErrorMessage = error.localizedDescription
+        presentModelImportError(error.localizedDescription)
       }
     }
     .sheet(
       isPresented: Binding(
-        get: { pendingUnitlessModelURL != nil },
-        set: { if !$0 { pendingUnitlessModelURL = nil } }
+        get: { !pendingModelImportURLs.isEmpty },
+        set: { if !$0 { pendingModelImportURLs.removeAll() } }
       )
     ) {
-      if let pendingUnitlessModelURL {
+      if !pendingModelImportURLs.isEmpty {
         ModelImportUnitsSheet(
-          filename: pendingUnitlessModelURL.lastPathComponent,
-          defaultUnit: pendingUnitlessModelURL.pathExtension.lowercased() == "stl"
-            ? .millimeters : .meters,
-          cancel: { self.pendingUnitlessModelURL = nil },
-          importModel: { unit in
-            let url = pendingUnitlessModelURL
-            self.pendingUnitlessModelURL = nil
-            Task { await importModel(from: url, sourceUnit: unit) }
+          urls: pendingModelImportURLs,
+          cancel: { pendingModelImportURLs.removeAll() },
+          importModels: { requests in
+            pendingModelImportURLs.removeAll()
+            Task { await importModels(requests) }
           }
         )
       }
+    }
+    .sheet(isPresented: $showsNewCharacterSheet) {
+      NewCharacterSheet(
+        existingCharacters: session.document.characters,
+        isCreating: isCreatingCharacter,
+        cancel: { showsNewCharacterSheet = false },
+        create: { name in Task { await createCharacter(named: name) } }
+      )
     }
     .alert(
       "STEP Needs Conversion",
@@ -193,7 +202,7 @@ struct StudioWorkspaceView: View {
     .alert(
       "Could Not Import Model",
       isPresented: Binding(
-        get: { workspace.importErrorMessage != nil },
+        get: { workspace.importErrorMessage != nil && workspace.activeWorkspace != .assets },
         set: { if !$0 { workspace.importErrorMessage = nil } }
       )
     ) {
@@ -287,6 +296,33 @@ struct StudioWorkspaceView: View {
   }
 
   private var authoringWorkspaceCanvas: some View {
+    Group {
+      if workspace.activeWorkspace == .assets {
+        AssetsWorkspaceView(
+          projectName: session.document.displayName,
+          characters: session.document.characters,
+          activeCharacterID: session.document.activeCharacter?.id,
+          activePartCount: workspace.engineParts.count,
+          showsLoadingStage: showsCharacterLoadingStage || workspace.engineParts.isEmpty,
+          importProgress: characterImportProgress,
+          importErrorMessage: characterImportErrorMessage,
+          isSwitchingCharacter: isSwitchingCharacter,
+          newCharacter: { showsNewCharacterSheet = true },
+          selectCharacter: { character in
+            Task { await selectCharacter(character) }
+          },
+          importModels: { isImportingModel = true },
+          dropModels: beginModelImport
+        )
+      } else {
+        viewportWorkspaceCanvas
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .clipped()
+  }
+
+  private var viewportWorkspaceCanvas: some View {
     ZStack {
       if workspace.activeWorkspace == .nodes {
         NodeWorkspaceView()
@@ -319,8 +355,6 @@ struct StudioWorkspaceView: View {
       }
       .padding(16)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .clipped()
   }
 
   private var viewport: some View {
@@ -705,6 +739,15 @@ struct StudioWorkspaceView: View {
       return
     }
     didLoadIndexedCharacter = true
+    _ = await loadCharacter(character, markDirty: false)
+  }
+
+  @MainActor
+  @discardableResult
+  private func loadCharacter(
+    _ character: ProjectCharacterReference,
+    markDirty: Bool
+  ) async -> Bool {
     do {
       let projectURL = try session.resolvedProjectURL()
       let accessed = projectURL.startAccessingSecurityScopedResource()
@@ -712,6 +755,7 @@ struct StudioWorkspaceView: View {
       await workspace.importAnimaCharacter(
         from: projectURL.appendingPathComponent(character.characterPath)
       )
+      guard workspace.animaCoreErrorMessage == nil else { return false }
       let editorURL = projectURL.appendingPathComponent(character.editorPath)
       if let data = try? Data(contentsOf: editorURL),
         let metadata = try? CharacterEditorMetadata.decode(data)
@@ -728,9 +772,17 @@ struct StudioWorkspaceView: View {
         editorMetadata: characterEditorMetadata
       )
       workspace.project.name = session.document.displayName
-      registerLoadedCharacter(markDirty: false)
+      var updated = session
+      updated.document.editorState.activeCharacterFolderName = character.folderName
+      updated.document.project = workspace.project
+      updated.document.project.name = session.document.displayName
+      updated.isDirty = markDirty
+      session = updated
+      showsCharacterLoadingStage = workspace.engineParts.isEmpty
+      return workspace.animaCoreErrorMessage == nil
     } catch {
       lifecycleErrorMessage = error.localizedDescription
+      return false
     }
   }
 
@@ -757,8 +809,9 @@ struct StudioWorkspaceView: View {
   }
 
   @MainActor
-  private func saveProject() async {
-    guard !isSavingProject else { return }
+  @discardableResult
+  private func saveProject() async -> Bool {
+    guard !isSavingProject else { return false }
     isSavingProject = true
     defer { isSavingProject = false }
     do {
@@ -778,8 +831,10 @@ struct StudioWorkspaceView: View {
       updated.isDirty = false
       session = updated
       didPersistProject(updated)
+      return true
     } catch {
       lifecycleErrorMessage = error.localizedDescription
+      return false
     }
   }
 
@@ -847,30 +902,72 @@ struct StudioWorkspaceView: View {
   }
 
   @MainActor
-  private func beginModelImport(from url: URL) {
-    let fileExtension = url.pathExtension.lowercased()
-    if fileExtension == "step" || fileExtension == "stp" {
-      stepConversionMessage =
-        "Anima Studio does not have a native STEP mesh loader. Export \(url.lastPathComponent) as STL or USD from SolidWorks, Onshape, Fusion 360, or your CAD tool, then import that file."
-    } else if fileExtension == "stl" || fileExtension == "obj" {
-      pendingUnitlessModelURL = url
-    } else {
-      Task { await importModel(from: url, sourceUnit: .meters) }
+  private func beginModelImport(from urls: [URL]) {
+    guard !urls.isEmpty else { return }
+    let stepFiles = urls.filter { ["step", "stp"].contains($0.pathExtension.lowercased()) }
+    if !stepFiles.isEmpty {
+      let filenames = stepFiles.map(\.lastPathComponent).joined(separator: ", ")
+      let message =
+        "STEP needs conversion. Export \(filenames) as STL or USD from SolidWorks, Onshape, Fusion 360, or your CAD tool, then import the converted files."
+      if workspace.activeWorkspace == .assets {
+        characterImportErrorMessage = message
+      } else {
+        stepConversionMessage = message
+      }
+      return
     }
+    characterImportErrorMessage = nil
+    pendingModelImportURLs = urls
   }
 
   @MainActor
-  private func importModel(from sourceURL: URL, sourceUnit: ModelImportUnit) async {
-    guard let character = session.document.activeCharacter else {
-      workspace.importErrorMessage =
-        "Import or create a .character.anima character before adding rigid-part models."
+  private func importModels(_ requests: [ModelImportRequest]) async {
+    guard !requests.isEmpty else { return }
+    guard session.document.activeCharacter != nil else {
+      presentModelImportError("Create a 3D character before importing model parts.")
       return
+    }
+    characterImportErrorMessage = nil
+    for (index, request) in requests.enumerated() {
+      characterImportProgress = CharacterImportProgress(
+        completedFiles: index,
+        totalFiles: requests.count,
+        currentFilename: request.url.lastPathComponent
+      )
+      let succeeded = await importModel(from: request.url, sourceUnit: request.unit)
+      guard succeeded else {
+        characterImportProgress = nil
+        if session.isDirty { _ = await saveProject() }
+        return
+      }
+    }
+    characterImportProgress = CharacterImportProgress(
+      completedFiles: requests.count,
+      totalFiles: requests.count,
+      currentFilename: "Finishing assembly"
+    )
+    let saved = await saveProject()
+    characterImportProgress = nil
+    guard saved else { return }
+    showsCharacterLoadingStage = false
+    workspace.activeWorkspace = .rig
+  }
+
+  @MainActor
+  @discardableResult
+  private func importModel(from sourceURL: URL, sourceUnit: ModelImportUnit) async -> Bool {
+    guard let character = session.document.activeCharacter else {
+      presentModelImportError("Create a 3D character before importing model parts.")
+      return false
     }
     await workspace.importModel(
       from: sourceURL,
       unitScaleToMeters: sourceUnit.scaleToMeters
     )
-    guard workspace.importErrorMessage == nil else { return }
+    guard workspace.importErrorMessage == nil else {
+      presentModelImportError(workspace.importErrorMessage ?? "The model could not be loaded.")
+      return false
+    }
     let importedHierarchy = workspace.importedModelHierarchy
     do {
       var updated = session
@@ -905,6 +1002,19 @@ struct StudioWorkspaceView: View {
           modelReference: modelReference,
           suggestedPartName: sourceURL.deletingPathExtension().lastPathComponent
         )
+        let fileExtension = sourceURL.pathExtension.lowercased()
+        let renderableNodes = importedHierarchy?.flattened.filter(\.hasRenderableGeometry) ?? []
+        if ["usd", "usda", "usdc", "usdz", "reality"].contains(fileExtension),
+          renderableNodes.count > 1
+        {
+          for node in renderableNodes {
+            _ = try await workspace.authorImportedModel(
+              modelReference: modelReference,
+              modelNode: node.id.modelNodeReference,
+              suggestedPartName: node.displayName
+            )
+          }
+        }
         activeImportedModelReference = modelReference
         workspace.importedModelURL = copiedURL
         workspace.importedModelHierarchy = importedHierarchy
@@ -916,11 +1026,100 @@ struct StudioWorkspaceView: View {
           editorMetadata: characterEditorMetadata
         )
       }
+      workspace.project.name = updated.document.displayName
       updated.isDirty = true
       session = updated
+      return true
     } catch {
-      workspace.importErrorMessage = error.localizedDescription
+      presentModelImportError(error.localizedDescription)
+      return false
     }
+  }
+
+  @MainActor
+  private func presentModelImportError(_ message: String) {
+    workspace.importErrorMessage = nil
+    if workspace.activeWorkspace == .assets {
+      characterImportErrorMessage = message
+    } else {
+      workspace.importErrorMessage = message
+    }
+  }
+
+  @MainActor
+  private func createCharacter(named displayName: String) async {
+    guard !isCreatingCharacter else { return }
+    isCreatingCharacter = true
+    defer { isCreatingCharacter = false }
+    do {
+      let reference = try ProjectCharacterNaming.reference(
+        for: displayName,
+        existingCharacters: session.document.characters
+      )
+      let canonicalText = try await workspace.serializedEmptyCharacterText(
+        name: reference.folderName,
+        displayName: reference.displayName
+      )
+
+      var updated = session
+      var writes = try await projectFileWrites(updating: &updated.document)
+      updated.document.characters.append(reference)
+      updated.document.editorState.activeCharacterFolderName = reference.folderName
+      let emptyEditorMetadata = CharacterEditorMetadata()
+      writes.append(ProjectFileWrite(relativePath: reference.characterPath, text: canonicalText))
+      writes.append(
+        ProjectFileWrite(
+          relativePath: reference.editorPath,
+          data: try emptyEditorMetadata.encodedData()
+        )
+      )
+
+      let projectURL = try updated.resolvedProjectURL()
+      let accessed = projectURL.startAccessingSecurityScopedResource()
+      defer { if accessed { projectURL.stopAccessingSecurityScopedResource() } }
+      updated.document = try ProjectLifecycle.store.save(
+        updated.document,
+        to: projectURL,
+        fileWrites: writes
+      )
+      try await workspace.loadSerializedCharacter(text: canonicalText)
+      workspace.project.name = updated.document.displayName
+      characterEditorMetadata = emptyEditorMetadata
+      activeImportedModelReference = nil
+      workspace.configurePartModelSources(
+        characterDirectoryURL: projectURL.appendingPathComponent(
+          reference.directoryPath,
+          isDirectory: true
+        ),
+        editorMetadata: emptyEditorMetadata
+      )
+      updated.projectURL = projectURL
+      updated.bookmarkData = ProjectLifecycle.bookmark(for: projectURL)
+      updated.isDirty = false
+      session = updated
+      didPersistProject(updated)
+      characterImportErrorMessage = nil
+      showsCharacterLoadingStage = true
+      showsNewCharacterSheet = false
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func selectCharacter(_ character: ProjectCharacterReference) async {
+    guard character.id != session.document.activeCharacter?.id else {
+      showsCharacterLoadingStage = workspace.engineParts.isEmpty
+      return
+    }
+    guard !isSwitchingCharacter else { return }
+    isSwitchingCharacter = true
+    defer { isSwitchingCharacter = false }
+    if session.isDirty {
+      guard await saveProject() else { return }
+    }
+    characterImportErrorMessage = nil
+    _ = await loadCharacter(character, markDirty: true)
   }
 
   @MainActor
@@ -949,6 +1148,7 @@ struct StudioWorkspaceView: View {
         ),
         editorMetadata: characterEditorMetadata
       )
+      workspace.project.name = session.document.displayName
       var updated = session
       updated.isDirty = true
       session = updated

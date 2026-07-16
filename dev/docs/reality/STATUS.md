@@ -46,8 +46,8 @@
   positions and real-last quaternions directly in RealityKit at the playhead;
   it no longer infers a second hierarchy, connector frame, or mate motion in
   Swift. Continuous playhead evaluation is live for imported engine clips.
-  Canonical character mutation, scene loading/playback, and hardware output
-  remain subsequent bridge packets. The SwiftUI app launches into a
+  General mate/clip character mutation, scene loading/playback, and hardware
+  output remain subsequent bridge packets. The SwiftUI app launches into a
   Bottango-inspired dark home screen with working New Studio Project and Open
   Project actions. Its Recent Projects section uses compact thumbnail
   cards with the project name, actual last-opened timestamp, revision badge,
@@ -59,7 +59,17 @@
   its active character through AnimaCore. A
   new project now opens as a genuinely empty project in the first **Assets**
   workspace rather than silently inserting the sample mechanism or jumping
-  ahead to Rig. The workspace-model initializer accepts an alternate startup
+  ahead to Rig. Assets is now a dedicated character-management surface backed
+  by `project.json`: it lists every indexed character, marks and switches the
+  active character used by Rig/Animate, and gives an empty project a prominent
+  first-character action. New Character validates a project-unique name and
+  offers the live **3D Character** rigid-parts pipeline alongside a visibly
+  disabled, honestly labeled **2D (Live2D-style) — coming later** option. On
+  creation the document layer adds `characters/<name>/`, while AnimaCore
+  validates and serializes the zero-part canonical character; Swift never
+  hand-formats its YAML. The new character then enters an in-app 3D loading
+  stage with file drop/picker controls, progress, and inline errors. The
+  workspace-model initializer accepts an alternate startup
   workspace so a future operator preference can choose it without changing
   workspace semantics. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
@@ -399,15 +409,21 @@
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
   optional reference plane, and a highlighted limit arc with independent layer
   toggles on every created mate. Project and asset names are also editable in
-  memory. Users can import USD/Reality, STL, and OBJ models. USD loads natively;
+  memory. Users can batch-import USD/Reality, STL, and OBJ models. USD loads natively;
   ModelIO converts STL/OBJ geometry into RealityKit meshes after an explicit
   mm/cm/m prompt (STL defaults to mm). STEP selection displays truthful
-  conversion guidance. Imports are copied into the active character's portable
+  conversion guidance. A single unit-preparation sheet reviews the batch and
+  gives each unitless file its own mm/cm/m setting; loading remains asynchronous
+  and reports the current file. Imports are copied into the active character's portable
   `assets/` directory, authored into AnimaCore's full rig DTO as safe relative
   per-part `model` references, serialized and reloaded by the engine, and
   rendered at each part's `resolve_pose` transform. A multi-node USD can create
   persistent semantic parts sharing the same model with distinct `model_node`
-  paths. Unitless-file scale lives in `<character>.editor.json`, so save/reopen
+  paths. A multi-renderable-node USD is automatically expanded into persistent
+  Parts sharing the source asset with distinct `model_node` references. On a
+  successful batch Studio saves the project and enters Rig; failed imports stay
+  on Assets with a readable inline error. Unitless-file scale lives in
+  `<character>.editor.json`, so save/reopen
   restores the same metre-sized rendering. The complete entity hierarchy is
   projected into value-only nodes with unique sibling paths, shown as a
   selectable Structure outline, and described in the inspector. Package tests

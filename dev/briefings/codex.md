@@ -205,6 +205,21 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — Assets character manager + 3D loading stage complete:** Assets
+  now renders the real `project.json` character index, selects the active
+  Rig/Animate character, and gives empty projects a first-character action.
+  New Character validates a unique project-local name, exposes the live rigid
+  3D assembly choice, and leaves 2D visibly disabled as coming later. Creation
+  sends a zero-part DTO through AnimaCore serialization before atomically
+  adding the character folder/index. The follow-on stage supports batch
+  STL/OBJ/USD selection and file drops, per-file unit preparation, progress,
+  inline errors, and automatic multi-node USD Part mapping; a successful batch
+  saves and enters Rig. Swift owns workflow/filesystem/rendering only. All 224
+  XCTest plus 15 real-bridge Swift Testing cases pass; recursive lint, native
+  Xcode build, rebuilt/deep-signed root app, launch, and accessible native
+  window verification pass. Concurrent in-flight changes under `animacore/`
+  were detected during verification and deliberately left untouched/uncommitted.
+
 - **2026-07-16 — portable rigid-part model import complete:** The Swift app now
   consumes AnimaCore's per-part `model`/`model_node` contract end to end. USD
   remains native; STL and OBJ load through ModelIO with an explicit mm/cm/m
