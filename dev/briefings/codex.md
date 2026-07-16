@@ -148,6 +148,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — FANUC-style structured logic node concepts complete:** Nodes
+  now separates Program Logic, Conditions, I/O & Registers, and Background
+  Logic. New placeable cards cover IF/ELSE, single-line IF, SELECT, CALL, WAIT
+  Until, AND/OR/XOR/NOT, input/output, numeric registers, flags, position
+  registers, monitors, and monitor-only End Scene. Typed ports and inspector
+  Manual Syntax values communicate that Visual and Script authoring will be two
+  projections of one scene program. Per the existing scene-format contract,
+  JMP/LBL appear only as red IMPORT ONLY references with validation directing
+  operators to Loop, SELECT, or CALL; they cannot compile into Anima scenes.
+  Eleven focused and all 208 Swift tests pass with strict claimed-file lint,
+  root-app build/signature, launch, and `git diff --check`.
+
 - **2026-07-15 — UI Dev Reference Widgets pack 05 complete:** Added a reusable
   responsive concept-template card component matching Jonathan's reference and
   six Anima starting points for rig organization, AI node-flow generation,

@@ -153,9 +153,12 @@ struct NodeWorkspaceView: View {
                         Text(kind.title)
                           .font(.caption.weight(.semibold))
                         if !kind.isRuntimeAvailable {
-                          Text("Concept")
+                          Text(kind.capabilityLabel.capitalized)
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(StudioPalette.muted)
+                            .foregroundStyle(
+                              kind.isPermanentlyUnsupported
+                                ? Color(red: 0.96, green: 0.34, blue: 0.34) : StudioPalette.muted
+                            )
                         }
                       }
                       Spacer()
@@ -197,10 +200,13 @@ struct NodeWorkspaceView: View {
                 .font(.callout.weight(.bold))
                 .foregroundStyle(nodeColor(node.kind))
               Spacer()
-              Text(node.kind.isRuntimeAvailable ? "SCENE V1" : "CONCEPT")
+              Text(node.kind.capabilityLabel)
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
                 .foregroundStyle(
-                  node.kind.isRuntimeAvailable ? StudioPalette.semanticPart : StudioPalette.muted
+                  node.kind.isRuntimeAvailable
+                    ? StudioPalette.semanticPart
+                    : (node.kind.isPermanentlyUnsupported
+                      ? Color(red: 0.96, green: 0.34, blue: 0.34) : StudioPalette.muted)
                 )
             }
 
@@ -227,11 +233,16 @@ struct NodeWorkspaceView: View {
             Label(
               node.kind.availabilityDetail,
               systemImage: node.kind.isRuntimeAvailable
-                ? "checkmark.circle.fill" : "clock.badge.exclamationmark"
+                ? "checkmark.circle.fill"
+                : (node.kind.isPermanentlyUnsupported
+                  ? "xmark.octagon.fill" : "clock.badge.exclamationmark")
             )
             .font(.caption)
             .foregroundStyle(
-              node.kind.isRuntimeAvailable ? StudioPalette.semanticPart : StudioPalette.muted
+              node.kind.isRuntimeAvailable
+                ? StudioPalette.semanticPart
+                : (node.kind.isPermanentlyUnsupported
+                  ? Color(red: 0.96, green: 0.34, blue: 0.34) : StudioPalette.muted)
             )
           }
           .padding(12)
@@ -342,9 +353,13 @@ struct NodeWorkspaceView: View {
       position: CGPoint(x: 560 + offset, y: 180 + offset)
     )
     statusMessage =
-      kind.isRuntimeAvailable
-      ? "Added \(kind.title); connect it when the graph contract lands"
-      : "Added \(kind.title) concept; no runtime provider is connected"
+      if kind.isRuntimeAvailable {
+        "Added \(kind.title); connect it when the graph contract lands"
+      } else if kind.isPermanentlyUnsupported {
+        "Added import reference; replace JMP/LBL with Loop, SELECT, or CALL"
+      } else {
+        "Added \(kind.title) concept; no graph compiler binding is connected"
+      }
   }
 
   private func deleteSelectedNode() {
@@ -412,9 +427,13 @@ struct NodeWorkspaceView: View {
   private func nodeColor(_ kind: NodeCanvasDraftKind) -> Color {
     switch kind.family {
     case .flow: StudioPalette.accent
+    case .programLogic: Color(red: 0.96, green: 0.70, blue: 0.24)
+    case .conditions: Color(red: 0.93, green: 0.39, blue: 0.64)
     case .performance: StudioPalette.semanticPart
     case .timing: StudioPalette.joint
     case .events: StudioPalette.hardware
+    case .dataIO: Color(red: 0.28, green: 0.78, blue: 0.62)
+    case .background: Color(red: 0.96, green: 0.34, blue: 0.34)
     case .inputs: Color(red: 0.35, green: 0.72, blue: 0.96)
     case .voiceAI: Color(red: 0.72, green: 0.48, blue: 0.96)
     case .outputs: Color(red: 0.98, green: 0.55, blue: 0.24)

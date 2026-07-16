@@ -88,6 +88,14 @@
   families are available in the UI draft. The concept library now separates
   Inputs, Voice & AI, and Outputs, with placeable STT/TTS/LLM, memory, tool,
   microphone, text, event, audio, motion, screen, LED, and hardware cards.
+  The library also includes FANUC-inspired structured logic concepts: IF/ELSE,
+  single-line IF guards, SELECT, CALL, WAIT Until, AND/OR/XOR/NOT, input reads,
+  output writes, numeric registers, flags, position registers, background
+  monitors, and monitor-only End Scene. Typed ports and inspector properties
+  show the intended manual scene syntax so future Visual and Script editors can
+  project the same program. JMP and LBL exist only as red IMPORT ONLY reference
+  cards and validation errors; Anima scenes require the structured Loop, SELECT,
+  and CALL equivalents rather than irreducible jump flow.
   Typed visual ports and editable sample properties support UI review, while
   every concept stays validation-blocked from execution until its runtime
   provider ships. This surface does not

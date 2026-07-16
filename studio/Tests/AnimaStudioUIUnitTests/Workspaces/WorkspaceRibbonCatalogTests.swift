@@ -47,17 +47,29 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
     let groups = WorkspaceRibbonCatalog.groups(for: .nodes)
     XCTAssertEqual(
       groups.map(\.title),
-      ["Flow", "Actions", "Graph", "Inputs", "Voice & AI", "Outputs"]
+      [
+        "Flow", "Actions", "Graph", "Program Logic", "Conditions", "I/O & Registers",
+        "Background", "Inputs", "Voice & AI", "Outputs",
+      ]
     )
 
     let titles = groups.flatMap(\.tools).map(\.title)
     XCTAssertTrue(titles.contains("Parallel"))
+    XCTAssertTrue(titles.contains("IF / ELSE"))
+    XCTAssertTrue(titles.contains("SELECT"))
+    XCTAssertTrue(titles.contains("CALL"))
+    XCTAssertTrue(titles.contains("WAIT Until"))
+    XCTAssertTrue(titles.contains("JMP (Import)"))
+    XCTAssertTrue(titles.contains("LBL (Import)"))
+    XCTAssertTrue(titles.contains("XOR"))
+    XCTAssertTrue(titles.contains("Position"))
+    XCTAssertTrue(titles.contains("Monitor"))
     XCTAssertTrue(titles.contains("Wait for Event"))
     XCTAssertTrue(titles.contains("STT"))
     XCTAssertTrue(titles.contains("LLM"))
     XCTAssertTrue(titles.contains("TTS"))
     XCTAssertTrue(titles.contains("Screen"))
-    XCTAssertTrue(groups.suffix(3).flatMap(\.tools).allSatisfy { !$0.isImplemented })
+    XCTAssertTrue(groups.dropFirst(3).flatMap(\.tools).allSatisfy { !$0.isImplemented })
   }
 
   func testHardwareCatalogIncludesConnectionMappingCalibrationSafetyAndMonitoring() {

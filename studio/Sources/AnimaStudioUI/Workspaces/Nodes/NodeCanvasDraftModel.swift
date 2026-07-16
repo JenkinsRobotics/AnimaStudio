@@ -8,9 +8,13 @@ import Foundation
 /// being completed.
 enum NodeCanvasDraftFamily: String, CaseIterable, Identifiable, Sendable {
   case flow
+  case programLogic
+  case conditions
   case performance
   case timing
   case events
+  case dataIO
+  case background
   case inputs
   case voiceAI
   case outputs
@@ -20,9 +24,13 @@ enum NodeCanvasDraftFamily: String, CaseIterable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .flow: "Flow"
+    case .programLogic: "Program Logic"
+    case .conditions: "Conditions"
     case .performance: "Performance"
     case .timing: "Timing & Gates"
     case .events: "Events & Data"
+    case .dataIO: "I/O & Registers"
+    case .background: "Background Logic"
     case .inputs: "Inputs"
     case .voiceAI: "Voice & AI"
     case .outputs: "Outputs"
@@ -36,13 +44,30 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
   case sequence
   case parallel
   case branch
+  case ifGuard
+  case select
   case loop
+  case callSubroutine
+  case jumpLegacy
+  case labelLegacy
+  case logicAnd
+  case logicOr
+  case logicXor
+  case logicNot
   case clip
   case pose
   case wait
   case waitForEvent
+  case waitUntil
   case emitEvent
   case setVariable
+  case readInput
+  case writeOutput
+  case numericRegister
+  case flag
+  case positionRegister
+  case backgroundMonitor
+  case endScene
   case audio
   case textInput
   case microphoneInput
@@ -69,14 +94,31 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .end: "End"
     case .sequence: "Sequence"
     case .parallel: "Parallel"
-    case .branch: "Branch"
+    case .branch: "IF / ELSE"
+    case .ifGuard: "Single-Line IF"
+    case .select: "SELECT"
     case .loop: "Loop"
+    case .callSubroutine: "CALL Subroutine"
+    case .jumpLegacy: "JMP (Import Only)"
+    case .labelLegacy: "LBL (Import Only)"
+    case .logicAnd: "AND"
+    case .logicOr: "OR"
+    case .logicXor: "XOR"
+    case .logicNot: "NOT"
     case .clip: "Animation Clip"
     case .pose: "Pose"
     case .wait: "Wait"
     case .waitForEvent: "Wait for Event"
+    case .waitUntil: "WAIT Until"
     case .emitEvent: "Emit Event"
     case .setVariable: "Set Variable"
+    case .readInput: "Read Input"
+    case .writeOutput: "Write Output"
+    case .numericRegister: "Numeric Register"
+    case .flag: "Flag"
+    case .positionRegister: "Position Register"
+    case .backgroundMonitor: "Background Monitor"
+    case .endScene: "End Scene / Interlock"
     case .audio: "Audio Clip"
     case .textInput: "Text Input"
     case .microphoneInput: "Microphone Input"
@@ -99,10 +141,15 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
 
   var family: NodeCanvasDraftFamily {
     switch self {
-    case .start, .end, .sequence, .parallel, .branch, .loop: .flow
+    case .start, .end, .sequence, .parallel: .flow
+    case .branch, .ifGuard, .select, .loop, .callSubroutine, .jumpLegacy, .labelLegacy:
+      .programLogic
+    case .logicAnd, .logicOr, .logicXor, .logicNot: .conditions
     case .clip, .pose: .performance
-    case .wait, .waitForEvent: .timing
+    case .wait, .waitForEvent, .waitUntil: .timing
     case .emitEvent, .setVariable: .events
+    case .readInput, .writeOutput, .numericRegister, .flag, .positionRegister: .dataIO
+    case .backgroundMonitor, .endScene: .background
     case .textInput, .microphoneInput, .eventInput, .hardwareInput: .inputs
     case .speechToText, .llmPrompt, .memory, .toolCall, .textToSpeech, .aiBehavior: .voiceAI
     case .audio, .audioOutput, .motionOutput, .eventOutput, .screen, .ledOutput,
@@ -118,13 +165,30 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .sequence: "arrow.right.to.line.compact"
     case .parallel: "arrow.triangle.branch"
     case .branch: "arrow.triangle.swap"
+    case .ifGuard: "questionmark.diamond"
+    case .select: "list.number"
     case .loop: "repeat"
+    case .callSubroutine: "rectangle.stack"
+    case .jumpLegacy: "arrow.turn.up.right"
+    case .labelLegacy: "tag"
+    case .logicAnd: "circle.grid.cross"
+    case .logicOr: "circle.grid.2x2"
+    case .logicXor: "arrow.triangle.branch"
+    case .logicNot: "exclamationmark.circle"
     case .clip: "figure.walk.motion"
     case .pose: "figure.stand"
     case .wait: "timer"
     case .waitForEvent: "hourglass"
+    case .waitUntil: "hourglass"
     case .emitEvent: "bolt.circle"
     case .setVariable: "equal.circle"
+    case .readInput: "arrow.down.to.line"
+    case .writeOutput: "arrow.up.from.line"
+    case .numericRegister: "number.square"
+    case .flag: "flag"
+    case .positionRegister: "mappin.and.ellipse"
+    case .backgroundMonitor: "waveform.path.ecg"
+    case .endScene: "hand.raised.fill"
     case .audio: "waveform"
     case .textInput: "text.cursor"
     case .microphoneInput: "mic"
@@ -148,9 +212,22 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
   var inputPorts: [String] {
     switch self {
     case .start: []
-    case .branch: ["FLOW", "CONDITION"]
+    case .branch, .ifGuard: ["FLOW", "CONDITION"]
+    case .select: ["FLOW", "VALUE"]
     case .loop: ["FLOW", "COUNT"]
+    case .callSubroutine, .labelLegacy: ["FLOW"]
+    case .jumpLegacy: ["FLOW", "LABEL"]
+    case .logicAnd, .logicOr, .logicXor: ["A", "B"]
+    case .logicNot: ["CONDITION"]
+    case .waitUntil: ["FLOW", "CONDITION"]
     case .setVariable: ["FLOW", "VALUE"]
+    case .readInput: ["ADDRESS"]
+    case .writeOutput: ["FLOW", "VALUE"]
+    case .numericRegister: ["VALUE"]
+    case .flag: ["BOOL"]
+    case .positionRegister: ["POSE"]
+    case .backgroundMonitor: ["CONDITION"]
+    case .endScene: ["FLOW", "RESULT"]
     case .textInput, .microphoneInput, .eventInput, .hardwareInput: []
     case .speechToText: ["AUDIO"]
     case .llmPrompt: ["TEXT", "CONTEXT"]
@@ -173,7 +250,19 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
     case .end: []
     case .parallel: ["A", "B"]
     case .branch: ["TRUE", "FALSE"]
+    case .ifGuard: ["TRUE", "NEXT"]
+    case .select: ["CASE 1", "CASE 2", "DEFAULT"]
     case .loop: ["BODY", "DONE"]
+    case .callSubroutine, .jumpLegacy, .labelLegacy: ["FLOW"]
+    case .logicAnd, .logicOr, .logicXor, .logicNot: ["CONDITION"]
+    case .waitUntil: ["FLOW", "TIMEOUT"]
+    case .readInput: ["VALUE"]
+    case .writeOutput: ["FLOW"]
+    case .numericRegister: ["VALUE"]
+    case .flag: ["BOOL"]
+    case .positionRegister: ["POSE"]
+    case .backgroundMonitor: ["TRIGGER"]
+    case .endScene: []
     case .audio: ["FLOW", "AUDIO"]
     case .textInput: ["TEXT"]
     case .microphoneInput: ["AUDIO"]
@@ -190,12 +279,23 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
   }
 
   var isRuntimeAvailable: Bool {
-    switch family {
-    case .flow, .performance, .timing, .events:
+    switch self {
+    case .start, .end, .sequence, .parallel, .branch, .loop, .clip, .pose, .wait,
+      .waitForEvent, .emitEvent, .setVariable:
       true
-    case .inputs, .voiceAI, .outputs:
+    default:
       false
     }
+  }
+
+  var isPermanentlyUnsupported: Bool {
+    self == .jumpLegacy || self == .labelLegacy
+  }
+
+  var capabilityLabel: String {
+    if isRuntimeAvailable { return "SCENE V1" }
+    if isPermanentlyUnsupported { return "IMPORT ONLY" }
+    return "CONCEPT"
   }
 
   var availabilityDetail: String {
@@ -203,6 +303,23 @@ enum NodeCanvasDraftKind: String, CaseIterable, Identifiable, Sendable {
       return "Scene v1 action"
     }
     return switch self {
+    case .ifGuard: "Concept: structured scene-v2 IF guard compiler binding required"
+    case .select: "Concept: structured scene-v2 SELECT compiler binding required"
+    case .callSubroutine: "Concept: scene-v2 subroutine graph compiler binding required"
+    case .jumpLegacy, .labelLegacy:
+      "Import reference only: replace JMP/LBL with Loop, SELECT, or CALL"
+    case .logicAnd: "Concept: typed all-condition expression"
+    case .logicOr: "Concept: typed any-condition expression"
+    case .logicXor: "Concept: typed two-input XOR condition expression"
+    case .logicNot: "Concept: typed inverted condition expression"
+    case .waitUntil: "Concept: scene-v2 level-triggered condition gate"
+    case .readInput: "Concept: read a declared external scene input"
+    case .writeOutput: "Concept: write a mapped digital or numeric output"
+    case .numericRegister: "Concept: named numeric scene variable"
+    case .flag: "Concept: named Boolean scene variable"
+    case .positionRegister: "Concept: named pose or transform value"
+    case .backgroundMonitor: "Concept: edge-triggered background interlock lane"
+    case .endScene: "Concept: monitor-only safe scene termination"
     case .textInput: "Concept: operator text or plugin-provided text input"
     case .microphoneInput: "Concept: live microphone audio stream"
     case .eventInput: "Concept: scene, network, MIDI, or OSC event input"
@@ -326,6 +443,9 @@ struct NodeCanvasDraftGraph: Equatable, Sendable {
     if nodes.contains(where: { !$0.kind.isRuntimeAvailable }) {
       messages.append("Concept nodes cannot execute until their runtime providers ship.")
     }
+    if nodes.contains(where: { $0.kind.isPermanentlyUnsupported }) {
+      messages.append("JMP and LBL are import references only; use Loop, SELECT, or CALL.")
+    }
     return messages
   }
 
@@ -380,10 +500,35 @@ struct NodeCanvasDraftGraph: Equatable, Sendable {
     case .pose: ["Duration": "0.5 s", "Targets": "0"]
     case .wait: ["Duration": "1.0 s"]
     case .waitForEvent: ["Event": "event_name", "Timeout": "None"]
+    case .waitUntil:
+      [
+        "Condition": "input.part_ready == true", "Timeout": "None",
+        "Manual Syntax": "wait_until: {condition: …}",
+      ]
     case .emitEvent: ["Event": "event_name"]
     case .setVariable: ["Variable": "name", "Value": "0"]
-    case .loop: ["Count": "2"]
-    case .branch: ["Condition": "variable == value"]
+    case .loop: ["Count": "2", "Manual Syntax": "loop: {count: 2}"]
+    case .branch: ["Condition": "variable == value", "Manual Syntax": "if: {when: …}"]
+    case .ifGuard: ["Condition": "input.part_ready == true", "Manual Syntax": "if: {when: …}"]
+    case .select: ["Value": "register.mode", "Cases": "2", "Manual Syntax": "select:"]
+    case .callSubroutine: ["Subroutine": "wave", "Manual Syntax": "call: wave"]
+    case .jumpLegacy: ["Label": "10", "Replacement": "Loop / SELECT / CALL"]
+    case .labelLegacy: ["Label": "10", "Replacement": "Structured block entry"]
+    case .logicAnd: ["Manual Syntax": "all: [A, B]"]
+    case .logicOr: ["Manual Syntax": "any: [A, B]"]
+    case .logicXor: ["Manual Syntax": "xor: [A, B]"]
+    case .logicNot: ["Manual Syntax": "not: A"]
+    case .readInput:
+      ["Input": "part_ready", "Type": "Boolean", "Manual Syntax": "input: part_ready"]
+    case .writeOutput: ["Output": "conveyor_enable", "Value": "true"]
+    case .numericRegister: ["Name": "cycle_count", "Mode": "Read / Write", "Value": "0"]
+    case .flag: ["Name": "part_ready", "Mode": "Read / Write", "Value": "false"]
+    case .positionRegister: ["Name": "home_pose", "Space": "Character", "Value": "Choose pose"]
+    case .backgroundMonitor:
+      [
+        "Name": "estop_guard", "Trigger": "Rising edge", "Manual Syntax": "monitors:",
+      ]
+    case .endScene: ["Result": "estop", "Manual Syntax": "end_scene: estop"]
     case .audio: ["Asset": "Choose audio", "Volume": "100%"]
     case .textInput: ["Label": "Operator text", "Default": ""]
     case .microphoneInput: ["Device": "System default", "Mode": "Streaming"]

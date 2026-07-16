@@ -203,7 +203,7 @@ enum WorkspaceRibbonCatalog {
         tool("End", "stop.fill", "Add the terminal point for a scene graph."),
         tool("Sequence", "arrow.right.to.line.compact", "Run child actions in order."),
         tool("Parallel", "arrow.triangle.branch", "Run child actions together."),
-        tool("Branch", "arrow.triangle.swap", "Choose a path from a structured condition."),
+        tool("IF / ELSE", "arrow.triangle.swap", "Choose a path from a structured condition."),
         tool("Loop", "repeat", "Repeat a structured group of scene actions."),
       ]),
     group(
@@ -226,6 +226,48 @@ enum WorkspaceRibbonCatalog {
           "Frame All", "arrow.up.left.and.down.right.magnifyingglass",
           "Frame the complete graph."),
         tool("Validate", "checkmark.shield", "Validate graph structure and availability."),
+      ]),
+    group(
+      "Program Logic", "curlybraces", .planned,
+      [
+        tool(
+          "Single-Line IF", "questionmark.diamond", "Concept: guard one action with a condition."),
+        tool(
+          "SELECT", "list.number", "Concept: choose the first matching case without fallthrough."),
+        tool("CALL", "rectangle.stack", "Concept: run a shared subroutine and return."),
+        tool("WAIT Until", "hourglass", "Concept: pause on a level-triggered condition."),
+        tool(
+          "JMP (Import)", "arrow.turn.up.right",
+          "Import reference only: Anima replaces JMP with Loop, SELECT, or CALL."),
+        tool(
+          "LBL (Import)", "tag",
+          "Import reference only: arbitrary labels cannot compile into a structured graph."),
+      ]),
+    group(
+      "Conditions", "checkmark.circle", .planned,
+      [
+        tool("AND", "circle.grid.cross", "Concept: true when both typed conditions are true."),
+        tool("OR", "circle.grid.2x2", "Concept: true when either typed condition is true."),
+        tool("XOR", "arrow.triangle.branch", "Concept: true when exactly one condition is true."),
+        tool("NOT", "exclamationmark.circle", "Concept: invert a typed condition."),
+      ]),
+    group(
+      "I/O & Registers", "number.square", .planned,
+      [
+        tool("Read Input", "arrow.down.to.line", "Concept: read a declared external scene input."),
+        tool(
+          "Write Output", "arrow.up.from.line", "Concept: write a mapped Boolean or numeric output."
+        ),
+        tool("Register", "number.square", "Concept: read or write a named numeric value."),
+        tool("Flag", "flag", "Concept: read or write a named Boolean value."),
+        tool("Position", "mappin.and.ellipse", "Concept: read or write a named pose value."),
+      ]),
+    group(
+      "Background", "waveform.path.ecg", .planned,
+      [
+        tool(
+          "Monitor", "waveform.path.ecg", "Concept: continuously scan an edge-triggered interlock."),
+        tool("End Scene", "hand.raised.fill", "Concept: safely terminate a scene from a monitor."),
       ]),
     group(
       "Inputs", "arrow.down.to.line", .planned,

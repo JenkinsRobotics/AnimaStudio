@@ -151,9 +151,13 @@ struct NodeCanvasView: View {
   private func nodeColor(_ kind: NodeCanvasDraftKind) -> Color {
     switch kind.family {
     case .flow: StudioPalette.accent
+    case .programLogic: Color(red: 0.96, green: 0.70, blue: 0.24)
+    case .conditions: Color(red: 0.93, green: 0.39, blue: 0.64)
     case .performance: StudioPalette.semanticPart
     case .timing: StudioPalette.joint
     case .events: StudioPalette.hardware
+    case .dataIO: Color(red: 0.28, green: 0.78, blue: 0.62)
+    case .background: Color(red: 0.96, green: 0.34, blue: 0.34)
     case .inputs: Color(red: 0.35, green: 0.72, blue: 0.96)
     case .voiceAI: Color(red: 0.72, green: 0.48, blue: 0.96)
     case .outputs: Color(red: 0.98, green: 0.55, blue: 0.24)

@@ -65,4 +65,46 @@ final class NodeCanvasDraftModelTests: XCTestCase {
       )
     )
   }
+
+  func testStructuredRobotLogicConceptsExposeTypedPortsAndManualSyntax() throws {
+    XCTAssertEqual(
+      NodeCanvasDraftKind.allCases.filter { $0.family == .programLogic },
+      [.branch, .ifGuard, .select, .loop, .callSubroutine, .jumpLegacy, .labelLegacy]
+    )
+    XCTAssertEqual(
+      NodeCanvasDraftKind.allCases.filter { $0.family == .conditions },
+      [.logicAnd, .logicOr, .logicXor, .logicNot]
+    )
+    XCTAssertEqual(
+      NodeCanvasDraftKind.allCases.filter { $0.family == .dataIO },
+      [.readInput, .writeOutput, .numericRegister, .flag, .positionRegister]
+    )
+    XCTAssertEqual(
+      NodeCanvasDraftKind.allCases.filter { $0.family == .background },
+      [.backgroundMonitor, .endScene]
+    )
+
+    XCTAssertEqual(NodeCanvasDraftKind.select.inputPorts, ["FLOW", "VALUE"])
+    XCTAssertEqual(NodeCanvasDraftKind.select.outputPorts, ["CASE 1", "CASE 2", "DEFAULT"])
+    XCTAssertEqual(NodeCanvasDraftKind.waitUntil.outputPorts, ["FLOW", "TIMEOUT"])
+    XCTAssertEqual(NodeCanvasDraftKind.logicXor.inputPorts, ["A", "B"])
+    XCTAssertEqual(NodeCanvasDraftKind.logicXor.outputPorts, ["CONDITION"])
+    XCTAssertTrue(NodeCanvasDraftKind.jumpLegacy.isPermanentlyUnsupported)
+    XCTAssertTrue(NodeCanvasDraftKind.labelLegacy.isPermanentlyUnsupported)
+
+    var graph = NodeCanvasDraftGraph.sample
+    let registerID = graph.addNode(kind: .numericRegister, position: CGPoint(x: 500, y: 400))
+    let selectID = graph.addNode(kind: .select, position: CGPoint(x: 700, y: 400))
+    _ = graph.addNode(kind: .jumpLegacy, position: CGPoint(x: 900, y: 400))
+
+    let register = try XCTUnwrap(graph.nodes.first { $0.id == registerID })
+    let select = try XCTUnwrap(graph.nodes.first { $0.id == selectID })
+    XCTAssertEqual(register.properties["Mode"], "Read / Write")
+    XCTAssertEqual(select.properties["Manual Syntax"], "select:")
+    XCTAssertTrue(
+      graph.validationMessages.contains(
+        "JMP and LBL are import references only; use Loop, SELECT, or CALL."
+      )
+    )
+  }
 }
