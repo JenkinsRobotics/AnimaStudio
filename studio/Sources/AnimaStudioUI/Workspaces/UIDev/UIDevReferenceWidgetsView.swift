@@ -6,6 +6,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
   case layoutStyleControls
   case compactTabPanel
   case documentTabStrip
+  case materialEditor
 
   var id: Self { self }
 
@@ -16,6 +17,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .layoutStyleControls: "Layout & Style Controls"
     case .compactTabPanel: "Compact Action Panel"
     case .documentTabStrip: "Document Tab Strip"
+    case .materialEditor: "Material Editor"
     }
   }
 
@@ -31,6 +33,8 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
       "Primary and settings actions with shortcuts plus an immediate theme switch."
     case .documentTabStrip:
       "Selectable, closable project tabs with macOS window context and new-tab control."
+    case .materialEditor:
+      "A compact surface editor with preview, color, channels, textures, and assignment actions."
     }
   }
 
@@ -41,6 +45,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .layoutStyleControls: "rectangle.3.group.bubble"
     case .compactTabPanel: "rectangle.3.group"
     case .documentTabStrip: "rectangle.split.3x1"
+    case .materialEditor: "circle.hexagongrid.fill"
     }
   }
 
@@ -51,6 +56,7 @@ enum UIDevReferenceWidgetKind: String, CaseIterable, Identifiable, Sendable {
     case .layoutStyleControls: CGSize(width: 980, height: 620)
     case .compactTabPanel: CGSize(width: 320, height: 190)
     case .documentTabStrip: CGSize(width: 980, height: 88)
+    case .materialEditor: CGSize(width: 410, height: 620)
     }
   }
 }
@@ -93,6 +99,21 @@ struct UIDevReferenceWidgetsView: View {
         }
 
         referenceCard(.documentTabStrip)
+
+        StudioSectionHeader(
+          title: "Reference Widgets · Pack 03 · Materials",
+          detail:
+            "An interactive material-authoring surface for appearance, channel, and assignment workflow review.",
+          systemImage: "circle.hexagongrid.fill"
+        )
+
+        LazyVGrid(
+          columns: [GridItem(.adaptive(minimum: 430, maximum: 680), alignment: .top)],
+          alignment: .leading,
+          spacing: 18
+        ) {
+          referenceCard(.materialEditor)
+        }
       }
       .frame(maxWidth: 1_440, alignment: .topLeading)
       .padding(24)
@@ -150,6 +171,8 @@ struct UIDevReferenceWidgetSpecimen: View {
       UIDevCompactTabPanelWidget()
     case .documentTabStrip:
       UIDevDocumentTabStripWidget()
+    case .materialEditor:
+      UIDevMaterialWidgetView()
     }
   }
 }

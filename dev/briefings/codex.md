@@ -148,6 +148,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-15 — UI Dev Reference Widgets pack 03 complete:** Added Jonathan's
+  material-widget reference as a dedicated interactive SwiftUI specimen. The
+  HSB sliders and native color picker drive a live shaded preview sphere; name,
+  material type, lock state, six material-channel rows, independent channel
+  enablement, Float/Texture input, per-channel value, Mix, and footer actions
+  are interactive. Node Editor, Assignment, and Help clearly report prototype
+  behavior without claiming renderer or saved-document support. The widget now
+  appears in UI Dev → References and the 28-template matrix. Nine focused tests
+  and all 200 Swift tests, recursive strict format lint, native Xcode/root-app
+  build, strict signature verification, and `git diff --check` pass.
+
 - **2026-07-15 — UI Dev Reference Widgets pack 02 complete:** Added two
   interactive tab patterns from Jonathan's supplied references. The compact
   action panel includes New Query and Settings commands, visible keyboard

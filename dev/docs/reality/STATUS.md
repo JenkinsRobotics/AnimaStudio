@@ -98,7 +98,7 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on an **all-surfaces Template Matrix**: twenty-seven current app
+  UI Dev opens on an **all-surfaces Template Matrix**: twenty-eight current app
   specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
   Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
   States. Every specimen is visible together in a responsive board and names
@@ -119,7 +119,13 @@
   and a live Light/Dark segmented switch, plus a multi-document strip with
   macOS window context, tab selection and hover states, per-tab close controls,
   and new-tab creation. Both tab specimens are isolated in a dedicated source
-  file and appear in the same matrix; none of these reference widgets is wired into an
+  file and appear in the same matrix. Pack 03 adds a dedicated interactive
+  Material Editor reference with a live HSB-driven preview sphere, editable
+  name and surface type, native color selection, six selectable and independently
+  enabled material channels, Float/Texture inputs, per-channel value and mix
+  controls, locking, and explicit Node Editor/Assignment/Help feedback. It is a
+  UI-only draft until renderer material, texture-asset, assignment, and document
+  contracts are defined. None of these reference widgets is wired into an
   operator workflow until it is reviewed and adopted there. The separate
   **Live UI Kit** remains available with a resizable Design Inspector
   beside a production-component catalog. The inspector edits the shared Studio surface

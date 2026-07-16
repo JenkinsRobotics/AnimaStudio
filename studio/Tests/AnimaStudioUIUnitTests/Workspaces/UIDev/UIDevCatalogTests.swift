@@ -72,7 +72,7 @@ final class UIDevCatalogTests: XCTestCase {
       UIDevReferenceWidgetKind.allCases,
       [
         .layeredIconList, .notificationPopup, .layoutStyleControls, .compactTabPanel,
-        .documentTabStrip,
+        .documentTabStrip, .materialEditor,
       ]
     )
 
@@ -82,6 +82,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertTrue(matrixIDs.contains(.layoutStyleControls))
     XCTAssertTrue(matrixIDs.contains(.compactTabPanel))
     XCTAssertTrue(matrixIDs.contains(.documentTabStrip))
+    XCTAssertTrue(matrixIDs.contains(.materialEditor))
 
     for widget in UIDevReferenceWidgetKind.allCases {
       XCTAssertFalse(widget.title.isEmpty)
@@ -109,5 +110,28 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertEqual(documents.category, .windowsAndWorkspaces)
     XCTAssertGreaterThan(documents.idealWidth, compact.idealWidth)
     XCTAssertLessThan(documents.idealHeight, compact.idealHeight)
+  }
+
+  func testMaterialReferencePackHasStableSurfaceVocabulary() throws {
+    XCTAssertEqual(
+      UIDevMaterialType.allCases,
+      [.glossy, .matte, .metallic, .glass, .emissive]
+    )
+    XCTAssertEqual(
+      UIDevMaterialChannel.allCases,
+      [.diffuse, .specular, .roughness, .bump, .normal, .displacement]
+    )
+    XCTAssertTrue(
+      UIDevMaterialChannel.allCases.allSatisfy {
+        (0...1).contains($0.defaultValue) && !$0.title.isEmpty
+      }
+    )
+
+    let material = try XCTUnwrap(
+      UIDevTemplateMatrixCatalog.templates.first { $0.id == .materialEditor }
+    )
+    XCTAssertEqual(material.category, .inspectors)
+    XCTAssertGreaterThanOrEqual(material.idealWidth, 400)
+    XCTAssertGreaterThanOrEqual(material.idealHeight, 600)
   }
 }

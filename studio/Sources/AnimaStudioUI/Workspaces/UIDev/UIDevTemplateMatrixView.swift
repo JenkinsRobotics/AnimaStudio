@@ -78,6 +78,7 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case layoutStyleControls
   case compactTabPanel
   case documentTabStrip
+  case materialEditor
   case navigator
   case workspace3D
   case agent
@@ -149,6 +150,9 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .appearanceInspector, "Appearance", "Palette, RGB, opacity, and quality.",
       .inspectors, 340, 520, 390, "paintpalette"),
+    descriptor(
+      .materialEditor, "Material Editor", "Preview, surface color, channels, and assignment.",
+      .inspectors, 410, 620, 520, "circle.hexagongrid.fill"),
     descriptor(
       .mateEditor, "Mate Editor", "Shared eight-kind mate configuration panel.",
       .inspectors, 350, 540, 390, "link.badge.plus"),
@@ -385,6 +389,8 @@ struct UIDevTemplateMatrixView: View {
       UIDevReferenceWidgetSpecimen(kind: .compactTabPanel)
     case .documentTabStrip:
       UIDevReferenceWidgetSpecimen(kind: .documentTabStrip)
+    case .materialEditor:
+      UIDevReferenceWidgetSpecimen(kind: .materialEditor)
     case .navigator: navigatorTemplate
     case .workspace3D: workspaceTemplate
     case .agent: agentTemplate
