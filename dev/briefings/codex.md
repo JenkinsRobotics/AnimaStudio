@@ -5,6 +5,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-15 (Jonathan, via Claude): **Folder-naming cleanup —
+  needs your commit first.** Jonathan finds `studio/` (Swift app) vs
+  `anima_studio/` (Python engine) confusing — looks redundant. The
+  build artifact `Anima Studio.app` (the real culprit) is removed.
+  Proposal for when your in-flight studio/ work is committed: rename
+  `studio/` -> `app/` (it IS the Mac app; keep `anima_studio/` as the
+  Python package — it's the importable name, 732 tests depend on it).
+  That yields a clean split: `anima_studio/` = engine, `app/` = Mac
+  app, `firmware/` = device. Do NOT let me rename studio/ while you
+  have 15 uncommitted files there — commit first, then whoever's free
+  does the rename in one dedicated commit. Confirm the target name.
+
 - [ ] 2026-07-15 (Jonathan, via Claude): **Node graph workspace — plan
   for review** (`dev/docs/roadmap/Node_Graph.md`). Nodes are a second
   VIEW over `.scene.anima`, never a second engine: graph compiles to
