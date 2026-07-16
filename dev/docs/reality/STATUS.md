@@ -63,7 +63,7 @@
   carries the same eight-type family (`JointType`, including `parallel`:
   XYZ translation + Z rotation) with per-type DOF templates, optional
   per-DOF limits, per-joint mate offsets, and gear/rack-and-pinion/
-  screw/linear relations; 460 Python tests pass. Motors, 3D Models & Media, and Events are also
+  screw/linear relations; 583 Python tests pass. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. Its project
   window now uses a CAD-style two-level header: a compact global document/live
@@ -365,12 +365,35 @@
   stays the safety net. Tested over a real pyserial `loop://` port
   against the reference `SimulatedDevice` with exact-line assertions
   (no reconnect/threading yet — that lands with Studio live control).
-  460 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  The runtime also executes `.scene.anima` shows headless
+  (`anima_studio/scene.py`, the B10 offline-playback foundation):
+  the execution-v1 subset of `Scene_Format.md` — `clip` (speed ratio,
+  background `wait: false`, required `duration_s` for looping clips),
+  one-off `pose` interpolation from captured start values, `wait`,
+  `wait_for` event gates with optional timeout (`skip`/`end`), `set`/
+  `if` over declared scalar variables (literals and variable copies
+  only — no expressions yet), bounded and variable-gated `loop`,
+  deterministic `parallel` (timestamp order, ties by track order), and
+  outbound `event` emission — with the deferred spec actions (`speak`,
+  `expression`, `blend_shapes`, `lights`, `ai_response`, `goto`)
+  rejected loudly at load. The `character:` path resolves relative to
+  the scene file; `SceneRunner` has no wall clock (caller-driven
+  `advance(now_s)` ticks plus `post_event(name)` gates, mirroring the
+  simulator's explicit-time discipline), merges active motion sources
+  over held values, recomputes relation-driven DOF each frame with the
+  same refuse-to-arm limit semantics, streams frames through any
+  `OutputAdapter`, and reports `finished` /
+  `ended_by_gate_timeout` / `stopped` plus an emitted-events log.
+  `examples/pick_and_wave.scene.anima` drives the six-axis arm through
+  the whole v1 surface.
+  583 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
   relation coupling → channel projection → simulated servo tests,
   rig evaluation → `OutputAdapter.send_frame` → simulated/UDP output
-  tests, and rig evaluation → serial bytes → simulated servo tests.
+  tests, rig evaluation → serial bytes → simulated servo tests, and
+  scene file → `SceneRunner` → simulated servo values at exact
+  timestamps with logic-gate branching.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later
@@ -399,8 +422,11 @@
   last only for the current session. Project open/save, undo/redo, Home
   templates, and live hardware controls are intentionally visible but disabled.
   There is no `.anima` parsing in Studio (the Python runtime loads
-  `.character.anima` only; `.scene.anima` is unimplemented everywhere), no
-  editable Bézier curves/handles, audio, screens/LEDs, Live2D, scene execution, output
+  `.character.anima` and executes the `.scene.anima` v1 subset; Studio
+  parses neither, and the deferred scene actions — speech, expressions,
+  lights/LEDs, AI handoff, goto — execute nowhere), no
+  editable Bézier curves/handles, audio, screens/LEDs, Live2D, Studio Show
+  workspace playback, output
   node, JaegerOS connection, or full 52-blend-shape JP01 character file (a
   minimal example head ships in `examples/`). The root app bundle is a local
   development artifact rather than a notarized distribution; release signing,

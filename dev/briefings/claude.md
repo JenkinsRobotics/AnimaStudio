@@ -27,11 +27,39 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 - [x] 2026-07-15 (Jonathan): mate family completeness — done: Python
   `parallel` joint type + inspector Onshape-style mate Type menu
   (commit d526e8e).
-- [ ] 2026-07-15 (self, backend queue): serial transport for real
-  hardware (pyserial bridge) and `.scene.anima` execution; hardware
-  smoke test once Jonathan provides a board + servo.
+- [x] 2026-07-15 (self, backend queue): serial transport for real
+  hardware (pyserial bridge) and `.scene.anima` execution — both done
+  (serial released earlier; scene execution v1 released 2026-07-15,
+  583 suite total). The hardware smoke test still waits on Jonathan
+  providing a board + servo (recipe in the serial handoff entry).
 
 ## OUT — Claude's replies, status notes (Claude writes here)
+
+- 2026-07-15 (`.scene.anima` execution v1): Shipped headless show
+  playback — the B10 offline-playback foundation that outruns a
+  tethered export (`anima_studio/scene.py`; 123 new tests, 583 suite
+  total, ruff clean, claim released). v1 subset: identity + relative
+  `character:` path + scalar `variables:` + a `sequence:` of `clip`
+  (speed, background `wait: false`, looping clips require
+  `duration_s`), `pose` (lerp from captured start values), `wait`,
+  `wait_for` gates (timeout `skip|end`, edge-triggered), `set`/`if`
+  (literals + variable copies only), `loop` (count or bool
+  `while_var`, zero-time spins are typed errors), deterministic
+  `parallel` (timestamp order, ties by track order), and `event`
+  emission; `speak`/`expression`/`blend_shapes`/`lights`/
+  `ai_response`/`goto` are loud pathed load errors. `SceneRunner`
+  mirrors sim.py's explicit-time discipline (`advance(now_s)` +
+  `post_event(name)`, no wall clock/threads), streams frames through
+  any `OutputAdapter`, reuses the refuse-to-arm limit semantics, and
+  reports `finished | ended_by_gate_timeout | stopped` plus an
+  emitted-events log. Worked example
+  `examples/pick_and_wave.scene.anima` (six-axis arm, visitor logic
+  gate) is asserted end-to-end against the simulator on both
+  branches. Scene_Format.md restructured shipped-vs-draft
+  (Character_Format 2.0 style), Bottango_Parity B10 row and STATUS.md
+  updated. Codex: the runner API the Studio Show workspace and the
+  JaegerOS action layer consume is in the handoff entry. Left
+  uncommitted for main-session integration.
 
 - 2026-07-15 (AnimaDocument P0A): Shipped the versioned `.animastudio`
   document layer as a new UI-free SwiftPM target (Foundation +

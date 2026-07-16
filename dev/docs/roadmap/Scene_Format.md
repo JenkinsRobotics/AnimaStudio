@@ -2,26 +2,132 @@
 
 > File extension: `.scene.anima`  
 > Format: YAML  
-> Version: 1.0 (draft)
+> Version: execution v1 — the show-playback subset the Python runtime
+> executes (`anima_studio/scene.py` is the reference implementation).
+> The 1.0 draft below it is kept for the speech/expression/lights/AI
+> sections that have not been redesigned yet; those action types are
+> spec'd-but-deferred and rejected by the v1 loader.
 
-A scene file describes a complete performance — a sequence of actions with timing, logic, and audio synchronization that the Anima Runtime executes as a JaegerOS action.
+A scene file describes a complete performance — an ordered action
+sequence with timing and logic gates that drives one character. This is
+the piece that outruns a tethered export: a scene plus its character
+file plays back on the headless runtime with no authoring tool
+attached.
 
 ---
 
-## File Structure Overview
+## Execution v1 — the shipped subset
+
+A v1 scene is `identity` metadata, the relative path of the
+`.character.anima` it drives, initial scalar `variables`, and a
+`sequence` of actions. Parsing follows the character-loader
+discipline: closed schema, typed errors naming the offending path
+(`sequence[2].if.then[0].clip`, ...), explicit units (`_s`/`_ms`).
+Unknown fields anywhere are load errors: reject, never silently drop.
+
+```yaml
+anima_version: "2.0"
+type: scene
+
+identity:                # same shape as character identity
+  name: pick_and_wave    # required
+  display_name: "Pick and wave"   # optional, with description/version/author
+
+character: six_axis_arm.character.anima   # resolved relative to the
+                                          # scene file's directory
+
+variables:               # optional; scalar initial values only
+  keep_scanning: true    # bool | int | float | string
+  finale: "wave"
+
+sequence:                # ordered action list (see below)
+  - clip: pick
+```
+
+The worked example exercising the full v1 surface is
+[`examples/pick_and_wave.scene.anima`](../../../examples/pick_and_wave.scene.anima).
+
+### v1 actions
+
+| Action | Shape | Semantics |
+|---|---|---|
+| `clip` | `clip: <name>` + optional `speed`, `wait`, `duration_s` | Play a character clip. `speed` is a rate ratio (2.0 = twice as fast). `duration_s` bounds wall playback and is **required for a looping clip** (a loop has no natural end; time wraps modulo the clip). `wait: false` continues the sequence immediately while the clip plays in the background — inside a clip entry `wait:` is this flag, never the wait action. |
+| `pose` | `pose: {<dof_path_or_param>: <value>, ...}` + `duration_s` | One-off linear move to a target pose over `duration_s` (0 = jump), starting from each target's current value captured when the action starts. Values are file units (degrees / meters / 0..1) and are validated against limits at load; a relation-driven DOF cannot be posed (pose its driver). |
+| `wait` | `wait: {seconds: <float>}` | Hold the current pose for the duration. |
+| `wait_for` | `wait_for: {event: <name>, timeout_s: <float>?, on_timeout: skip\|end?}` | Suspend until `post_event(name)` fires. Without `timeout_s`, waits indefinitely. `on_timeout` (legal only with a timeout): `skip` continues past the gate (default); `end` ends the whole scene as `ended_by_gate_timeout`. Events are edge-triggered — only gates already waiting see them; there is no queue. |
+| `set` | `set: {var: <name>, value: <literal-or-var-name>}` | Set a declared variable. A string value naming another declared variable copies it; anything else is the literal. No arithmetic/expressions in v1 (a real ceiling, noted in code). |
+| `if` | `if: {var, equals, then: [...], else: [...]?}` | Branch on literal equality with the variable (`true` ≠ `1`). |
+| `loop` | `loop: {count: <int> \| while_var: <name>, body: [...]}` | Repeat the body a fixed count, or while a **bool** variable is true (checked before each iteration — a parallel track can clear it). A `while_var` iteration that consumes no time while the variable stays true is a runtime error, not a hang. |
+| `parallel` | `parallel: {tracks: [[...], [...]]}` | Run every track concurrently; completes when **all** tracks finish. Interleaving is deterministic: steps execute in timestamp order, ties broken by track declaration order. |
+| `event` | `event: {emit: <name>}` | Emit an outbound named event: recorded on the runner's emitted-events log and passed to its `on_event` callback. |
+
+Every variable referenced by `set`/`if`/`loop` must be declared under
+`variables:`; clip names and pose targets are validated against the
+loaded character at load time.
+
+### Deferred past v1 (spec'd below, rejected loudly)
+
+`speak`, `expression`, `blend_shapes`, `lights`, `ai_response`, and
+`goto`/`label` parse as typed errors naming the action — a scene using
+them refuses to load rather than playing back incompletely. The 1.0
+draft's `meta:` block is superseded by `identity:`, its scalar
+`wait: 1.5` form by `wait: {seconds: 1.5}`, and its
+`character: {file: ...}` mapping by the plain `character:` path.
+`wait_for`'s condition-expression triggers (`user_speech_contains`,
+`and`/`or`, ...) are deferred with the JaegerOS bus integration; v1
+gates are plain named events.
+
+### Execution model (shipped)
+
+`anima_studio.scene.SceneRunner` executes a loaded scene against a
+character rig and any `OutputAdapter` (simulator, UDP, serial — the
+adapter seam is proven adapter-agnostic):
+
+```
+load_scene_file(path)        -> (Scene, Rig)   # resolves character:
+SceneRunner(scene, rig, adapter, frame_interval_ms=33, on_event=None)
+runner.advance(now_s)        # tick: execute due actions at exact
+                             # timestamps, evaluate the pose, send one
+                             # frame; returns None or the result
+runner.post_event(name)      # deliver a gate event, between ticks
+runner.stop()                # e-stop the adapter, result = stopped
+runner.result                # finished | ended_by_gate_timeout | stopped
+runner.emitted_events        # ((name, time_s), ...) outbound log
+```
+
+There is no wall clock and no threads: the caller drives scene-local
+time with monotonic `advance(now_s)` ticks (the same explicit-time
+discipline as the device simulator), so execution is deterministic and
+testable to exact frame values. Each tick merges the active motion
+sources (later-started wins a contested target while both are active;
+finished motion settles and holds), recomputes relation-driven DOF,
+and projects through `rig.project_channels` — a mapped DOF outside its
+limits refuses to arm per the kinematics contract. The scene finishes
+when the root sequence and every background (`wait: false`) clip have
+run to completion. The runner never opens or closes the adapter;
+channel configs are hardware detail owned by the caller.
+
+---
+
+## Draft 1.0 — full show-control vision (unshipped sections)
+
+Everything below is the original planning draft, kept for the action
+types v1 defers. Where it conflicts with the v1 subset above (header
+blocks, `wait` shapes, condition expressions), the v1 form is the
+shipped truth.
+
+### File structure overview (draft)
 
 ```yaml
 anima_version: "1.0"
 type: scene
 
-meta:        # scene identity and settings
-character:   # which character file this targets
+meta:        # superseded by identity: in v1
+character:   # a mapping in the draft; a plain relative path in v1
 sequence:    # the ordered list of actions
 ```
 
----
-
-## Meta Block
+### Meta block (draft — superseded by `identity:`)
 
 ```yaml
 meta:
@@ -34,9 +140,7 @@ meta:
   tags: [greeting, wave, social]
 ```
 
----
-
-## Character Reference
+### Character reference (draft — a plain path in v1)
 
 ```yaml
 character:
@@ -47,13 +151,7 @@ character:
       default_speed: 1.05
 ```
 
----
-
-## Sequence — Action Types
-
-The `sequence` is an ordered list of actions. Actions execute top-to-bottom by default. Special actions (parallel, wait_for, if) modify flow.
-
-### `speak` — Text to Speech
+### `speak` — Text to Speech (deferred)
 
 ```yaml
 - speak: "Hello! I'm JP01. Nice to meet you."
@@ -64,32 +162,14 @@ The `sequence` is an ordered list of actions. Actions execute top-to-bottom by d
 
 Internally: publishes `/act/speech` and waits for `/sense/spoken` acknowledgement before proceeding (unless `wait_for_completion: false`).
 
-### `expression` — Set Expression State
+### `expression` — Set Expression State (deferred)
 
 ```yaml
 - expression: curious
   blend_time_s: 0.4           # transition duration (default 0.3)
 ```
 
-### `clip` — Play Named Animation Clip
-
-```yaml
-- clip: wave
-  wait_for_completion: true
-  blend_in_s: 0.1
-  blend_out_s: 0.2
-```
-
-### `pose` — Set Specific Joint or Blend Shape Values
-
-```yaml
-- pose:
-    head_yaw: 15.0            # degrees
-    head_pitch: -5.0
-    blend_time_s: 0.5
-```
-
-### `blend_shapes` — Set Specific Blend Shape Values Directly
+### `blend_shapes` — Set Blend Shape Values Directly (deferred)
 
 ```yaml
 - blend_shapes:
@@ -99,7 +179,7 @@ Internally: publishes `/act/speech` and waits for `/sense/spoken` acknowledgemen
     blend_time_s: 0.3
 ```
 
-### `lights` — LED State
+### `lights` — LED State (deferred)
 
 ```yaml
 - lights:
@@ -109,21 +189,7 @@ Internally: publishes `/act/speech` and waits for `/sense/spoken` acknowledgemen
     speed: 0.8
 ```
 
-### `wait` — Timed Pause
-
-```yaml
-- wait: 1.5                   # seconds
-```
-
-### `wait_for` — Wait for External Event
-
-```yaml
-- wait_for: user_speech_start
-  timeout_s: 30.0             # optional — continue after timeout
-  timeout_action: continue    # "continue" | "skip_to_end" | "goto: label"
-```
-
-Supported event triggers:
+### `wait_for` condition triggers (deferred beyond named events)
 
 | Event | Fires when |
 |-------|-----------|
@@ -135,38 +201,8 @@ Supported event triggers:
 | `topic: /sense/my_topic` | any message on this topic |
 | `expression_reached: happy` | expression transition completes |
 
-### `parallel` — Run Multiple Actions Simultaneously
-
-```yaml
-- parallel:
-    - speak: "Let me show you something."
-      wait_for_completion: false
-    - clip: wave
-    - lights:
-        pattern: pulse
-        color: [100, 200, 255]
-  wait_for: all               # "all" | "first" | "speak"
-```
-
-`wait_for: all` — parallel block completes when all children complete.  
-`wait_for: first` — parallel block completes when the first child completes, cancels others.  
-`wait_for: speak` — waits specifically for the speak action, lets clip continue.
-
-### `if` — Conditional Branch
-
-```yaml
-- if:
-    condition: user_speech_contains("goodbye")
-    then:
-      - speak: "It was great meeting you! Goodbye!"
-      - expression: happy
-      - clip: wave
-    else:
-      - speak: "What else can I help you with?"
-      - wait_for: user_speech_start
-```
-
-Condition expressions:
+Draft condition expressions for `if` (v1 branches on
+`var`/`equals` literals only):
 
 ```yaml
 condition: user_speech_contains("keyword")
@@ -182,17 +218,10 @@ condition: or:
   - user_speech_contains("bye")
 ```
 
-### `loop` — Repeat a Block
+Draft `parallel` also offered `wait_for: all | first | speak`
+completion modes; v1 ships `all` semantics only.
 
-```yaml
-- loop:
-    count: 3           # integer, or "forever"
-    body:
-      - clip: nod
-      - wait: 0.5
-```
-
-### `goto` — Jump to Labeled Step
+### `goto` — Jump to Labeled Step (deferred)
 
 ```yaml
 - label: ask_again
@@ -206,15 +235,7 @@ condition: or:
       - goto: ask_again
 ```
 
-### `set_variable` — Store a Value
-
-```yaml
-- set_variable:
-    name: user_mood
-    value: "interested"
-```
-
-### `ai_response` — Hand Off to JaegerAI
+### `ai_response` — Hand Off to JaegerAI (deferred)
 
 ```yaml
 - ai_response:
@@ -225,38 +246,7 @@ condition: or:
 
 This suspends the scene and lets JaegerAI handle conversation. When `max_turns` is reached or JaegerAI signals completion, the scene resumes.
 
----
-
-## Complete Scene Examples
-
-### Example 1 — Simple Greeting
-
-```yaml
-anima_version: "1.0"
-type: scene
-
-meta:
-  name: greeting_simple
-  duration_hint_s: 4.0
-
-character:
-  file: jp01.character.anima
-
-sequence:
-  - expression: happy
-    blend_time_s: 0.3
-  - parallel:
-      - speak: "Hello! I'm JP01."
-        wait_for_completion: false
-      - clip: wave
-    wait_for: speak
-  - wait: 0.5
-  - speak: "It's great to meet you!"
-  - expression: neutral
-    blend_time_s: 0.5
-```
-
-### Example 2 — Interactive Conversation with Logic Gates
+### Draft example — interactive conversation with logic gates
 
 ```yaml
 anima_version: "1.0"
@@ -317,92 +307,7 @@ sequence:
       brightness: 0.7
 ```
 
-### Example 3 — Show Control Scene (No AI)
-
-```yaml
-anima_version: "1.0"
-type: scene
-
-meta:
-  name: demo_performance
-  description: "Timed show control demo — no AI interaction"
-  interruptible: false
-
-character:
-  file: jp01.character.anima
-
-sequence:
-  - lights:
-      pattern: rainbow
-      speed: 1.0
-
-  - parallel:
-      - expression: excited
-      - wait: 0.5
-    wait_for: all
-
-  - speak: "Welcome to the Jenkins Robotics demonstration."
-  - wait: 0.8
-
-  - parallel:
-      - clip: wave
-      - lights:
-          pattern: pulse
-          color: [255, 150, 0]
-    wait_for: all
-
-  - speak: "My name is JP01. I am an AI-powered walking robot built on the Jaeger ecosystem."
-  - wait: 0.5
-
-  - expression: curious
-  - speak: "I can perceive my environment, navigate autonomously, and hold a conversation."
-  - wait: 1.0
-
-  - parallel:
-      - expression: happy
-      - lights:
-          pattern: solid
-          color: [100, 200, 100]
-    wait_for: all
-
-  - speak: "Thank you for visiting. I look forward to working with you."
-  - clip: wave
-```
-
-### Example 4 — AI Handoff Scene
-
-```yaml
-anima_version: "1.0"
-type: scene
-
-meta:
-  name: open_conversation
-  description: "Scripted intro, then hand off to JaegerAI"
-
-character:
-  file: jp01.character.anima
-
-sequence:
-  - expression: happy
-  - speak: "Hi there! I'm JP01. How can I help you today?"
-
-  - wait_for: user_speech_start
-    timeout_s: 20.0
-    timeout_action: continue
-
-  - ai_response:
-      prompt_hint: "You just greeted a visitor. Continue the conversation naturally."
-      max_turns: 10
-      on_complete: continue
-
-  - expression: neutral
-  - speak: "It was great talking with you. Come back any time!"
-  - clip: wave
-```
-
----
-
-## Execution Model
+### Draft execution model (JaegerOS runtime)
 
 When the Anima Runtime receives an `AnimationCommand` with a scene file:
 
@@ -421,17 +326,21 @@ When the Anima Runtime receives an `AnimationCommand` with a scene file:
 7. On error: publish AnimationResult(success=False, reason=...)
 ```
 
----
+Steps 1–4 exist today in `anima_studio/scene.py` with `post_event` as
+the gate surface; the JaegerOS action/bus wrapping (feedback topics,
+cancel-with-blend-out, `AnimationResult`) is the deferred integration
+layer.
 
-## Variable Scope
+### Variable scope
 
-Variables set with `set_variable` are scoped to the current scene execution. They reset when the scene ends. JaegerAI can also read and write scene variables through the tool interface during `ai_response` blocks.
+Variables set with `set` are scoped to the current scene execution.
+They reset when the scene ends. JaegerAI will also read and write
+scene variables through the tool interface during `ai_response` blocks
+(deferred).
 
----
+### Logic gate evaluation (draft — JaegerOS bus)
 
-## Logic Gate Evaluation
-
-`wait_for` events are resolved by subscribing to JaegerOS bus topics:
+`wait_for` events resolve by subscribing to JaegerOS bus topics:
 
 ```
 wait_for: user_speech_start
@@ -445,13 +354,15 @@ wait_for: user_speech_contains("goodbye")
     → resume when match found or timeout fires
 ```
 
-This means all wait conditions are event-driven — no polling. The scene suspends on the JaegerOS bus and resumes when the event arrives.
+All wait conditions are event-driven — no polling. The shipped v1
+equivalent is `SceneRunner.post_event(name)`: the bus adapter's job is
+translating topics into posted events.
 
 ---
 
 ## Related Docs
 
-- [[05_Anima/Character_Format]] — character file spec (blend shapes, expressions, clips)
-- [[05_Anima/Architecture]] — how the Runtime executes scenes
-- [[01_JaegerOS/Communication_Semantics]] — JaegerOS action semantics
-- [[01_JaegerOS/Wire_Contract]] — bus topics used by scene execution
+- [`Character_Format.md`](Character_Format.md) — character file spec (the 2.0 mechanism rig v1 scenes drive)
+- [`Bottango_Parity.md`](Bottango_Parity.md) — B10 offline playback milestone
+- [[01_JaegerOS/Communication_Semantics]] — JaegerOS action semantics (deferred integration)
+- [[01_JaegerOS/Wire_Contract]] — bus topics used by draft scene execution

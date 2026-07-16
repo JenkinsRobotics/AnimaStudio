@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | UI Dev reference widgets pack 02: tab views | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTabWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive compact action/settings/theme panel; interactive multi-document tab strip with selection, close, and add; Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | in progress |
 | Codex | UI Dev reference widgets pack 01 | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevReferenceWidgetsView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | interactive layered icon list; dismissible notification popup; layout/border/spacing/background controls; dedicated Reference Widgets lab plus matrix entries; tests/lint/build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Codex | UI Dev all-surfaces Template Matrix | `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevCatalog.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevTemplateMatrixView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/Workspaces/UIDev/UIDevRibbonView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `studio/Sources/AnimaStudioUI/AppShell/WorkspaceChrome.swift`, `studio/Tests/AnimaStudioUIUnitTests/Workspaces/UIDev/UIDevCatalogTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | default matrix board grouped by windows/workspaces, timelines, inspectors, panels, dialogs/popovers, controls, and status; production-size Recent Projects specimen; stable coverage catalog; focused/full Swift tests; lint; Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-15 |
 | Claude | Wire protocol host + loopback simulator | `anima_studio/wire.py`, `anima_studio/sim.py`, `anima_studio/clips.py`, `anima_studio/tests/test_wire.py`, `anima_studio/tests/test_sim.py`, `anima_studio/tests/test_clips.py` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (74 passed) | released 2026-07-14 |
@@ -107,7 +108,7 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | Serial wire transport (pyserial) as an OutputAdapter — real-hardware bridge | `anima_studio/serial_transport.py`, `anima_studio/tests/test_serial_transport.py`, `pyproject.toml` (add pyserial), `dev/docs/roadmap/Wire_Protocol.md` (transport note if needed) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (loop:// URL tests, no hardware) | released 2026-07-15 (20 new tests, 370 suite total at release time; ruff clean; `pip install -e ".[dev]"` re-verified with pyserial) |
 | Codex | Start-screen Recent Projects gallery | `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/RecentProjects.swift`, `studio/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, `studio/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | thumbnail/name/last-opened/revision cards; real recency persistence; honest disabled reopen until P0; empty state; milestone-ready metadata; tests/lint/build/signature/live walkthrough; `git diff --check` | released 2026-07-15 |
 
-| Claude | `.scene.anima` execution v1 (backend show playback) | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py`, `examples/**.scene.anima`, `dev/docs/roadmap/Scene_Format.md` (v1 subset), `dev/docs/roadmap/Bottango_Parity.md` (B10 row) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Claude | `.scene.anima` execution v1 (backend show playback) | `anima_studio/scene.py`, `anima_studio/tests/test_scene.py`, `examples/**.scene.anima`, `dev/docs/roadmap/Scene_Format.md` (v1 subset), `dev/docs/roadmap/Bottango_Parity.md` (B10 row) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | released 2026-07-15 (123 new tests in test_scene.py; 583 suite total, ruff clean) |
 | Claude | AnimaDocument: versioned .animastudio package encoding (P0A core, no UI) | `studio/Sources/AnimaDocument/**`, `studio/Tests/AnimaDocumentTests/**`, `studio/Package.swift` (target entries only), `studio/project.yml` (if needed) | `swift test` + claimed-file lint; deterministic round-trip; typed errors; no SwiftUI imports | released 2026-07-15 (25 new tests; 197 suite total; project.yml unchanged — app consumes package products, no new wiring needed) |
 
 ## Requests
@@ -155,6 +156,61 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, `.scene.anima` execution v1 — B10 offline
+  playback, backend):** Shipped `anima_studio/scene.py` (123 new tests
+  in `anima_studio/tests/test_scene.py`; 583 suite total, ruff clean;
+  claim released above). **Format v1 subset (Scene_Format.md
+  restructured shipped-vs-draft, Character_Format 2.0 style):**
+  `anima_version: "2.0"` + `type: scene` + `identity:` (character
+  identity shape) + `character:` (plain relative path, resolved
+  against the scene file's directory; the draft's `meta:` and
+  `character: {file:}` forms get superseded-section errors) +
+  `variables:` (scalar initial values) + `sequence:` of nine actions —
+  `clip` (speed ratio; `wait: false` = background; looping clip
+  REQUIRES `duration_s`, validated against the loaded rig; inside a
+  clip entry `wait:` is the completion flag, disambiguated from the
+  wait action), `pose` (one-off lerp from start values captured at
+  action start; file units; load-validated against limits and
+  relation-driven DOF rejected), `wait: {seconds}`, `wait_for:
+  {event, timeout_s?, on_timeout: skip|end}` (edge-triggered, no
+  event queue), `set` (literal or variable-name copy — expression
+  arithmetic is a `# ponytail:` ceiling), `if` (literal equality,
+  bool≠int guarded), `loop` (`count` XOR `while_var`, bool-typed,
+  checked per iteration; a zero-time iteration with the var still
+  true is a typed runtime error, never a hang), `parallel` (all
+  tracks to completion; steps execute in timestamp order, ties by
+  track declaration order), `event: {emit}`. Deferred spec actions
+  (`speak`, `expression`, `blend_shapes`, `lights`, `ai_response`,
+  `goto`/`label`) are loud pathed load errors. **SceneRunner API
+  (what JaegerOS integration and the Studio Show workspace consume):**
+  `load_scene_file(path) -> (Scene, Rig)`;
+  `SceneRunner(scene, rig, adapter, frame_interval_ms=33,
+  on_event=None)` over any `OutputAdapter` (caller owns
+  open/close); `advance(now_s)` monotonic explicit-time ticks (sim.py
+  discipline — deterministic to exact frame values; due actions run
+  at their exact timestamps regardless of tick size);
+  `post_event(name)` between ticks delivers gates at the current
+  scene time; `stop()` = adapter e-stop + result `stopped`; `result`
+  = `finished | ended_by_gate_timeout | stopped` (None while
+  running); `emitted_events` log + `on_event` callback; `variables`
+  snapshot property. Motion model: held last-settled values per
+  target, active sources override in start order (a finished short
+  source holds only until an earlier still-active source reasserts —
+  documented ceiling), relation-driven DOF recomputed every frame
+  with the existing refuse-to-arm `LimitViolationError` semantics
+  reused, scene finishes when root sequence AND background clips
+  complete. **Worked example:**
+  `examples/pick_and_wave.scene.anima` drives the six-axis arm
+  through the whole surface (parallel gate-track + scan loop; posting
+  `visitor_detected` cuts the scan short) with end-to-end simulator
+  tests asserting servo values at exact timestamps on both branches.
+  Docs: Scene_Format.md v1 section, Bottango_Parity B10 row (offline
+  playback foundation shipped backend-side), STATUS.md Python
+  sentences. For the JaegerOS layer later: bus topics translate to
+  `post_event`; feedback/cancel wrap `advance`/`stop`; nothing in
+  scene.py imports beyond loader/rig/tracks/outputs. Not committed
+  per packet instructions.
 
 - **2026-07-15 (Claude, AnimaDocument P0A — versioned `.animastudio`
   package encoding, no UI):** Shipped the durable document layer as a
