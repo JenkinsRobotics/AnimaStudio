@@ -174,6 +174,8 @@ def _rig_summary(rig: Rig) -> dict:
                 "model_node": part.model_node,
                 "description": part.description,
                 "model": part.model,
+                "suppressed": part.suppressed,
+                "grounded": part.grounded,
             }
             for part in rig.parts.values()
         ],
@@ -302,6 +304,8 @@ def rig_from_dict(dto: dict) -> Rig:
             model_node=entry.get("model_node"),
             description=entry.get("description", ""),
             model=entry.get("model", ""),
+            suppressed=entry.get("suppressed", False),
+            grounded=entry.get("grounded", False),
         )
         for entry in dto.get("parts", [])
     }
@@ -340,6 +344,7 @@ def rig_from_dict(dto: dict) -> Rig:
             ratio=entry["ratio"],
             offset=entry.get("offset", 0.0),
             display=dict(entry.get("display", {})),
+            suppressed=entry.get("suppressed", False),
         )
         for entry in dto.get("relations", [])
     )
@@ -380,6 +385,7 @@ def _joint_from_dto(dto: dict) -> Joint:
                 selection_b=tangent_dto["selection_b"],
                 propagation=tangent_dto.get("propagation", True),
             ),
+            suppressed=dto.get("suppressed", False),
         )
     dofs = tuple(_dof_from_dto(entry) for entry in dto.get("dofs", []))
     return Joint(
@@ -391,6 +397,7 @@ def _joint_from_dto(dto: dict) -> Joint:
         id=dto.get("id", ""),
         description=dto.get("description", ""),
         controls=_controls_from_dto(dto.get("controls")),
+        suppressed=dto.get("suppressed", False),
     )
 
 

@@ -221,7 +221,16 @@ def _parse_parts(raw: object) -> dict[str, Part]:
         path = f"parts.{name}"
         entry = _mapping(entry if entry is not None else {}, path)
         _reject_unknown_fields(
-            entry, path, {"parent", "model_node", "description", "model"}
+            entry,
+            path,
+            {
+                "parent",
+                "model_node",
+                "description",
+                "model",
+                "suppressed",
+                "grounded",
+            },
         )
         parent = entry.get("parent")
         if parent is not None:
@@ -236,6 +245,13 @@ def _parse_parts(raw: object) -> dict[str, Part]:
         model = entry.get("model")
         model = "" if model is None else _string(model, f"{path}.model")
         _reject_unsafe_relative_path(model, f"{path}.model")
+        # Parse the bool states before construction: ``_bool`` raises a
+        # pathed ``CharacterFormatError`` (a ``ValueError``), which the
+        # ``except ValueError`` below would otherwise re-wrap and blur.
+        suppressed = _bool(
+            entry.get("suppressed", False), f"{path}.suppressed"
+        )
+        grounded = _bool(entry.get("grounded", False), f"{path}.grounded")
         try:
             parts[str(name)] = Part(
                 name=str(name),
@@ -245,6 +261,8 @@ def _parse_parts(raw: object) -> dict[str, Part]:
                     entry.get("description", ""), f"{path}.description"
                 ),
                 model=model,
+                suppressed=suppressed,
+                grounded=grounded,
             )
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
@@ -325,6 +343,9 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
             )
         controls = _parse_mate_controls(entry, path, parts)
         joint_id = _string(entry.get("id", ""), f"{path}.id")
+        suppressed = _bool(
+            entry.get("suppressed", False), f"{path}.suppressed"
+        )
         try:
             joints[str(name)] = Joint(
                 name=str(name),
@@ -337,6 +358,7 @@ def _parse_joints(raw: object, parts: dict[str, Part]) -> dict[str, Joint]:
                 ),
                 id=joint_id,
                 controls=controls,
+                suppressed=suppressed,
             )
         except ValueError as error:
             raise CharacterFormatError(path, str(error)) from error
@@ -360,6 +382,7 @@ _KINEMATIC_JOINT_FIELDS = {
     "flip_primary_axis",
     "secondary_axis_rotation_deg",
     "simulation_connection",
+    "suppressed",
 }
 _WIDTH_JOINT_FIELDS = {
     "type",
@@ -370,6 +393,7 @@ _WIDTH_JOINT_FIELDS = {
     "connectors",
     "flip_primary_axis",
     "simulation_connection",
+    "suppressed",
 }
 _TANGENT_JOINT_FIELDS = {
     "type",
@@ -378,6 +402,7 @@ _TANGENT_JOINT_FIELDS = {
     "description",
     "id",
     "tangent",
+    "suppressed",
 }
 
 
@@ -408,6 +433,7 @@ def _parse_geometry_constraint_joint(
     """
     joint_id = _string(entry.get("id", ""), f"{path}.id")
     description = _string(entry.get("description", ""), f"{path}.description")
+    suppressed = _bool(entry.get("suppressed", False), f"{path}.suppressed")
     controls = None
     tangent = None
     if joint_type is JointType.WIDTH:
@@ -424,6 +450,7 @@ def _parse_geometry_constraint_joint(
             id=joint_id,
             controls=controls,
             tangent=tangent,
+            suppressed=suppressed,
         )
     except ValueError as error:
         raise CharacterFormatError(path, str(error)) from error
@@ -1073,7 +1100,15 @@ def _parse_relations(
         _reject_unknown_fields(
             entry,
             path,
-            {"kind", "driver", "driven", "ratio", offset_key, "display"},
+            {
+                "kind",
+                "driver",
+                "driven",
+                "ratio",
+                offset_key,
+                "display",
+                "suppressed",
+            },
         )
         ratio = _number(entry["ratio"], f"{path}.ratio")
         if ratio == 0.0:
@@ -1105,6 +1140,9 @@ def _parse_relations(
                         key_path, f"must be > 0: {value!r}"
                     )
                 display[str(key)] = number
+        suppressed = _bool(
+            entry.get("suppressed", False), f"{path}.suppressed"
+        )
         try:
             relations.append(
                 Relation(
@@ -1114,6 +1152,7 @@ def _parse_relations(
                     ratio=ratio,
                     offset=offset,
                     display=display,
+                    suppressed=suppressed,
                 )
             )
         except ValueError as error:

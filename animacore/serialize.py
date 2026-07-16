@@ -115,6 +115,12 @@ def _parts_dict(rig: Rig) -> dict:
             entry["model"] = part.model
         if part.description:
             entry["description"] = part.description
+        # Persistent rig-semantic states — emitted only when set, so a
+        # default part stays clean and the round-trip is lossless.
+        if part.suppressed:
+            entry["suppressed"] = True
+        if part.grounded:
+            entry["grounded"] = True
         parts[part.name] = entry
     return parts
 
@@ -153,6 +159,8 @@ def _joint_dict(joint: Joint) -> dict:
             entry["dofs"] = dofs
     if joint.description:
         entry["description"] = joint.description
+    if joint.suppressed:
+        entry["suppressed"] = True
     return entry
 
 
@@ -362,6 +370,8 @@ def _relations_list(rig: Rig, dof_paths: dict[str, DegreeOfFreedom]) -> list:
                 entry["offset_m"] = relation.offset
         if relation.display:
             entry["display"] = dict(relation.display)
+        if relation.suppressed:
+            entry["suppressed"] = True
         relations.append(entry)
     return relations
 

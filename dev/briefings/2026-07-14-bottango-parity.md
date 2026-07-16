@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | CAD mouse/navigation overhaul + reusable Mouse settings panel | `app/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,RobotPreviewView,SubObjectSelection}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportCameraControls,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, new focused settings views under `app/Sources/AnimaStudioUI/Settings/**`, focused tests under `app/Tests/{RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/Studio_App.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Default/SolidWorks/Onshape/Fusion/Custom mappings match the approved CAD table; Option bindings, click-vs-drag right routing, normalized reversible zoom, precise zoom and middle-double-click frame; reliable selection/empty clear with selection feedback; compact reusable settings window with profile summaries, mouse-button diagram, manual bindings, sensitivity and reverse-wheel persistence; mapping/classifier/UI tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | in progress |
 | Codex | Assets character manager + 3D assembly loading stage | `app/Sources/AnimaCoreClient/AnimaCoreRigDocumentEditor.swift`, `app/Sources/AnimaDocument/{AnimaStudioDocument,ProjectCharacterNaming}.swift`, `app/Sources/RealityKitViewport/ModelHierarchy.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/ModelImportUnitsSheet.swift`, new `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Assets lists indexed characters and selects the active Rig/Animate character; validated 3D-only New Character sheet with disabled honest 2D option; engine-serialized empty character folder; async batch STL/OBJ/USD import with explicit unit preparation, progress, multi-node USD mapping, inline failures, and transition to Rig; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Portable rigid-part model import (STL/OBJ/USD + honest STEP) | `app/Package.swift`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaDocument/{AnimaDocumentStore,CharacterEditorMetadata}.swift`, `app/Sources/RealityKitViewport/{ModelHierarchy,PartModelSource,RealityKitModelLoader,RobotPreviewView}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ModelImportUnitsSheet}.swift`, `app/Sources/AnimaStudioUI/Workspaces/WorkspaceRibbonCatalog.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, `dev/docs/{reality/STATUS.md,roadmap/{Project_Format,Hardware_Animation_Milestone}.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | picker supports STL/OBJ/USD family; STEP presents conversion guidance; STL/OBJ units are explicit and persisted; ModelIO meshes render in RealityKit; imports copy beneath the active character; rig DTO receives safe relative `model` plus optional `model_node` and is engine-validated/reloaded; per-part meshes inherit `resolve_pose`; save/reopen integration; tests/lint/Xcode/root-app build/signature/launch; `git diff --check` | released 2026-07-16 |
 | Codex | Engine-canonical project lifecycle (New/Open/Save/Save As/Recents) | `app/Package.swift`, `app/project.yml`, `app/AnimaStudio.xcodeproj/project.pbxproj`, `app/Sources/AnimaCoreClient/**`, `app/Sources/AnimaDocument/**`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioHomeView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome,RecentProjects,ProjectLifecycle}.swift`, `app/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,AnimaStudioUIUnitTests}/**`, `dev/docs/{reality/STATUS.md,roadmap/Project_Format.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | plain-folder project layout; native New/Open/Save As dialogs; engine-only character serialization; atomic Save; real bookmark-backed recents; reopen through `load_character`; no Swift YAML semantics; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
@@ -148,7 +149,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Per-part asset file reference in the character format (portable multi-file assemblies: STL/OBJ/STEP/USD) | `animacore/rig.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/**`, `examples/pan_tilt_head.character.anima` (new), `dev/docs/roadmap/Character_Format.md`, `dev/docs/roadmap/Project_Format.md`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,CLAUDE}.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; round-trip of per-part model refs | released 2026-07-16 (944 suite total, +17; ruff clean; no `app/`/`firmware/` touched; ADDITIVE `Part.model` field; DTO shape + validation rules in the handoff entry below) |
 
-| Claude | Persistent object states: suppress (part/joint/relation) + ground (part) in the rig model, evaluation, and file round-trip | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; suppress->serialize->load stays suppressed | in progress |
+| Claude | Persistent object states: suppress (part/joint/relation) + ground (part) in the rig model, evaluation, and file round-trip | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/mates.py` (`describe_mate` +`suppressed`), `animacore/tests/**`, `dev/docs/roadmap/Character_Format.md`, `dev/docs/reality/STATUS.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; suppress->serialize->load stays suppressed | released 2026-07-16 (966 suite total, +22; ruff clean; no `app/`/`firmware/` touched; ADDITIVE bool fields default False; field shapes + exact solve semantics in the handoff entry below) |
 
 ## Requests
 
@@ -203,6 +204,65 @@ change needed in the Handoff log instead of inventing commands.
   Codex editing or reverting the backend lane.
 
 ## Handoff log
+
+- **2026-07-16 (Claude, persistent object states — suppress + ground):**
+  A user can suppress an object or ground a part, save, quit, relaunch —
+  and it stays that way, because these are now **rig-semantic states in
+  the canonical `.character.anima`**, not app view-state. **Additive:
+  every field is an optional `bool` defaulting `False`, so existing files
+  and every prior test are byte- and behavior-unchanged.** Distinct from
+  the app's `hidden`/`lock` view-state (transient UI, stays app-side, NOT
+  in the format).
+
+  **Field shapes** (all default `False`, emitted to the file only when
+  `True`):
+  - `Part.suppressed: bool`, `Part.grounded: bool`
+  - `Joint.suppressed: bool`
+  - `Relation.suppressed: bool`
+
+  File keys are literally `suppressed:` / `grounded:` on the part / joint
+  / relation entry; loader parses them via `_bool` with a pathed error on
+  a non-bool (`parts.<n>.suppressed`, `joints.<n>.suppressed`,
+  `relations[i].suppressed`, `parts.<n>.grounded`).
+
+  **Exact solve semantics (so the tree toggles wire correctly)** —
+  deterministic, per-element, **no cascade**:
+  - `evaluate_pose` (`rig.py`): a **suppressed joint** contributes no
+    driven DOF — its DOF are excluded from `dof_values` entirely (not read
+    from clips, not neutral-filled). A **suppressed relation** is skipped
+    (its driven DOF keeps its own neutral); a relation whose driver/driven
+    DOF sits on a suppressed joint is likewise skipped (no dangling ref).
+    All non-suppressed behavior is byte-identical.
+  - `resolve_pose` (`kinematics.py`): FK walks only ACTIVE elements. A
+    **suppressed part** is EXCLUDED from the output dict and any joint
+    touching it (parent OR child) is inactive. A **suppressed joint** is
+    skipped (its child is not positioned by it). A **grounded part** is a
+    FIXED ROOT at `IDENTITY` even with an incoming joint — **ground
+    overrides the joint** (that joint is inactive). **Orphan rule:** a
+    non-suppressed part whose only positioning path runs through a
+    suppressed/inactive joint (or a suppressed parent) has no active
+    incoming joint, so it resolves as an identity root (floats to origin).
+    `suppressed` + `grounded` on one part → suppressed wins.
+
+  **Codex — UI wiring:** the states are surfaced additively (nothing
+  renamed): `load_character` rig-summary part entries gain
+  `suppressed`/`grounded`; `describe_mate` gains `suppressed`;
+  `describe_relation` gains `suppressed`. `serialize_character` /
+  `rig_from_dict` round-trip all four, so the full-fidelity DTO stays
+  lossless. To make "suppress a folder → everything under it vanishes,"
+  suppress the member PARTS (there is no engine cascade — `# ponytail:`
+  kept deliberately simple and explicit).
+
+  **Persistence proof:** the round-trip test builds a rig, suppresses a
+  joint + a part, grounds a part, suppresses a relation, `rig_to_yaml` →
+  `parse_character`, and asserts every state survived (and defaults stay
+  `False`). Files: `animacore/{rig,kinematics,loader,serialize,bridge,
+  mates}.py`, new `animacore/tests/test_object_states.py` (22 tests),
+  `dev/docs/roadmap/Character_Format.md` (new "Object states" section),
+  `dev/docs/reality/STATUS.md`. Verified: `.venv/bin/ruff check .` clean,
+  `.venv/bin/pytest animacore/tests -q` = **966 passed** (+22). No
+  `app/`/`firmware/` touched. Left uncommitted for main-session
+  integration.
 
 - **2026-07-16 (Codex, portable rigid-part model import):** Added native
   USD-family loading and ModelIO STL/OBJ-to-RealityKit conversion, with an

@@ -276,6 +276,60 @@ Rules (load errors, never silent fixes):
   raises (`LimitViolationError`) — hardware must refuse to arm while
   violated.
 
+### Object states — `suppressed` / `grounded` (persistent)
+
+Parts, joints, and relations carry optional **persistent, rig-semantic
+states** that change what the rig solves and are stored in this file, so
+they survive save → quit → relaunch. They are distinct from the app's
+**hidden** / **lock** view-state, which is transient UI presentation
+(what's drawn / what's editable), lives app-side, and is **not** in the
+character format. Every state defaults to `false` and is written to the
+file **only when `true`** (a default rig is byte-clean), so existing
+files and their evaluation are unchanged.
+
+| Field | On | Meaning |
+|---|---|---|
+| `suppressed` | part | The part leaves the solve entirely: it is **absent** from resolved output, and any joint touching it (as parent or child) goes inactive. |
+| `grounded` | part | The part is pinned as a **fixed root at identity**, overriding any incoming joint (ground wins). It still parents its own children. |
+| `suppressed` | joint | The joint contributes **no driven DOF** (its DOF are not read from clips / not in the active solve) and does **not** position its child in forward kinematics. |
+| `suppressed` | relation | The relation is **skipped** (not applied); its driven DOF falls back to its own neutral. |
+
+Solve semantics (deterministic — `animacore/rig.py` `evaluate_pose`,
+`animacore/kinematics.py` `resolve_pose`):
+
+- **Suppression is per-element — no cascade.** Suppressing a part does
+  not auto-suppress its assembly-tree children. The UI achieves "suppress
+  a folder → everything under it vanishes" by suppressing the member
+  parts, not by any implicit cascade in the engine.
+- **Orphan rule.** A non-suppressed part whose only positioning path runs
+  through a suppressed/inactive joint (or a suppressed parent part) has no
+  active incoming joint, so it resolves as an **identity root** (it floats
+  to the origin). This is deterministic and intentional.
+- `suppressed` + `grounded` on the same part: suppression wins (the part
+  is absent).
+
+```yaml
+parts:
+  base: {}
+  spinner:
+    grounded: true          # fixed root at identity, ignores any joint
+  broken_link:
+    suppressed: true        # absent from the solve; its joints inactive
+joints:
+  drive:
+    type: revolute
+    parent: base
+    child: wheel
+    suppressed: true        # wheel not driven/positioned by this joint
+    dofs: { rotation: { neutral_deg: 0 } }
+relations:
+  - kind: gear
+    driver: drive.rotation
+    driven: idler.rotation
+    ratio: 2.0
+    suppressed: true        # coupling off; idler.rotation holds neutral
+```
+
 ---
 
 ## Format 1.0 (draft) — superseded sections below

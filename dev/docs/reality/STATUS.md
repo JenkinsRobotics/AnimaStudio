@@ -495,6 +495,20 @@
   refuses to arm). `examples/six_axis_arm|rc_car|walle_style
   .character.anima` load end-to-end; rc_car exercises a steering
   rack-and-pinion relation and an unlimited free-spinning axle.
+  Parts, joints, and relations carry persistent **object states** —
+  `Part.suppressed` / `Part.grounded` and `Joint.suppressed` /
+  `Relation.suppressed` (all default `false`, written to the file only
+  when `true`, so round-trip is lossless) — that change the solve and
+  survive save/quit/relaunch, distinct from the app's transient
+  hidden/lock view-state. `evaluate_pose` drops a suppressed joint's DOF
+  from the active solve and skips a suppressed relation; `resolve_pose`
+  excludes a suppressed part (and deactivates its joints), skips a
+  suppressed joint, and pins a grounded part as a fixed identity root
+  overriding any incoming joint. Suppression is per-element (no cascade);
+  an orphaned non-suppressed part floats to the origin. The bridge
+  surfaces the states in the `load_character` rig summary (`describe_mate`
+  / `describe_relation` / part entries) and round-trips them through
+  `serialize_character`.
   The runtime also ships the community-extension foundation
   (Extensions.md packet E1): `animacore/outputs.py` defines the
   `OutputAdapter` extension-point protocol (`open(channel_configs)` /

@@ -653,6 +653,7 @@ def describe_mate(joint: Joint) -> dict:
         "category": mate_category(joint.joint_type).value,
         "parent_part": joint.parent_part,
         "child_part": joint.child_part,
+        "suppressed": joint.suppressed,
         "dofs": [
             {
                 "path": f"{joint.name}.{dof.name}",

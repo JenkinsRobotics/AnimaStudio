@@ -153,6 +153,14 @@ class Part:
 
     ``parent`` is optional assembly-tree metadata; kinematic
     connectivity is carried by ``Joint``, not here.
+
+    ``suppressed`` and ``grounded`` are persistent *rig-semantic* object
+    states (round-tripped through the file, unlike the app's transient
+    hidden/lock view-state): a **suppressed** part is excluded from the
+    solve entirely (its geometry vanishes and any joint touching it goes
+    inactive); a **grounded** part is pinned as a fixed root at identity,
+    overriding any incoming joint. Both default off, so an existing rig
+    is unchanged. See ``kinematics.resolve_pose`` for the exact FK rules.
     """
 
     name: str
@@ -160,6 +168,8 @@ class Part:
     model_node: str | None = None
     description: str = ""
     model: str = ""
+    suppressed: bool = False
+    grounded: bool = False
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -193,6 +203,12 @@ class Joint:
     it carries ``controls=None`` and a ``tangent`` (``TangentSpec``)
     block of two opaque surface selections plus a propagation flag,
     round-tripped for the app.
+
+    ``suppressed`` is a persistent rig-semantic state (round-tripped
+    through the file, unlike app view-state): a suppressed joint
+    contributes no driven DOF in ``evaluate_pose`` and is skipped in the
+    ``resolve_pose`` FK walk, so its child is not positioned by it.
+    Defaults off, so an existing rig is unchanged.
     """
 
     name: str
@@ -204,6 +220,7 @@ class Joint:
     id: str = ""
     controls: MateControls | None = None
     tangent: TangentSpec | None = None
+    suppressed: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dofs", tuple(self.dofs))
@@ -372,6 +389,10 @@ class Relation:
     (``"<joint_name>.<dof_name>"``). The relation always computes —
     no collision detection, no clamping; limit handling for the driven
     DOF is violation reporting in ``evaluate_pose``.
+
+    ``suppressed`` is a persistent rig-semantic state: a suppressed
+    relation is skipped (not applied) in ``evaluate_pose``'s dependency
+    pass, so its driven DOF falls back to its own neutral. Defaults off.
     """
 
     kind: RelationKind
@@ -380,6 +401,7 @@ class Relation:
     ratio: float
     offset: float = 0.0
     display: Mapping[str, float] = field(default_factory=dict)
+    suppressed: bool = False
 
     def __post_init__(self) -> None:
         for role, path in (("driver", self.driver), ("driven", self.driven)):
@@ -532,6 +554,7 @@ def describe_relation(relation: Relation) -> dict:
             relation.kind, relation.ratio
         ),
         "display": dict(relation.display),
+        "suppressed": relation.suppressed,
     }
 
 
@@ -757,6 +780,14 @@ def evaluate_pose(
     neutral), relations apply in dependency order, then limits — a
     driven value outside its enabled limits is reported in
     ``Pose.limit_violations``, never clamped.
+
+    Object states (persistent, per-element — no cascade): a **suppressed
+    joint** contributes no driven DOF — its DOF are not read from the
+    clip and never appear in ``dof_values`` (they are simply not part of
+    the active solve). A **suppressed relation** is skipped in the
+    dependency pass, so its driven DOF keeps its own neutral. A relation
+    whose driver/driven DOF belongs to a suppressed joint is also skipped
+    (that DOF is not in the active solve), avoiding a dangling reference.
     """
     animated: Mapping[int | str, float] = {}
     if clip_name is not None:
@@ -768,12 +799,31 @@ def evaluate_pose(
             time_seconds = time_seconds % duration_seconds
         animated = evaluate_clip(rig_clip.clip, time_seconds)
 
-    paths = rig.dof_paths()
+    # A suppressed joint's DOF are excluded from the active solve: joint
+    # names carry no '.', so the path prefix before the first '.' is the
+    # joint name.
+    paths = {
+        path: dof
+        for path, dof in rig.dof_paths().items()
+        if not rig.joints[path.split(".", 1)[0]].suppressed
+    }
     dof_values = {
         path: animated.get(path, dof.neutral) for path, dof in paths.items()
     }
+    # Skip a suppressed relation, and one whose driver/driven DOF is not
+    # in the active solve (belongs to a suppressed joint).
+    # ponytail: suppression is strictly per-element — there is no cascade
+    # here (suppressing a joint does not touch its parts, or vice versa).
+    # The UI composes folder-level effects by suppressing each member.
+    active_relations = tuple(
+        relation
+        for relation in rig.relations
+        if not relation.suppressed
+        and relation.driver in dof_values
+        and relation.driven in dof_values
+    )
     violations: list[LimitViolation] = []
-    for relation in relations_in_dependency_order(rig.relations):
+    for relation in relations_in_dependency_order(active_relations):
         driven_value = (
             relation.ratio * dof_values[relation.driver] + relation.offset
         )

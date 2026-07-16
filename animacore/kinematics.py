@@ -348,28 +348,80 @@ def child_in_parent(joint, dof_values) -> Transform:
 # Forward kinematics ----------------------------------------------------------
 
 
+def _is_joint_active(joint, suppressed_parts, grounded_parts) -> bool:
+    """Whether a joint positions its child in the FK walk.
+
+    Inactive when the joint itself is suppressed, when either endpoint
+    part is suppressed (a suppressed part leaves the solve, taking its
+    joints with it), or when the child part is grounded (ground pins the
+    child as a fixed root, overriding any incoming joint).
+
+    ponytail: activity is per-element with no cascade — a suppressed part
+    deactivates only the joints that directly touch it, not a subtree.
+    "Suppress a folder → all vanish" is the UI suppressing each member
+    part, not implicit propagation here.
+    """
+    if joint.suppressed:
+        return False
+    if joint.parent_part in suppressed_parts:
+        return False
+    if joint.child_part in suppressed_parts:
+        return False
+    if joint.child_part in grounded_parts:
+        return False
+    return True
+
+
 def resolve_pose(rig, pose) -> dict[str, Transform]:
     """Forward kinematics over the joint graph: each part's world transform.
 
-    A part that is no joint's ``child_part`` is a ROOT at ``IDENTITY``
-    (parts carry no rest transform). For each joint,
+    A part that is no *active* joint's ``child_part`` is a ROOT at
+    ``IDENTITY`` (parts carry no rest transform). For each active joint,
     ``world[child] = compose(world[parent], child_in_parent(joint, ...))``,
     pulling the joint's DOF values from ``pose.dof_values`` (keyed
     ``"<joint>.<dof>"``). The graph is acyclic (rig-validated);
     parents are resolved before children by repeated passes.
     Deterministic — parts and joints keep their rig order.
+
+    Object states (persistent, per-element — no cascade):
+
+    - A **suppressed part** is excluded from the output entirely, and any
+      joint touching it (as parent or child) is inactive.
+    - A **suppressed joint** is skipped: it does not position its child.
+    - A **grounded part** is a fixed root at ``IDENTITY`` even if a joint
+      feeds into it — ground overrides the incoming joint.
+    - Orphan rule: a non-suppressed part whose only positioning path runs
+      through a suppressed/inactive joint (or a suppressed parent) has no
+      active incoming joint, so it resolves as an identity root (floats to
+      the origin). The UI makes "suppress a folder → everything vanishes"
+      by suppressing the member parts, not by any cascade here.
     """
+    suppressed_parts = {
+        name for name, part in rig.parts.items() if part.suppressed
+    }
+    grounded_parts = {
+        name
+        for name, part in rig.parts.items()
+        if part.grounded and name not in suppressed_parts
+    }
+
     joint_by_child: dict[str, object] = {}
+    active_joints: list[object] = []
     for joint in rig.joints.values():
+        if not _is_joint_active(joint, suppressed_parts, grounded_parts):
+            continue
+        active_joints.append(joint)
         joint_by_child.setdefault(joint.child_part, joint)
 
     world: dict[str, Transform] = {}
     for part_name in rig.parts:
+        if part_name in suppressed_parts:
+            continue
         if part_name not in joint_by_child:
             world[part_name] = IDENTITY
 
     dof_values = pose.dof_values
-    pending = list(rig.joints.values())
+    pending = list(active_joints)
     while pending:
         progressed = False
         still_pending: list[object] = []

@@ -35,6 +35,31 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-16 (Persistent object states — suppress + ground): Suppress an
+  object (part/joint/relation) or ground a part, save, quit, relaunch —
+  it stays that way, because these are now **rig-semantic states in the
+  canonical `.character.anima`**, not app view-state (distinct from
+  `hidden`/`lock`, which stay app-side). **Additive: optional `bool`
+  fields, all default `False`, emitted to the file only when `True`** —
+  existing files/tests byte- and behavior-unchanged. Field shapes:
+  `Part.suppressed` / `Part.grounded`, `Joint.suppressed`,
+  `Relation.suppressed`. **Solve semantics (per-element, no cascade):**
+  `evaluate_pose` drops a suppressed joint's DOF from the active solve
+  and skips a suppressed relation (driven DOF holds its neutral);
+  `resolve_pose` excludes a suppressed part (deactivating its joints),
+  skips a suppressed joint, and pins a grounded part as a fixed identity
+  root that **overrides any incoming joint**; an orphaned non-suppressed
+  part floats to origin. **Codex:** surfaced additively — part entries in
+  the `load_character` summary gain `suppressed`/`grounded`,
+  `describe_mate` + `describe_relation` gain `suppressed`, and
+  `serialize_character`/`rig_from_dict` round-trip all four. Build
+  "suppress a folder → all vanish" by suppressing the member PARTS (no
+  engine cascade — `# ponytail:`). Round-trip proven
+  (suppress→serialize→load stays suppressed). 966 tests (+22), ruff
+  clean, no `app/`/`firmware/` touched. Field shapes + exact FK
+  semantics in the briefing handoff entry. Left uncommitted for
+  main-session integration.
+
 - 2026-07-16 (Per-part asset file reference — portable multi-file
   assemblies): A character is now an ASSEMBLY of rigid parts that each
   record WHICH asset file they use, so a `characters/<name>/` folder is
