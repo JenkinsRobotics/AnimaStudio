@@ -101,6 +101,10 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | Extensions E1: manifest + discovery + output_adapter point + example extension (per Extensions.md) | `anima_studio/extensions.py`, `anima_studio/outputs.py`, `anima_studio/tests/test_extensions.py`, `anima_studio/tests/test_outputs.py`, `examples/extensions/**`, `dev/docs/roadmap/Extensions.md` | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (350 passed) | released 2026-07-15 |
 
+| Claude | Extensions E2 backend: parametric_feature template schema + expansion into standard rig | `anima_studio/features.py`, `anima_studio/extensions.py` (kind enablement only), `anima_studio/tests/test_features.py`, `examples/extensions/parametric-linkage.animaext/**`, `dev/docs/roadmap/Extensions.md` (E2 section) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` | in progress |
+| Claude | Serial wire transport (pyserial) as an OutputAdapter — real-hardware bridge | `anima_studio/serial_transport.py`, `anima_studio/tests/test_serial_transport.py`, `pyproject.toml` (add pyserial), `dev/docs/roadmap/Wire_Protocol.md` (transport note if needed) | `.venv/bin/ruff check .` + `.venv/bin/pytest anima_studio/tests -q` (loop:// URL tests, no hardware) | released 2026-07-15 (20 new tests, 370 suite total at release time; ruff clean; `pip install -e ".[dev]"` re-verified with pyserial) |
+| Codex | Start-screen Recent Projects gallery | `studio/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, `studio/Sources/AnimaStudioUI/AppShell/StudioHomeView.swift`, `studio/Sources/AnimaStudioUI/AppShell/RecentProjects.swift`, `studio/Sources/AnimaStudioUI/Components/RecentProjectCard.swift`, `studio/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, `studio/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/2026-07-14-bottango-parity.md`, `dev/briefings/codex.md` | thumbnail/name/last-opened/revision cards; real recency persistence; honest disabled reopen until P0; empty state; milestone-ready metadata; tests/lint/build/signature/live walkthrough; `git diff --check` | in progress |
+
 ## Requests
 
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
@@ -146,6 +150,55 @@ change needed in the Handoff log instead of inventing commands.
   compositions) so UI wiring can project from one shared mate contract later.
 
 ## Handoff log
+
+- **2026-07-15 (Claude, serial wire transport — the real-hardware
+  bridge):** Shipped `anima_studio/serial_transport.py`:
+  `SerialWireOutput`, the third `OutputAdapter` consumer, drives real
+  boards over pyserial (`pyserial>=3.5` added to `pyproject.toml`;
+  `pip install -e ".[dev]"` re-verified). Constructor: `port` (device
+  path like `/dev/tty.usbmodem*`, or any `serial_for_url` URL —
+  `loop://` for tests), `baudrate=115200`, `handshake_timeout_s=2.0`,
+  `reply_timeout_s=0.5`. `open` = HELLO handshake (ANIMA reply with
+  protocol-version check) then CFG+EN per channel, each OK-checked;
+  `send_frame` = `wire.encode_frm` → write → require OK. **Error
+  semantics:** every failure is typed and names what happened —
+  `HandshakeError` (non-ANIMA or wrong-version reply),
+  `DeviceRejectedError` (carries the device's ERR code + message),
+  `ReplyTimeoutError` (silent device within the read timeout),
+  `ProtocolError` (undecodable bytes, unparseable line, >256-byte
+  garbage without a newline, wrong reply type). No polling/sleeps:
+  pyserial's own read timeouts do all waiting. A reply timeout is the
+  *operator signal*; the device-side failsafe stays the *safety net*
+  (short host-guidance note added to `Wire_Protocol.md` Transport).
+  `stop()` is idempotent, works before open and after close, and
+  swallows dead-port errors into `.last_error` (an e-stop must never
+  raise past the caller); `close()` is explicitly not stop. No
+  reconnect/threading in v1 (`# ponytail:` ceiling noted — lands with
+  Studio live control). Tests
+  (`anima_studio/tests/test_serial_transport.py`, 20 new; suite 370,
+  ruff clean) run host bytes through a REAL pyserial `loop://` port
+  with the reference `SimulatedDevice` answering from inside the
+  loopback — exact-line sequencing asserts, frame motion on the sim
+  clock, ERR code propagation, wrong-version/timeout/garbage paths,
+  stop idempotence incl. post-close, and end-to-end rig
+  `evaluate_pose` → `project_channels` → serial bytes → servo values.
+  **First physical smoke test (Jonathan):** 1) flash: `arduino-cli
+  compile --fqbn arduino:avr:uno firmware/anima_firmware &&
+  arduino-cli upload -p <port> --fqbn arduino:avr:uno
+  firmware/anima_firmware` (ESP32: swap fqbn for `esp32:esp32:esp32`);
+  2) find the port: `ls /dev/tty.usbmodem*` (macOS; the board must be
+  plugged in — pass that path below; Unos reset on port open, so use
+  `handshake_timeout_s=3.0` if the default 2 s handshake times out);
+  3) drive one servo on pin 9 from the repo root:
+  `python3 -c "from anima_studio.serial_transport import
+  SerialWireOutput; from anima_studio.outputs import ChannelConfig;
+  o = SerialWireOutput('/dev/tty.usbmodemXXXX');
+  o.open([ChannelConfig(channel=0, pin=9, min_us=600, max_us=2400)]);
+  o.send_frame({0: 1.0}, duration_ms=1000); import time;
+  time.sleep(1.5); o.stop()"` — the servo sweeps neutral→max over 1 s,
+  then STOP disarms it (and if anything is unplugged mid-run, the
+  2000 ms firmware failsafe disarms it anyway). Not committed per
+  packet instructions.
 
 - **2026-07-15 (Claude, Extensions E1 — manifest + discovery +
   output_adapter point + packaged example):** Shipped per

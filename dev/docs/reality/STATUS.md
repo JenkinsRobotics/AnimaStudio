@@ -286,12 +286,28 @@
   "not yet supported". The packaged
   `examples/extensions/udp-wire-output.animaext/` example streams
   wire lines as UDP datagrams and is tested from its real bundle path.
-  350 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
+  The runtime also ships the real-hardware serial bridge
+  (`anima_studio/serial_transport.py`): `SerialWireOutput` implements
+  the same `OutputAdapter` contract over pyserial (`pyserial>=3.5` is
+  now a package dependency) — `serial_for_url` port opening (device
+  paths like `/dev/tty.usbmodem*` or URLs like `loop://` for tests),
+  HELLO handshake with protocol-version check, CFG+EN per channel,
+  OK-checked FRM streaming, and best-effort idempotent STOP that
+  swallows dead-port errors into `last_error` during an e-stop.
+  Typed errors name what happened (`HandshakeError`,
+  `ReplyTimeoutError`, `ProtocolError`, `DeviceRejectedError` carrying
+  the device's ERR code/message); reply reads use pyserial timeouts
+  only (0.5 s default, 2 s handshake — no polling, no sleeps), and a
+  host-side timeout is the operator signal while the device failsafe
+  stays the safety net. Tested over a real pyserial `loop://` port
+  against the reference `SimulatedDevice` with exact-line assertions
+  (no reconnect/threading yet — that lands with Studio live control).
+  370 Python tests pass with `.venv/bin/pytest anima_studio/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
-  relation coupling → channel projection → simulated servo tests, and
+  relation coupling → channel projection → simulated servo tests,
   rig evaluation → `OutputAdapter.send_frame` → simulated/UDP output
-  tests.
+  tests, and rig evaluation → serial bytes → simulated servo tests.
 - **What's stubbed:** every `*.example` file under `anima_studio/` —
   `module.yaml`, `config.py`, `node.py`, the module-contract test —
   these are the JaegerOS-module shape for later

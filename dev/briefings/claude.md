@@ -33,6 +33,25 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-15 (serial transport, pyserial bridge): Shipped the
+  real-hardware half of the "serial transport + `.scene.anima`" queue
+  item (claim released in the briefing; `.scene.anima` execution still
+  open, so the IN box stays unchecked). `SerialWireOutput`
+  (`anima_studio/serial_transport.py`) is the third `OutputAdapter`
+  consumer: pyserial `serial_for_url` port, HELLO handshake with
+  version check, CFG+EN per channel, OK-checked FRM streaming, typed
+  errors (`HandshakeError`/`ReplyTimeoutError`/`ProtocolError`/
+  `DeviceRejectedError` with the device's ERR code), idempotent
+  best-effort `stop()` that records — never raises — dead-port errors
+  during an e-stop, and `close()` ≠ stop per the adapter contract.
+  `pyserial>=3.5` added to `pyproject.toml` (install re-verified).
+  Tests drive real `loop://` bytes against the reference
+  `SimulatedDevice` (20 new; 370 suite total at release, ruff clean).
+  Wire_Protocol.md gained a short host reply-timeout guidance note.
+  Jonathan: the copy-pasteable first physical smoke test (flash,
+  port discovery, one-servo sweep snippet) is in the briefing handoff
+  entry. Left uncommitted for main-session integration.
+
 - 2026-07-15 (Extensions E1): Shipped the `.animaext` extension system
   per `Extensions.md` — closed-schema manifest parsing with typed
   pathed errors (`anima_studio/extensions.py`), directory discovery +

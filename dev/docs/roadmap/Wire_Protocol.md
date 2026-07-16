@@ -13,6 +13,13 @@ unchanged over TCP for simulators. Fields are comma-separated; no
 spaces. Commands are uppercase. v0 has no checksum — a known gap;
 v1 adds one if line noise shows up in practice.
 
+Host reply handling: every command expects one reply line; hosts set a
+read timeout per reply (the Python reference uses 0.5 s, and 2 s for
+`HELLO` because many boards reset when the port opens) and surface a
+missing/garbled reply as an error to the operator — no silent retry.
+That host error is the operator signal only; the device-side failsafe
+below is the safety net that actually disarms hardware on a dead link.
+
 ## Values
 
 Channel values are normalized floats `0.0..1.0` — the same range as rig
