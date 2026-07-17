@@ -35,6 +35,16 @@ public enum RealityKitModelLoader {
   ]
   public static let modelIOFileExtensions: Set<String> = ["stl", "obj"]
 
+  /// Per-file triangle budget for CAD-selection topology. Above it, the
+  /// model still loads and renders (whole-part selection), but the
+  /// coplanar-face / edge / corner extraction is skipped.
+  // ponytail: that topology allocates redundant per-face triangle geometry
+  // (ImportedMeshFace stores [[SIMD3]]), so it is O(mesh) memory; a dense
+  // CAD assembly (100k+ triangle parts) OOM-kills the app when every part
+  // is processed eagerly on load. The real upgrade is lazy per-part
+  // topology computed on first hover, not on load.
+  public static let maxTopologyTriangles = 40_000
+
   public static func load(
     contentsOf url: URL,
     unitScaleToMeters: Double = 1,
@@ -92,7 +102,12 @@ public enum RealityKitModelLoader {
     }
 
     let topology: ImportedMeshTopology?
-    if importedMeshes.isEmpty {
+    let topologyTriangleCount = importedMeshes.reduce(0) {
+      $0 + $1.topologyGeometry.indices.count / 3
+    }
+    if importedMeshes.isEmpty || topologyTriangleCount > maxTopologyTriangles {
+      // Skip feature-topology on heavy meshes so the model still loads;
+      // whole-part selection remains. See maxTopologyTriangles.
       topology = nil
     } else {
       topology = await ImportedMeshTopologyCache.shared.topology(
