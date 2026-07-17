@@ -23,6 +23,8 @@ struct AnimaCoreClientTests {
     #expect(hello.capabilities.contains("mate_types"))
     #expect(hello.capabilities.contains("relation_types"))
     #expect(hello.capabilities.contains("serialize_character"))
+    #expect(hello.capabilities.contains("forward_kinematics"))
+    #expect(hello.capabilities.contains("solve_ik"))
 
     let mateCatalog = try await client.mateTypes()
     #expect(
@@ -113,6 +115,29 @@ struct AnimaCoreClientTests {
     let assetReloaded = try await client.loadCharacter(text: assetText)
     #expect(assetReloaded.rig.parts.first { $0.name == "base" }?.model == "assets/base.stl")
 
+    let positioned = try AnimaCoreRigDocumentEditor.settingPartTransform(
+      named: "base",
+      positionMeters: [0.125, -0.25, 0.5],
+      rotationEulerRadians: [0.1, -0.2, 0.3],
+      in: loaded.rigDocument
+    )
+    let stateful = try AnimaCoreRigDocumentEditor.settingPartState(
+      named: "base",
+      suppressed: true,
+      grounded: true,
+      in: positioned
+    )
+    let stateText = try await client.serializeCharacter(rig: stateful).text
+    let stateReloaded = try await client.loadCharacter(text: stateText)
+    let persistedBase = try #require(stateReloaded.rig.parts.first { $0.name == "base" })
+    #expect(persistedBase.positionMeters == [0.125, -0.25, 0.5])
+    #expect(
+      zip(persistedBase.rotationEulerRadians, [0.1, -0.2, 0.3])
+        .allSatisfy { abs($0 - $1) < 1e-12 }
+    )
+    #expect(persistedBase.isSuppressed)
+    #expect(persistedBase.isGrounded)
+
     let emptyText = try await client.serializeCharacter(
       rig: AnimaCoreRigDocumentEditor.emptyCharacter(
         name: "new_character",
@@ -148,8 +173,56 @@ struct AnimaCoreClientTests {
     try await client.release(handle: loaded.handle)
     try await client.release(handle: reloaded.handle)
     try await client.release(handle: assetReloaded.handle)
+    try await client.release(handle: stateReloaded.handle)
     try await client.release(handle: emptyReloaded.handle)
     await client.shutdown()
+  }
+
+  @Test
+  func articulatedArmDecodesAndRunsForwardAndInverseKinematics() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    defer { Task { await client.shutdown() } }
+    let text = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "examples/six_axis_arm_dh.character.anima"
+      ),
+      encoding: .utf8
+    )
+
+    let loaded = try await client.loadCharacter(text: text)
+    let chain = try #require(loaded.rig.kinematicChain)
+    #expect(chain.name == "arm")
+    #expect(chain.joints.count == 6)
+    #expect(chain.joints.allSatisfy { $0.jointType == .revolute })
+    #expect(chain.joints[1].neutral == -.pi / 3)
+    #expect(chain.toolPart == "gripper")
+
+    let seed = Dictionary(uniqueKeysWithValues: chain.joints.map { ($0.name, $0.neutral) })
+    let forward = try await client.forwardKinematics(
+      handle: loaded.handle,
+      jointValues: seed
+    )
+    #expect(forward.linkFrames.count == chain.joints.count)
+    #expect(forward.toolPose.position.count == 3)
+    #expect(forward.toolPose.orientation.count == 4)
+
+    let inverse = try await client.solveInverseKinematics(
+      handle: loaded.handle,
+      targetPose: forward.toolPose,
+      seed: seed
+    )
+    #expect(inverse.reached)
+    #expect(inverse.jointValues.keys.sorted() == seed.keys.sorted())
+    #expect(inverse.positionErrorMeters < 0.001)
+    #expect(inverse.orientationErrorRadians < 0.01)
+
+    try await client.release(handle: loaded.handle)
   }
 
   @Test

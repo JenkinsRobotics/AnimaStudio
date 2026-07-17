@@ -43,9 +43,32 @@ struct MouseNavigationSettingsView: View {
   @Binding var panSpeed: PreviewNavigationSpeed
   @Binding var zoomSpeed: PreviewNavigationSpeed
   @Binding var reversesWheelZoom: Bool
+  let showsDismissButton: Bool
 
   @State private var selectedTab = MouseSettingsTab.mouse
   @Environment(\.dismiss) private var dismiss
+
+  init(
+    profile: Binding<PreviewNavigationProfile>,
+    customRotateDrag: Binding<NavigationDragBinding>,
+    customPanDrag: Binding<NavigationDragBinding>,
+    customPreciseZoomDrag: Binding<NavigationDragBinding>,
+    orbitSpeed: Binding<PreviewNavigationSpeed>,
+    panSpeed: Binding<PreviewNavigationSpeed>,
+    zoomSpeed: Binding<PreviewNavigationSpeed>,
+    reversesWheelZoom: Binding<Bool>,
+    showsDismissButton: Bool = true
+  ) {
+    _profile = profile
+    _customRotateDrag = customRotateDrag
+    _customPanDrag = customPanDrag
+    _customPreciseZoomDrag = customPreciseZoomDrag
+    _orbitSpeed = orbitSpeed
+    _panSpeed = panSpeed
+    _zoomSpeed = zoomSpeed
+    _reversesWheelZoom = reversesWheelZoom
+    self.showsDismissButton = showsDismissButton
+  }
 
   private var customMapping: CustomNavigationMapping {
     CustomNavigationMapping(
@@ -100,9 +123,11 @@ struct MouseNavigationSettingsView: View {
             .foregroundStyle(StudioPalette.muted)
         }
         Spacer()
-        Button("Close", systemImage: "xmark") { dismiss() }
-          .labelStyle(.iconOnly)
-          .buttonStyle(StudioIconButtonStyle())
+        if showsDismissButton {
+          Button("Close", systemImage: "xmark") { dismiss() }
+            .labelStyle(.iconOnly)
+            .buttonStyle(StudioIconButtonStyle())
+        }
       }
 
       HStack(spacing: 4) {

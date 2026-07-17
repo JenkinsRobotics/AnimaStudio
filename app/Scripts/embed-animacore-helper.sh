@@ -21,6 +21,7 @@ python_home="$($venv_python -c 'import sys; print(sys.base_prefix)')"
 python_version="$($venv_python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 python_executable="$($venv_python -c 'import pathlib, sys; print(pathlib.Path(sys.executable).resolve())')"
 yaml_package="$($venv_python -c 'import pathlib, yaml; print(pathlib.Path(yaml.__path__[0]).resolve())')"
+numpy_package="$($venv_python -c 'import pathlib, numpy; print(pathlib.Path(numpy.__path__[0]).resolve())')"
 python_dependency="$(otool -L "$python_executable" | awk '/Python.framework.*\/Python/{print $1; exit}')"
 
 if [[ -z "$python_dependency" || ! -f "$python_home/Python" ]]; then
@@ -50,6 +51,10 @@ ln -s "Versions/Current/Headers" "$framework_dir/Headers"
 ditto "$python_executable" "$bundled_python"
 ditto "$repo_root/animacore" "$python_resources/animacore"
 ditto "$yaml_package" "$python_resources/yaml"
+# The DH inverse-kinematics path imports NumPy. Keep it beside the other
+# explicit bridge dependencies so the signed app never reaches into the
+# developer virtual environment at runtime.
+ditto "$numpy_package" "$python_resources/numpy"
 
 install_name_tool \
   -change "$python_dependency" \

@@ -75,7 +75,9 @@ struct InspectorView: View {
         LabeledContent("Missing", value: "0")
       }
     case .rig:
-      EmptyView()
+      if let chain = workspace.engineKinematicChain {
+        ArticulatedArmControlsView(workspace: workspace, chain: chain)
+      }
     case .nodes:
       EmptyView()
     }
@@ -275,6 +277,23 @@ struct InspectorView: View {
         .foregroundStyle(StudioPalette.semanticPart)
     }
 
+    if part.primitiveKind == .box {
+      Section("Geometry") {
+        StudioNumberFieldRow(
+          title: "Fillet Radius",
+          value: partFilletRadiusMillimetersBinding(part.id),
+          unit: "mm",
+          help:
+            "Rounds this generated box proxy for display. Zero keeps mathematically sharp edges."
+        )
+        Text(
+          "Default: 0 mm. This view-only proxy setting saves in editor.json and does not change the AnimaCore solve."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+    }
+
     Section("Position") {
       StudioNumberFieldRow(
         title: "X",
@@ -318,6 +337,17 @@ struct InspectorView: View {
       .font(.caption)
       .foregroundStyle(.secondary)
     }
+  }
+
+  private func partFilletRadiusMillimetersBinding(_ id: PartID) -> Binding<Double> {
+    Binding(
+      get: {
+        (workspace.componentAppearance(for: id)?.proxyFilletRadiusMeters ?? 0) * 1_000
+      },
+      set: { millimeters in
+        workspace.setComponentProxyFilletRadius(id: id, meters: millimeters / 1_000)
+      }
+    )
   }
 
   /// Onshape-style mate type selector. Every mate kind in the family is

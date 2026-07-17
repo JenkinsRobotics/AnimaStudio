@@ -9,5 +9,9 @@ struct AnimaStudioApp: App {
         .frame(minWidth: 1_100, minHeight: 720)
     }
     .windowToolbarStyle(.unified)
+
+    Settings {
+      AnimaStudioSettingsView()
+    }
   }
 }

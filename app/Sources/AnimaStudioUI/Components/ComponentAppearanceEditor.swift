@@ -77,6 +77,11 @@ struct ComponentAppearanceEditor: View {
     }
 
     Section("Body") {
+      Picker("PBR Finish", selection: finishBinding) {
+        ForEach(ViewportMaterialFinish.allCases) { finish in
+          Text(finish.title).tag(finish)
+        }
+      }
       Toggle("Visible", isOn: visibilityBinding)
       VStack(alignment: .leading, spacing: 5) {
         HStack {
@@ -100,8 +105,8 @@ struct ComponentAppearanceEditor: View {
 
     Section("Persistence") {
       Label(
-        "This override is kept for the current Studio session. Project-file persistence arrives with the document layer.",
-        systemImage: "info.circle"
+        "Color, PBR finish, opacity, and visibility save in this character’s editor.json. They never change the AnimaCore solve.",
+        systemImage: "checkmark.seal"
       )
       .font(.caption)
       .foregroundStyle(StudioPalette.muted)
@@ -211,6 +216,17 @@ struct ComponentAppearanceEditor: View {
     )
   }
 
+  private var finishBinding: Binding<ViewportMaterialFinish> {
+    Binding(
+      get: { appearance.finish },
+      set: { finish in
+        var updated = appearance
+        updated.finish = finish
+        workspace.setComponentAppearance(id: part.id, to: updated)
+      }
+    )
+  }
+
   private func channelBinding(
     _ keyPath: WritableKeyPath<PreviewPartAppearance, Double>
   ) -> Binding<Double> {
@@ -237,7 +253,9 @@ struct ComponentAppearanceEditor: View {
       let color = PreviewPartAppearance(
         hexRGB: hex,
         opacity: appearance.opacity,
-        isVisible: appearance.isVisible
+        isVisible: appearance.isVisible,
+        finish: appearance.finish,
+        proxyFilletRadiusMeters: appearance.proxyFilletRadiusMeters
       )
     else { return }
     workspace.setComponentAppearance(id: part.id, to: color)
@@ -293,7 +311,9 @@ private struct ComponentHexColorField: View {
       let updated = PreviewPartAppearance(
         hexRGB: draft,
         opacity: appearance.opacity,
-        isVisible: appearance.isVisible
+        isVisible: appearance.isVisible,
+        finish: appearance.finish,
+        proxyFilletRadiusMeters: appearance.proxyFilletRadiusMeters
       )
     else {
       draft = appearance.hexRGB

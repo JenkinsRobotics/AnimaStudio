@@ -1,6 +1,7 @@
 import Foundation
 import ModelIO
 import RealityKit
+import simd
 
 public enum RealityKitModelLoadingError: Error, Equatable, Sendable {
   case unsupportedFileType(String)
@@ -39,24 +40,71 @@ public enum RealityKitModelLoader {
     unitScaleToMeters: Double = 1,
     modelNode: String? = nil
   ) async throws -> Entity {
+    try await loadWithTopology(
+      contentsOf: url,
+      unitScaleToMeters: unitScaleToMeters,
+      modelNode: modelNode
+    ).entity
+  }
+
+  public static func loadWithTopology(
+    contentsOf url: URL,
+    unitScaleToMeters: Double = 1,
+    modelNode: String? = nil
+  ) async throws -> LoadedRealityKitModel {
     let fileExtension = url.pathExtension.lowercased()
     let root: Entity
+    let importedMeshes: [ImportedMesh]
     if nativeFileExtensions.contains(fileExtension) {
       root = try await Entity(contentsOf: url)
+      importedMeshes =
+        (try? await Task.detached(priority: .userInitiated) {
+          try ModelIOImporter.load(
+            url: url,
+            unitScaleToMeters: unitScaleToMeters,
+            modelNode: modelNode
+          )
+        }.value) ?? []
     } else if modelIOFileExtensions.contains(fileExtension) {
-      let meshes = try await Task.detached(priority: .userInitiated) {
-        try ModelIOImporter.load(url: url, unitScaleToMeters: unitScaleToMeters)
+      importedMeshes = try await Task.detached(priority: .userInitiated) {
+        try ModelIOImporter.load(
+          url: url,
+          unitScaleToMeters: unitScaleToMeters,
+          modelNode: modelNode
+        )
       }.value
-      root = try makeEntity(from: meshes, name: url.deletingPathExtension().lastPathComponent)
+      root = try makeEntity(
+        from: importedMeshes,
+        name: url.deletingPathExtension().lastPathComponent
+      )
     } else {
       throw RealityKitModelLoadingError.unsupportedFileType(fileExtension)
     }
 
-    guard let modelNode, !modelNode.isEmpty else { return root }
-    guard let selected = entity(at: modelNode, in: root) else {
-      throw RealityKitModelLoadingError.modelNodeNotFound(modelNode)
+    let selectedRoot: Entity
+    if let modelNode, !modelNode.isEmpty {
+      guard let selected = entity(at: modelNode, in: root) else {
+        throw RealityKitModelLoadingError.modelNodeNotFound(modelNode)
+      }
+      selectedRoot = selected.clone(recursive: true)
+    } else {
+      selectedRoot = root
     }
-    return selected.clone(recursive: true)
+
+    let topology: ImportedMeshTopology?
+    if importedMeshes.isEmpty {
+      topology = nil
+    } else {
+      topology = await ImportedMeshTopologyCache.shared.topology(
+        key: topologyCacheKey(
+          url: url,
+          unitScaleToMeters: unitScaleToMeters,
+          modelNode: modelNode
+        ),
+        geometries: importedMeshes.map(\.topologyGeometry)
+      )
+    }
+    return LoadedRealityKitModel(entity: selectedRoot, topology: topology)
   }
 
   private static func makeEntity(from meshes: [ImportedMesh], name: String) throws -> Entity {
@@ -95,24 +143,68 @@ public enum RealityKitModelLoader {
     }
     return current
   }
+
+  private static func topologyCacheKey(
+    url: URL,
+    unitScaleToMeters: Double,
+    modelNode: String?
+  ) -> String {
+    let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+    let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+    let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+    return
+      "\(url.standardizedFileURL.path)|\(modified)|\(size)|\(unitScaleToMeters)|\(modelNode ?? "")"
+  }
 }
 
-private struct ImportedMesh: Sendable {
+@MainActor
+public struct LoadedRealityKitModel {
+  public let entity: Entity
+  public let topology: ImportedMeshTopology?
+
+  public init(entity: Entity, topology: ImportedMeshTopology?) {
+    self.entity = entity
+    self.topology = topology
+  }
+}
+
+struct ImportedMesh: Sendable {
   let name: String
   let positions: [SIMD3<Float>]
   let normals: [SIMD3<Float>]
   let textureCoordinates: [SIMD2<Float>]
   let indices: [UInt32]
+
+  var topologyGeometry: ImportedMeshGeometry {
+    ImportedMeshGeometry(name: name, positions: positions, indices: indices)
+  }
 }
 
-private enum ModelIOImporter {
-  static func load(url: URL, unitScaleToMeters: Double) throws -> [ImportedMesh] {
+enum ModelIOImporter {
+  static func load(
+    url: URL,
+    unitScaleToMeters: Double,
+    modelNode: String? = nil
+  ) throws -> [ImportedMesh] {
     let asset = MDLAsset(url: url)
     asset.loadTextures()
-    let meshes = asset.childObjects(of: MDLMesh.self).compactMap { $0 as? MDLMesh }
+    let allMeshes = asset.childObjects(of: MDLMesh.self).compactMap { $0 as? MDLMesh }
+    let selectedObject = selectedObject(in: asset, modelNode: modelNode)
+    let meshes = allMeshes.filter { mesh in
+      guard let selectedObject else { return true }
+      return isDescendant(mesh, of: selectedObject)
+    }
     guard !meshes.isEmpty else {
+      if let modelNode, !modelNode.isEmpty {
+        throw RealityKitModelLoadingError.modelNodeNotFound(modelNode)
+      }
       throw RealityKitModelLoadingError.emptyAsset(url.lastPathComponent)
     }
+    let selectedGlobal =
+      selectedObject.map {
+        MDLTransform.globalTransform(with: $0, atTime: 0)
+      } ?? matrix_identity_float4x4
+    let inverseSelectedGlobal = simd_inverse(selectedGlobal)
     return try meshes.enumerated().map { index, mesh in
       let name = mesh.name.isEmpty ? "Mesh \(index + 1)" : mesh.name
       if mesh.vertexAttributeData(forAttributeNamed: MDLVertexAttributeNormal) == nil {
@@ -129,9 +221,14 @@ private enum ModelIOImporter {
       else {
         throw RealityKitModelLoadingError.missingPositions(name)
       }
+      let meshGlobal = MDLTransform.globalTransform(with: mesh, atTime: 0)
+      let relativeTransform = inverseSelectedGlobal * meshGlobal
       let scale = Float(unitScaleToMeters)
-      let scaledPositions = positions.map { $0 * scale }
-      let normals =
+      let scaledPositions = positions.map { position in
+        let transformed = relativeTransform * SIMD4<Float>(position, 1)
+        return SIMD3<Float>(transformed.x, transformed.y, transformed.z) * scale
+      }
+      let sourceNormals =
         vectors3(
           mesh.vertexAttributeData(
             forAttributeNamed: MDLVertexAttributeNormal,
@@ -139,6 +236,24 @@ private enum ModelIOImporter {
           ),
           count: mesh.vertexCount
         ) ?? []
+      let linearTransform = simd_float3x3(
+        columns: (
+          SIMD3(
+            relativeTransform.columns.0.x, relativeTransform.columns.0.y,
+            relativeTransform.columns.0.z),
+          SIMD3(
+            relativeTransform.columns.1.x, relativeTransform.columns.1.y,
+            relativeTransform.columns.1.z),
+          SIMD3(
+            relativeTransform.columns.2.x, relativeTransform.columns.2.y,
+            relativeTransform.columns.2.z)
+        ))
+      let normalTransform = simd_transpose(simd_inverse(linearTransform))
+      let normals = sourceNormals.map { normal in
+        let transformed = normalTransform * normal
+        let length = simd_length(transformed)
+        return length > 0.000_001 ? transformed / length : normal
+      }
       let textureCoordinates =
         vectors2(
           mesh.vertexAttributeData(
@@ -159,6 +274,32 @@ private enum ModelIOImporter {
         indices: indices
       )
     }
+  }
+
+  private static func selectedObject(
+    in asset: MDLAsset,
+    modelNode: String?
+  ) -> MDLObject? {
+    guard let modelNode, !modelNode.isEmpty else { return nil }
+    let requested = normalizedPath(modelNode)
+    let objects = asset.childObjects(of: MDLObject.self)
+    return objects.first { object in
+      let candidate = normalizedPath(object.path)
+      return candidate == requested || candidate.hasSuffix("/\(requested)")
+    }
+  }
+
+  private static func isDescendant(_ object: MDLObject, of ancestor: MDLObject) -> Bool {
+    var current: MDLObject? = object
+    while let candidate = current {
+      if candidate === ancestor { return true }
+      current = candidate.parent
+    }
+    return false
+  }
+
+  private static func normalizedPath(_ path: String) -> String {
+    path.split(separator: "/").map(String.init).joined(separator: "/")
   }
 
   private static func vectors3(

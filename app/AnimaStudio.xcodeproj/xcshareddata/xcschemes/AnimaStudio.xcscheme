@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "32EBEA9A69628C6A5BE67AA2"
+               BlueprintIdentifier = "A66B5A3E2945923DEF6B2B47"
                BuildableName = "Anima Studio.app"
-               BlueprintName = "AnimaStudio"
+               BlueprintName = "Anima Studio"
                ReferencedContainer = "container:AnimaStudio.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -47,9 +47,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "32EBEA9A69628C6A5BE67AA2"
+            BlueprintIdentifier = "A66B5A3E2945923DEF6B2B47"
             BuildableName = "Anima Studio.app"
-            BlueprintName = "AnimaStudio"
+            BlueprintName = "Anima Studio"
             ReferencedContainer = "container:AnimaStudio.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -83,9 +83,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "32EBEA9A69628C6A5BE67AA2"
+            BlueprintIdentifier = "A66B5A3E2945923DEF6B2B47"
             BuildableName = "Anima Studio.app"
-            BlueprintName = "AnimaStudio"
+            BlueprintName = "Anima Studio"
             ReferencedContainer = "container:AnimaStudio.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -102,9 +102,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "32EBEA9A69628C6A5BE67AA2"
+            BlueprintIdentifier = "A66B5A3E2945923DEF6B2B47"
             BuildableName = "Anima Studio.app"
-            BlueprintName = "AnimaStudio"
+            BlueprintName = "Anima Studio"
             ReferencedContainer = "container:AnimaStudio.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

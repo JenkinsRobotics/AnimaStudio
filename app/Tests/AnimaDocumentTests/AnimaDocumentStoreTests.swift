@@ -282,19 +282,91 @@ final class AnimaDocumentStoreTests: XCTestCase {
     XCTAssertNoThrow(try store.save(saved, to: url))
   }
 
-  func testCharacterEditorMetadataRoundTripsUnitlessModelScale() throws {
+  func testCharacterEditorMetadataRoundTripsAppearanceAndTreeState() throws {
+    let groupID = UUID(uuidString: "AD000000-0000-4000-8000-000000000001")!
     let metadata = CharacterEditorMetadata(
       modelImports: [
         "assets/head.stl": ModelImportMetadata(
           unitName: "millimeters",
           unitScaleToMeters: 0.001
         )
-      ]
+      ],
+      partAssetVersions: ["head": 3],
+      partAppearances: [
+        "head": CharacterPartAppearanceMetadata(
+          red: 0.2,
+          green: 0.4,
+          blue: 0.8,
+          opacity: 0.75,
+          isVisible: false,
+          finish: "metallic",
+          proxyFilletRadiusMeters: 0.012,
+          renderSettings: ["tessellation_quality": "high"]
+        )
+      ],
+      tree: CharacterTreeMetadata(
+        groups: [
+          CharacterTreeGroupMetadata(
+            id: groupID,
+            displayName: "Head Assembly",
+            partNames: ["head"],
+            isLocked: true
+          )
+        ],
+        lockedPartNames: ["head"],
+        lockedMateIDs: ["Revolute 1"],
+        expandedNodeKeys: ["group:\(groupID.uuidString)"],
+        partOrder: ["base", "head"],
+        mateOrder: ["Revolute 1"]
+      ),
+      viewport: CharacterViewportMetadata(
+        backgroundMode: "gradient",
+        appearancePreset: "blueprint",
+        primaryColor: .init(red: 0.1, green: 0.2, blue: 0.3),
+        secondaryColor: .init(red: 0.4, green: 0.5, blue: 0.6),
+        sectionEnabled: true,
+        sectionAxis: "z",
+        sectionPositionMeters: 0.125,
+        namedViews: [
+          CharacterNamedViewMetadata(
+            name: "Hero",
+            projection: "perspective",
+            direction: [0, 0, 1],
+            rollRadians: 0,
+            target: [0, 0.8, 0],
+            distance: 4.5,
+            orthographicScale: 2.8
+          )
+        ]
+      )
     )
 
     let decoded = try CharacterEditorMetadata.decode(metadata.encodedData())
 
     XCTAssertEqual(decoded, metadata)
+    XCTAssertEqual(decoded.formatVersion, "5")
+    XCTAssertEqual(decoded.partAssetVersions["head"], 3)
+    XCTAssertEqual(decoded.partAppearances["head"]?.proxyFilletRadiusMeters, 0.012)
+  }
+
+  func testLegacyAppearanceMetadataDefaultsProxyFilletToSharp() throws {
+    let legacy = Data(
+      """
+      {
+        "red": 0.2,
+        "green": 0.4,
+        "blue": 0.8,
+        "opacity": 1,
+        "visible": true,
+        "finish": "satin",
+        "render_settings": {}
+      }
+      """.utf8
+    )
+
+    let decoded = try JSONDecoder().decode(CharacterPartAppearanceMetadata.self, from: legacy)
+
+    XCTAssertEqual(decoded.proxyFilletRadiusMeters, 0)
   }
 
   func testLinkedAssetBookmarkRoundTrips() throws {

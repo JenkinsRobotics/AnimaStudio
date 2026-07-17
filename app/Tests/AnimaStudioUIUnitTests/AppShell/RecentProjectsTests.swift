@@ -20,26 +20,31 @@ final class RecentProjectsTests: XCTestCase {
     XCTAssertEqual(summary.milestoneName, "First motion")
   }
 
-  func testRecordOpenedMovesExistingProjectToTheFrontWithoutDuplicatingIt() {
+  func testRecordOpenedMovesExistingProjectToTheFrontWithoutDuplicatingIt() throws {
     let defaults = isolatedDefaults()
     let id = UUID()
+    let robotURL = try temporaryProjectDirectory(named: "Robot")
+    let stageURL = try temporaryProjectDirectory(named: "Stage")
     let earlier = RecentProjectSummary(
       id: id,
       displayName: "Robot",
       lastOpenedAt: Date(timeIntervalSince1970: 100),
-      revisionNumber: 3
+      revisionNumber: 3,
+      projectPath: robotURL.path
     )
     let other = RecentProjectSummary(
       displayName: "Stage",
       lastOpenedAt: Date(timeIntervalSince1970: 200),
       revisionNumber: 7,
-      thumbnailKind: .show
+      thumbnailKind: .show,
+      projectPath: stageURL.path
     )
     let reopened = RecentProjectSummary(
       id: id,
       displayName: "Robot",
       lastOpenedAt: Date(timeIntervalSince1970: 300),
-      revisionNumber: 4
+      revisionNumber: 4,
+      projectPath: robotURL.path
     )
 
     let result = RecentProjectsPersistence.recordOpened(
@@ -54,6 +59,7 @@ final class RecentProjectsTests: XCTestCase {
 
   func testPersistenceRoundTripsMilestoneAndThumbnailMetadata() throws {
     let defaults = isolatedDefaults()
+    let projectURL = try temporaryProjectDirectory(named: "Walker")
     let project = RecentProjectSummary(
       displayName: "Walker",
       lastOpenedAt: Date(timeIntervalSince1970: 500),
@@ -61,7 +67,7 @@ final class RecentProjectsTests: XCTestCase {
       milestoneName: "Stable gait",
       thumbnailKind: .character,
       thumbnailPath: "/tmp/walker-preview.png",
-      projectPath: "/tmp/Walker",
+      projectPath: projectURL.path,
       bookmarkData: Data([1, 2, 3])
     )
 
@@ -93,10 +99,12 @@ final class RecentProjectsTests: XCTestCase {
   func testPersistenceKeepsOnlyTheTwelveMostRecentValidProjects() {
     let defaults = isolatedDefaults()
     let projects = (0..<15).map { index in
-      RecentProjectSummary(
+      let projectURL = try! temporaryProjectDirectory(named: "Project-\(index)")
+      return RecentProjectSummary(
         displayName: "Project \(index)",
         lastOpenedAt: Date(timeIntervalSince1970: Double(index)),
-        revisionNumber: index + 1
+        revisionNumber: index + 1,
+        projectPath: projectURL.path
       )
     }
 
@@ -108,6 +116,57 @@ final class RecentProjectsTests: XCTestCase {
     XCTAssertEqual(loaded.last?.displayName, "Project 3")
   }
 
+  func testRemoveForgetsOnlyTheRecentEntryAndLeavesProjectFolderOnDisk() throws {
+    let defaults = isolatedDefaults()
+    let removedURL = try temporaryProjectDirectory(named: "Keep-On-Disk")
+    let retainedURL = try temporaryProjectDirectory(named: "Retained")
+    let removed = RecentProjectSummary(
+      displayName: "Forget Me",
+      lastOpenedAt: Date(timeIntervalSince1970: 200),
+      revisionNumber: 2,
+      projectPath: removedURL.path
+    )
+    let retained = RecentProjectSummary(
+      displayName: "Keep Me",
+      lastOpenedAt: Date(timeIntervalSince1970: 100),
+      revisionNumber: 1,
+      projectPath: retainedURL.path
+    )
+    RecentProjectsPersistence.save([removed, retained], to: defaults)
+
+    let updated = RecentProjectsPersistence.remove(id: removed.id, from: defaults)
+
+    XCTAssertEqual(updated.map(\.id), [retained.id])
+    XCTAssertEqual(RecentProjectsPersistence.load(from: defaults).map(\.id), [retained.id])
+    XCTAssertTrue(FileManager.default.fileExists(atPath: removedURL.path))
+  }
+
+  func testLoadPrunesMissingProjectsAndPersistsTheCleanedList() throws {
+    let defaults = isolatedDefaults()
+    let existingURL = try temporaryProjectDirectory(named: "Existing")
+    let missingURL = existingURL.deletingLastPathComponent()
+      .appendingPathComponent("Missing-\(UUID().uuidString)", isDirectory: true)
+    let existing = RecentProjectSummary(
+      displayName: "Existing",
+      lastOpenedAt: Date(timeIntervalSince1970: 100),
+      revisionNumber: 1,
+      projectPath: existingURL.path
+    )
+    let missing = RecentProjectSummary(
+      displayName: "Missing",
+      lastOpenedAt: Date(timeIntervalSince1970: 200),
+      revisionNumber: 1,
+      projectPath: missingURL.path
+    )
+    RecentProjectsPersistence.save([missing, existing], to: defaults)
+
+    XCTAssertEqual(RecentProjectsPersistence.load(from: defaults).map(\.id), [existing.id])
+
+    let storedData = try XCTUnwrap(defaults.data(forKey: RecentProjectsPersistence.storageKey))
+    let stored = try JSONDecoder().decode([RecentProjectSummary].self, from: storedData)
+    XCTAssertEqual(stored.map(\.id), [existing.id])
+  }
+
   private func isolatedDefaults() -> UserDefaults {
     let suiteName = "RecentProjectsTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -116,5 +175,16 @@ final class RecentProjectsTests: XCTestCase {
       UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
     }
     return defaults
+  }
+
+  private func temporaryProjectDirectory(named name: String) throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("AnimaStudio-RecentProjectsTests-\(UUID().uuidString)")
+      .appendingPathComponent(name, isDirectory: true)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    addTeardownBlock {
+      try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+    return url
   }
 }

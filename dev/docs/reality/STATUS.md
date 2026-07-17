@@ -54,14 +54,26 @@
   and optional milestone metadata. Records are recency-sorted, deduplicated,
   capped at twelve, and stored as versioned user-local metadata. Cards load a
   cached render path when one exists and otherwise show an honest project-type
-  preview. Records carry the real project-folder path plus a security-scoped
-  bookmark; clicking a card reopens the folder, reads its manifest, and loads
-  its active character through AnimaCore. A standard macOS **Settings** scene
-  is available from the app menu and Command-comma. Its Workspace tab owns the
-  single default project root (`~/Documents/Anima Studio/` initially), supports
+  preview. Hovering a card reveals a top-right remove control, and the same
+  forget-only action is available from **Remove from Recents** in its context
+  menu; neither path touches the project folder. Recents are pruned on load
+  when neither their security-scoped bookmark nor fallback path resolves to an
+  existing directory, and a missing project discovered on click disappears
+  immediately as well. Records carry the real project-folder path plus a
+  security-scoped bookmark; clicking a card reopens the folder, reads its
+  manifest, and loads its active character through AnimaCore. A standard macOS
+  **Settings** scene is available from the app menu and Command-comma. Its Workspace tab owns the
+  single default project root (`~/Documents/AnimaStudio/` initially), supports
   choosing/revealing/restoring the folder, and persists custom roots with an
   app-scoped security bookmark. New Project, Open Project, and Save As all
-  resolve this same preference and lazily create the root. Navigation embeds
+  create this exact root before configuring their native panels, so first run
+  cannot silently fall back to the Documents parent. Because macOS App Sandbox
+  does not provide a static Documents entitlement, first use presents a focused
+  folder picker: the operator selects Documents once, Studio creates
+  `AnimaStudio`, stores its security-scoped bookmark, and opens the project
+  panel there. Later launches go straight to that root. Stored references to
+  the old spaced default migrate to `AnimaStudio`, while real custom roots
+  remain unchanged. Navigation embeds
   the existing CAD mouse profile, bindings, response, and reverse-wheel
   controls rather than presenting a separate sheet; Appearance exposes the
   existing viewport theme/render/lighting/material/reflection preferences. A
@@ -79,13 +91,34 @@
   validates and serializes the zero-part canonical character; Swift never
   hand-formats its YAML. The new character then enters an in-app 3D loading
   stage with file drop/picker controls, progress, and inline errors. The
+  Assets workspace now uses the same three-column grammar as the other
+  authoring workspaces: a persistent shared-`TreeView` project/character tree
+  on the left, one context-sensitive collection surface in the center, and a
+  compact import tool plus live RealityKit selection preview on the right.
+  The tree does not invent a parallel catalog: Parts, mates/relations/groups,
+  clips, and scene scripts project the retained engine/project data, while
+  material/appearance rows project the active character's `editor.json`.
+  Source assets are scoped to the active character. Every center collection
+  now uses the same Table/Grid component: Table is the default, collection-
+  appropriate headers remain visible at zero rows, filtering is shared, and
+  empty bodies consistently say **No … yet** without duplicating actions. Grid
+  is an operator-selectable alternate view. The Parts table is selectable and
+  shows source, parent, engine state, and a deliberately simple app-side asset
+  version: initial import is V1 and a successful re-upload of that part through
+  the one-file **Replace Part** action increments the integer in `editor.json`;
+  no PDM/history system is implied. The collection surface is pinned to the top
+  and fills the center column. The right Preview always remains a live 3D
+  viewport, even before geometry is selected or imported. A separate user-level Parts Library branch is visibly scaffolded
+  for future cross-project reuse and is not stored in `.character.anima`.
+  The
   workspace-model initializer accepts an alternate startup
   workspace so a future operator preference can choose it without changing
   workspace semantics. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
   proxy components with their local origin at the workspace origin, then
   creates a Revolute Mate through an explicit two-step placement flow. Orange,
-  hover-reactive connector markers expose proxy face centers, edge midpoints,
+  hover-reactive connector markers appear only while the mate-placement tool is
+  active and expose proxy face centers, edge midpoints,
   corners, cylinder axes/circular centers, sphere cardinal points, and component
   origins. The first selection is the moving component; the second is fixed.
   The transitional local Revolute draft stores both connector frames but no
@@ -321,22 +354,38 @@
   view cube driven by the same camera state as RealityKit. It mirrors manual
   orbit/pan/zoom changes; its faces, edges, and corners select principal,
   two-axis, and trimetric views, while its surrounding arrows rotate the view
-  in 15-degree steps. A dedicated camera/render menu provides
+  in 15-degree steps. When a principal face is head-on, curved corner controls
+  roll the real camera and cube together by 90 degrees clockwise or
+  counterclockwise. A dedicated camera/render menu provides
   perspective/orthographic projection, 30–90° perspective field-of-view
   presets and selection framing. The lower camera toolbar now contains Home,
   Display, and Help; Front, Right, and Top shortcuts are omitted because the
   view cube owns principal, edge, and corner navigation. Display independently
-  controls Shaded/Wireframe/Translucent surfaces, mesh-edge visibility, grid,
-  viewport appearance, and Balanced/Soft/Bright/High Contrast RealityKit
-  lighting rigs. Shaded proxies use physically based materials with
-  Matte/Satin/Glossy/Metallic finishes; Subtle/Studio reflection modes use a
-  generated softbox image-based-light environment, and directional shadow
-  casting can be toggled directly. These settings persist as user-local presentation preferences
-  and do not alter project data. Cube face names behave as fixed-size decals at
-  their face centers, using one face-local orientation without readability flip
-  correction, clipping, or scaling; its XYZ triad shares one origin and follows
-  only the positive axis directions, and hovering previews the exact clickable
-  face, edge, or corner. The viewport also provides trackpad pan/pinch and
+  controls Shaded, Shaded with Edges, Wireframe, Unshaded, and Translucent
+  surfaces, mesh-edge visibility, grid, viewport appearance, and
+  Balanced/Soft/Bright/High Contrast RealityKit lighting rigs. Shaded proxies
+  use physically based materials with Matte/Satin/Glossy/Metallic finishes;
+  Subtle/Studio reflection modes now use selectable Neutral Softbox, Cool Rim,
+  or Warm Stage generated image-based-light environments with live intensity
+  and rotation. Directional shadows remain independently switchable. The
+  environment panel retains Midnight/Graphite/CAD Light/Blueprint quick picks
+  and adds project-persistent solid and two-color gradient backgrounds. A real
+  section view converts render materials to a bundled RealityKit clip-plane
+  shader and exposes X/Y/Z selection, numeric/slider position, and a colored
+  draggable viewport handle; it intentionally does not yet cap or hatch the
+  cut surface. Named camera views save/restore orientation, target, distance,
+  and projection in character editor metadata, while Previous View swaps with
+  the last completed camera interaction. High-quality rendering enables real
+  4x MSAA. Lighting/environment/render-quality choices persist as user-local
+  preferences; backgrounds, section state, and named views live in
+  `<character>.editor.json`; none enter `.character.anima`. Cube face names are
+  affine-projected decals:
+  each label is centered in and foreshortens with its projected face quad,
+  receives a readability correction rather than becoming mirrored or
+  upside-down, and disappears when the face becomes an edge-on sliver. Its XYZ
+  triad shares one origin, follows only the positive axis directions, and rolls
+  with the same camera orientation; hovering previews the exact clickable face,
+  edge, or corner. The viewport also provides trackpad pan/pinch and
   persistent Default, SolidWorks, Onshape, Fusion 360, and Custom mouse
   profiles. Default now intentionally mirrors SolidWorks: middle drag orbits,
   Option + middle drag pans, and Shift + middle drag performs precise zoom.
@@ -369,9 +418,20 @@
   rings at its origin; dragging them edits the core-backed rest transform, and
   connector-authored mate rotation composes through parent/child chains. During
   pointer inspection, semantic proxy bodies and imported model surfaces use a
-  cyan preselection glow before left-click commit. Selected proxy components
-  continue to expose quiet face-center, edge-midpoint, corner, axis, and origin
-  markers whose own hover effect previews the exact inferred feature target.
+  cyan preselection glow before left-click commit. Imported STL, OBJ, and
+  ModelIO-readable USD geometry now receives a cached topology projection at
+  import/reimport time: duplicate mesh vertices are welded, connected coplanar
+  triangles become selectable face islands, boundary/sharp-normal edges become
+  selectable polylines, and vertices where at least three feature edges meet
+  become selectable corners. A hovered face gets a translucent cyan surface
+  overlay; an edge or corner gets a crisp cyan overlay with zoom-adjusted pick
+  thickness; committed features turn stronger orange while the owning body and
+  navigator row stay selected. These mesh features use the same
+  `MateConnectorCandidate` contract as proxy candidates, so selection,
+  inspection, staged Escape, and two-click mate placement do not fork into a
+  second state model. Normal proxy selection no longer draws face-center,
+  edge-midpoint, corner, axis, or origin dots over the body; those candidate
+  points are placement aids rather than permanent model decoration.
   During any inspectable selection, Studio now restores the right-side Inspector if
   the operator had hidden it. A selected semantic proxy component exposes
   **Properties** and **Appearance** tabs. Appearance provides a 40-color
@@ -382,6 +442,11 @@
   immediately; locked components reject these edits. Overrides persist by
   engine part name in the active character's app-owned
   `<character>.editor.json`, never in renderer-independent `.character.anima`.
+  Generated box proxies now default to a mathematically sharp `0 mm` corner
+  radius instead of the former hard-coded 35 mm rounding. Their Properties
+  inspector exposes an explicit Fillet Radius field in millimetres; the
+  clamped view-only value saves beside appearance in editor JSON, reloads
+  without changing the engine solve, and legacy metadata defaults to `0 mm`.
   A selected
   semantic component also has a Studio-owned, CAD-ordered viewport context menu. It
   identifies the body and groups property editing, attached-mate navigation,
@@ -422,8 +487,9 @@
   semantic Components and Mates remain separate editable-role rows in teal and
   purple. Component disclosure groups support contextual rename, move up/down,
   move-to-group, dissolve, and lock/unlock; Mates support contextual rename,
-  reorder, and lock/unlock. Component-row edges now show insertion lines for
-  before/after placement; the center shows a bordered **+ Group** target and
+  reorder, and lock/unlock. Every component row is now a full-width drag and
+  drop target. Its upper/lower zones show a raised, animated insertion line for
+  before/after placement; the center shows a bordered **+ Create Group** target and
   creates an expanded folder containing the target plus the dragged active
   multi-selection. Existing folders accept the dragged selection, while the
   Components heading returns it to top level. Groups and Mates show peer
@@ -752,8 +818,19 @@
   assembly) so the app knows the rig is an arm and can drive it, and
   `rig_from_dict` reconstructs it for `serialize_character`. Example:
   `examples/six_axis_arm_dh.character.anima` (UR5-style 6R, alongside the
-  mate-based `six_axis_arm.character.anima`). Analytic per-geometry IK (DH4)
-  is a later packet.
+  mate-based `six_axis_arm.character.anima`). The Swift app now consumes that
+  contract directly: a non-null chain adds a docked Articulated Arm inspector
+  with one limit-bounded joint jog per axis (degrees/mm are display conversions
+  only), calls `forward_kinematics` for every jog, and applies the returned
+  character-space link/tool frames in RealityKit. A cyan XYZ/rotation target
+  sits at the end effector; dragging it calls `solve_ik` with the current joint
+  pose as seed, updates every joint and link on success, and stays orange at the
+  requested pose with metre/radian residuals on honest non-convergence. No DH
+  or IK math exists in Swift. The root app bundle also carries NumPy beside the
+  explicit AnimaCore/PyYAML resources, so the signed helper has no virtual-env
+  dependency. Live Swift bridge and workspace tests load the 6R example and
+  prove decode → FK → IK → RealityKit-frame projection; 240 XCTest + 20 Swift
+  Testing tests pass. Analytic per-geometry IK (DH4) is a later packet.
   1043 Python tests pass with `.venv/bin/pytest animacore/tests -q` (lint:
   `.venv/bin/ruff check .`), including end-to-end clip → FRM stream →
   simulated servo → failsafe, character file → rig evaluation →
@@ -776,14 +853,15 @@
   Automatic imported-hole centers require durable mesh/topology references;
   current hole-like snapping is available on cylinder proxy axes and circular
   face centers. The shipped part transform gizmo edits semantic-part rest
-  transforms outside mate placement. Sub-object selection covers the inferred
-  proxy feature candidates (face centers, edge midpoints, corners, axes,
-  origins); imported-mesh face selection still
-  needs triangle identity through reimport, and full edge-curve selection still needs
-  topology/adjacency plus screen-space proximity. Transform gizmos are currently
+  transforms outside mate placement. Sub-object selection covers inferred proxy
+  candidates and cached imported-mesh face islands, feature-edge polylines, and
+  3+-edge corners. Imported feature IDs are deterministic for unchanged
+  topology, but durable identity remapping after a topology-changing reimport
+  remains open; this is a mesh projection rather than a CAD-kernel B-rep, so
+  analytic holes/cylinders and tangent curves are not inferred. Transform gizmos are currently
   world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display
-  triangle mesh lines, not classified CAD feature edges; hidden-line removal,
-  section views, camera roll, and saved named views are not implemented. Typed
+  triangle mesh lines, not classified CAD feature edges; hidden-line removal
+  remains unimplemented. Section views and saved named views are now live. Typed
   prismatic/cylindrical/ball/planar/fastened joints and keyframes are not yet
   editable in the canonical rig DTO. Project folders and imported canonical
   characters persist. Rest-transform, suppress, and ground edits are projected

@@ -82,9 +82,34 @@ public struct PreviewCameraDirection: Equatable, Sendable {
 
 public struct PreviewCameraOrientation: Equatable, Sendable {
   public var direction: PreviewCameraDirection
+  /// Camera-local screen-axis roll in radians around the forward view axis.
+  public var rollRadians: Float
 
-  public init(direction: PreviewCameraDirection = .home) {
+  public init(
+    direction: PreviewCameraDirection = .home,
+    rollRadians: Float = 0
+  ) {
     self.direction = direction
+    self.rollRadians = Self.normalizedRoll(rollRadians)
+  }
+
+  public func rolled(by radians: Float) -> Self {
+    Self(
+      direction: direction,
+      rollRadians: rollRadians + radians
+    )
+  }
+
+  private static func normalizedRoll(_ radians: Float) -> Float {
+    guard radians.isFinite else { return 0 }
+    let fullTurn = Float.pi * 2
+    var normalized = radians.truncatingRemainder(dividingBy: fullTurn)
+    if normalized > .pi {
+      normalized -= fullTurn
+    } else if normalized <= -.pi {
+      normalized += fullTurn
+    }
+    return normalized
   }
 }
 
@@ -120,5 +145,24 @@ public struct PreviewCameraState: Equatable, Sendable {
     self.target = target
     self.distance = max(distance, 0.001)
     self.orthographicScale = max(orthographicScale, 0.001)
+  }
+}
+
+public struct PreviewNamedView: Identifiable, Equatable, Sendable {
+  public var id: UUID
+  public var name: String
+  public var state: PreviewCameraState
+  public var projection: PreviewCameraProjection
+
+  public init(
+    id: UUID = UUID(),
+    name: String,
+    state: PreviewCameraState,
+    projection: PreviewCameraProjection
+  ) {
+    self.id = id
+    self.name = name
+    self.state = state
+    self.projection = projection
   }
 }

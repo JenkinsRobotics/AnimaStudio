@@ -100,6 +100,127 @@ public struct AnimaCoreRigSummary: Codable, Equatable, Sendable {
   public let clips: [AnimaCoreClipSummary]
   public let outputs: [AnimaCoreOutputSummary]
   public let relations: [AnimaCoreRelationSummary]
+  public let kinematicChain: AnimaCoreKinematicChainSummary?
+
+  enum CodingKeys: String, CodingKey {
+    case identity, parts, joints, parameters, clips, outputs, relations
+    case kinematicChain = "kinematic_chain"
+  }
+}
+
+public enum AnimaCoreChainJointType: String, Codable, Sendable {
+  case revolute
+  case prismatic
+}
+
+/// Engine-authored description of a serial DH chain. Values stay in the
+/// engine's native radians/metres; views perform display-only conversions.
+public struct AnimaCoreKinematicChainSummary: Codable, Equatable, Sendable {
+  public let name: String
+  public let basePart: String?
+  public let toolPart: String?
+  public let toolPositionMeters: [Double]
+  public let toolRotationEulerRadians: [Double]
+  public let joints: [AnimaCoreChainJointSummary]
+
+  enum CodingKeys: String, CodingKey {
+    case name, joints
+    case basePart = "base_part"
+    case toolPart = "tool_part"
+    case toolPositionMeters = "tool_position_m"
+    case toolRotationEulerRadians = "tool_rotation_euler_rad"
+  }
+}
+
+public struct AnimaCoreChainJointSummary: Codable, Equatable, Sendable, Identifiable {
+  public let name: String
+  public let degreeOfFreedomPath: String
+  public let jointType: AnimaCoreChainJointType
+  public let linkLengthMeters: Double
+  public let linkTwistRadians: Double
+  public let linkOffsetMeters: Double
+  public let jointAngleRadians: Double
+  public let minimum: Double?
+  public let maximum: Double?
+  public let neutral: Double
+  public let part: String?
+
+  public var id: String { degreeOfFreedomPath }
+
+  public init(
+    name: String,
+    degreeOfFreedomPath: String,
+    jointType: AnimaCoreChainJointType,
+    linkLengthMeters: Double,
+    linkTwistRadians: Double,
+    linkOffsetMeters: Double,
+    jointAngleRadians: Double,
+    minimum: Double?,
+    maximum: Double?,
+    neutral: Double,
+    part: String?
+  ) {
+    self.name = name
+    self.degreeOfFreedomPath = degreeOfFreedomPath
+    self.jointType = jointType
+    self.linkLengthMeters = linkLengthMeters
+    self.linkTwistRadians = linkTwistRadians
+    self.linkOffsetMeters = linkOffsetMeters
+    self.jointAngleRadians = jointAngleRadians
+    self.minimum = minimum
+    self.maximum = maximum
+    self.neutral = neutral
+    self.part = part
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case name
+    case degreeOfFreedomPath = "dof_path"
+    case jointType = "joint_type"
+    case linkLengthMeters = "a_m"
+    case linkTwistRadians = "alpha_rad"
+    case linkOffsetMeters = "d_m"
+    case jointAngleRadians = "theta_rad"
+    case minimum = "min"
+    case maximum = "max"
+    case neutral, part
+  }
+}
+
+public struct AnimaCoreTransformPose: Codable, Equatable, Sendable {
+  public let position: [Double]
+  public let orientation: [Double]
+
+  public init(position: [Double], orientation: [Double]) {
+    self.position = position
+    self.orientation = orientation
+  }
+}
+
+public struct AnimaCoreForwardKinematicsResult: Codable, Equatable, Sendable {
+  public let linkFrames: [AnimaCoreTransformPose]
+  public let toolPose: AnimaCoreTransformPose
+
+  enum CodingKeys: String, CodingKey {
+    case linkFrames = "link_frames"
+    case toolPose = "tool_pose"
+  }
+}
+
+public struct AnimaCoreInverseKinematicsResult: Codable, Equatable, Sendable {
+  public let jointValues: [String: Double]
+  public let reached: Bool
+  public let positionErrorMeters: Double
+  public let orientationErrorRadians: Double
+  public let iterations: Int
+
+  enum CodingKeys: String, CodingKey {
+    case jointValues = "joint_values"
+    case reached
+    case positionErrorMeters = "position_error_m"
+    case orientationErrorRadians = "orientation_error_rad"
+    case iterations
+  }
 }
 
 public struct AnimaCoreRigIdentity: Codable, Equatable, Sendable {
@@ -124,6 +245,12 @@ public struct AnimaCorePartSummary: Codable, Equatable, Sendable {
   public let model: String
   public let modelNode: String?
   public let description: String
+  /// Part-in-character rest position, in metres.
+  public let positionMeters: [Double]
+  /// Intrinsic XYZ rest rotation, in radians.
+  public let rotationEulerRadians: [Double]
+  public let isSuppressed: Bool
+  public let isGrounded: Bool
 
   enum CodingKeys: String, CodingKey {
     case name
@@ -131,6 +258,27 @@ public struct AnimaCorePartSummary: Codable, Equatable, Sendable {
     case model
     case modelNode = "model_node"
     case description
+    case positionMeters = "position_m"
+    case rotationEulerRadians = "rotation_euler_rad"
+    case isSuppressed = "suppressed"
+    case isGrounded = "grounded"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    parent = try container.decodeIfPresent(String.self, forKey: .parent)
+    model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+    modelNode = try container.decodeIfPresent(String.self, forKey: .modelNode)
+    description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+    positionMeters =
+      try container.decodeIfPresent([Double].self, forKey: .positionMeters)
+      ?? [0, 0, 0]
+    rotationEulerRadians =
+      try container.decodeIfPresent([Double].self, forKey: .rotationEulerRadians)
+      ?? [0, 0, 0]
+    isSuppressed = try container.decodeIfPresent(Bool.self, forKey: .isSuppressed) ?? false
+    isGrounded = try container.decodeIfPresent(Bool.self, forKey: .isGrounded) ?? false
   }
 }
 
@@ -159,6 +307,7 @@ public struct AnimaCoreJointSummary: Codable, Equatable, Sendable {
   public let controls: AnimaCoreMateControls?
   public let tangent: AnimaCoreTangentControls?
   public let degreesOfFreedom: [AnimaCoreDOFSummary]
+  public let isSuppressed: Bool
 
   enum CodingKeys: String, CodingKey {
     case id
@@ -170,6 +319,22 @@ public struct AnimaCoreJointSummary: Codable, Equatable, Sendable {
     case controls
     case tangent
     case degreesOfFreedom = "dofs"
+    case isSuppressed = "suppressed"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+    name = try container.decode(String.self, forKey: .name)
+    type = try container.decode(String.self, forKey: .type)
+    category = try container.decode(AnimaCoreMateCategory.self, forKey: .category)
+    parentPart = try container.decodeIfPresent(String.self, forKey: .parentPart)
+    childPart = try container.decodeIfPresent(String.self, forKey: .childPart)
+    controls = try container.decodeIfPresent(AnimaCoreMateControls.self, forKey: .controls)
+    tangent = try container.decodeIfPresent(AnimaCoreTangentControls.self, forKey: .tangent)
+    degreesOfFreedom =
+      try container.decodeIfPresent([AnimaCoreDOFSummary].self, forKey: .degreesOfFreedom) ?? []
+    isSuppressed = try container.decodeIfPresent(Bool.self, forKey: .isSuppressed) ?? false
   }
 
   /// The engine tracking id is authoritative when present. Legacy files may
@@ -338,6 +503,7 @@ public struct AnimaCoreRelationSummary: Codable, Equatable, Sendable, Identifiab
   public let magnitude: Double
   public let ratioFieldValue: Double
   public let display: [String: Double]
+  public let isSuppressed: Bool
 
   /// Relations do not yet carry a persisted tracking id. This deterministic
   /// key is presentation identity only and is never written into `.anima`.
@@ -355,6 +521,22 @@ public struct AnimaCoreRelationSummary: Codable, Equatable, Sendable, Identifiab
     case magnitude
     case ratioFieldValue = "ratio_field_value"
     case display
+    case isSuppressed = "suppressed"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    kind = try container.decode(AnimaCoreRelationKind.self, forKey: .kind)
+    driver = try container.decode(String.self, forKey: .driver)
+    driven = try container.decode(String.self, forKey: .driven)
+    ratio = try container.decode(Double.self, forKey: .ratio)
+    offset = try container.decodeIfPresent(Double.self, forKey: .offset) ?? 0
+    isReversed = try container.decodeIfPresent(Bool.self, forKey: .isReversed) ?? (ratio < 0)
+    magnitude = try container.decodeIfPresent(Double.self, forKey: .magnitude) ?? abs(ratio)
+    ratioFieldValue =
+      try container.decodeIfPresent(Double.self, forKey: .ratioFieldValue) ?? abs(ratio)
+    display = try container.decodeIfPresent([String: Double].self, forKey: .display) ?? [:]
+    isSuppressed = try container.decodeIfPresent(Bool.self, forKey: .isSuppressed) ?? false
   }
 }
 
@@ -383,7 +565,8 @@ public struct AnimaCoreResolvedPose: Codable, Equatable, Sendable {
 }
 
 public struct AnimaCoreResolvedPartPose: Codable, Equatable, Sendable {
-  /// World-space position in metres.
+  /// Character-space position in metres. The renderer applies this beneath
+  /// the character root; Character-in-World remains scene-level state.
   public let position: [Double]
   /// Quaternion imaginary XYZ components followed by the real component.
   public let orientation: [Double]

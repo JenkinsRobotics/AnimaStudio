@@ -5,6 +5,7 @@ struct StudioHomeView: View {
   let createProject: () -> Void
   let openProject: () -> Void
   let openRecentProject: (RecentProjectSummary) -> Void
+  let removeRecentProject: (RecentProjectSummary.ID) -> Void
 
   var body: some View {
     VStack(spacing: 0) {
@@ -67,9 +68,11 @@ struct StudioHomeView: View {
         ScrollView {
           LazyVStack(spacing: 8) {
             ForEach(recentProjects) { project in
-              RecentProjectCard(project: project) {
-                openRecentProject(project)
-              }
+              RecentProjectCard(
+                project: project,
+                open: { openRecentProject(project) },
+                remove: { removeRecentProject(project.id) }
+              )
             }
           }
           .padding(.vertical, 2)
@@ -77,7 +80,7 @@ struct StudioHomeView: View {
 
         Label(
           "Project folders reopen from their saved security-scoped locations.",
-          systemImage: "folder.badge.checkmark"
+          systemImage: "checkmark.seal.fill"
         )
         .font(.caption2)
         .foregroundStyle(StudioPalette.muted)

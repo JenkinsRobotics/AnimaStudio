@@ -7,41 +7,43 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2BF8987884672D19F682FA75 /* AnimaStudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD807500A5610B3B0F367A1 /* AnimaStudioApp.swift */; };
-		79D35624E7D9E746543DA600 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F058355D2985C312D6662D5C /* Localizable.xcstrings */; };
+		0C2326E7A8D16484224C139D /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F058355D2985C312D6662D5C /* Localizable.xcstrings */; };
+		1834C1889E29D0584A475E5C /* AnimaStudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD807500A5610B3B0F367A1 /* AnimaStudioApp.swift */; };
+		236FD44525A878015E6E7FC6 /* ViewportSection.metal in Sources */ = {isa = PBXBuildFile; fileRef = 03E462CC2C75805CD2494A5B /* ViewportSection.metal */; };
+		366B2254EF977E31081A4F04 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E362632664BDB0FEC7AA3AAF /* Assets.xcassets */; };
+		6E15844F763F266E64E2C51F /* AnimaStudioUI in Frameworks */ = {isa = PBXBuildFile; productRef = 12A5A190D34DE723F7619A85 /* AnimaStudioUI */; };
 		B403A99A4089B33F34F3FB72 /* AnimaStudioAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394BBFB29398F4351134AEDA /* AnimaStudioAppUITests.swift */; };
-		BC2CB6AB6CF413C0A33490E1 /* AnimaStudioUI in Frameworks */ = {isa = PBXBuildFile; productRef = EAC2CB6702ECE935DC387659 /* AnimaStudioUI */; };
-		D223F7D2C401115017A31F21 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E362632664BDB0FEC7AA3AAF /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		91BC6948081445FF48C4F1A8 /* PBXContainerItemProxy */ = {
+		70856C3FF143BFDAE613C838 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 397A42CEAF36B7EDA42B0DF0 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 32EBEA9A69628C6A5BE67AA2;
-			remoteInfo = AnimaStudio;
+			remoteGlobalIDString = A66B5A3E2945923DEF6B2B47;
+			remoteInfo = "Anima Studio";
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		03E462CC2C75805CD2494A5B /* ViewportSection.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ViewportSection.metal; sourceTree = "<group>"; };
 		394BBFB29398F4351134AEDA /* AnimaStudioAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimaStudioAppUITests.swift; sourceTree = "<group>"; };
 		3BAD0EB3940357ACAA6E2DAD /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; name = app; path = .; sourceTree = SOURCE_ROOT; };
 		59D1F830F21EBF78DCD375C3 /* AnimaStudioAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AnimaStudioAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7290CE010A6A4BCED2DF3ECC /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		7FD807500A5610B3B0F367A1 /* AnimaStudioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimaStudioApp.swift; sourceTree = "<group>"; };
+		8002684AF82B819B94955795 /* Anima Studio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Anima Studio.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		904D64AC9C9975B59FC813F6 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		E362632664BDB0FEC7AA3AAF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		EC98644D7B9991FCCB986547 /* Anima Studio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Anima Studio.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F058355D2985C312D6662D5C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		AF17FE77D51B23E120B4FCC9 /* Frameworks */ = {
+		B221C2A2989EE170C712E4B8 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BC2CB6AB6CF413C0A33490E1 /* AnimaStudioUI in Frameworks */,
+				6E15844F763F266E64E2C51F /* AnimaStudioUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -63,6 +65,14 @@
 				904D64AC9C9975B59FC813F6 /* Release.xcconfig */,
 			);
 			path = Config;
+			sourceTree = "<group>";
+		};
+		6B241A2A449DEECF2C974424 /* Shaders */ = {
+			isa = PBXGroup;
+			children = (
+				03E462CC2C75805CD2494A5B /* ViewportSection.metal */,
+			);
+			path = Shaders;
 			sourceTree = "<group>";
 		};
 		8D10BD780AABD5DD7E397B0D = {
@@ -90,6 +100,7 @@
 			children = (
 				7FD807500A5610B3B0F367A1 /* AnimaStudioApp.swift */,
 				959FA8C49909B604B0B7426F /* Resources */,
+				6B241A2A449DEECF2C974424 /* Shaders */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -97,7 +108,7 @@
 		BAC0D0D36DF2E2EE6717E58D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				EC98644D7B9991FCCB986547 /* Anima Studio.app */,
+				8002684AF82B819B94955795 /* Anima Studio.app */,
 				59D1F830F21EBF78DCD375C3 /* AnimaStudioAppUITests.xctest */,
 			);
 			name = Products;
@@ -114,24 +125,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		32EBEA9A69628C6A5BE67AA2 /* AnimaStudio */ = {
+		A66B5A3E2945923DEF6B2B47 /* Anima Studio */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 24EA6D9D61E0B6A09386EAE6 /* Build configuration list for PBXNativeTarget "AnimaStudio" */;
+			buildConfigurationList = C4037F0988928551CA851AB8 /* Build configuration list for PBXNativeTarget "Anima Studio" */;
 			buildPhases = (
-				710051C1CEEF82AA6C357673 /* Sources */,
-				93A1B7381300E9D6EB7C2100 /* Resources */,
-				AF17FE77D51B23E120B4FCC9 /* Frameworks */,
+				5E33F2F173E88690EAE3D5B8 /* Sources */,
+				D6C8DF94CF3BD498C7F30DFD /* Resources */,
+				B221C2A2989EE170C712E4B8 /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = AnimaStudio;
+			name = "Anima Studio";
 			packageProductDependencies = (
-				EAC2CB6702ECE935DC387659 /* AnimaStudioUI */,
+				12A5A190D34DE723F7619A85 /* AnimaStudioUI */,
 			);
-			productName = AnimaStudio;
-			productReference = EC98644D7B9991FCCB986547 /* Anima Studio.app */;
+			productName = "Anima Studio";
+			productReference = 8002684AF82B819B94955795 /* Anima Studio.app */;
 			productType = "com.apple.product-type.application";
 		};
 		FACECD57A9965EB2F567FC9B /* AnimaStudioAppUITests */ = {
@@ -143,7 +154,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				549B598E9452D1A5D62CAAA5 /* PBXTargetDependency */,
+				F6323B9B4E39FC2552DFA90A /* PBXTargetDependency */,
 			);
 			name = AnimaStudioAppUITests;
 			packageProductDependencies = (
@@ -161,11 +172,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					32EBEA9A69628C6A5BE67AA2 = {
+					A66B5A3E2945923DEF6B2B47 = {
 						ProvisioningStyle = Automatic;
 					};
 					FACECD57A9965EB2F567FC9B = {
-						TestTargetID = 32EBEA9A69628C6A5BE67AA2;
+						TestTargetID = A66B5A3E2945923DEF6B2B47;
 					};
 				};
 			};
@@ -186,30 +197,31 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				32EBEA9A69628C6A5BE67AA2 /* AnimaStudio */,
+				A66B5A3E2945923DEF6B2B47 /* Anima Studio */,
 				FACECD57A9965EB2F567FC9B /* AnimaStudioAppUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		93A1B7381300E9D6EB7C2100 /* Resources */ = {
+		D6C8DF94CF3BD498C7F30DFD /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D223F7D2C401115017A31F21 /* Assets.xcassets in Resources */,
-				79D35624E7D9E746543DA600 /* Localizable.xcstrings in Resources */,
+				366B2254EF977E31081A4F04 /* Assets.xcassets in Resources */,
+				0C2326E7A8D16484224C139D /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		710051C1CEEF82AA6C357673 /* Sources */ = {
+		5E33F2F173E88690EAE3D5B8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2BF8987884672D19F682FA75 /* AnimaStudioApp.swift in Sources */,
+				1834C1889E29D0584A475E5C /* AnimaStudioApp.swift in Sources */,
+				236FD44525A878015E6E7FC6 /* ViewportSection.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -224,10 +236,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		549B598E9452D1A5D62CAAA5 /* PBXTargetDependency */ = {
+		F6323B9B4E39FC2552DFA90A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 32EBEA9A69628C6A5BE67AA2 /* AnimaStudio */;
-			targetProxy = 91BC6948081445FF48C4F1A8 /* PBXContainerItemProxy */;
+			target = A66B5A3E2945923DEF6B2B47 /* Anima Studio */;
+			targetProxy = 70856C3FF143BFDAE613C838 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -288,28 +300,6 @@
 			};
 			name = Release;
 		};
-		5D4EF53930C3BBC2F5B9C1E6 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7290CE010A6A4BCED2DF3ECC /* Debug.xcconfig */;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = App/AnimaStudio.entitlements;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Anima Studio";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = org.animastudio.studio;
-				PRODUCT_NAME = "Anima Studio";
-				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-			};
-			name = Debug;
-		};
 		8E3657774D9E9BE5BEB8E97B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -323,7 +313,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.animastudio.studio.uitests;
 				SDKROOT = macosx;
-				TEST_TARGET_NAME = AnimaStudio;
+				TEST_TARGET_NAME = "Anima Studio";
 			};
 			name = Debug;
 		};
@@ -390,6 +380,52 @@
 			};
 			name = Debug;
 		};
+		D02604C950FDAB8C67920D6A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 904D64AC9C9975B59FC813F6 /* Release.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = App/AnimaStudio.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Anima Studio";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Anima Studio creates and manages project folders in Documents/AnimaStudio.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.animastudio.studio;
+				PRODUCT_NAME = "Anima Studio";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		D97EC469F95CBACD2B6AA8F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7290CE010A6A4BCED2DF3ECC /* Debug.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = App/AnimaStudio.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Anima Studio";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Anima Studio creates and manages project folders in Documents/AnimaStudio.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.animastudio.studio;
+				PRODUCT_NAME = "Anima Studio";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
 		E7A99B0C62878DC533A573CF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -403,44 +439,13 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.animastudio.studio.uitests;
 				SDKROOT = macosx;
-				TEST_TARGET_NAME = AnimaStudio;
-			};
-			name = Release;
-		};
-		EADC6990855A8AD1E8F5E5DF /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 904D64AC9C9975B59FC813F6 /* Release.xcconfig */;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = App/AnimaStudio.entitlements;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Anima Studio";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = org.animastudio.studio;
-				PRODUCT_NAME = "Anima Studio";
-				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				TEST_TARGET_NAME = "Anima Studio";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		24EA6D9D61E0B6A09386EAE6 /* Build configuration list for PBXNativeTarget "AnimaStudio" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				5D4EF53930C3BBC2F5B9C1E6 /* Debug */,
-				EADC6990855A8AD1E8F5E5DF /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
-		};
 		4BAA7804753C53B87C1480A1 /* Build configuration list for PBXNativeTarget "AnimaStudioAppUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -459,6 +464,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		C4037F0988928551CA851AB8 /* Build configuration list for PBXNativeTarget "Anima Studio" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D97EC469F95CBACD2B6AA8F6 /* Debug */,
+				D02604C950FDAB8C67920D6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -469,7 +483,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		EAC2CB6702ECE935DC387659 /* AnimaStudioUI */ = {
+		12A5A190D34DE723F7619A85 /* AnimaStudioUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AnimaStudioUI;
 		};

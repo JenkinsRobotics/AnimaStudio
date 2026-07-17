@@ -13,6 +13,10 @@ struct ViewportCameraHUD: View {
   @Binding var showsGrid: Bool
   @Binding var appearance: PreviewAppearance
   @Binding var fieldOfViewDegrees: Float
+  @Binding var lightingIntensity: Double
+  @Binding var environmentPreset: ViewportEnvironmentPreset
+  @Binding var environmentRotationDegrees: Double
+  @Binding var renderQuality: ViewportRenderQuality
   @Binding var navigationProfile: PreviewNavigationProfile
   @Binding var customRotateDrag: NavigationDragBinding
   @Binding var customPanDrag: NavigationDragBinding
@@ -33,7 +37,8 @@ struct ViewportCameraHUD: View {
             horizontalRadians: horizontalRadians,
             verticalRadians: verticalRadians
           )
-        }
+        },
+        onRoll: workspace.rollCamera
       )
 
       ViewportCameraControls(
@@ -46,6 +51,7 @@ struct ViewportCameraHUD: View {
         ),
         showMouseSettings: showMouseSettings,
         displayMenu: ViewportRenderMenu(
+          workspace: workspace,
           projection: $projection,
           renderStyle: $renderStyle,
           edgeDisplay: $edgeDisplay,
@@ -56,6 +62,10 @@ struct ViewportCameraHUD: View {
           showsGrid: $showsGrid,
           appearance: $appearance,
           fieldOfViewDegrees: $fieldOfViewDegrees,
+          lightingIntensity: $lightingIntensity,
+          environmentPreset: $environmentPreset,
+          environmentRotationDegrees: $environmentRotationDegrees,
+          renderQuality: $renderQuality,
           navigationProfile: $navigationProfile,
           customRotateDrag: $customRotateDrag,
           customPanDrag: $customPanDrag,

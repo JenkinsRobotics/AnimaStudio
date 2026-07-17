@@ -205,6 +205,114 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-16 — sharp boxes and placement-only snap points:** The reported
+  rounded cube and permanent dots were both confirmed as code defaults: a
+  hard-coded 35 mm `generateBox` corner radius and a standing mate-candidate
+  marker mode. Boxes now default to a true sharp mesh. A Properties → Geometry
+  Fillet Radius field accepts millimetres, persists in app-owned editor JSON,
+  and rebuilds the proxy immediately without entering AnimaCore semantics.
+  Candidate dots exist only during the active mate connector placement flow;
+  normal selection stays clean. Full Swift tests/lint, native/root builds,
+  deep signing, and launch pass; detailed file and verification record is in
+  the active briefing handoff.
+
+- **2026-07-16 — Navigator drag/drop regression awaiting live confirmation:**
+  Component rows now expose their entire width as a drop target; upper/lower
+  zones show animated raised insertion lines and the center explicitly shows
+  **Create Group** before creating and expanding a real group folder. Added a
+  native drag regression and repaired the UI-test target's association with
+  the spaced app product. All 15 focused navigator tests and the complete 263
+  XCTest + 20 Swift Testing suites pass, as do lint/root build/sign/launch.
+  macOS canceled UI-automation authentication before XCTest could execute the
+  gesture, so Jonathan's live confirmation remains the final acceptance step.
+
+- **2026-07-16 — CAD environment and display packet complete:** Display now
+  exposes Shaded, Shaded with Edges, Wireframe, Unshaded, and Translucent;
+  presets plus project-persistent solid/gradient backgrounds; three generated
+  studio IBLs with intensity and rotation; a bundled clip-shader section view with
+  X/Y/Z position controls and draggable plane handle; saved/previous views;
+  and genuine RealityKit 4x MSAA. Character editor metadata v3 owns spatial
+  presentation state, machine-local Settings owns lighting/performance, and
+  `.character.anima` remains untouched. Verification passed: 263 XCTest + 20
+  Swift Testing, recursive lint, native and root-app builds with bundled Metal,
+  deep signature verification, direct RealityKit clip-material smoke check,
+  launch, and clean `git diff --check`.
+
+- **2026-07-16 — Recent Projects removal and cleanup complete:** Each launch
+  card has a hover-revealed x and a **Remove from Recents** context command.
+  They forget only user-local recents metadata, update the launch list
+  immediately, and never delete the project directory. Load now resolves the
+  security-scoped bookmark with a path fallback, prunes entries that no longer
+  identify an existing directory, and persists the cleaned list; `openRecent`
+  uses the same resolver so availability cannot disagree between launch and
+  click. Verification: 7 focused tests; 257 XCTest + 20 Swift Testing;
+  recursive lint; Xcode/root-app build, deep signature, launch, and diff check.
+
+- **2026-07-16 — imported-mesh face/edge/corner selection complete:** STL,
+  OBJ, and ModelIO-readable USD imports now build and cache a pragmatic mesh
+  topology projection: welded vertices, connected coplanar face islands,
+  sharp/boundary edge polylines, and 3+-edge corners. Exact feature overlays
+  participate in the existing hover/selection/mate-candidate contract, so
+  viewport selection also selects and reveals the owning navigator row without
+  a second selection model. Directional CAD box selection remains blue/solid
+  window versus yellow/dashed crossing and now has pure tests. Verification:
+  7 focused topology tests; 255 XCTest + 20 Swift Testing; recursive lint;
+  native Xcode and rebuilt root-app builds; deep signature verification and
+  app launch. Honest boundary: this is mesh-derived topology, not analytic CAD
+  B-rep data, and durable feature-ID remapping across topology-changing
+  reimports remains future work.
+
+- **2026-07-16 — ViewCube labels and real roll controls complete:** Face names
+  are now projected affine decals built from the actual face quad instead of
+  fixed Text translated to its center. They foreshorten/skew with the cube,
+  remain non-mirrored/readable, and disappear on back-facing or edge-on faces.
+  A renderer-neutral camera roll value now drives RealityKit and ViewCube from
+  the same state; head-on principal faces expose curved ±90-degree roll
+  controls while all four 15-degree orbit arrows remain. Final verification:
+  248 XCTest + 20 Swift Testing, recursive lint, native Xcode build, rebuilt and
+  deep-signed root app, signature verification, and replacement app launch all
+  pass. No engine or format semantics changed.
+
+- **2026-07-16 — first-run project-panel root corrected:** The canonical
+  default is now `~/Documents/AnimaStudio/` (no space). New Project, Open, and
+  Save As synchronously create that exact directory before assigning it to the
+  native panel; creation errors are surfaced instead of silently walking up to
+  Documents. The sandbox-safe first-use path asks the operator to select
+  Documents once, creates `AnimaStudio` under that grant, and bookmarks the
+  created root; later launches open there directly. Custom roots remain
+  security-scoped, and a stored reference to the former spaced default
+  migrates. Focused preference tests cover real-vs-container resolution,
+  exact-path creation, no accidental nested folder, and migration. Final
+  verification: 8 focused tests; 245 XCTest + 20 Swift Testing full suite;
+  recursive lint, Xcode/root-app build, deep signature, and diff check all
+  green. Live first-use and relaunch walkthroughs confirmed the real path,
+  `Untitled Project`, Where = `AnimaStudio`, and no repeat grant prompt.
+
+- **2026-07-16 — standard Settings + workspace root complete:** Added the
+  native macOS Settings scene (Workspace, Navigation, Appearance) and removed
+  the viewport's one-off mouse sheet. One bookmark-backed preference now
+  resolves the default project root, initially `~/Documents/Anima Studio/`;
+  New/Open/Save As all begin there and create it lazily. The Workspace page can
+  change, reveal, or restore the root, and the existing CAD mouse controls keep
+  their approved icon-family header inside Navigation. Focused root tests and
+  the complete Swift suite pass. The real launch audit also found and fixed an
+  unrelated existing invalid `folder.badge.checkmark` SF Symbol that prevented
+  the home window from being constructed when saved recents existed.
+
+- **2026-07-16 — reusable navigator + object-state persistence complete:**
+  Instances and Mate Features now render through one generic `TreeView` and
+  pure tested tree model. Viewport reveal, token filtering, state badges,
+  grouping/reordering, lock-safe drop validation, engine-owned rest/suppress/
+  ground edits, editor-owned appearance/tree metadata, and explicit
+  World→Character→Part rendering are wired. Save writes both canonical
+  `.character.anima` and per-character `editor.json`; reopen integration covers
+  position, material/visibility, groups, and locks. Full Swift tests/lint/build/
+  root-app launch are green. Review also found a backend-only blocker:
+  suppressing `base_yaw` in `six_axis_arm` makes `project_channels` index the
+  intentionally removed `base_yaw.rotation` DOF and kill the bridge. Exact
+  reproduction and requested regression coverage are in the active briefing
+  Requests; no Python file was changed from the Swift lane.
+
 - **2026-07-16 — CAD mouse/navigation and reusable settings complete:** The
   production viewport now implements the agreed SolidWorks-default, Onshape,
   Fusion 360, and Custom mappings with Option support, precise zoom, normalized
@@ -896,3 +1004,29 @@ does the heavy implementation; Codex reviews it and plans what's next.
   the Swift integration suite. No Swift YAML authoring or evaluation semantics
   were added. The released claim and full verification record are in the
   active briefing.
+
+- **2026-07-16 — DH articulated-arm UI complete:** The app now recognizes the
+  engine's `kinematic_chain`, provides a docked six-axis joint-jog inspector,
+  sends every jog to engine FK, and renders the returned link/tool frames. A
+  viewport end-effector target uses the existing XYZ/rotation visual language
+  and sends drag poses to engine IK; reached and honestly unreachable results
+  have distinct feedback, with no kinematic math duplicated in Swift. NumPy is
+  now included in the signed root app helper. Live DH bridge/workspace tests,
+  all 260 Swift tests, lint, Xcode build, deep-sign, embedded-helper handshake,
+  and real app launch pass. Full contract and file list are in the active
+  briefing handoff.
+
+- **2026-07-16 — three-column Asset Builder complete:** Assets now shares the
+  app's reusable `TreeView` and stable three-column workspace structure. Its
+  branches are projections of retained engine/project data (parts,
+  mates/relations/groups, clips, scene scripts) or character editor metadata
+  (appearance), not new truth. The center Parts table is selectable and adds
+  only Jonathan's simple app-side V counter; the right column combines the live
+  import stage with a RealityKit selected-part preview. The future user Parts
+  Library is explicitly separate from character/project files. Full results
+  and migration details are recorded in the active briefing handoff. The center
+  table is now top-pinned and full-height, its empty state is simply an empty
+  table, and Preview remains a live empty 3D viewport until geometry exists.
+  The final collection pass adds one shared Table/Grid switch across every
+  center option. Table is the default, each type keeps its headers at zero rows,
+  and empty bodies consistently show `No … yet`.

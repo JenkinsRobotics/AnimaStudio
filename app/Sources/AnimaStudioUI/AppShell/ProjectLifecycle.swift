@@ -55,6 +55,9 @@ struct StudioProjectSession: Equatable {
 
 enum ProjectLifecycle {
   static let store = AnimaDocumentStore()
+  static var workspaceLocation: WorkspaceLocationPreference {
+    WorkspaceLocationPreference()
+  }
 
   static func makeEmptyDocument(name: String) -> AnimaStudioDocument {
     AnimaStudioDocument(
@@ -67,47 +70,100 @@ enum ProjectLifecycle {
   }
 
   static func defaultProjectsDirectory() -> URL {
-    let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    return documents.appendingPathComponent("Anima Studio", isDirectory: true)
+    workspaceLocation.workspaceRootURL
+  }
+
+  @discardableResult
+  static func ensureDefaultProjectsDirectory() throws -> URL {
+    try workspaceLocation.ensureWorkspaceRootExists()
   }
 
   @MainActor
   static func chooseNewProjectURL(suggestedName: String = "Untitled Project") -> URL? {
+    guard let rootURL = prepareWorkspaceRootForPanel() else { return nil }
+    let accessed = rootURL.startAccessingSecurityScopedResource()
+    defer { if accessed { rootURL.stopAccessingSecurityScopedResource() } }
     let panel = NSSavePanel()
     panel.title = "Create Anima Studio Project"
     panel.message = "Choose a name and location for the project folder."
     panel.prompt = "Create Project"
     panel.nameFieldStringValue = suggestedName
-    panel.directoryURL = defaultProjectsDirectory()
+    panel.directoryURL = rootURL
     panel.canCreateDirectories = true
     panel.isExtensionHidden = true
-    return panel.runModal() == .OK ? panel.url : nil
+    guard panel.runModal() == .OK, let url = panel.url else { return nil }
+    if url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL {
+      workspaceLocation.persistWorkspaceRoot(rootURL)
+    }
+    return url
   }
 
   @MainActor
   static func chooseProjectToOpen() -> URL? {
+    guard let rootURL = prepareWorkspaceRootForPanel() else { return nil }
+    let accessed = rootURL.startAccessingSecurityScopedResource()
+    defer { if accessed { rootURL.stopAccessingSecurityScopedResource() } }
     let panel = NSOpenPanel()
     panel.title = "Open Anima Studio Project"
     panel.message = "Choose a project folder containing project.json."
     panel.prompt = "Open Project"
-    panel.directoryURL = defaultProjectsDirectory()
+    panel.directoryURL = rootURL
     panel.canChooseDirectories = true
     panel.canChooseFiles = false
     panel.allowsMultipleSelection = false
-    return panel.runModal() == .OK ? panel.url : nil
+    guard panel.runModal() == .OK, let url = panel.url else { return nil }
+    if url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL {
+      workspaceLocation.persistWorkspaceRoot(rootURL)
+    }
+    return url
   }
 
   @MainActor
   static func chooseSaveAsURL(currentName: String) -> URL? {
+    guard let rootURL = prepareWorkspaceRootForPanel() else { return nil }
+    let accessed = rootURL.startAccessingSecurityScopedResource()
+    defer { if accessed { rootURL.stopAccessingSecurityScopedResource() } }
     let panel = NSSavePanel()
     panel.title = "Save Anima Studio Project As"
     panel.message = "Choose a new project folder name and location."
     panel.prompt = "Save As"
     panel.nameFieldStringValue = currentName
-    panel.directoryURL = defaultProjectsDirectory()
+    panel.directoryURL = rootURL
     panel.canCreateDirectories = true
     panel.isExtensionHidden = true
-    return panel.runModal() == .OK ? panel.url : nil
+    guard panel.runModal() == .OK, let url = panel.url else { return nil }
+    if url.deletingLastPathComponent().standardizedFileURL == rootURL.standardizedFileURL {
+      workspaceLocation.persistWorkspaceRoot(rootURL)
+    }
+    return url
+  }
+
+  @MainActor
+  private static func prepareWorkspaceRootForPanel() -> URL? {
+    do {
+      return try workspaceLocation.preparedPanelDirectory()
+    } catch {
+      if workspaceLocation.usesDefaultWorkspaceRoot {
+        do {
+          return try workspaceLocation.requestDefaultWorkspaceRootAccess()
+        } catch {
+          return showWorkspacePreparationError(error)
+        }
+      }
+      return showWorkspacePreparationError(error)
+    }
+  }
+
+  @MainActor
+  private static func showWorkspacePreparationError(_ error: Error) -> URL? {
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = "Anima Studio Could Not Prepare the Project Folder"
+    alert.informativeText =
+      "The default project location could not be created. Choose another location in Settings → Workspace, then try again.\n\n\(error.localizedDescription)"
+    alert.addButton(withTitle: "OK")
+    alert.runModal()
+    return nil
   }
 
   static func createProject(at url: URL) throws -> StudioProjectSession {
@@ -133,19 +189,7 @@ enum ProjectLifecycle {
   }
 
   static func openRecent(_ recent: RecentProjectSummary) throws -> StudioProjectSession {
-    let url: URL
-    if let bookmarkData = recent.bookmarkData {
-      var stale = false
-      url = try URL(
-        resolvingBookmarkData: bookmarkData,
-        options: [.withSecurityScope],
-        relativeTo: nil,
-        bookmarkDataIsStale: &stale
-      )
-      if stale { throw ProjectLifecycleError.recentProjectUnavailable }
-    } else if let path = recent.projectPath {
-      url = URL(fileURLWithPath: path, isDirectory: true)
-    } else {
+    guard let url = recent.resolvedProjectURL() else {
       throw ProjectLifecycleError.recentProjectUnavailable
     }
     return try openProject(at: url)

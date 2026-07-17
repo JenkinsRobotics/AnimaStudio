@@ -1,272 +1,220 @@
 import AnimaDocument
+import AnimaModel
 import SwiftUI
 
+/// Asset Builder follows the same durable three-column workspace grammar as Rig:
+/// navigation on the left, the active collection in the center, and task tools /
+/// selected-item context on the right.
 struct AssetsWorkspaceView: View {
+  @Bindable var workspace: StudioWorkspaceModel
   let projectName: String
+  let projectRevision: Int
   let characters: [ProjectCharacterReference]
+  let projectScenes: [ProjectSceneReference]
+  let projectAssets: [DocumentAssetReference]
+  let partAssetVersions: [String: Int]
   let activeCharacterID: String?
-  let activePartCount: Int
-  let showsLoadingStage: Bool
   let importProgress: CharacterImportProgress?
   let importErrorMessage: String?
   let isSwitchingCharacter: Bool
   let newCharacter: () -> Void
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
+  let replaceModel: () -> Void
   let dropModels: ([URL]) -> Void
 
-  @State private var isDropTargeted = false
+  @State private var selection = AssetBuilderSelection.characters
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 22) {
-        header
-
-        if characters.isEmpty {
-          emptyState
-        } else {
-          characterGrid
-        }
-
-        if let activeCharacter = characters.first(where: { $0.id == activeCharacterID }),
-          showsLoadingStage
-        {
-          modelLoadingStage(character: activeCharacter)
-        }
-      }
-      .padding(28)
-      .frame(maxWidth: 1120, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .center)
-    }
-    .background(StudioPalette.canvas)
-  }
-
-  private var header: some View {
-    HStack(alignment: .top) {
-      VStack(alignment: .leading, spacing: 6) {
-        Text("ASSETS")
-          .font(.caption2.weight(.bold))
-          .tracking(1.2)
-          .foregroundStyle(StudioPalette.sourceModel)
-        Text("Characters")
-          .font(.largeTitle.weight(.semibold))
-        Text("Manage the characters in \(projectName). Select one to use it in Rig and Animate.")
-          .foregroundStyle(.secondary)
-      }
-      Spacer()
-      Button(action: newCharacter) {
-        Label("New Character", systemImage: "plus")
-          .padding(.horizontal, 4)
-      }
-      .buttonStyle(.borderedProminent)
-      .controlSize(.large)
-    }
-  }
-
-  private var emptyState: some View {
-    VStack(spacing: 16) {
-      Image(systemName: "person.crop.rectangle.stack")
-        .font(.system(size: 46, weight: .light))
-        .foregroundStyle(StudioPalette.sourceModel)
-      VStack(spacing: 6) {
-        Text("Create your first character")
-          .font(.title2.weight(.semibold))
-        Text("Start with a 3D rigid-parts assembly, then connect its parts with mates in Rig.")
-          .foregroundStyle(.secondary)
-          .multilineTextAlignment(.center)
-      }
-      Button("Create 3D Character", action: newCharacter)
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-    }
-    .frame(maxWidth: .infinity, minHeight: 310)
-    .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 16))
-    .overlay { RoundedRectangle(cornerRadius: 16).stroke(StudioPalette.border) }
-  }
-
-  private var characterGrid: some View {
-    LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
-      ForEach(characters) { character in
-        Button {
-          selectCharacter(character)
-        } label: {
-          HStack(spacing: 13) {
-            ZStack {
-              RoundedRectangle(cornerRadius: 10)
-                .fill(StudioPalette.sourceModel.opacity(0.12))
-              Image(systemName: "cube.transparent")
-                .font(.title2)
-                .foregroundStyle(StudioPalette.sourceModel)
-            }
-            .frame(width: 54, height: 54)
-
-            VStack(alignment: .leading, spacing: 5) {
-              Text(character.displayName)
-                .font(.headline)
-                .lineLimit(1)
-              Text(character.id == activeCharacterID ? "ACTIVE · 3D ASSEMBLY" : "3D ASSEMBLY")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(
-                  character.id == activeCharacterID ? StudioPalette.sourceModel : .secondary)
-              if character.id == activeCharacterID {
-                Text("\(activePartCount) part\(activePartCount == 1 ? "" : "s")")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-            }
-            Spacer()
-            if isSwitchingCharacter && character.id == activeCharacterID {
-              ProgressView().controlSize(.small)
-            } else if character.id == activeCharacterID {
-              Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(StudioPalette.sourceModel)
-            }
-          }
-          .padding(14)
-          .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
-          .background(
-            character.id == activeCharacterID
-              ? StudioPalette.sourceModel.opacity(0.1) : StudioPalette.panel,
-            in: RoundedRectangle(cornerRadius: 13)
-          )
-          .overlay {
-            RoundedRectangle(cornerRadius: 13)
-              .stroke(
-                character.id == activeCharacterID
-                  ? StudioPalette.sourceModel.opacity(0.75) : StudioPalette.border,
-                lineWidth: character.id == activeCharacterID ? 1.5 : 1
-              )
-          }
-        }
-        .buttonStyle(.plain)
-        .disabled(isSwitchingCharacter || importProgress != nil)
-      }
-    }
-  }
-
-  private func modelLoadingStage(character: ProjectCharacterReference) -> some View {
-    VStack(alignment: .leading, spacing: 18) {
-      HStack {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("LOAD 3D ASSEMBLY")
-            .font(.caption2.weight(.bold))
-            .tracking(1)
-            .foregroundStyle(StudioPalette.sourceModel)
-          Text("Add models to \(character.displayName)")
-            .font(.title2.weight(.semibold))
-          Text(
-            "Import multiple part files, or one multi-node USD. Each model becomes a rigid Part ready for mates."
-          )
-          .font(.callout)
-          .foregroundStyle(.secondary)
-        }
-        Spacer()
-        Text("STL · OBJ · USD · USDZ")
-          .font(.caption2.weight(.bold))
-          .foregroundStyle(StudioPalette.muted)
-      }
-
-      Button(action: importModels) {
-        VStack(spacing: 13) {
-          if let importProgress {
-            ProgressView(value: importProgress.fractionCompleted)
-              .progressViewStyle(.linear)
-              .frame(maxWidth: 360)
-            Text("Loading \(importProgress.currentFilename)")
-              .font(.headline)
-            Text("\(importProgress.completedFiles) of \(importProgress.totalFiles) complete")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          } else {
-            Image(systemName: "square.and.arrow.down.on.square")
-              .font(.system(size: 34, weight: .light))
-              .foregroundStyle(StudioPalette.sourceModel)
-            Text("Drop model files here")
-              .font(.headline)
-            Text("or click to choose files")
-              .font(.callout)
-              .foregroundStyle(.secondary)
-          }
-        }
-        .frame(maxWidth: .infinity, minHeight: 170)
-        .background(
-          isDropTargeted ? StudioPalette.sourceModel.opacity(0.16) : StudioPalette.field,
-          in: RoundedRectangle(cornerRadius: 14)
-        )
-        .overlay {
-          RoundedRectangle(cornerRadius: 14)
-            .stroke(
-              isDropTargeted ? StudioPalette.sourceModel : StudioPalette.border,
-              style: StrokeStyle(lineWidth: isDropTargeted ? 2 : 1, dash: [7, 5])
-            )
-        }
-      }
-      .buttonStyle(.plain)
-      .disabled(importProgress != nil)
-      .dropDestination(for: URL.self) { urls, _ in
-        dropModels(urls)
-        return !urls.isEmpty
-      } isTargeted: {
-        isDropTargeted = $0
-      }
-
-      if let importErrorMessage {
-        Label(importErrorMessage, systemImage: "exclamationmark.triangle.fill")
-          .font(.callout)
-          .foregroundStyle(.orange)
-          .padding(12)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-      }
-
-      Label(
-        "STL and OBJ are unitless, so Anima asks for mm, cm, or m before loading. STEP must be converted in your CAD tool.",
-        systemImage: "info.circle"
+    HStack(alignment: .top, spacing: 0) {
+      AssetBuilderSidebar(
+        projectName: projectName,
+        revision: projectRevision,
+        characters: characters,
+        activeCharacterID: activeCharacterID,
+        counts: collectionCounts,
+        isSwitchingCharacter: isSwitchingCharacter,
+        selection: $selection,
+        newCharacter: newCharacter,
+        selectCharacter: selectCharacter
       )
-      .font(.caption)
-      .foregroundStyle(.secondary)
+      .frame(width: 260)
+
+      Divider()
+
+      AssetBuilderContentView(
+        selection: selection,
+        characters: characters,
+        activeCharacterID: activeCharacterID,
+        parts: partRows,
+        assets: activeCharacterAssets,
+        animations: workspace.project.clips,
+        assemblies: assemblyItems,
+        renders: renderItems,
+        scripts: scriptItems,
+        isSwitchingCharacter: isSwitchingCharacter,
+        selectedPartID: selectedPartBinding,
+        newCharacter: newCharacter,
+        selectCharacter: selectCharacter,
+        importModels: importModels,
+        replaceModel: replaceModel
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+      Divider()
+
+      AssetBuilderInspector(
+        activeCharacter: activeCharacter,
+        selectedPart: selectedPart,
+        workspace: workspace,
+        importProgress: importProgress,
+        importErrorMessage: importErrorMessage,
+        importModels: importModels,
+        dropModels: dropModels
+      )
+      .frame(width: 350)
     }
-    .padding(20)
-    .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 16))
-    .overlay { RoundedRectangle(cornerRadius: 16).stroke(StudioPalette.border) }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(StudioPalette.canvas)
+    .onAppear {
+      selection = .initial(activeCharacterID: activeCharacterID)
+    }
+    .onChange(of: activeCharacterID) { _, newValue in
+      selection = .initial(activeCharacterID: newValue)
+    }
+  }
+
+  private var partRows: [AssetBuilderPartRow] {
+    AssetBuilderCatalog.partRows(parts: workspace.engineParts) {
+      workspace.partID(forEngineName: $0)
+    } version: {
+      partAssetVersions[$0] ?? 1
+    }
+  }
+
+  private var selectedPart: AssetBuilderPartRow? {
+    guard let selectedPartID = workspace.selectedPartID else { return nil }
+    return partRows.first { $0.id == selectedPartID }
+  }
+
+  private var activeCharacter: ProjectCharacterReference? {
+    characters.first { $0.id == activeCharacterID }
+  }
+
+  private var selectedPartBinding: Binding<PartID?> {
+    Binding(
+      get: { workspace.selectedPartID },
+      set: { value in
+        if let value {
+          workspace.selectPart(id: value, extendingSelection: false)
+        } else {
+          workspace.clearSelection()
+        }
+      }
+    )
+  }
+
+  private var collectionCounts: [AssetBuilderCollection: Int] {
+    [
+      .parts: partRows.count,
+      .sourceAssets: Set(partRows.map(\.model).filter { !$0.isEmpty }).count
+        + activeCharacterAssets.count,
+      .animations: workspace.project.clips.count,
+      .renders: renderItems.count,
+      .assemblies: assemblyItems.count,
+      .scripts: scriptItems.count,
+    ]
+  }
+
+  private var activeCharacterAssets: [DocumentAssetReference] {
+    guard let activeCharacter else { return [] }
+    return projectAssets.filter { asset in
+      switch asset.storage {
+      case .embedded(let path): path.hasPrefix(activeCharacter.assetsDirectoryPath + "/")
+      case .linked: true
+      }
+    }
+  }
+
+  private var assemblyItems: [AssetBuilderListItem] {
+    let mates = workspace.engineMates.map { mate in
+      AssetBuilderListItem(
+        id: "mate:\(mate.selectionKey)",
+        title: mate.name,
+        detail: [mate.parentPart, mate.childPart].compactMap { $0 }.joined(separator: " → "),
+        systemImage: "link",
+        badge: mate.isSuppressed ? "Suppressed" : mate.type.capitalized
+      )
+    }
+    let relations = workspace.engineRelations.map { relation in
+      AssetBuilderListItem(
+        id: "relation:\(relation.id)",
+        title: relation.kind.rawValue.replacingOccurrences(of: "_", with: " ").capitalized,
+        detail: "\(relation.driver) → \(relation.driven)",
+        systemImage: "arrow.triangle.branch",
+        badge: relation.isSuppressed ? "Suppressed" : "Relation"
+      )
+    }
+    let groups = workspace.componentGroups.map { group in
+      AssetBuilderListItem(
+        id: "group:\(group.id.uuidString)",
+        title: group.displayName,
+        detail: "\(group.componentIDs.count) parts",
+        systemImage: "folder",
+        badge: group.isLocked ? "Locked group" : "Editor group"
+      )
+    }
+    return mates + relations + groups
+  }
+
+  private var renderItems: [AssetBuilderListItem] {
+    workspace.componentAppearances.compactMap { partID, appearance in
+      guard let name = workspace.enginePartName(for: partID) else { return nil }
+      return AssetBuilderListItem(
+        id: "appearance:\(partID.rawValue.uuidString)",
+        title: name,
+        detail: "\(appearance.finish.rawValue.capitalized) · \(appearance.hexRGB)",
+        systemImage: "paintpalette",
+        badge: appearance.isVisible ? "Visible" : "Hidden"
+      )
+    }
+  }
+
+  private var scriptItems: [AssetBuilderListItem] {
+    projectScenes.map { scene in
+      AssetBuilderListItem(
+        id: scene.id,
+        title: scene.displayName,
+        detail: scene.filename,
+        systemImage: "curlybraces",
+        badge: ".scene.anima"
+      )
+    }
   }
 }
 
-#Preview("Assets · Empty Project") {
+#Preview("Assets · Three Column") {
   AssetsWorkspaceView(
-    projectName: "Audio-Animatronic Show",
-    characters: [],
-    activeCharacterID: nil,
-    activePartCount: 0,
-    showsLoadingStage: false,
-    importProgress: nil,
-    importErrorMessage: nil,
-    isSwitchingCharacter: false,
-    newCharacter: {},
-    selectCharacter: { _ in },
-    importModels: {},
-    dropModels: { _ in }
-  )
-  .frame(width: 1100, height: 720)
-  .preferredColorScheme(.dark)
-}
-
-#Preview("Assets · Loading Stage") {
-  let character = ProjectCharacterReference(folderName: "walle", displayName: "WALL-E")
-  AssetsWorkspaceView(
+    workspace: StudioWorkspaceModel(),
     projectName: "Lobby Robots",
-    characters: [character],
-    activeCharacterID: character.id,
-    activePartCount: 0,
-    showsLoadingStage: true,
+    projectRevision: 12,
+    characters: [
+      ProjectCharacterReference(folderName: "walle", displayName: "WALL-E"),
+      ProjectCharacterReference(folderName: "greeter", displayName: "Greeter Robot"),
+    ],
+    projectScenes: [],
+    projectAssets: [],
+    partAssetVersions: [:],
+    activeCharacterID: "walle",
     importProgress: nil,
     importErrorMessage: nil,
     isSwitchingCharacter: false,
     newCharacter: {},
     selectCharacter: { _ in },
     importModels: {},
+    replaceModel: {},
     dropModels: { _ in }
   )
-  .frame(width: 1100, height: 720)
+  .frame(width: 1380, height: 760)
   .preferredColorScheme(.dark)
 }

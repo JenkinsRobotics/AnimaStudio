@@ -20,7 +20,8 @@
       ],
       createProject: {},
       openProject: {},
-      openRecentProject: { _ in }
+      openRecentProject: { _ in },
+      removeRecentProject: { _ in }
     )
     .frame(width: 1_180, height: 760)
   }

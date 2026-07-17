@@ -35,6 +35,9 @@ private struct ComponentViewportContextMenuModifier: ViewModifier {
     Button("Edit Properties…", systemImage: "slider.horizontal.3") {
       workspace.showComponentInspector(.properties)
     }
+    Button("Go to Item in List", systemImage: "list.bullet.rectangle") {
+      workspace.requestNavigatorReveal(.part(state.partID))
+    }
     Menu(
       "Mates & Dependencies (\(state.dependencies.count))",
       systemImage: "link"
@@ -250,6 +253,9 @@ struct ComponentViewportContextMenuOverlay: View {
             menuDivider
             menuButton("Edit Properties…", systemImage: "slider.horizontal.3") {
               workspace.showComponentInspector(.properties)
+            }
+            menuButton("Go to Item in List", systemImage: "list.bullet.rectangle") {
+              workspace.requestNavigatorReveal(.part(state.partID))
             }
             ForEach(state.dependencies) { dependency in
               menuButton(dependency.displayName, systemImage: "link") {

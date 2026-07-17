@@ -46,4 +46,27 @@ final class ComponentAppearanceTests: XCTestCase {
 
     XCTAssertNil(model.componentAppearance(for: PartID()))
   }
+
+  func testBoxFilletDefaultsSharpAndEditsInMillimeterBackedGeometry() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    let part = try XCTUnwrap(model.project.rig.parts.first)
+
+    XCTAssertEqual(model.componentAppearance(for: part.id)?.proxyFilletRadiusMeters, 0)
+
+    model.setComponentProxyFilletRadius(id: part.id, meters: 0.012)
+
+    XCTAssertEqual(model.componentAppearance(for: part.id)?.proxyFilletRadiusMeters, 0.012)
+  }
+
+  func testFilletIsIgnoredForNonBoxProxy() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .sphere)
+    let part = try XCTUnwrap(model.project.rig.parts.first)
+
+    model.setComponentProxyFilletRadius(id: part.id, meters: 0.012)
+
+    XCTAssertEqual(model.componentAppearance(for: part.id)?.proxyFilletRadiusMeters, 0)
+    XCTAssertNil(model.componentAppearances[part.id])
+  }
 }

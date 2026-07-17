@@ -7,6 +7,23 @@ import XCTest
 final class ViewCubeGeometryTests: XCTestCase {
   private let size = CGSize(width: 100, height: 100)
 
+  @MainActor
+  func testNamedAndPreviousViewsUseWorkspaceCameraState() {
+    let workspace = StudioWorkspaceModel()
+    let original = workspace.cameraState
+    workspace.setCameraDirection(.front)
+    XCTAssertEqual(workspace.previousCameraState, original)
+
+    workspace.saveNamedCameraView(name: "Front")
+    let saved = workspace.namedCameraViews[0]
+    workspace.setCameraDirection(.top)
+    workspace.restoreNamedCameraView(id: saved.id)
+    XCTAssertEqual(workspace.cameraState, saved.state)
+
+    workspace.restorePreviousCameraView()
+    XCTAssertEqual(workspace.cameraState.orientation.direction, .top)
+  }
+
   func testFrontOrientationShowsAndSelectsFrontFace() {
     let orientation = PreviewCameraOrientation(direction: .front)
     let faces = ViewCubeGeometry.projectedFaces(in: size, orientation: orientation)
@@ -111,21 +128,35 @@ final class ViewCubeGeometryTests: XCTestCase {
     XCTAssertTrue(axes.allSatisfy { $0.endpoint != origin })
   }
 
-  func testFaceLabelsStayAnchoredAtProjectedFaceCenters() {
+  func testFaceLabelDecalsStayCenteredAndUseNonMirroredAffineProjection() throws {
     let orientations = [
       PreviewCameraOrientation(direction: .home),
       PreviewCameraOrientation(direction: .right),
       PreviewCameraOrientation(direction: .top),
     ]
+    let labelSize = CGSize(width: 28, height: 9)
 
     for orientation in orientations {
       for face in ViewCubeGeometry.projectedFaces(in: size, orientation: orientation) {
-        XCTAssertEqual(ViewCubeGeometry.labelPosition(for: face), face.center)
+        let decal = try XCTUnwrap(
+          ViewCubeGeometry.labelProjection(
+            for: face,
+            orientation: orientation,
+            labelSize: labelSize
+          )
+        )
+        let projectedCenter = CGPoint(
+          x: decal.localBounds.midX,
+          y: decal.localBounds.midY
+        ).applying(decal.transform)
+        XCTAssertEqual(projectedCenter.x, face.center.x, accuracy: 0.001)
+        XCTAssertEqual(projectedCenter.y, face.center.y, accuracy: 0.001)
+        XCTAssertGreaterThan(decal.determinant, 0)
       }
     }
   }
 
-  func testFaceLabelDecalsUseAStableLocalOrientationInPrincipalViews() throws {
+  func testFaceLabelDecalsRemainReadableInPrincipalAndRolledViews() throws {
     let cases: [(ViewCubeFace, PreviewCameraDirection)] = [
       (.front, .front),
       (.back, .back),
@@ -136,17 +167,79 @@ final class ViewCubeGeometryTests: XCTestCase {
     ]
 
     for (expectedFace, direction) in cases {
-      let orientation = PreviewCameraOrientation(direction: direction)
-      let face = try XCTUnwrap(
-        ViewCubeGeometry.projectedFaces(in: size, orientation: orientation)
-          .first(where: { $0.face == expectedFace })
-      )
-      XCTAssertEqual(
-        ViewCubeGeometry.labelRotationRadians(for: face, orientation: orientation),
-        0,
-        accuracy: 0.001
-      )
+      for rollRadians in [Float(0), Float.pi / 2, .pi] {
+        let orientation = PreviewCameraOrientation(
+          direction: direction,
+          rollRadians: rollRadians
+        )
+        let face = try XCTUnwrap(
+          ViewCubeGeometry.projectedFaces(in: size, orientation: orientation)
+            .first(where: { $0.face == expectedFace })
+        )
+        let decal = try XCTUnwrap(
+          ViewCubeGeometry.labelProjection(
+            for: face,
+            orientation: orientation,
+            labelSize: CGSize(width: 28, height: 9)
+          )
+        )
+        let start = CGPoint(x: 0, y: decal.localBounds.midY).applying(decal.transform)
+        let end = CGPoint(
+          x: decal.localBounds.maxX,
+          y: decal.localBounds.midY
+        ).applying(decal.transform)
+        XCTAssertGreaterThan(decal.determinant, 0)
+        XCTAssertTrue(
+          end.x > start.x || (abs(end.x - start.x) < 0.001 && end.y < start.y),
+          "\(expectedFace) at roll \(rollRadians) rendered upside-down"
+        )
+      }
     }
+  }
+
+  func testFaceLabelDecalHidesNearEdgeOnSlivers() throws {
+    let orientation = PreviewCameraOrientation(
+      direction: PreviewCameraDirection(x: 1, y: 0, z: 0.04)
+    )
+    let front = try XCTUnwrap(
+      ViewCubeGeometry.projectedFaces(in: size, orientation: orientation)
+        .first(where: { $0.face == .front })
+    )
+
+    XCTAssertNil(
+      ViewCubeGeometry.labelProjection(
+        for: front,
+        orientation: orientation,
+        labelSize: CGSize(width: 28, height: 9)
+      )
+    )
+  }
+
+  func testRollControlsOnlyAppearForHeadOnPrincipalFaces() {
+    XCTAssertEqual(
+      ViewCubeGeometry.headOnFace(
+        for: PreviewCameraOrientation(direction: .front)
+      ),
+      .front
+    )
+    XCTAssertEqual(
+      ViewCubeGeometry.headOnFace(
+        for: PreviewCameraOrientation(direction: .top, rollRadians: .pi / 2)
+      ),
+      .top
+    )
+    XCTAssertNil(
+      ViewCubeGeometry.headOnFace(
+        for: PreviewCameraOrientation(direction: .home)
+      )
+    )
+    XCTAssertNil(
+      ViewCubeGeometry.headOnFace(
+        for: PreviewCameraOrientation(
+          direction: .front.nudged(horizontalRadians: .pi / 12, verticalRadians: 0)
+        )
+      )
+    )
   }
 
   @MainActor
@@ -166,5 +259,14 @@ final class ViewCubeGeometryTests: XCTestCase {
     XCTAssertEqual(workspace.cameraState, orbitState)
     XCTAssertEqual(workspace.cameraViewpoint, .custom)
     XCTAssertEqual(workspace.cameraCommandRevision, 1)
+
+    workspace.rollCamera(by: .pi / 2)
+    XCTAssertEqual(workspace.cameraState.orientation.direction, .left)
+    XCTAssertEqual(workspace.cameraState.orientation.rollRadians, .pi / 2, accuracy: 0.001)
+    XCTAssertEqual(workspace.cameraCommandRevision, 2)
+
+    workspace.setCameraViewpoint(.home)
+    XCTAssertEqual(workspace.cameraState.orientation.rollRadians, 0, accuracy: 0.001)
+    XCTAssertEqual(workspace.cameraCommandRevision, 3)
   }
 }

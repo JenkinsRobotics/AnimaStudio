@@ -6,6 +6,9 @@ public enum AnimaCoreRigDocumentEditingError: Error, Equatable, Sendable {
   case invalidPartEntry
   case invalidModelReference(String)
   case unknownPart(String)
+  case unknownJoint(String)
+  case unknownRelation(String)
+  case invalidTransformVector(String)
 }
 
 extension AnimaCoreRigDocumentEditingError: LocalizedError {
@@ -21,6 +24,12 @@ extension AnimaCoreRigDocumentEditingError: LocalizedError {
       "The model reference ‘\(reference)’ is not a safe relative assets path."
     case .unknownPart(let name):
       "The character does not contain a part named ‘\(name)’."
+    case .unknownJoint(let name):
+      "The character does not contain a mate named ‘\(name)’."
+    case .unknownRelation(let id):
+      "The character does not contain relation ‘\(id)’."
+    case .invalidTransformVector(let field):
+      "\(field) must contain three finite values."
     }
   }
 }
@@ -96,6 +105,84 @@ public enum AnimaCoreRigDocumentEditor {
     return (.object(root), partName)
   }
 
+  public static func settingPartTransform(
+    named partName: String,
+    positionMeters: [Double],
+    rotationEulerRadians: [Double],
+    in document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    try validateVector(positionMeters, field: "position_m")
+    try validateVector(rotationEulerRadians, field: "rotation_euler_rad")
+    var root = try rootObject(document)
+    var parts = try objectArray(root, key: "parts")
+    guard let index = parts.firstIndex(where: { stringValue($0["name"]) == partName }) else {
+      throw AnimaCoreRigDocumentEditingError.unknownPart(partName)
+    }
+    parts[index]["position_m"] = .array(positionMeters.map(AnimaCoreJSONValue.number))
+    parts[index]["rotation_euler_rad"] = .array(
+      rotationEulerRadians.map(AnimaCoreJSONValue.number)
+    )
+    root["parts"] = .array(parts.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
+  public static func settingPartState(
+    named partName: String,
+    suppressed: Bool? = nil,
+    grounded: Bool? = nil,
+    in document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    var root = try rootObject(document)
+    var parts = try objectArray(root, key: "parts")
+    guard let index = parts.firstIndex(where: { stringValue($0["name"]) == partName }) else {
+      throw AnimaCoreRigDocumentEditingError.unknownPart(partName)
+    }
+    if let suppressed { parts[index]["suppressed"] = .bool(suppressed) }
+    if let grounded { parts[index]["grounded"] = .bool(grounded) }
+    root["parts"] = .array(parts.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
+  public static func settingJointSuppressed(
+    named jointName: String,
+    suppressed: Bool,
+    in document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    var root = try rootObject(document)
+    var joints = try objectArray(root, key: "joints")
+    guard let index = joints.firstIndex(where: { stringValue($0["name"]) == jointName }) else {
+      throw AnimaCoreRigDocumentEditingError.unknownJoint(jointName)
+    }
+    joints[index]["suppressed"] = .bool(suppressed)
+    root["joints"] = .array(joints.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
+  public static func settingRelationSuppressed(
+    kind: AnimaCoreRelationKind,
+    driver: String,
+    driven: String,
+    suppressed: Bool,
+    in document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    var root = try rootObject(document)
+    var relations = try objectArray(root, key: "relations")
+    guard
+      let index = relations.firstIndex(where: {
+        stringValue($0["kind"]) == kind.rawValue
+          && stringValue($0["driver"]) == driver
+          && stringValue($0["driven"]) == driven
+      })
+    else {
+      throw AnimaCoreRigDocumentEditingError.unknownRelation(
+        "\(kind.rawValue):\(driver)->\(driven)"
+      )
+    }
+    relations[index]["suppressed"] = .bool(suppressed)
+    root["relations"] = .array(relations.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
   private static func rootObject(
     _ document: AnimaCoreJSONValue
   ) throws -> [String: AnimaCoreJSONValue] {
@@ -119,6 +206,22 @@ public enum AnimaCoreRigDocumentEditor {
     }
   }
 
+  private static func objectArray(
+    _ root: [String: AnimaCoreJSONValue],
+    key: String
+  ) throws -> [[String: AnimaCoreJSONValue]] {
+    guard case .array(let values) = root[key] else {
+      if key == "parts" { throw AnimaCoreRigDocumentEditingError.partsAreMissing }
+      return []
+    }
+    return try values.map { value in
+      guard case .object(let object) = value else {
+        throw AnimaCoreRigDocumentEditingError.invalidPartEntry
+      }
+      return object
+    }
+  }
+
   private static func stringValue(_ value: AnimaCoreJSONValue?) -> String? {
     guard case .string(let value) = value else { return nil }
     return value
@@ -130,6 +233,12 @@ public enum AnimaCoreRigDocumentEditor {
       components.allSatisfy({ !$0.isEmpty && $0 != ".." && $0 != "." })
     else {
       throw AnimaCoreRigDocumentEditingError.invalidModelReference(reference)
+    }
+  }
+
+  private static func validateVector(_ values: [Double], field: String) throws {
+    guard values.count == 3, values.allSatisfy(\.isFinite) else {
+      throw AnimaCoreRigDocumentEditingError.invalidTransformVector(field)
     }
   }
 

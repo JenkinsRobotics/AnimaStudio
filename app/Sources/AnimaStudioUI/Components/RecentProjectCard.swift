@@ -5,31 +5,64 @@ struct RecentProjectCard: View {
   let project: RecentProjectSummary
   var canOpen: Bool { project.canOpen }
   var open: () -> Void = {}
+  var remove: (() -> Void)?
 
   @State private var isHovering = false
 
   var body: some View {
-    Group {
-      if canOpen {
-        Button(action: open) {
+    ZStack(alignment: .topTrailing) {
+      Group {
+        if canOpen {
+          Button(action: open) {
+            cardContent
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(project.displayName)
+          .accessibilityValue(accessibilityValue)
+        } else {
           cardContent
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(project.displayName)
+            .accessibilityValue(accessibilityValue)
         }
-        .buttonStyle(.plain)
-      } else {
-        cardContent
+      }
+
+      if isHovering, let remove {
+        removeButton(action: remove)
+          .padding(7)
+          .transition(.opacity.combined(with: .scale(scale: 0.85)))
       }
     }
     .onHover { isHovering = $0 }
+    .animation(.easeOut(duration: 0.12), value: isHovering)
+    .contextMenu {
+      if let remove {
+        Button("Remove from Recents", systemImage: "clock.badge.xmark", role: .destructive) {
+          remove()
+        }
+      }
+    }
     .help(
       canOpen
         ? "Open \(project.displayName)"
         : "The project folder must be located again before it can be reopened."
     )
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(project.displayName)
-    .accessibilityValue(
-      "Last opened \(formattedLastOpened), revision \(project.revisionNumber)"
-    )
+  }
+
+  private func removeButton(action: @escaping () -> Void) -> some View {
+    Button(role: .destructive, action: action) {
+      Image(systemName: "xmark")
+        .font(.caption.weight(.bold))
+        .frame(width: 22, height: 22)
+        .background(.regularMaterial, in: Circle())
+        .overlay {
+          Circle().stroke(StudioPalette.border, lineWidth: 1)
+        }
+    }
+    .buttonStyle(.plain)
+    .foregroundStyle(.secondary)
+    .help("Remove \(project.displayName) from Recents")
+    .accessibilityLabel("Remove \(project.displayName) from Recents")
   }
 
   private var cardContent: some View {
@@ -95,6 +128,10 @@ struct RecentProjectCard: View {
         .hour()
         .minute()
     )
+  }
+
+  private var accessibilityValue: String {
+    "Last opened \(formattedLastOpened), revision \(project.revisionNumber)"
   }
 }
 

@@ -33,4 +33,17 @@ final class PreviewCameraTests: XCTestCase {
     XCTAssertEqual(state.distance, 0.001)
     XCTAssertEqual(state.orthographicScale, 0.001)
   }
+
+  func testCameraRollNormalizesAndPreservesLookDirection() {
+    let orientation = PreviewCameraOrientation(
+      direction: .right,
+      rollRadians: .pi * 2.5
+    )
+    let rolled = orientation.rolled(by: .pi)
+
+    XCTAssertEqual(orientation.direction, .right)
+    XCTAssertEqual(orientation.rollRadians, .pi / 2, accuracy: 0.0001)
+    XCTAssertEqual(rolled.direction, .right)
+    XCTAssertEqual(rolled.rollRadians, -.pi / 2, accuracy: 0.0001)
+  }
 }

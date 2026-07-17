@@ -32,6 +32,10 @@ enum ViewCubeFace: String, CaseIterable {
     }
   }
 
+  var labelUpDirection: SIMD3<Float> {
+    simd_cross(normal, labelRightDirection)
+  }
+
   var vertices: [SIMD3<Float>] {
     switch self {
     case .front:
@@ -96,6 +100,16 @@ struct ProjectedViewCubeAxis {
   let endpoint: CGPoint
 }
 
+struct ViewCubeLabelProjection {
+  let transform: CGAffineTransform
+  let localBounds: CGRect
+  let projectedArea: CGFloat
+
+  var determinant: CGFloat {
+    transform.a * transform.d - transform.b * transform.c
+  }
+}
+
 enum ViewCubeHitKind: Equatable {
   case face(ViewCubeFace)
   case edge
@@ -119,7 +133,7 @@ enum ViewCubeGeometry {
     in size: CGSize,
     orientation: PreviewCameraOrientation
   ) -> [ProjectedViewCubeFace] {
-    let basis = cameraBasis(for: orientation.direction.vector)
+    let basis = cameraBasis(for: orientation)
     let scale = min(size.width, size.height) * 0.28
 
     return ViewCubeFace.allCases
@@ -146,7 +160,7 @@ enum ViewCubeGeometry {
     in size: CGSize,
     orientation: PreviewCameraOrientation
   ) -> [ProjectedViewCubeAxis] {
-    let basis = cameraBasis(for: orientation.direction.vector)
+    let basis = cameraBasis(for: orientation)
     let scale = min(size.width, size.height) * 0.28
     let worldOrigin = SIMD3<Float>(repeating: -1.15)
     let axisLength: Float = 2.35
@@ -214,25 +228,85 @@ enum ViewCubeGeometry {
     return nil
   }
 
-  static func labelPosition(for face: ProjectedViewCubeFace) -> CGPoint {
-    face.center
-  }
-
-  static func labelRotationRadians(
+  static func labelProjection(
     for face: ProjectedViewCubeFace,
-    orientation: PreviewCameraOrientation
-  ) -> CGFloat {
-    let basis = cameraBasis(for: orientation.direction.vector)
-    let direction = face.face.labelRightDirection
-    return atan2(
-      -CGFloat(simd_dot(direction, basis.up)),
-      CGFloat(simd_dot(direction, basis.right))
+    orientation: PreviewCameraOrientation,
+    labelSize: CGSize
+  ) -> ViewCubeLabelProjection? {
+    guard labelSize.width > 0, labelSize.height > 0 else { return nil }
+
+    let facing = simd_dot(face.face.normal, orientation.direction.vector)
+    let projectedArea = abs(polygonArea(face.points))
+    guard facing >= minimumLabelFacing, projectedArea >= minimumLabelArea else {
+      return nil
+    }
+
+    guard
+      var right = projectedSpan(
+        of: face,
+        along: face.face.labelRightDirection
+      ),
+      var down = projectedSpan(
+        of: face,
+        along: -face.face.labelUpDirection
+      )
+    else { return nil }
+
+    let rightLength = hypot(right.x, right.y)
+    let downLength = hypot(down.x, down.y)
+    guard rightLength > 0.05, downLength > 0.05 else { return nil }
+
+    // Keep the printed decal's baseline readable without detaching it from the
+    // face. A simultaneous 180-degree flip preserves the face plane and avoids
+    // upside-down labels; the determinant correction prevents mirroring.
+    if right.x < -0.001 || (abs(right.x) <= 0.001 && right.y > 0) {
+      right = CGPoint(x: -right.x, y: -right.y)
+      down = CGPoint(x: -down.x, y: -down.y)
+    }
+    if cross(right, down) < 0 {
+      down = CGPoint(x: -down.x, y: -down.y)
+    }
+
+    let horizontalSpan = CGPoint(
+      x: right.x * labelWidthFraction,
+      y: right.y * labelWidthFraction
+    )
+    let verticalSpan = CGPoint(
+      x: down.x * labelHeightFraction,
+      y: down.y * labelHeightFraction
+    )
+    let origin = CGPoint(
+      x: face.center.x - horizontalSpan.x / 2 - verticalSpan.x / 2,
+      y: face.center.y - horizontalSpan.y / 2 - verticalSpan.y / 2
+    )
+    let transform = CGAffineTransform(
+      a: horizontalSpan.x / labelSize.width,
+      b: horizontalSpan.y / labelSize.width,
+      c: verticalSpan.x / labelSize.height,
+      d: verticalSpan.y / labelSize.height,
+      tx: origin.x,
+      ty: origin.y
+    )
+    return ViewCubeLabelProjection(
+      transform: transform,
+      localBounds: CGRect(origin: .zero, size: labelSize),
+      projectedArea: projectedArea
     )
   }
 
+  static func headOnFace(
+    for orientation: PreviewCameraOrientation
+  ) -> ViewCubeFace? {
+    ViewCubeFace.allCases
+      .map { ($0, simd_dot($0.normal, orientation.direction.vector)) }
+      .max(by: { $0.1 < $1.1 })
+      .flatMap { $0.1 >= headOnFacing ? $0.0 : nil }
+  }
+
   private static func cameraBasis(
-    for cameraDirection: SIMD3<Float>
+    for orientation: PreviewCameraOrientation
   ) -> (right: SIMD3<Float>, up: SIMD3<Float>) {
+    let cameraDirection = orientation.direction.vector
     let forward = -simd_normalize(cameraDirection)
     var right = simd_cross(forward, SIMD3<Float>(0, 1, 0))
     if simd_length_squared(right) < 0.0001 {
@@ -240,8 +314,52 @@ enum ViewCubeGeometry {
     } else {
       right = simd_normalize(right)
     }
-    return (right, simd_normalize(simd_cross(right, forward)))
+    var up = simd_normalize(simd_cross(right, forward))
+    if abs(orientation.rollRadians) > 0.0001 {
+      let roll = simd_quatf(angle: orientation.rollRadians, axis: forward)
+      right = roll.act(right)
+      up = roll.act(up)
+    }
+    return (right, up)
   }
+
+  private static func projectedSpan(
+    of face: ProjectedViewCubeFace,
+    along direction: SIMD3<Float>
+  ) -> CGPoint? {
+    let desiredDifference = direction * 2
+    for firstIndex in face.worldVertices.indices {
+      for secondIndex in face.worldVertices.indices where secondIndex != firstIndex {
+        let difference = face.worldVertices[secondIndex] - face.worldVertices[firstIndex]
+        guard simd_length_squared(difference - desiredDifference) < 0.0001 else {
+          continue
+        }
+        return CGPoint(
+          x: face.points[secondIndex].x - face.points[firstIndex].x,
+          y: face.points[secondIndex].y - face.points[firstIndex].y
+        )
+      }
+    }
+    return nil
+  }
+
+  private static func polygonArea(_ points: [CGPoint]) -> CGFloat {
+    guard points.count >= 3 else { return 0 }
+    return points.indices.reduce(0) { total, index in
+      let next = (index + 1) % points.count
+      return total + points[index].x * points[next].y - points[next].x * points[index].y
+    } / 2
+  }
+
+  private static func cross(_ first: CGPoint, _ second: CGPoint) -> CGFloat {
+    first.x * second.y - first.y * second.x
+  }
+
+  private static let minimumLabelFacing: Float = 0.16
+  private static let minimumLabelArea: CGFloat = 80
+  private static let headOnFacing: Float = 0.985
+  private static let labelWidthFraction: CGFloat = 0.58
+  private static let labelHeightFraction: CGFloat = 0.25
 
   private static func direction(for vector: SIMD3<Float>) -> PreviewCameraDirection {
     PreviewCameraDirection(x: vector.x, y: vector.y, z: vector.z)

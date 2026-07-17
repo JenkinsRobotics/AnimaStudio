@@ -6,17 +6,20 @@ import SwiftUI
 
 public struct RobotPreviewView: View {
   @State private var transformDragState: TransformDragState?
+  @State private var armIKDragState: ArmIKDragState?
   @State private var navigationAction: CADNavigationAction?
   @State private var navigationCommandRevision = 0
   /// Standing sub-object selection shown in the viewport. The workspace
   /// model mirrors it through `onSelectMateCandidate` events and remains
-  /// authoritative for the inspector; this local copy only drives the
-  /// persistent marker treatment.
+  /// authoritative for the inspector; this local copy drives mesh-feature
+  /// overlays without exposing mate snap-point markers outside placement.
   @State private var standingFeature: MateConnectorCandidate?
+  @State private var hoveredFeature: MateConnectorCandidate?
   @State private var pointerTarget = ViewportPointerTarget.canvas
   @State private var entityTapRevision = 0
   @State private var lastSelectionPoint: CGPoint?
   @State private var boxSelectionState: BoxSelectionState?
+  @State private var sectionDragStartPositionMeters: Double?
 
   private let rig: CharacterRig
   private let engineResolvedPartPoses: [PartID: EngineResolvedPartPose]
@@ -39,11 +42,15 @@ public struct RobotPreviewView: View {
   private let focusedPartIsLocked: Bool
   private let mateCandidatePartIDs: Set<PartID>
   private let selectedMateCandidate: MateConnectorCandidate?
+  private let armIKTargetPose: EngineResolvedPartPose?
+  private let armIKTargetIsUnreachable: Bool
   private let importedHierarchyRootPath: ModelEntityPath?
   private let onSelectModelPath: (ModelEntityPath) -> Void
   private let onSelectPartID: (PartID) -> Void
   private let onSetPartPosition: (PartID, RigVector3) -> Void
   private let onSetPartRotation: (PartID, RigVector3) -> Void
+  private let onSetArmIKTargetPose: (EngineResolvedPartPose) -> Void
+  private let onSetSectionPosition: (Double) -> Void
   private let onSelectMateCandidate: (ViewportPickEvent) -> Void
   private let rigGuideVisibility: RigGuideVisibility
   private let appearance: PreviewAppearance
@@ -52,6 +59,12 @@ public struct RobotPreviewView: View {
   private let lightingPreset: ViewportLightingPreset
   private let materialFinish: ViewportMaterialFinish
   private let reflectionMode: ViewportReflectionMode
+  private let lightingIntensity: Float
+  private let environmentPreset: ViewportEnvironmentPreset
+  private let environmentRotationDegrees: Float
+  private let renderQuality: ViewportRenderQuality
+  private let backgroundSettings: ViewportBackgroundSettings
+  private let sectionPlane: ViewportSectionPlane
   private let showsShadows: Bool
   private let fieldOfViewDegrees: Float
   private let onCameraStateChange: (PreviewCameraState) -> Void
@@ -82,6 +95,8 @@ public struct RobotPreviewView: View {
     focusedPartIsLocked: Bool = false,
     mateCandidatePartIDs: Set<PartID> = [],
     selectedMateCandidate: MateConnectorCandidate? = nil,
+    armIKTargetPose: EngineResolvedPartPose? = nil,
+    armIKTargetIsUnreachable: Bool = false,
     importedHierarchyRootPath: ModelEntityPath? = nil,
     rigGuideVisibility: RigGuideVisibility = .hidden,
     appearance: PreviewAppearance = .midnight,
@@ -90,12 +105,20 @@ public struct RobotPreviewView: View {
     lightingPreset: ViewportLightingPreset = .balanced,
     materialFinish: ViewportMaterialFinish = .satin,
     reflectionMode: ViewportReflectionMode = .subtle,
+    lightingIntensity: Float = 1,
+    environmentPreset: ViewportEnvironmentPreset = .softbox,
+    environmentRotationDegrees: Float = 0,
+    renderQuality: ViewportRenderQuality = .standard,
+    backgroundSettings: ViewportBackgroundSettings = ViewportBackgroundSettings(),
+    sectionPlane: ViewportSectionPlane = ViewportSectionPlane(),
     showsShadows: Bool = true,
     fieldOfViewDegrees: Float = 60,
     onSelectModelPath: @escaping (ModelEntityPath) -> Void = { _ in },
     onSelectPartID: @escaping (PartID) -> Void = { _ in },
     onSetPartPosition: @escaping (PartID, RigVector3) -> Void = { _, _ in },
     onSetPartRotation: @escaping (PartID, RigVector3) -> Void = { _, _ in },
+    onSetArmIKTargetPose: @escaping (EngineResolvedPartPose) -> Void = { _ in },
+    onSetSectionPosition: @escaping (Double) -> Void = { _ in },
     onSelectMateCandidate: @escaping (ViewportPickEvent) -> Void = { _ in },
     onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in },
     onPointerTargetChange: @escaping (ViewportPointerTarget) -> Void = { _ in },
@@ -124,6 +147,8 @@ public struct RobotPreviewView: View {
     self.focusedPartIsLocked = focusedPartIsLocked
     self.mateCandidatePartIDs = mateCandidatePartIDs
     self.selectedMateCandidate = selectedMateCandidate
+    self.armIKTargetPose = armIKTargetPose
+    self.armIKTargetIsUnreachable = armIKTargetIsUnreachable
     self.importedHierarchyRootPath = importedHierarchyRootPath
     self.rigGuideVisibility = rigGuideVisibility
     self.appearance = appearance
@@ -132,12 +157,20 @@ public struct RobotPreviewView: View {
     self.lightingPreset = lightingPreset
     self.materialFinish = materialFinish
     self.reflectionMode = reflectionMode
+    self.lightingIntensity = min(max(lightingIntensity, 0.1), 3)
+    self.environmentPreset = environmentPreset
+    self.environmentRotationDegrees = environmentRotationDegrees
+    self.renderQuality = renderQuality
+    self.backgroundSettings = backgroundSettings
+    self.sectionPlane = sectionPlane
     self.showsShadows = showsShadows
     self.fieldOfViewDegrees = min(max(fieldOfViewDegrees, 20), 120)
     self.onSelectModelPath = onSelectModelPath
     self.onSelectPartID = onSelectPartID
     self.onSetPartPosition = onSetPartPosition
     self.onSetPartRotation = onSetPartRotation
+    self.onSetArmIKTargetPose = onSetArmIKTargetPose
+    self.onSetSectionPosition = onSetSectionPosition
     self.onSelectMateCandidate = onSelectMateCandidate
     self.onCameraStateChange = onCameraStateChange
     self.onPointerTargetChange = onPointerTargetChange
@@ -158,8 +191,14 @@ public struct RobotPreviewView: View {
         partAppearances: partAppearances,
         partModelSources: partModelSources,
         reflectionMode: reflectionMode,
+        lightingIntensity: lightingIntensity,
+        environmentPreset: environmentPreset,
+        environmentRotationDegrees: environmentRotationDegrees,
+        sectionPlane: sectionPlane,
         showsShadows: showsShadows
       )
+      content.renderingEffects.antialiasing =
+        renderQuality == .high ? .multisample4X : .none
       content.add(root)
       content.cameraTarget = root.findEntity(named: "previewCameraTarget")
 
@@ -188,6 +227,8 @@ public struct RobotPreviewView: View {
       guard let root = content.entities.first else {
         return
       }
+      content.renderingEffects.antialiasing =
+        renderQuality == .high ? .multisample4X : .none
 
       root.findEntity(named: "previewGrid")?.isEnabled = showsGrid
       RigGuideFactory.apply(rigGuideVisibility, to: root)
@@ -204,34 +245,41 @@ public struct RobotPreviewView: View {
         reportCameraState(updatedCameraState)
       }
       Self.applyRig(rig, engineResolvedPartPoses: engineResolvedPartPoses, to: root)
+      ArmIKTargetFactory.apply(
+        pose: armIKTargetPose,
+        isUnreachable: armIKTargetIsUnreachable,
+        to: root
+      )
       Self.applyPartAppearances(
         partAppearances,
         rig: rig,
         renderStyle: renderStyle,
-        materialFinish: materialFinish,
         to: root
       )
+      if let characterRoot = root.findEntity(named: "animaCharacterRoot") {
+        ViewportSectionFactory.refreshClippingMaterials(sectionPlane, below: characterRoot)
+      }
       if isPlacementActive {
+        let primitiveCandidatePartIDs = mateCandidatePartIDs.subtracting(partModelSources.keys)
         MateConnectorMarkerFactory.apply(
           rig: rig,
-          visiblePartIDs: mateCandidatePartIDs,
+          visiblePartIDs: primitiveCandidatePartIDs,
           selectedCandidate: selectedMateCandidate,
           style: .placement,
-          to: root
-        )
-      } else if let focusedPartID,
-        rig.parts.contains(where: { $0.id == focusedPartID })
-      {
-        MateConnectorMarkerFactory.apply(
-          rig: rig,
-          visiblePartIDs: [focusedPartID],
-          selectedCandidate: standingFeature,
-          style: .standingSelection,
           to: root
         )
       } else {
         MateConnectorMarkerFactory.remove(from: root)
       }
+      MeshFeatureOverlayFactory.applyInteraction(
+        hovered: hoveredFeature,
+        selected: isPlacementActive ? selectedMateCandidate : standingFeature,
+        pickScale: Self.meshFeaturePickScale(
+          projection: projection,
+          cameraState: cameraState
+        ),
+        to: root
+      )
       Self.applySelection(
         focusedPartID,
         highlightedPartIDs: highlightedPartIDs,
@@ -244,6 +292,7 @@ public struct RobotPreviewView: View {
         if let updatedCameraState = Self.applyNavigation(
           navigationAction,
           revision: navigationCommandRevision,
+          cameraState: cameraState,
           to: root
         ) {
           reportCameraState(updatedCameraState)
@@ -275,8 +324,15 @@ public struct RobotPreviewView: View {
             isPlacementActive: isPlacementActive
           ) {
           case .selectFeature(let candidate):
-            standingFeature = candidate
-            onSelectMateCandidate(.feature(candidate))
+            if standingFeature?.partID == candidate.partID,
+              standingFeature?.id == candidate.id
+            {
+              standingFeature = nil
+              onSelectMateCandidate(.clearFeature)
+            } else {
+              standingFeature = candidate
+              onSelectMateCandidate(.feature(candidate))
+            }
           case .forwardToPlacement(let candidate):
             onSelectMateCandidate(.feature(candidate))
           case .selectComponent(let partID):
@@ -361,6 +417,8 @@ public struct RobotPreviewView: View {
           transformDragState = nil
         }
     )
+    .simultaneousGesture(armIKTargetDragGesture)
+    .simultaneousGesture(sectionPlaneDragGesture)
     .simultaneousGesture(
       DragGesture(minimumDistance: 4)
         .targetedToAnyEntity()
@@ -370,9 +428,10 @@ public struct RobotPreviewView: View {
           else {
             return
           }
-          let mode: BoxSelectionMode =
-            value.location.x >= value.startLocation.x
-            ? .window : .crossing
+          let mode = BoxSelectionState.mode(
+            start: value.startLocation,
+            current: value.location
+          )
           boxSelectionState = BoxSelectionState(
             start: value.startLocation,
             current: value.location,
@@ -390,9 +449,10 @@ public struct RobotPreviewView: View {
             start: value.startLocation,
             current: value.location
           )
-          let mode: BoxSelectionMode =
-            value.location.x >= value.startLocation.x
-            ? .window : .crossing
+          let mode = BoxSelectionState.mode(
+            start: value.startLocation,
+            current: value.location
+          )
           guard let root = Self.ancestor(named: "animaPreviewRoot", from: value.entity) else {
             boxSelectionState = nil
             return
@@ -407,11 +467,11 @@ public struct RobotPreviewView: View {
                 value.project(point: point, to: .local)
               }
               guard let projectedBounds = Self.screenBounds(points) else { return nil }
-              let isSelected =
-                switch mode {
-                case .window: selectionRect.contains(projectedBounds)
-                case .crossing: selectionRect.intersects(projectedBounds)
-                }
+              let isSelected = BoxSelectionState.includes(
+                projectedBounds,
+                in: selectionRect,
+                mode: mode
+              )
               return isSelected ? part.id : nil
             })
           boxSelectionState = nil
@@ -422,11 +482,15 @@ public struct RobotPreviewView: View {
       SpatialEventGesture()
         .targetedToAnyEntity()
         .onChanged { value in
+          hoveredFeature = MeshFeatureOverlayFactory.candidate(from: value.entity)
           reportPointerTarget(
             SubObjectSelection.pointerTarget(
               for: Self.tapTarget(for: value.entity, rig: rig)
             )
           )
+        }
+        .onEnded { _ in
+          hoveredFeature = nil
         }
     )
     .overlay {
@@ -501,13 +565,14 @@ public struct RobotPreviewView: View {
     }
     .onHover { isInside in
       if !isInside {
+        hoveredFeature = nil
         reportPointerTarget(.canvas)
       }
     }
     .onDisappear {
       reportPointerTarget(.canvas)
     }
-    .background(appearance.backgroundColor.gradient)
+    .background { backgroundSettings.background }
     .id(sceneIdentity)
   }
 
@@ -518,11 +583,101 @@ public struct RobotPreviewView: View {
     !mateCandidatePartIDs.isEmpty || selectedMateCandidate != nil
   }
 
+  private var armIKTargetDragGesture: some Gesture {
+    DragGesture(minimumDistance: 2)
+      .targetedToAnyEntity()
+      .onChanged { value in
+        guard let targetPose = armIKTargetPose,
+          ArmIKTargetFactory.contains(value.entity),
+          let handle = TransformGizmoFactory.handle(from: value.entity),
+          let targetEntity = Self.ancestor(named: ArmIKTargetFactory.name, from: value.entity)
+        else { return }
+
+        let dragState: ArmIKDragState
+        if let armIKDragState, armIKDragState.handle == handle {
+          dragState = armIKDragState
+        } else {
+          dragState = ArmIKDragState(handle: handle, startPose: targetPose)
+          armIKDragState = dragState
+        }
+
+        let updatedPose: EngineResolvedPartPose?
+        switch handle {
+        case .translate(let axis):
+          guard
+            let start = value.unproject(value.startLocation, from: .local, to: .scene),
+            let current = value.unproject(value.location, from: .local, to: .scene)
+          else { return }
+          let worldAxis = simd_normalize(
+            targetEntity.convert(direction: TransformGizmoFactory.vector(for: axis), to: nil)
+          )
+          let distance = simd_dot(current - start, worldAxis)
+          let position = dragState.startPose.positionMeters + worldAxis * distance
+          updatedPose = EngineResolvedPartPose(
+            positionMeters: [Double(position.x), Double(position.y), Double(position.z)],
+            orientationImaginaryReal: [
+              Double(dragState.startPose.orientationImaginaryReal.x),
+              Double(dragState.startPose.orientationImaginaryReal.y),
+              Double(dragState.startPose.orientationImaginaryReal.z),
+              Double(dragState.startPose.orientationImaginaryReal.w),
+            ]
+          )
+        case .rotate(let axis):
+          let angle = Self.rotationAngle(for: value.translation, axis: axis)
+          let start = dragState.startPose.realityKitTransform.rotation
+          let delta = simd_quatf(
+            angle: Float(angle),
+            axis: TransformGizmoFactory.vector(for: axis)
+          )
+          let rotation = simd_normalize(start * delta)
+          updatedPose = EngineResolvedPartPose(
+            positionMeters: [
+              Double(dragState.startPose.positionMeters.x),
+              Double(dragState.startPose.positionMeters.y),
+              Double(dragState.startPose.positionMeters.z),
+            ],
+            orientationImaginaryReal: [
+              Double(rotation.imag.x), Double(rotation.imag.y),
+              Double(rotation.imag.z), Double(rotation.real),
+            ]
+          )
+        }
+        if let updatedPose {
+          onSetArmIKTargetPose(updatedPose)
+        }
+      }
+      .onEnded { _ in
+        armIKDragState = nil
+      }
+  }
+
+  private var sectionPlaneDragGesture: some Gesture {
+    DragGesture(minimumDistance: 2)
+      .targetedToAnyEntity()
+      .onChanged { value in
+        guard sectionPlane.isEnabled, ViewportSectionFactory.contains(value.entity),
+          let start = value.unproject(value.startLocation, from: .local, to: .scene),
+          let current = value.unproject(value.location, from: .local, to: .scene)
+        else { return }
+        let initial = sectionDragStartPositionMeters ?? sectionPlane.positionMeters
+        sectionDragStartPositionMeters = initial
+        let offset = simd_dot(
+          current - start,
+          ViewportSectionFactory.axisVector(sectionPlane.axis)
+        )
+        onSetSectionPosition(initial + Double(offset))
+      }
+      .onEnded { _ in sectionDragStartPositionMeters = nil }
+  }
+
   private var sceneIdentity: String {
     let partIDs = rig.parts.map { $0.id.rawValue.uuidString }.joined(separator: ",")
     let jointIDs = rig.joints.map { $0.id.rawValue }.joined(separator: ",")
+    let proxyFillets = partAppearances.map {
+      "\($0.key.rawValue.uuidString):\($0.value.proxyFilletRadiusMeters)"
+    }.sorted().joined(separator: ",")
     return
-      "\(modelURL?.absoluteString ?? "none")|\(partModelSources.values.map { "\($0.partID.rawValue):\($0.fileURL.path):\($0.modelNode ?? ""):\($0.unitScaleToMeters)" }.sorted().joined(separator: ","))|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(showsShadows)|\(partIDs)|\(jointIDs)"
+      "\(modelURL?.absoluteString ?? "none")|\(partModelSources.values.map { "\($0.partID.rawValue):\($0.fileURL.path):\($0.modelNode ?? ""):\($0.unitScaleToMeters)" }.sorted().joined(separator: ","))|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(lightingIntensity)|\(environmentPreset.rawValue)|\(environmentRotationDegrees)|\(sectionPlane.isEnabled)|\(sectionPlane.axis.rawValue)|\(sectionPlane.positionMeters)|\(showsShadows)|\(partIDs)|\(jointIDs)|\(proxyFillets)"
   }
 
   private static func makeScene(
@@ -535,37 +690,49 @@ public struct RobotPreviewView: View {
     partAppearances: [PartID: PreviewPartAppearance],
     partModelSources: [PartID: PartModelSource],
     reflectionMode: ViewportReflectionMode,
+    lightingIntensity: Float,
+    environmentPreset: ViewportEnvironmentPreset,
+    environmentRotationDegrees: Float,
+    sectionPlane: ViewportSectionPlane,
     showsShadows: Bool
   ) async -> Entity {
     let root = Entity()
     root.name = "animaPreviewRoot"
 
+    // AnimaCore resolves part-in-character transforms. Keep a distinct
+    // character root even while Character-in-World is identity in the Rig
+    // workspace, so scene placement never leaks into part authoring.
+    let characterRoot = Entity()
+    characterRoot.name = "animaCharacterRoot"
+    root.addChild(characterRoot)
+
     root.addChild(makeGrid(appearance: appearance))
 
     for part in rig.parts {
       if let source = partModelSources[part.id],
-        let imported = try? await RealityKitModelLoader.load(
+        let loaded = try? await RealityKitModelLoader.loadWithTopology(
           contentsOf: source.fileURL,
           unitScaleToMeters: source.unitScaleToMeters,
           modelNode: source.modelNode
         )
       {
-        root.addChild(
-          makeImportedPart(
+        characterRoot.addChild(
+          await makeImportedPart(
             part,
-            imported: imported,
+            imported: loaded.entity,
+            topology: loaded.topology,
             renderStyle: renderStyle,
             edgeDisplay: edgeDisplay,
+            appearance: partAppearances[part.id],
             showsShadows: showsShadows
           )
         )
       } else {
-        root.addChild(
+        characterRoot.addChild(
           makePart(
             part,
             renderStyle: renderStyle,
             edgeDisplay: edgeDisplay,
-            materialFinish: materialFinish,
             appearance: partAppearances[part.id],
             showsShadows: showsShadows
           )
@@ -575,7 +742,7 @@ public struct RobotPreviewView: View {
 
     for joint in rig.joints {
       guard let childPartID = joint.childPartID,
-        let child = root.findEntity(named: partEntityName(childPartID))
+        let child = characterRoot.findEntity(named: partEntityName(childPartID))
       else { continue }
       let guide = RigGuideFactory.makeRevoluteGuide()
       if let connector = joint.childConnector {
@@ -600,17 +767,23 @@ public struct RobotPreviewView: View {
     for light in ViewportLightingFactory.makeLights(
       preset: lightingPreset,
       baseIntensity: appearance.lightIntensity,
+      intensityMultiplier: lightingIntensity,
       showsShadows: showsShadows
     ) {
       root.addChild(light)
     }
 
     if let environmentLight = await ViewportLightingFactory.makeEnvironmentLight(
-      mode: reflectionMode
+      mode: reflectionMode,
+      preset: environmentPreset,
+      intensityMultiplier: lightingIntensity,
+      rotationDegrees: environmentRotationDegrees
     ) {
       root.addChild(environmentLight)
       ViewportLightingFactory.applyEnvironmentReceiver(light: environmentLight, to: root)
     }
+
+    ViewportSectionFactory.apply(sectionPlane, to: characterRoot)
 
     return root
   }
@@ -619,26 +792,33 @@ public struct RobotPreviewView: View {
     _ part: RigPartDefinition,
     renderStyle: ViewportRenderStyle,
     edgeDisplay: ViewportEdgeDisplay,
-    materialFinish: ViewportMaterialFinish,
     appearance: PreviewPartAppearance?,
     showsShadows: Bool
   ) -> Entity {
     let appearance = appearance ?? .defaultAppearance(for: part.primitiveKind)
     let material = ViewportRenderStyleApplier.partMaterial(
       renderStyle,
-      finish: materialFinish,
+      finish: appearance.finish,
       baseColor: appearance.nsColor
     )
     let entity: ModelEntity
     switch part.primitiveKind {
     case .box:
+      let size = Float(RigPrimitivePreviewGeometry.boxSizeMeters)
+      let filletRadius = Float(appearance.proxyFilletRadiusMeters)
+      let mesh: MeshResource =
+        if filletRadius > 0 {
+          .generateBox(
+            width: size,
+            height: size,
+            depth: size,
+            cornerRadius: filletRadius
+          )
+        } else {
+          .generateBox(width: size, height: size, depth: size)
+        }
       entity = ModelEntity(
-        mesh: .generateBox(
-          width: Float(RigPrimitivePreviewGeometry.boxSizeMeters),
-          height: Float(RigPrimitivePreviewGeometry.boxSizeMeters),
-          depth: Float(RigPrimitivePreviewGeometry.boxSizeMeters),
-          cornerRadius: 0.035
-        ),
+        mesh: mesh,
         materials: [material]
       )
     case .cylinder:
@@ -683,19 +863,34 @@ public struct RobotPreviewView: View {
   private static func makeImportedPart(
     _ part: RigPartDefinition,
     imported: Entity,
+    topology: ImportedMeshTopology?,
     renderStyle: ViewportRenderStyle,
     edgeDisplay: ViewportEdgeDisplay,
+    appearance: PreviewPartAppearance?,
     showsShadows: Bool
-  ) -> Entity {
+  ) async -> Entity {
+    let appearance = appearance ?? .defaultAppearance(for: part.primitiveKind)
     let container = Entity()
     container.name = partEntityName(part.id)
     imported.name = "importedGeometry"
-    prepareForSelection(imported)
+    prepareForSelection(imported, hoverStrength: 0.48)
     ViewportRenderStyleApplier.apply(renderStyle, edgeDisplay: edgeDisplay, to: imported)
     applyShadowParticipation(showsShadows, to: imported)
     container.addChild(imported)
     container.position = simdPosition(part.positionMeters)
     container.orientation = orientation(part.rotationEulerRadians)
+    container.isEnabled = appearance.isVisible
+    container.components.set(OpacityComponent(opacity: Float(appearance.opacity)))
+    applyMaterialOverride(
+      appearance,
+      renderStyle: renderStyle,
+      to: imported
+    )
+    if let topology {
+      imported.addChild(
+        await MeshFeatureOverlayFactory.make(partID: part.id, topology: topology)
+      )
+    }
     return container
   }
 
@@ -703,25 +898,45 @@ public struct RobotPreviewView: View {
     _ appearances: [PartID: PreviewPartAppearance],
     rig: CharacterRig,
     renderStyle: ViewportRenderStyle,
-    materialFinish: ViewportMaterialFinish,
     to root: Entity
   ) {
     for part in rig.parts {
-      guard let entity = root.findEntity(named: partEntityName(part.id)),
-        var model = entity.components[ModelComponent.self]
-      else { continue }
+      guard let entity = root.findEntity(named: partEntityName(part.id)) else { continue }
 
       let appearance = appearances[part.id] ?? .defaultAppearance(for: part.primitiveKind)
       entity.isEnabled = appearance.isVisible
       entity.components.set(OpacityComponent(opacity: Float(appearance.opacity)))
-      model.materials = [
-        ViewportRenderStyleApplier.partMaterial(
-          renderStyle,
-          finish: materialFinish,
-          baseColor: appearance.nsColor
+      applyMaterialOverride(
+        appearance,
+        renderStyle: renderStyle,
+        to: entity
+      )
+    }
+  }
+
+  private static func applyMaterialOverride(
+    _ appearance: PreviewPartAppearance,
+    renderStyle: ViewportRenderStyle,
+    to root: Entity
+  ) {
+    var stack = [root]
+    while let entity = stack.popLast() {
+      if entity.components[MeshFeatureComponent.self] != nil {
+        continue
+      }
+      if var model = entity.components[ModelComponent.self] {
+        let count = max(model.materials.count, 1)
+        model.materials = Array(
+          repeating: ViewportRenderStyleApplier.partMaterial(
+            renderStyle,
+            finish: appearance.finish,
+            baseColor: appearance.nsColor
+          ),
+          count: count
         )
-      ]
-      entity.components.set(model)
+        entity.components.set(model)
+      }
+      stack.append(contentsOf: entity.children)
     }
   }
 
@@ -824,6 +1039,9 @@ public struct RobotPreviewView: View {
     if let candidate = MateConnectorMarkerFactory.candidate(from: entity, rig: rig) {
       return .feature(candidate)
     }
+    if let candidate = MeshFeatureOverlayFactory.candidate(from: entity) {
+      return .feature(candidate)
+    }
     if let partID = partID(for: entity) {
       return .component(partID)
     }
@@ -839,6 +1057,22 @@ public struct RobotPreviewView: View {
 
   private static func rigVector(_ vector: SIMD3<Float>) -> RigVector3 {
     RigVector3(x: Double(vector.x), y: Double(vector.y), z: Double(vector.z))
+  }
+
+  /// Keeps edge/corner hit hulls approximately screen-size-stable as the
+  /// operator zooms. Face picking remains exact triangle geometry.
+  private static func meshFeaturePickScale(
+    projection: PreviewCameraProjection,
+    cameraState: PreviewCameraState
+  ) -> Float {
+    let rawScale: Float =
+      switch projection {
+      case .perspective:
+        cameraState.distance / 4.5
+      case .orthographic:
+        cameraState.orthographicScale / 2.8
+      }
+    return min(max(rawScale, 0.35), 8)
   }
 
   private static func boundingCorners(_ bounds: BoundingBox) -> [SIMD3<Float>] {
@@ -864,10 +1098,7 @@ public struct RobotPreviewView: View {
   }
 
   private static func orientation(_ eulerRadians: RigVector3) -> simd_quatf {
-    let x = simd_quatf(angle: Float(eulerRadians.x), axis: SIMD3<Float>(1, 0, 0))
-    let y = simd_quatf(angle: Float(eulerRadians.y), axis: SIMD3<Float>(0, 1, 0))
-    let z = simd_quatf(angle: Float(eulerRadians.z), axis: SIMD3<Float>(0, 0, 1))
-    return z * y * x
+    CharacterSpaceTransform.orientation(rotationEulerRadians: eulerRadians)
   }
 
   private static func rotationAngle(
@@ -886,6 +1117,7 @@ public struct RobotPreviewView: View {
   private static func applyNavigation(
     _ action: CADNavigationAction,
     revision: Int,
+    cameraState: PreviewCameraState,
     to root: Entity
   ) -> PreviewCameraState? {
     let markerName = "previewNavigationCommand-\(revision)"
@@ -938,11 +1170,19 @@ public struct RobotPreviewView: View {
       }
     }
 
-    camera.look(at: cameraTarget.position, from: camera.position, relativeTo: nil)
+    applyCameraOrientation(
+      to: camera,
+      target: cameraTarget.position,
+      rollRadians: cameraState.orientation.rollRadians
+    )
     let marker = Entity()
     marker.name = markerName
     root.addChild(marker)
-    return captureCameraState(camera: camera, target: cameraTarget)
+    return captureCameraState(
+      camera: camera,
+      target: cameraTarget,
+      rollRadians: cameraState.orientation.rollRadians
+    )
   }
 
   private static func applyProjectionIfNeeded(
@@ -1057,19 +1297,28 @@ public struct RobotPreviewView: View {
       distance = cameraState.distance
       camera.position = target + cameraState.orientation.direction.vector * distance
     }
-    camera.look(at: target, from: camera.position, relativeTo: nil)
+    applyCameraOrientation(
+      to: camera,
+      target: target,
+      rollRadians: cameraState.orientation.rollRadians
+    )
     root.findEntity(named: "previewCameraTarget")?.position = target
 
     let marker = Entity()
     marker.name = markerName
     root.addChild(marker)
     guard let cameraTarget = root.findEntity(named: "previewCameraTarget") else { return nil }
-    return captureCameraState(camera: camera, target: cameraTarget)
+    return captureCameraState(
+      camera: camera,
+      target: cameraTarget,
+      rollRadians: cameraState.orientation.rollRadians
+    )
   }
 
   private static func captureCameraState(
     camera: Entity,
-    target: Entity
+    target: Entity,
+    rollRadians: Float
   ) -> PreviewCameraState {
     let offset = camera.position - target.position
     let distance = max(simd_length(offset), 0.001)
@@ -1077,7 +1326,8 @@ public struct RobotPreviewView: View {
     let orthographicScale = camera.components[OrthographicCameraComponent.self]?.scale ?? 2.8
     return PreviewCameraState(
       orientation: PreviewCameraOrientation(
-        direction: PreviewCameraDirection(x: direction.x, y: direction.y, z: direction.z)
+        direction: PreviewCameraDirection(x: direction.x, y: direction.y, z: direction.z),
+        rollRadians: rollRadians
       ),
       target: PreviewCameraPoint(
         x: target.position.x,
@@ -1087,6 +1337,17 @@ public struct RobotPreviewView: View {
       distance: distance,
       orthographicScale: orthographicScale
     )
+  }
+
+  private static func applyCameraOrientation(
+    to camera: Entity,
+    target: SIMD3<Float>,
+    rollRadians: Float
+  ) {
+    camera.look(at: target, from: camera.position, relativeTo: nil)
+    guard abs(rollRadians) > 0.0001 else { return }
+    let localViewAxis = SIMD3<Float>(0, 0, -1)
+    camera.orientation *= simd_quatf(angle: rollRadians, axis: localViewAxis)
   }
 
   private static func entity(
@@ -1103,10 +1364,13 @@ public struct RobotPreviewView: View {
     return entity
   }
 
-  private static func prepareForSelection(_ entity: Entity) {
+  private static func prepareForSelection(
+    _ entity: Entity,
+    hoverStrength: Float = 1.35
+  ) {
     entity.generateCollisionShapes(recursive: true)
     addInputTargets(to: entity)
-    addHoverEffects(to: entity)
+    addHoverEffects(to: entity, strength: hoverStrength)
   }
 
   private static func applyShadowParticipation(_ enabled: Bool, to root: Entity) {
@@ -1128,16 +1392,16 @@ public struct RobotPreviewView: View {
     }
   }
 
-  private static func addHoverEffects(to entity: Entity) {
+  private static func addHoverEffects(to entity: Entity, strength: Float) {
     if entity.components[ModelComponent.self] != nil {
       entity.components.set(
         HoverEffectComponent(
-          .highlight(.init(color: .systemCyan, strength: 1.35))
+          .highlight(.init(color: .systemCyan, strength: strength))
         )
       )
     }
     for child in entity.children {
-      addHoverEffects(to: child)
+      addHoverEffects(to: child, strength: strength)
     }
   }
 
@@ -1247,12 +1511,17 @@ private struct TransformDragState {
   let startRotation: RigVector3
 }
 
-private enum BoxSelectionMode {
+private struct ArmIKDragState {
+  let handle: TransformHandleKind
+  let startPose: EngineResolvedPartPose
+}
+
+enum BoxSelectionMode: Equatable {
   case window
   case crossing
 }
 
-private struct BoxSelectionState {
+struct BoxSelectionState {
   let start: CGPoint
   let current: CGPoint
   let mode: BoxSelectionMode
@@ -1268,6 +1537,23 @@ private struct BoxSelectionState {
       width: abs(current.x - start.x),
       height: abs(current.y - start.y)
     )
+  }
+
+  static func mode(start: CGPoint, current: CGPoint) -> BoxSelectionMode {
+    current.x >= start.x ? .window : .crossing
+  }
+
+  static func includes(
+    _ projectedBounds: CGRect,
+    in selectionRect: CGRect,
+    mode: BoxSelectionMode
+  ) -> Bool {
+    switch mode {
+    case .window:
+      selectionRect.contains(projectedBounds)
+    case .crossing:
+      selectionRect.intersects(projectedBounds)
+    }
   }
 }
 

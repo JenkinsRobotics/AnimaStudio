@@ -47,7 +47,7 @@ let package = Package(
       name: "AnimaStudioApp",
       dependencies: ["AnimaStudioUI"],
       path: "App",
-      exclude: ["AnimaCoreHelper.entitlements", "AnimaStudio.entitlements", "Resources"]
+      exclude: ["AnimaCoreHelper.entitlements", "AnimaStudio.entitlements", "Resources", "Shaders"]
     ),
     .testTarget(
       name: "AnimaCoreClientTests",

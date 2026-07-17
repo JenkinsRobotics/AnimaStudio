@@ -33,7 +33,8 @@ public struct AnimaStudioRootView: View {
           recentProjects: recentProjects,
           createProject: createProject,
           openProject: openProject,
-          openRecentProject: openRecent
+          openRecentProject: openRecent,
+          removeRecentProject: removeRecent
         )
       }
     }
@@ -85,8 +86,15 @@ public struct AnimaStudioRootView: View {
       projectSession = session
       recordRecent(session)
     } catch {
+      if recent.resolvedProjectURL() == nil {
+        removeRecent(recent.id)
+      }
       lifecycleErrorMessage = error.localizedDescription
     }
+  }
+
+  private func removeRecent(_ id: RecentProjectSummary.ID) {
+    recentProjects = RecentProjectsPersistence.remove(id: id)
   }
 
   private func recordRecent(_ session: StudioProjectSession) {

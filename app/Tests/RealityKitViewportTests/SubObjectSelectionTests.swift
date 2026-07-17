@@ -183,17 +183,8 @@ final class SubObjectSelectionTests: XCTestCase {
 
   // MARK: Marker presentation
 
-  func testStandingSelectionMarkersAreDistinguishableFromPlacementMarkers() {
-    let placementIdle = MateConnectorMarkerStyle.placement.appearance(isSelected: false)
-    let standingIdle = MateConnectorMarkerStyle.standingSelection.appearance(isSelected: false)
-    let standingSelected = MateConnectorMarkerStyle.standingSelection.appearance(isSelected: true)
-
-    XCTAssertNotEqual(placementIdle.tint, standingIdle.tint)
-    XCTAssertNotNil(standingIdle.opacity, "idle preview markers stay quiet until hover")
-    XCTAssertNil(standingSelected.opacity, "the committed feature reads at full strength")
-    XCTAssertGreaterThan(standingSelected.radiusMeters, standingIdle.radiusMeters)
-    XCTAssertFalse(standingIdle.showsAxisStem)
-    XCTAssertTrue(standingSelected.showsAxisStem)
+  func testMateCandidateDotsHavePlacementModeOnly() {
+    XCTAssertEqual(MateConnectorMarkerStyle.allCases, [.placement])
   }
 
   func testPlacementMarkerAppearanceIsUnchanged() {

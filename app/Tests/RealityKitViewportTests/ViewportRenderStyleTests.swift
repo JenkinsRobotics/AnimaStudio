@@ -9,7 +9,7 @@ final class ViewportRenderStyleTests: XCTestCase {
   func testRenderStyleIdentifiersRemainStable() {
     XCTAssertEqual(
       ViewportRenderStyle.allCases.map(\.rawValue),
-      ["shaded", "wireframe", "translucent"]
+      ["shaded", "shadedWithEdges", "wireframe", "unshaded", "translucent"]
     )
     XCTAssertEqual(ViewportEdgeDisplay.allCases.map(\.rawValue), ["hidden", "mesh"])
     XCTAssertEqual(
@@ -78,5 +78,42 @@ final class ViewportRenderStyleTests: XCTestCase {
     XCTAssertEqual(pbr.metallic.scale, 0.92)
     XCTAssertEqual(pbr.roughness.scale, 0.24)
     XCTAssertEqual(pbr.clearcoat.scale, 0.08)
+  }
+
+  func testUnshadedProxyUsesLightingIndependentMaterial() {
+    let material = ViewportRenderStyleApplier.partMaterial(
+      .unshaded,
+      baseColor: .systemTeal
+    )
+    XCTAssertTrue(material is UnlitMaterial)
+  }
+
+  func testShadedWithEdgesForcesOverlayWhenGeneralEdgesAreHidden() {
+    let entity = ModelEntity(
+      mesh: .generateBox(size: 1),
+      materials: [SimpleMaterial(color: .systemTeal, isMetallic: false)]
+    )
+    ViewportRenderStyleApplier.apply(.shadedWithEdges, edgeDisplay: .hidden, to: entity)
+    XCTAssertNotNil(entity.findEntity(named: ViewportRenderStyleApplier.meshEdgeOverlayName))
+  }
+
+  func testSectionViewInstallsInteractivePlaneAndHandle() throws {
+    let root = Entity()
+    let box = ModelEntity(
+      mesh: .generateBox(size: 1),
+      materials: [
+        ViewportRenderStyleApplier.partMaterial(.shaded, baseColor: .systemTeal)
+      ]
+    )
+    root.addChild(box)
+
+    ViewportSectionFactory.apply(
+      ViewportSectionPlane(isEnabled: true, axis: .z, positionMeters: 0.25),
+      to: root
+    )
+
+    XCTAssertNotNil(root.findEntity(named: ViewportSectionFactory.planeName))
+    let handle = try XCTUnwrap(root.findEntity(named: ViewportSectionFactory.handleName))
+    XCTAssertNotNil(handle.components[InputTargetComponent.self])
   }
 }

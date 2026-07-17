@@ -2,7 +2,9 @@ import Foundation
 import RealityKit
 import simd
 
-/// Renderer-ready world transform projected from AnimaCore `resolve_pose`.
+/// Renderer-ready character-space transform projected from AnimaCore
+/// `resolve_pose`. The scene places it beneath the character root; a future
+/// Character-in-World transform belongs above that root.
 ///
 /// This type deliberately contains no mate or hierarchy semantics. It validates
 /// the bridge's array shape and converts the engine's quaternion convention

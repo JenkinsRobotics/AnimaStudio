@@ -55,6 +55,24 @@ struct RecentProjectSummary: Codable, Equatable, Identifiable, Sendable {
     projectPath != nil || bookmarkData != nil
   }
 
+  func resolvedProjectURL(fileManager: FileManager = .default) -> URL? {
+    if let bookmarkData {
+      var isStale = false
+      if let bookmarkedURL = try? URL(
+        resolvingBookmarkData: bookmarkData,
+        options: [.withSecurityScope],
+        relativeTo: nil,
+        bookmarkDataIsStale: &isStale
+      ), !isStale, Self.isExistingDirectory(bookmarkedURL, fileManager: fileManager) {
+        return bookmarkedURL
+      }
+    }
+
+    guard let projectPath else { return nil }
+    let pathURL = URL(fileURLWithPath: projectPath, isDirectory: true)
+    return Self.isExistingDirectory(pathURL, fileManager: fileManager) ? pathURL : nil
+  }
+
   static func project(_ session: StudioProjectSession, openedAt: Date = Date()) -> Self {
     Self(
       id: session.document.projectID,
@@ -77,6 +95,19 @@ struct RecentProjectSummary: Codable, Equatable, Identifiable, Sendable {
       thumbnailKind: .rig
     )
   }
+
+  private static func isExistingDirectory(_ url: URL, fileManager: FileManager) -> Bool {
+    let accessed = url.startAccessingSecurityScopedResource()
+    defer {
+      if accessed {
+        url.stopAccessingSecurityScopedResource()
+      }
+    }
+
+    var isDirectory: ObjCBool = false
+    return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+      && isDirectory.boolValue
+  }
 }
 
 enum RecentProjectsPersistence {
@@ -88,7 +119,13 @@ enum RecentProjectsPersistence {
     guard let data = defaults.data(forKey: storageKey) ?? defaults.data(forKey: legacyStorageKey),
       let decoded = try? JSONDecoder().decode([RecentProjectSummary].self, from: data)
     else { return [] }
-    return normalized(decoded)
+
+    let normalizedProjects = normalized(decoded)
+    let resolvableProjects = normalizedProjects.filter { $0.resolvedProjectURL() != nil }
+    if resolvableProjects != normalizedProjects {
+      save(resolvableProjects, to: defaults)
+    }
+    return resolvableProjects
   }
 
   static func recordOpened(
@@ -97,6 +134,17 @@ enum RecentProjectsPersistence {
     defaults: UserDefaults = .standard
   ) -> [RecentProjectSummary] {
     let updated = normalized([project] + current.filter { $0.id != project.id })
+      .filter { $0.resolvedProjectURL() != nil }
+    save(updated, to: defaults)
+    return updated
+  }
+
+  @discardableResult
+  static func remove(
+    id: RecentProjectSummary.ID,
+    from defaults: UserDefaults = .standard
+  ) -> [RecentProjectSummary] {
+    let updated = load(from: defaults).filter { $0.id != id }
     save(updated, to: defaults)
     return updated
   }

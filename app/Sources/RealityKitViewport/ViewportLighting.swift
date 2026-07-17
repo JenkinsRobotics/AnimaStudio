@@ -87,11 +87,12 @@ enum ViewportLightingFactory {
   static let fillLightName = "viewportFillLight"
   static let environmentLightName = "viewportEnvironmentLight"
 
-  private static var studioEnvironment: EnvironmentResource?
+  private static var studioEnvironments: [ViewportEnvironmentPreset: EnvironmentResource] = [:]
 
   static func makeLights(
     preset: ViewportLightingPreset,
     baseIntensity: Float,
+    intensityMultiplier: Float = 1,
     showsShadows: Bool = true
   ) -> [Entity] {
     let configuration = preset.configuration
@@ -99,7 +100,7 @@ enum ViewportLightingFactory {
       makeDirectionalLight(
         name: keyLightName,
         color: NSColor(calibratedRed: 1, green: 0.97, blue: 0.91, alpha: 1),
-        intensity: baseIntensity * configuration.keyMultiplier,
+        intensity: baseIntensity * configuration.keyMultiplier * intensityMultiplier,
         pitchRadians: -.pi / 4,
         yawRadians: -.pi / 4,
         castsShadows: showsShadows
@@ -107,7 +108,7 @@ enum ViewportLightingFactory {
       makeDirectionalLight(
         name: fillLightName,
         color: NSColor(calibratedRed: 0.78, green: 0.88, blue: 1, alpha: 1),
-        intensity: baseIntensity * configuration.fillMultiplier,
+        intensity: baseIntensity * configuration.fillMultiplier * intensityMultiplier,
         pitchRadians: -.pi / 6,
         yawRadians: .pi * 0.72,
         castsShadows: false
@@ -116,29 +117,36 @@ enum ViewportLightingFactory {
   }
 
   static func makeEnvironmentLight(
-    mode: ViewportReflectionMode
+    mode: ViewportReflectionMode,
+    preset: ViewportEnvironmentPreset = .softbox,
+    intensityMultiplier: Float = 1,
+    rotationDegrees: Float = 0
   ) async -> Entity? {
     guard mode != .off else { return nil }
     let environment: EnvironmentResource
-    if let studioEnvironment {
-      environment = studioEnvironment
+    if let cached = studioEnvironments[preset] {
+      environment = cached
     } else {
-      guard let image = makeStudioEnvironmentImage(),
+      guard let image = makeStudioEnvironmentImage(preset: preset),
         let generated = try? await EnvironmentResource(
           equirectangular: image,
-          withName: "AnimaStudioSoftboxes"
+          withName: "AnimaStudio-\(preset.rawValue)"
         )
       else { return nil }
-      studioEnvironment = generated
+      studioEnvironments[preset] = generated
       environment = generated
     }
     let entity = Entity(
       components: ImageBasedLightComponent(
         source: .single(environment),
-        intensityExponent: mode.intensityExponent
+        intensityExponent: mode.intensityExponent + log2(max(intensityMultiplier, 0.05))
       )
     )
     entity.name = environmentLightName
+    entity.orientation = simd_quatf(
+      angle: rotationDegrees * .pi / 180,
+      axis: SIMD3<Float>(0, 1, 0)
+    )
     return entity
   }
 
@@ -182,7 +190,9 @@ enum ViewportLightingFactory {
     return light
   }
 
-  private static func makeStudioEnvironmentImage() -> CGImage? {
+  private static func makeStudioEnvironmentImage(
+    preset: ViewportEnvironmentPreset
+  ) -> CGImage? {
     let width = 512
     let height = 256
     guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
@@ -197,12 +207,27 @@ enum ViewportLightingFactory {
       )
     else { return nil }
 
-    let colors =
-      [
-        NSColor(calibratedWhite: 0.055, alpha: 1).cgColor,
-        NSColor(calibratedRed: 0.24, green: 0.30, blue: 0.38, alpha: 1).cgColor,
-        NSColor(calibratedWhite: 0.035, alpha: 1).cgColor,
-      ] as CFArray
+    let colors: CFArray =
+      switch preset {
+      case .softbox:
+        [
+          NSColor(white: 0.055, alpha: 1).cgColor,
+          NSColor(red: 0.24, green: 0.30, blue: 0.38, alpha: 1).cgColor,
+          NSColor(white: 0.035, alpha: 1).cgColor,
+        ] as CFArray
+      case .rim:
+        [
+          NSColor(red: 0.02, green: 0.04, blue: 0.10, alpha: 1).cgColor,
+          NSColor(red: 0.10, green: 0.28, blue: 0.52, alpha: 1).cgColor,
+          NSColor(red: 0.02, green: 0.02, blue: 0.04, alpha: 1).cgColor,
+        ] as CFArray
+      case .warmStage:
+        [
+          NSColor(red: 0.08, green: 0.035, blue: 0.02, alpha: 1).cgColor,
+          NSColor(red: 0.40, green: 0.20, blue: 0.08, alpha: 1).cgColor,
+          NSColor(red: 0.025, green: 0.02, blue: 0.02, alpha: 1).cgColor,
+        ] as CFArray
+      }
     if let gradient = CGGradient(
       colorsSpace: colorSpace,
       colors: colors,

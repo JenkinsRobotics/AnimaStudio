@@ -50,6 +50,14 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Three-column Asset Builder workspace + consistent collection views | `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, focused Assets tests, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every center collection uses one Table/Grid presentation; Table is default; type-appropriate headers remain visible at zero rows; every empty body says `No <collection> yet` without duplicate actions; Parts behavior and right preview/import remain intact; full tests/lint/native/root sign/launch and `git diff --check` | released 2026-07-16 (272 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
+| Codex | Sharp box proxies + contextual mate snap points + persistent fillet inspector | `app/Sources/RealityKitViewport/{PreviewPartAppearance,RobotPreviewView,MateConnectorMarkers}.swift`, `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceModel.swift,Components/{InspectorView,ComponentAppearanceEditor}.swift}`, focused tests under `app/Tests/{AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | box proxies default to mathematically sharp edges; per-box fillet radius is an explicit mm Inspector value persisted in editor JSON; inferred face/edge/corner point markers are absent during normal selection and appear only during active mate-connector snapping; focused/full tests, lint, root-app build/sign/launch, `git diff --check` | released 2026-07-16 (267 XCTest + 20 Swift Testing; recursive lint; Xcode/root app build, deep sign, launch) |
+| Codex | Live navigator drag/drop regression: insertion feedback + drop-to-group | `app/project.yml`, `app/Sources/AnimaStudioUI/Components/{NavigatorDropInteraction,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Components/Tree/TreeView.swift`, `app/AppUITests/AnimaStudioAppUITests.swift`, focused navigator tests under `app/Tests/AnimaStudioUIUnitTests/Components/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | row-wide drag source/targets; visible animated before/after line and center + Create Group state; center drop creates and expands a real folder containing target plus dragged selection; a native UI test performs the drag in the app; full tests/lint/root build/sign/launch; `git diff --check` | implemented 2026-07-16; awaiting operator drag confirmation (263 XCTest + 20 Swift Testing green; root app built/signed; UI-test app association fixed, but macOS canceled UI automation authentication before gesture execution) |
+| Codex | CAD viewport environment, display, section, and saved-view controls | `app/App/Shaders/ViewportSection.metal`, `app/Package.swift`, `app/project.yml`, `app/Sources/RealityKitViewport/{PreviewAppearance,PreviewCameraState,RobotPreviewView,ViewportLighting,ViewportPresentation,ViewportRenderStyle,ViewportSection}.swift`, `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/{AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift,Components/{ViewportCameraHUD,ViewportEnvironmentSettingsView,ViewportRenderMenu}.swift,Settings/{AnimaStudioSettingsView,StudioPreferenceKeys}.swift}`, focused tests under `app/Tests/{AnimaDocumentTests,AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | project-persistent preset/custom solid/gradient backgrounds and named views; adjustable generated studio IBL intensity/rotation; shaded, shaded-with-edges, wireframe, unshaded, and translucent modes; real fragment clip-plane section view with axis/position handle; previous-view navigation; real 4x-MSAA high-quality mode; no object-material editor changes or engine semantics; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 (263 XCTest + 20 Swift Testing; recursive lint; native/root app + bundled Metal build; deep sign; RealityKit shader/material smoke; launch) |
+| Codex | Removable + self-pruning Recent Projects | `app/Sources/AnimaStudioUI/{AppShell/{RecentProjects,StudioHomeView,AnimaStudioRootView,ProjectLifecycle}.swift,Components/RecentProjectCard.swift,PreviewSupport/StudioPreviewCatalog.swift}`, `app/Tests/AnimaStudioUIUnitTests/AppShell/RecentProjectsTests.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | hover x and context menu forget an entry immediately without filesystem deletion; load prunes entries whose bookmark/path no longer resolves to an existing project folder; open and pruning share one resolver; focused/full tests, lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 (7 focused; 257 XCTest + 20 Swift Testing; Xcode/root app build, deep sign, launch) |
+| Codex | Imported-mesh topology hover/selection + tested CAD box selection | `app/Sources/RealityKitViewport/{ImportedMeshTopology,MeshFeatureOverlay,MateConnectorInference,RealityKitModelLoader,RobotPreviewView,SubObjectSelection}.swift`, `app/Tests/RealityKitViewportTests/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | ModelIO-backed imported meshes are welded and cached into connected coplanar face groups, sharp/boundary edge polylines, and 3+-edge corners; real mesh face/edge/corner proxies feed the existing feature selection and mate-candidate contract with distinct hover/selected styling; empty click/Escape/component behavior stays staged; directional window/crossing selection remains blue-solid/yellow-dashed and is pure-tested; existing viewport-to-tree reveal is reused; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 (255 XCTest + 20 Swift Testing; Xcode/root app build, deep sign, launch) |
+| Codex | ViewCube projected face decals + real camera roll controls | `app/Sources/RealityKitViewport/{PreviewCameraState,RobotPreviewView}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/{ViewCubeGeometry,ViewportViewCube,ViewportCameraHUD}.swift`, `app/Tests/{RealityKitViewportTests/PreviewCameraTests,AnimaStudioUIUnitTests/Components/ViewCubeGeometryTests}.swift`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | labels are drawn as readable affine decals glued to projected face quads and hidden on slivers; existing 15-degree orbit arrows remain; head-on principal faces expose real clockwise/counterclockwise 90-degree camera roll; ViewCube and RealityKit share one direction+roll state; focused/full tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 (248 XCTest + 20 Swift Testing; Xcode/root app build, deep sign, launch) |
+| Codex | First-run `~/Documents/AnimaStudio/` project-panel fix | `app/{project.yml,AnimaStudio.xcodeproj/project.pbxproj,App/AnimaStudio.entitlements}`, `app/Sources/AnimaStudioUI/{AppShell/{WorkspaceLocationPreference,ProjectLifecycle}.swift,Settings/AnimaStudioSettingsView.swift}`, `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceLocationPreferenceTests.swift`, `dev/docs/{reality/STATUS.md,roadmap/Project_Format.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | default root is the no-space real-user `~/Documents/AnimaStudio/`, never the sandbox container; New/Open/Save As create that exact folder before configuring their panels and never silently walk up to Documents; a focused first-use user-selected grant is bookmarked because App Sandbox has no static Documents entitlement; custom bookmarked roots still resolve; focused/full tests, lint, root-app build/signature/launch, real first-run + relaunch walkthrough, `git diff --check` | released 2026-07-16 |
 | Codex | Standard Settings scene + persistent workspace root | `app/{project.yml,App/{AnimaStudioApp.swift,AnimaStudio.entitlements}}`, `app/Sources/AnimaStudioUI/AppShell/{ProjectLifecycle,StudioHomeView,StudioWorkspaceView,WorkspaceLocationPreference}.swift`, `app/Sources/AnimaStudioUI/Settings/{AnimaStudioSettingsView,MouseNavigationSettingsView,StudioPreferenceKeys}.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{AppShell,Settings}/**`, `app/AppUITests/AnimaStudioAppUITests.swift`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/{reality/STATUS.md,roadmap/Project_Format.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one resolved/bookmarked workspace root defaults to `~/Documents/Anima Studio`; New/Open/Save As use it and lazily create it; Settings scene opens through standard macOS command/menu and contains Workspace, Navigation, Appearance; old mouse sheet removed; root preference/bookmark tests, full tests/lint/Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
 | Codex | Reusable navigator tree + persistent engine/editor object state | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/AppShell/{NavigatorOrganization,StudioWorkspaceModel,StudioWorkspaceView,ComponentContextActions}.swift`, `app/Sources/AnimaStudioUI/Components/{ProjectNavigatorView,PartTreeRow,NavigatorDropInteraction,ComponentAppearanceEditor,InspectorView}.swift`, new reusable tree files under `app/Sources/AnimaStudioUI/Components/Tree/**`, `app/Sources/RealityKitViewport/{PreviewPartAppearance,RobotPreviewView,CharacterSpaceTransform,EngineResolvedPose}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/{Studio_App,Coordinate_Frames}.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | one generic `TreeView`/pure tree model renders Instances and Mate Features; reorder/move/group/filter/drop validation and viewport-to-tree reveal are tested; state badges and context commands work; position/rotation/suppress/ground edit the retained engine DTO and round-trip through serialize/load; material/visibility/locks/disclosure/groups persist in character editor JSON; World→Character→Part remains explicit; full tests/lint/Xcode/root-app build/signature/launch plus move/suppress/material Save+reopen walkthrough and `git diff --check` | released 2026-07-16 (Swift/UI scope complete; engine suppression/output crash recorded in Requests) |
 | Codex | CAD mouse/navigation overhaul + reusable Mouse settings panel | `app/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture,RobotPreviewView,SubObjectSelection}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportCameraControls,ViewportRenderMenu,ComponentViewportContextMenu}.swift`, new focused settings views under `app/Sources/AnimaStudioUI/Settings/**`, focused tests under `app/Tests/{RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj` only if generation changes it, `dev/docs/{reality/STATUS.md,roadmap/Studio_App.md}`, `dev/briefings/{2026-07-14-bottango-parity.md,codex.md}` | Default/SolidWorks/Onshape/Fusion/Custom mappings match the approved CAD table; Option bindings, click-vs-drag right routing, normalized reversible zoom, precise zoom and middle-double-click frame; reliable selection/empty clear with selection feedback; compact reusable settings window with profile summaries, mouse-button diagram, manual bindings, sensitivity and reverse-wheel persistence; mapping/classifier/UI tests, recursive lint, Xcode/root-app build/signature/launch, `git diff --check` | released 2026-07-16 |
@@ -160,6 +168,7 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | DH2: inverse kinematics (damped least-squares, numpy) for articulated-arm rigs | `animacore/dh.py`, `animacore/tests/test_dh.py`, `pyproject.toml` (add numpy) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; IK reaches reachable targets, FK(IK(pose))==pose | released 2026-07-16 (1005 → 1013, +8 IK tests; numpy>=1.26 added; FK→IK→FK round-trip proven for 2R and 6R) |
 
 | Claude | DH3: kinematic_chain character-format block + arm rig type + bridge forward_kinematics/solve_ik verbs | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/test_kinematic_chain.py` (new), `dev/docs/roadmap/{Character_Format,DH_Kinematics}.md`, `dev/docs/reality/STATUS.md`, `examples/six_axis_arm_dh.character.anima` (new) | `.venv/bin/ruff check .` (clean) + `.venv/bin/pytest animacore/tests -q` (1043 passed); arm example round-trips, resolve_pose drives it via DH FK, bridge FK→IK→FK reaches target | released 2026-07-16 (1013 → 1043, +28 chain tests + 2 example-discovered; the DH articulated-arm rig type is complete) |
+| Codex | DH articulated-arm Swift UI: engine-backed joint jog/FK, end-effector IK target, arm inspector | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/ArticulatedArmControlsView.swift` (new), `app/Sources/RealityKitViewport/{RobotPreviewView,ArmIKTarget}.swift`, `app/Scripts/embed-animacore-helper.sh`, corresponding Swift tests, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | no Swift kinematics; decode `kinematic_chain`; FK/IK bridge integration; native-unit conversion; reachable/unreachable UI; bundled NumPy dependency; recursive lint + Swift tests + native build/root app launch | released 2026-07-16 (240 XCTest + 20 Swift Testing; Xcode/root app build + deep sign; bundled bridge hello includes FK/IK and NumPy 2.4.6 imports) |
 
 ## Requests
 
@@ -226,6 +235,124 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+- **2026-07-16 (Codex, sharp proxies + contextual snap candidates):** Removed
+  the hard-coded 35 mm corner radius from generated box proxies; the default
+  path now builds a sharp RealityKit box. Box Properties exposes a clamped
+  **Fillet Radius** field in millimetres, stored as view-only per-part editor
+  metadata v4 and restored on reopen; legacy metadata decodes to 0 mm. Color
+  editing preserves the geometry value. Primitive face/edge/corner/axis/origin
+  candidate dots no longer have a standing-selection style and are instantiated
+  only during an active mate placement session. Imported mesh selection keeps
+  its geometry overlay behavior. Verification: focused default/clamp,
+  placement-only marker, legacy decode, metadata round-trip, and engine-backed
+  Save/reopen tests; full 267 XCTest + 20 Swift Testing suite; recursive lint;
+  native Xcode and root-app builds; deep signature; launch; clean
+  `git diff --check`.
+
+- **2026-07-16 (Codex, live navigator drag/drop regression):** The tree rows
+  now occupy the full available hit area, insertion feedback is raised above
+  neighboring List rows and animated, and the center target explicitly reads
+  **Create Group**. A native UI regression creates two boxes and drags one onto
+  the other. This work also corrected the Xcode UI-test target's association
+  with the spaced `Anima Studio.app` product; Xcode now launches the test
+  runner, but macOS canceled its UI-automation authentication before the
+  gesture could execute. The 15 focused navigator tests and complete 263
+  XCTest + 20 Swift Testing suites pass; recursive lint, root build, signing,
+  and launch pass. Operator confirmation of the live gesture remains open.
+
+- **2026-07-16 (Codex, CAD environment/display controls):** The ViewCube's
+  Display menu now owns five explicit surface modes, quick backgrounds, a
+  production environment popover, named/previous camera views, section view,
+  and real 4x-MSAA quality. Backgrounds can be preset, solid, or two-stop
+  gradient. Three procedurally generated studio IBLs expose intensity and
+  rotation. Section view uses a bundled RealityKit surface shader for true
+  fragment clipping plus a draggable colored plane handle; cut caps/hatching
+  remain honest future polish. Background/section/named-view state round-trips
+  in character editor metadata v3, while performance/lighting remain operator
+  preferences. Object appearance files and AnimaCore were not changed.
+  Verification: 263 XCTest + 20 Swift Testing, recursive Swift format lint,
+  generated Xcode project, native and root-app builds (including the bundled
+  Metal library), deep signature verification, direct RealityKit
+  `CustomMaterial` shader conversion smoke check, launch, and clean
+  `git diff --check`.
+
+- **2026-07-16 (Codex, removable/self-pruning recents):** Recent-project cards
+  now reveal a compact top-right x on hover and expose **Remove from Recents**
+  from the context menu. Both route through the root's single recents state and
+  a persistence `remove(id:)` API, so the card disappears immediately and stays
+  gone while the project folder is never touched. Bookmark resolution and the
+  fallback path now share one existing-directory resolver with `openRecent`.
+  Stored recents whose bookmark/path no longer reaches a directory are pruned
+  and the cleaned list is persisted at launch; an entry that disappears during
+  the session is also forgotten when opening detects it. Verification: 7
+  focused persistence tests, including explicit on-disk preservation and
+  persisted missing-entry pruning; 257 XCTest + 20 Swift Testing full suite;
+  recursive lint; native Xcode/root-app build; deep signature verification;
+  launch; `git diff --check` clean.
+
+- **2026-07-16 (Codex, imported-mesh feature selection):** Added a cached,
+  renderer-side topology projection for STL, OBJ, and ModelIO-readable USD
+  geometry. Import now welds duplicated vertices, groups connected coplanar
+  triangles into face islands, extracts boundary/sharp-normal edge polylines,
+  and identifies vertices where at least three feature edges meet. Exact mesh
+  face, edge, and corner proxies feed the existing `MateConnectorCandidate`
+  contract, with cyan hover, stronger orange committed selection, zoom-adjusted
+  edge/corner picking, owning-component selection, navigator reveal, staged
+  Escape, and mate-placement feedback. The existing directional box selection
+  remains left-to-right blue/solid window containment and right-to-left
+  yellow/dashed crossing intersection; its pure classification and selection
+  rules are now covered alongside cube topology, welded STL vertices, USD
+  subtree transforms, topology caching, and feature-hit integration. This is a
+  pragmatic mesh projection, not analytic CAD B-rep topology; topology-changing
+  reimports do not yet remap durable feature identities. Verification: 7
+  focused topology tests; 255 XCTest + 20 Swift Testing full suite; recursive
+  format lint; native Xcode build; rebuilt/deep-signed root app, signature
+  verification, and launch; `git diff --check` clean.
+
+- **2026-07-16 (Codex, ViewCube projected decals + camera roll):** Replaced
+  center-positioned, fixed-size cube labels with affine face decals derived
+  from each face's projected vertex spans. The text center is locked to the
+  projected face center, both text axes foreshorten with the face, a determinant
+  and baseline correction prevent mirrored/upside-down labels, and rear or
+  near-edge-on slivers do not draw labels. The old `labelPosition` and
+  `labelRotationRadians` helpers are removed. Existing face/edge/corner hit
+  testing, hover feedback, the positive XYZ triad, and four 15-degree orbit
+  arrows remain unchanged.
+
+  `PreviewCameraOrientation` now carries a normalized renderer-neutral roll
+  angle. RealityKit applies it around the camera's local forward axis and
+  returns it with camera state; ViewCube face/axis projection consumes the same
+  angle. Curved counterclockwise/clockwise controls appear at the cube's top
+  corners only when one principal face is head-on and issue real 90-degree
+  roll commands. Selecting a principal direction or normal camera preset resets
+  roll to the canonical upright view. Verification: 10 ViewCube + 4 camera
+  focused tests; full `swift test` = **248 XCTest + 20 Swift Testing**; recursive
+  format lint and `git diff --check` clean; native Xcode build and rebuilt,
+  deeply verified root app pass; the replacement root app launched. Automated
+  screen capture remains unavailable under the host's Screen Recording policy.
+
+- **2026-07-16 (Codex, DH articulated-arm app UI):** The Swift front end now
+  detects `rig.kinematic_chain` and decodes its ordered revolute/prismatic
+  joint contract without adding any kinematic meaning to Swift. The Rig
+  inspector renders one limit-bounded jog control per engine joint, converts
+  radians/metres to degrees/mm only at the display boundary, sends edits to
+  `forward_kinematics`, and applies the returned character-space link/tool
+  frames to RealityKit. A dedicated cyan XYZ/rotation target is placed at the
+  tool; dragging it calls `solve_ik` using the current joints as seed. Reached
+  results update all sliders and link frames; unreachable targets remain
+  visible in orange with position/orientation residuals while the last valid
+  pose stays rendered. Requests are revision-guarded so stale drag/jog replies
+  cannot overwrite newer input.
+
+  The root helper packager now embeds NumPy alongside AnimaCore and PyYAML;
+  the rebuilt/deep-signed root app launched successfully. The embedded Python
+  framework imported `animacore.bridge` + NumPy 2.4.6 and its live hello
+  advertised `forward_kinematics`/`solve_ik`. Verification: recursive Swift
+  format lint clean; `swift test` = **240 XCTest + 20 Swift Testing**, all
+  passing, including real subprocess DH decode → FK → IK and workspace
+  jog/IK → renderer pose tests; Xcode build and root app build/sign passed;
+  `git diff --check` clean. Changed files are exactly the released claim above.
 
 - **2026-07-16 (Claude, DH3 — kinematic_chain arm rig type + bridge
   FK/IK verbs):** The DH articulated-arm rig type is COMPLETE — an arm is
@@ -320,6 +447,24 @@ change needed in the Handoff log instead of inventing commands.
   (`AnimaStudio` target vs `Anima Studio.app` product), which should be repaired
   as its own project-generation packet rather than changing the app product
   name in this UI change.
+
+- **2026-07-16 (Codex, first-run workspace-root correction):** Changed the
+  canonical default to `~/Documents/AnimaStudio/` (no space), added the
+  standard Documents usage description, and removed the panel paths' silent
+  closest-existing-directory fallback. The live sandbox walkthrough found that
+  there is no effective static Documents entitlement, so first use now asks the
+  operator to select Documents once, creates and bookmarks `AnimaStudio`, then
+  continues to the project panel; relaunch goes straight there. Custom roots
+  remain intact, and a stored reference to the former spaced default migrates.
+  Focused tests cover exact creation, real-vs-container resolution, and
+  migration. Verification: focused preference tests = 8 green; full suite =
+  245 XCTest + 20 Swift Testing, all green; recursive format lint clean; native
+  Xcode/root-app build and deep signature green; `git diff --check` clean. A
+  clean live sandbox walkthrough showed **Allow Anima Studio Project Access**,
+  then created the real `~/Documents/AnimaStudio/` (no container copy) and
+  opened **Create Anima Studio Project** with `Untitled Project` and Where =
+  `AnimaStudio`; relaunch skipped the grant picker and opened there directly.
+  The final root app is rebuilt and launched.
 
 - **2026-07-16 (Claude, DH2 — inverse kinematics, damped least-squares):**
   Closed the FK↔IK loop for the articulated-arm chains. Extended
@@ -2354,3 +2499,28 @@ change needed in the Handoff log instead of inventing commands.
   character walkthrough, and `git diff --check`. The temporary walkthrough
   character remained honestly in its required model-loading stage; no engine
   files or semantics were changed.
+- **2026-07-16 (Codex, three-column Asset Builder):** Replaced the Assets card
+  gallery with the standard left-navigation / center-content / right-context
+  workspace structure. The left adapter now renders through the shared
+  `TreeView`; its character branches project engine parts, mates/relations,
+  clips, indexed scenes, and app-owned appearance metadata, while the planned
+  user Parts Library remains visibly outside character truth. The center swaps
+  one collection surface by tree selection and provides a real selectable Parts
+  table. The right side keeps the live batch model loader and embeds a compact
+  RealityKit preview synchronized to the selected part. Added a deliberately
+  small `editor.json` part-asset V counter (V1 on first import, +1 on successful
+  one-file **Replace Part** upload; no history/PDM) with backward-compatible
+  metadata decoding. A follow-up pins the center collection to the top and full
+  available height, keeps zero-part collections as an empty table (the import
+  drop target already lives at right), and renders the actual 3D preview even
+  with an empty rig rather than substituting another empty-state message. The
+  final consistency pass routes Characters, Parts, Source Assets, Renders,
+  Assemblies, Scripts, Animations, and the planned Parts Library through one
+  Table/Grid surface. Table is the default, headers remain visible while empty,
+  and each body uses the same `No … yet` convention without another action.
+  Verification: recursive lint clean; 272 XCTest + 20 Swift Testing pass;
+  native Xcode and root-app builds pass; the bundled helper is deep-signed and
+  the root app launches with the engine helper running. Automated desktop
+  capture was not attempted after the environment rejected it as potentially
+  exposing unrelated screen contents; operator visual review remains the final
+  pixel-level check.

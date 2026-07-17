@@ -5,13 +5,11 @@ import simd
 
 /// How connector-candidate markers present in the viewport.
 ///
-/// `placement` is the mate-placement flow (orange commit targets).
-/// `standingSelection` is the persistent sub-object selection preview: the
-/// same inferred candidates, drawn quietly until hover reveals the exact
-/// clickable feature — the view-cube interaction generalized to components.
+/// `placement` is the mate/origin placement flow (orange commit targets).
+/// Candidate points deliberately have no standing mode: normal model
+/// selection uses geometry highlighting and stays free of snap-point dots.
 enum MateConnectorMarkerStyle: String, CaseIterable, Sendable {
   case placement
-  case standingSelection
 
   struct Appearance: Equatable {
     let tint: NSColor
@@ -24,23 +22,15 @@ enum MateConnectorMarkerStyle: String, CaseIterable, Sendable {
   }
 
   func appearance(isSelected: Bool) -> Appearance {
-    switch (self, isSelected) {
-    case (.placement, false):
+    switch isSelected {
+    case false:
       Appearance(
         tint: .systemOrange, opacity: nil, radiusMeters: 0.031,
         hoverColor: .systemYellow, hoverStrength: 1.45, showsAxisStem: true)
-    case (.placement, true):
+    case true:
       Appearance(
         tint: .systemPurple, opacity: nil, radiusMeters: 0.042,
         hoverColor: .systemYellow, hoverStrength: 1.45, showsAxisStem: true)
-    case (.standingSelection, false):
-      Appearance(
-        tint: .systemCyan, opacity: 0.34, radiusMeters: 0.024,
-        hoverColor: .systemCyan, hoverStrength: 2.2, showsAxisStem: false)
-    case (.standingSelection, true):
-      Appearance(
-        tint: .systemCyan, opacity: nil, radiusMeters: 0.038,
-        hoverColor: .systemCyan, hoverStrength: 2.2, showsAxisStem: true)
     }
   }
 }

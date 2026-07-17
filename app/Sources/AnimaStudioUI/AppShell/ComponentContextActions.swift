@@ -50,6 +50,9 @@ extension StudioWorkspaceModel {
     Dictionary(
       uniqueKeysWithValues: project.rig.parts.compactMap { part in
         guard var appearance = componentAppearance(for: part.id) else { return nil }
+        if enginePart(for: part.id)?.isSuppressed == true {
+          appearance.isVisible = false
+        }
         if let isolatedComponentID, part.id != isolatedComponentID {
           appearance.isVisible = false
         }

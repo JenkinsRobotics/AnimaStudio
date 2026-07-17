@@ -7,6 +7,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct StudioWorkspaceView: View {
+  @Environment(\.openSettings) private var openSettings
   @Binding var session: StudioProjectSession
   let closeProject: () -> Void
   let newProject: () -> Void
@@ -16,6 +17,7 @@ struct StudioWorkspaceView: View {
 
   @State private var workspace: StudioWorkspaceModel
   @State private var isImportingModel = false
+  @State private var replacesSelectedPartOnNextImport = false
   @State private var pendingModelImportURLs: [URL] = []
   @State private var stepConversionMessage: String?
   @State private var showsNewCharacterSheet = false
@@ -32,39 +34,55 @@ struct StudioWorkspaceView: View {
   @State private var showsUIDevAgentPanel = false
   @State private var viewportPointerTarget = ViewportPointerTarget.canvas
   @State private var viewportContextMenuRequest: ViewportContextMenuRequest?
-  @State private var showsMouseNavigationSettings = false
   @State private var lifecycleErrorMessage: String?
   @State private var isSavingProject = false
   @State private var didLoadIndexedCharacter = false
-  @AppStorage("viewportAppearance") private var viewportAppearanceRawValue =
+  @State private var armIKSolveTask: Task<Void, Never>?
+  @AppStorage(StudioPreferenceKey.viewportAppearance) private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
-  @AppStorage("viewportNavigationProfile") private var viewportNavigationProfileRawValue =
+  @AppStorage(StudioPreferenceKey.viewportNavigationProfile)
+  private var viewportNavigationProfileRawValue =
     PreviewNavigationProfile.default.rawValue
-  @AppStorage("viewportCustomRotateDrag") private var viewportCustomRotateDragRawValue =
+  @AppStorage(StudioPreferenceKey.viewportCustomRotateDrag)
+  private var viewportCustomRotateDragRawValue =
     NavigationDragBinding.rightMouse.rawValue
-  @AppStorage("viewportCustomPanDrag") private var viewportCustomPanDragRawValue =
+  @AppStorage(StudioPreferenceKey.viewportCustomPanDrag) private var viewportCustomPanDragRawValue =
     NavigationDragBinding.middleMouse.rawValue
-  @AppStorage("viewportCustomPreciseZoomDrag") private var viewportCustomPreciseZoomDragRawValue =
+  @AppStorage(StudioPreferenceKey.viewportCustomPreciseZoomDrag)
+  private var viewportCustomPreciseZoomDragRawValue =
     NavigationDragBinding.shiftMiddleMouse.rawValue
-  @AppStorage("viewportOrbitSpeed") private var viewportOrbitSpeedRawValue =
+  @AppStorage(StudioPreferenceKey.viewportOrbitSpeed) private var viewportOrbitSpeedRawValue =
     PreviewNavigationSpeed.standard.rawValue
-  @AppStorage("viewportPanSpeed") private var viewportPanSpeedRawValue =
+  @AppStorage(StudioPreferenceKey.viewportPanSpeed) private var viewportPanSpeedRawValue =
     PreviewNavigationSpeed.standard.rawValue
-  @AppStorage("viewportZoomSpeed") private var viewportZoomSpeedRawValue =
+  @AppStorage(StudioPreferenceKey.viewportZoomSpeed) private var viewportZoomSpeedRawValue =
     PreviewNavigationSpeed.reduced.rawValue
-  @AppStorage("viewportReversesWheelZoom") private var viewportReversesWheelZoom = false
-  @AppStorage("viewportRenderStyle") private var viewportRenderStyleRawValue =
+  @AppStorage(StudioPreferenceKey.viewportReversesWheelZoom)
+  private var viewportReversesWheelZoom = false
+  @AppStorage(StudioPreferenceKey.viewportRenderStyle) private var viewportRenderStyleRawValue =
     ViewportRenderStyle.shaded.rawValue
-  @AppStorage("viewportEdgeDisplay") private var viewportEdgeDisplayRawValue =
+  @AppStorage(StudioPreferenceKey.viewportEdgeDisplay) private var viewportEdgeDisplayRawValue =
     ViewportEdgeDisplay.mesh.rawValue
-  @AppStorage("viewportLightingPreset") private var viewportLightingPresetRawValue =
+  @AppStorage(StudioPreferenceKey.viewportLightingPreset)
+  private var viewportLightingPresetRawValue =
     ViewportLightingPreset.balanced.rawValue
-  @AppStorage("viewportMaterialFinish") private var viewportMaterialFinishRawValue =
+  @AppStorage(StudioPreferenceKey.viewportMaterialFinish)
+  private var viewportMaterialFinishRawValue =
     ViewportMaterialFinish.satin.rawValue
-  @AppStorage("viewportReflectionMode") private var viewportReflectionModeRawValue =
+  @AppStorage(StudioPreferenceKey.viewportReflectionMode)
+  private var viewportReflectionModeRawValue =
     ViewportReflectionMode.subtle.rawValue
-  @AppStorage("viewportShowsShadows") private var viewportShowsShadows = true
-  @AppStorage("viewportFieldOfViewDegrees") private var viewportFieldOfViewDegrees = 60.0
+  @AppStorage(StudioPreferenceKey.viewportShowsShadows) private var viewportShowsShadows = true
+  @AppStorage(StudioPreferenceKey.viewportFieldOfViewDegrees)
+  private var viewportFieldOfViewDegrees = 60.0
+  @AppStorage(StudioPreferenceKey.viewportLightingIntensity)
+  private var viewportLightingIntensity = 1.0
+  @AppStorage(StudioPreferenceKey.viewportEnvironmentPreset)
+  private var viewportEnvironmentPresetRawValue = ViewportEnvironmentPreset.softbox.rawValue
+  @AppStorage(StudioPreferenceKey.viewportEnvironmentRotationDegrees)
+  private var viewportEnvironmentRotationDegrees = 0.0
+  @AppStorage(StudioPreferenceKey.viewportRenderQuality)
+  private var viewportRenderQualityRawValue = ViewportRenderQuality.standard.rawValue
 
   init(
     session: Binding<StudioProjectSession>,
@@ -148,6 +166,7 @@ struct StudioWorkspaceView: View {
       case .success(let urls):
         beginModelImport(from: urls)
       case .failure(let error):
+        replacesSelectedPartOnNextImport = false
         presentModelImportError(error.localizedDescription)
       }
     }
@@ -160,7 +179,10 @@ struct StudioWorkspaceView: View {
       if !pendingModelImportURLs.isEmpty {
         ModelImportUnitsSheet(
           urls: pendingModelImportURLs,
-          cancel: { pendingModelImportURLs.removeAll() },
+          cancel: {
+            pendingModelImportURLs.removeAll()
+            replacesSelectedPartOnNextImport = false
+          },
           importModels: { requests in
             pendingModelImportURLs.removeAll()
             Task { await importModels(requests) }
@@ -252,8 +274,30 @@ struct StudioWorkspaceView: View {
     .task(id: workspace.playheadSeconds) {
       await workspace.refreshAnimaCoreFrameAtPlayhead()
     }
+    .onChange(of: workspace.documentEditRevision) { _, _ in
+      characterEditorMetadata = workspace.characterEditorMetadata(
+        applyingTo: characterEditorMetadata
+      )
+      var updated = session
+      updated.isDirty = true
+      session = updated
+    }
     .onDisappear {
+      armIKSolveTask?.cancel()
       Task { await workspace.shutdownAnimaCore() }
+    }
+  }
+
+  /// Coalesces high-frequency gizmo updates before they enter the sequential
+  /// bridge actor. The target moves immediately; AnimaCore still owns every
+  /// solved arm pose.
+  private func queueArmIKSolve(for pose: EngineResolvedPartPose) {
+    workspace.armIKTargetPose = pose
+    armIKSolveTask?.cancel()
+    armIKSolveTask = Task {
+      try? await Task.sleep(for: .milliseconds(35))
+      guard !Task.isCancelled else { return }
+      await workspace.solveArmIK(target: pose)
     }
   }
 
@@ -304,11 +348,14 @@ struct StudioWorkspaceView: View {
     Group {
       if workspace.activeWorkspace == .assets {
         AssetsWorkspaceView(
+          workspace: workspace,
           projectName: session.document.displayName,
+          projectRevision: session.document.metadata.revision,
           characters: session.document.characters,
+          projectScenes: session.document.scenes,
+          projectAssets: session.document.assets,
+          partAssetVersions: characterEditorMetadata.partAssetVersions,
           activeCharacterID: session.document.activeCharacter?.id,
-          activePartCount: workspace.engineParts.count,
-          showsLoadingStage: showsCharacterLoadingStage || workspace.engineParts.isEmpty,
           importProgress: characterImportProgress,
           importErrorMessage: characterImportErrorMessage,
           isSwitchingCharacter: isSwitchingCharacter,
@@ -317,6 +364,10 @@ struct StudioWorkspaceView: View {
             Task { await selectCharacter(character) }
           },
           importModels: { isImportingModel = true },
+          replaceModel: {
+            replacesSelectedPartOnNextImport = true
+            isImportingModel = true
+          },
           dropModels: beginModelImport
         )
       } else {
@@ -383,18 +434,32 @@ struct StudioWorkspaceView: View {
         highlightedPartIDs: workspace.viewportHighlightedPartIDs,
         selectionCount: workspace.selectionCount,
         partAppearances: workspace.viewportPartAppearances,
-        focusedPartIsLocked: workspace.selectedPartID.map(workspace.isComponentLocked) ?? false,
+        focusedPartIsLocked: workspace.selectedPartID.map {
+          workspace.isComponentLocked($0) || !workspace.isPartRestTransformEditable($0)
+        } ?? false,
         mateCandidatePartIDs: workspace.mateCandidatePartIDs,
         selectedMateCandidate: workspace.matePlacement?.sourceCandidate,
+        armIKTargetPose: workspace.activeWorkspace == .rig
+          ? workspace.armIKTargetPose : nil,
+        armIKTargetIsUnreachable: {
+          if case .unreachable = workspace.armIKReachState { return true }
+          return false
+        }(),
         importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
-        appearance: viewportAppearance,
+        appearance: workspace.viewportBackground.palette,
         renderStyle: viewportRenderStyle,
         edgeDisplay: viewportEdgeDisplay,
         lightingPreset: viewportLightingPreset,
         materialFinish: viewportMaterialFinish,
         reflectionMode: viewportReflectionMode,
+        lightingIntensity: Float(viewportLightingIntensity),
+        environmentPreset: viewportEnvironmentPreset,
+        environmentRotationDegrees: Float(viewportEnvironmentRotationDegrees),
+        renderQuality: viewportRenderQuality,
+        backgroundSettings: workspace.viewportBackground,
+        sectionPlane: workspace.viewportSectionPlane,
         showsShadows: viewportShowsShadows,
         fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
         onSelectModelPath: { path in
@@ -416,6 +481,14 @@ struct StudioWorkspaceView: View {
         },
         onSetPartRotation: { id, rotation in
           workspace.setPartRotation(id: id, to: rotation)
+        },
+        onSetArmIKTargetPose: { pose in
+          queueArmIKSolve(for: pose)
+        },
+        onSetSectionPosition: { positionMeters in
+          var section = workspace.viewportSectionPlane
+          section.positionMeters = positionMeters
+          workspace.setViewportSectionPlane(section)
         },
         onSelectMateCandidate: { candidate in
           workspace.selectMateConnector(candidate)
@@ -480,18 +553,6 @@ struct StudioWorkspaceView: View {
         )
       }
     }
-    .sheet(isPresented: $showsMouseNavigationSettings) {
-      MouseNavigationSettingsView(
-        profile: viewportNavigationProfileBinding,
-        customRotateDrag: viewportCustomRotateDragBinding,
-        customPanDrag: viewportCustomPanDragBinding,
-        customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
-        orbitSpeed: viewportOrbitSpeedBinding,
-        panSpeed: viewportPanSpeedBinding,
-        zoomSpeed: viewportZoomSpeedBinding,
-        reversesWheelZoom: $viewportReversesWheelZoom
-      )
-    }
   }
 
   private var viewportTitle: some View {
@@ -547,6 +608,10 @@ struct StudioWorkspaceView: View {
         showsGrid: previewGridBinding,
         appearance: viewportAppearanceBinding,
         fieldOfViewDegrees: viewportFieldOfViewBinding,
+        lightingIntensity: $viewportLightingIntensity,
+        environmentPreset: viewportEnvironmentPresetBinding,
+        environmentRotationDegrees: $viewportEnvironmentRotationDegrees,
+        renderQuality: viewportRenderQualityBinding,
         navigationProfile: viewportNavigationProfileBinding,
         customRotateDrag: viewportCustomRotateDragBinding,
         customPanDrag: viewportCustomPanDragBinding,
@@ -555,7 +620,13 @@ struct StudioWorkspaceView: View {
         panSpeed: viewportPanSpeedBinding,
         zoomSpeed: viewportZoomSpeedBinding,
         reversesWheelZoom: $viewportReversesWheelZoom,
-        showMouseSettings: { showsMouseNavigationSettings = true }
+        showMouseSettings: {
+          UserDefaults.standard.set(
+            StudioSettingsTab.navigation.rawValue,
+            forKey: StudioPreferenceKey.settingsSelectedTab
+          )
+          openSettings()
+        }
       )
       .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
@@ -585,8 +656,14 @@ struct StudioWorkspaceView: View {
 
   private var viewportAppearanceBinding: Binding<PreviewAppearance> {
     Binding(
-      get: { viewportAppearance },
-      set: { viewportAppearanceRawValue = $0.rawValue }
+      get: { workspace.viewportBackground.preset },
+      set: { value in
+        viewportAppearanceRawValue = value.rawValue
+        var settings = workspace.viewportBackground
+        settings.mode = .preset
+        settings.preset = value
+        workspace.setViewportBackground(settings)
+      }
     )
   }
 
@@ -761,6 +838,28 @@ struct StudioWorkspaceView: View {
     )
   }
 
+  private var viewportEnvironmentPreset: ViewportEnvironmentPreset {
+    ViewportEnvironmentPreset(rawValue: viewportEnvironmentPresetRawValue) ?? .softbox
+  }
+
+  private var viewportEnvironmentPresetBinding: Binding<ViewportEnvironmentPreset> {
+    Binding(
+      get: { viewportEnvironmentPreset },
+      set: { viewportEnvironmentPresetRawValue = $0.rawValue }
+    )
+  }
+
+  private var viewportRenderQuality: ViewportRenderQuality {
+    ViewportRenderQuality(rawValue: viewportRenderQualityRawValue) ?? .standard
+  }
+
+  private var viewportRenderQualityBinding: Binding<ViewportRenderQuality> {
+    Binding(
+      get: { viewportRenderQuality },
+      set: { viewportRenderQualityRawValue = $0.rawValue }
+    )
+  }
+
   private var viewportFieldOfViewBinding: Binding<Float> {
     Binding(
       get: { Float(viewportFieldOfViewDegrees) },
@@ -828,6 +927,7 @@ struct StudioWorkspaceView: View {
         ),
         editorMetadata: characterEditorMetadata
       )
+      workspace.applyCharacterEditorMetadata(characterEditorMetadata)
       workspace.project.name = session.document.displayName
       var updated = session
       updated.document.editorState.activeCharacterFolderName = character.folderName
@@ -949,6 +1049,9 @@ struct StudioWorkspaceView: View {
     }
     document.editorState.activeCharacterFolderName = character.folderName
     let canonicalText = try await workspace.serializedCharacterText()
+    characterEditorMetadata = workspace.characterEditorMetadata(
+      applyingTo: characterEditorMetadata
+    )
     return [
       ProjectFileWrite(relativePath: character.characterPath, text: canonicalText),
       ProjectFileWrite(
@@ -961,8 +1064,14 @@ struct StudioWorkspaceView: View {
   @MainActor
   private func beginModelImport(from urls: [URL]) {
     guard !urls.isEmpty else { return }
+    if replacesSelectedPartOnNextImport && urls.count != 1 {
+      replacesSelectedPartOnNextImport = false
+      presentModelImportError("Replace Part accepts one model file at a time.")
+      return
+    }
     let stepFiles = urls.filter { ["step", "stp"].contains($0.pathExtension.lowercased()) }
     if !stepFiles.isEmpty {
+      replacesSelectedPartOnNextImport = false
       let filenames = stepFiles.map(\.lastPathComponent).joined(separator: ", ")
       let message =
         "STEP needs conversion. Export \(filenames) as STL or USD from SolidWorks, Onshape, Fusion 360, or your CAD tool, then import the converted files."
@@ -980,6 +1089,8 @@ struct StudioWorkspaceView: View {
   @MainActor
   private func importModels(_ requests: [ModelImportRequest]) async {
     guard !requests.isEmpty else { return }
+    let replacesSelectedPart = replacesSelectedPartOnNextImport
+    replacesSelectedPartOnNextImport = false
     guard session.document.activeCharacter != nil else {
       presentModelImportError("Create a 3D character before importing model parts.")
       return
@@ -991,7 +1102,11 @@ struct StudioWorkspaceView: View {
         totalFiles: requests.count,
         currentFilename: request.url.lastPathComponent
       )
-      let succeeded = await importModel(from: request.url, sourceUnit: request.unit)
+      let succeeded = await importModel(
+        from: request.url,
+        sourceUnit: request.unit,
+        replacingSelectedPart: replacesSelectedPart && index == 0
+      )
       guard succeeded else {
         characterImportProgress = nil
         if session.isDirty { _ = await saveProject() }
@@ -1012,7 +1127,11 @@ struct StudioWorkspaceView: View {
 
   @MainActor
   @discardableResult
-  private func importModel(from sourceURL: URL, sourceUnit: ModelImportUnit) async -> Bool {
+  private func importModel(
+    from sourceURL: URL,
+    sourceUnit: ModelImportUnit,
+    replacingSelectedPart: Bool = false
+  ) async -> Bool {
     guard let character = session.document.activeCharacter else {
       presentModelImportError("Create a 3D character before importing model parts.")
       return false
@@ -1045,6 +1164,8 @@ struct StudioWorkspaceView: View {
       if let asset = updated.document.assets.last,
         case .embedded(let relativePath) = asset.storage
       {
+        let partNamesBeforeImport = Set(workspace.engineParts.map(\.name))
+        var versionedPartNames = Set<String>()
         let prefix = character.directoryPath + "/"
         guard relativePath.hasPrefix(prefix) else {
           throw AnimaDocumentError.pathTraversal(path: relativePath)
@@ -1055,20 +1176,32 @@ struct StudioWorkspaceView: View {
           unitName: sourceUnit.rawValue,
           unitScaleToMeters: sourceUnit.scaleToMeters
         )
-        _ = try await workspace.authorImportedModel(
+        let primaryPartName = try await workspace.authorImportedModel(
           modelReference: modelReference,
-          suggestedPartName: sourceURL.deletingPathExtension().lastPathComponent
+          suggestedPartName: sourceURL.deletingPathExtension().lastPathComponent,
+          replacingSelectedPart: replacingSelectedPart
+        )
+        recordAssetVersion(
+          for: primaryPartName,
+          replacesExisting: partNamesBeforeImport.contains(primaryPartName),
+          versionedPartNames: &versionedPartNames
         )
         let fileExtension = sourceURL.pathExtension.lowercased()
         let renderableNodes = importedHierarchy?.flattened.filter(\.hasRenderableGeometry) ?? []
-        if ["usd", "usda", "usdc", "usdz", "reality"].contains(fileExtension),
+        if !replacingSelectedPart,
+          ["usd", "usda", "usdc", "usdz", "reality"].contains(fileExtension),
           renderableNodes.count > 1
         {
           for node in renderableNodes {
-            _ = try await workspace.authorImportedModel(
+            let partName = try await workspace.authorImportedModel(
               modelReference: modelReference,
               modelNode: node.id.modelNodeReference,
               suggestedPartName: node.displayName
+            )
+            recordAssetVersion(
+              for: partName,
+              replacesExisting: partNamesBeforeImport.contains(partName),
+              versionedPartNames: &versionedPartNames
             )
           }
         }
@@ -1101,6 +1234,16 @@ struct StudioWorkspaceView: View {
     } else {
       workspace.importErrorMessage = message
     }
+  }
+
+  private func recordAssetVersion(
+    for partName: String,
+    replacesExisting: Bool,
+    versionedPartNames: inout Set<String>
+  ) {
+    guard versionedPartNames.insert(partName).inserted else { return }
+    let current = max(characterEditorMetadata.partAssetVersions[partName] ?? 1, 1)
+    characterEditorMetadata.partAssetVersions[partName] = replacesExisting ? current + 1 : current
   }
 
   @MainActor

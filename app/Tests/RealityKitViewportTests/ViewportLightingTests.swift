@@ -70,4 +70,28 @@ final class ViewportLightingTests: XCTestCase {
       ViewportReflectionMode.subtle.intensityExponent
     )
   }
+
+  func testEnvironmentAndQualityChoicesRemainStable() {
+    XCTAssertEqual(
+      ViewportEnvironmentPreset.allCases.map(\.rawValue),
+      ["softbox", "rim", "warmStage"]
+    )
+    XCTAssertEqual(ViewportRenderQuality.allCases.map(\.rawValue), ["standard", "high"])
+  }
+
+  func testLightingIntensityScalesKeyAndFillTogether() throws {
+    let lights = ViewportLightingFactory.makeLights(
+      preset: .balanced,
+      baseIntensity: 10_000,
+      intensityMultiplier: 0.5
+    )
+    XCTAssertEqual(
+      try XCTUnwrap(lights[0].components[DirectionalLightComponent.self]).intensity,
+      5_000
+    )
+    XCTAssertEqual(
+      try XCTUnwrap(lights[1].components[DirectionalLightComponent.self]).intensity,
+      1_400
+    )
+  }
 }

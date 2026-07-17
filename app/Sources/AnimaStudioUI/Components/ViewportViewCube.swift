@@ -7,15 +7,35 @@ struct ViewportViewCube: View {
   let orientation: PreviewCameraOrientation
   let onSelectDirection: (PreviewCameraDirection) -> Void
   let onNudge: (_ horizontalRadians: Float, _ verticalRadians: Float) -> Void
+  let onRoll: (_ radians: Float) -> Void
 
   var body: some View {
     VStack(spacing: 1) {
-      nudgeButton(
-        systemImage: "triangle.fill",
-        label: "Rotate view up",
-        horizontalRadians: 0,
-        verticalRadians: incrementRadians
-      )
+      HStack(spacing: 1) {
+        rollButton(
+          systemImage: "arrow.counterclockwise",
+          label: "Roll view counterclockwise",
+          radians: rollIncrementRadians
+        )
+
+        Spacer(minLength: 1)
+
+        nudgeButton(
+          systemImage: "triangle.fill",
+          label: "Rotate view up",
+          horizontalRadians: 0,
+          verticalRadians: incrementRadians
+        )
+
+        Spacer(minLength: 1)
+
+        rollButton(
+          systemImage: "arrow.clockwise",
+          label: "Roll view clockwise",
+          radians: -rollIncrementRadians
+        )
+      }
+      .frame(width: Self.controlRowWidth)
 
       HStack(spacing: 1) {
         nudgeButton(
@@ -68,20 +88,25 @@ struct ViewportViewCube: View {
         let label = Text(face.face.title)
           .font(.system(size: 8, weight: .bold, design: .rounded))
           .foregroundStyle(.white)
-        let labelPosition = ViewCubeGeometry.labelPosition(for: face)
-        var labelContext = context
-        labelContext.translateBy(x: labelPosition.x, y: labelPosition.y)
-        labelContext.rotate(
-          by: .radians(
-            Double(
-              ViewCubeGeometry.labelRotationRadians(
-                for: face,
-                orientation: orientation
-              )
+        let resolvedLabel = context.resolve(label)
+        let labelSize = resolvedLabel.measure(
+          in: CGSize(width: 64, height: 18)
+        )
+        if let decal = ViewCubeGeometry.labelProjection(
+          for: face,
+          orientation: orientation,
+          labelSize: labelSize
+        ) {
+          var labelContext = context
+          labelContext.concatenate(decal.transform)
+          labelContext.draw(
+            resolvedLabel,
+            at: CGPoint(
+              x: decal.localBounds.midX,
+              y: decal.localBounds.midY
             )
           )
-        )
-        labelContext.draw(label, at: .zero)
+        }
       }
 
       if let hoverLocation,
@@ -220,6 +245,31 @@ struct ViewportViewCube: View {
     .accessibilityLabel(label)
   }
 
+  @ViewBuilder
+  private func rollButton(
+    systemImage: String,
+    label: String,
+    radians: Float
+  ) -> some View {
+    if ViewCubeGeometry.headOnFace(for: orientation) != nil {
+      Button {
+        onRoll(radians)
+      } label: {
+        Image(systemName: systemImage)
+          .font(.system(size: 10, weight: .semibold))
+          .frame(width: 20, height: 17)
+          .foregroundStyle(StudioPalette.muted)
+      }
+      .buttonStyle(.plain)
+      .help("\(label) by 90°")
+      .accessibilityLabel(label)
+    } else {
+      Color.clear
+        .frame(width: 20, height: 17)
+        .accessibilityHidden(true)
+    }
+  }
+
   private func fillColor(for face: ViewCubeFace) -> Color {
     switch face {
     case .top, .bottom: Color(red: 0.34, green: 0.46, blue: 0.59)
@@ -229,6 +279,8 @@ struct ViewportViewCube: View {
   }
 
   private var incrementRadians: Float { .pi / 12 }
+  private var rollIncrementRadians: Float { .pi / 2 }
 
   private static let cubeSize = CGSize(width: 92, height: 92)
+  private static let controlRowWidth = cubeSize.width + 36
 }

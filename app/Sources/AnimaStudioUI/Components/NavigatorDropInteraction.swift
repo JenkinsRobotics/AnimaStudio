@@ -48,6 +48,7 @@ private struct NavigatorDropHeightKey: PreferenceKey {
 private struct NavigatorDropTargetModifier: ViewModifier {
   @Binding var activePayload: NavigatorDragPayload?
   let behavior: NavigatorDropBehavior
+  let canDrop: (NavigatorDragPayload, NavigatorDropIntent) -> Bool
   let onDrop: (NavigatorDragPayload, NavigatorDropIntent) -> Bool
   @State private var activeIntent: NavigatorDropIntent?
   @State private var rowHeight: CGFloat = NavigatorDropHeightKey.defaultValue
@@ -69,12 +70,15 @@ private struct NavigatorDropTargetModifier: ViewModifier {
       .overlay(alignment: .bottom) {
         if activeIntent == .after { insertionLine }
       }
+      .zIndex(activeIntent == nil ? 0 : 10)
+      .animation(.easeOut(duration: 0.12), value: activeIntent)
       .onDrop(
         of: [NavigatorDragPayload.typeIdentifier],
         delegate: NavigatorRowDropDelegate(
           activePayload: $activePayload,
           activeIntent: $activeIntent,
           behavior: behavior,
+          canDrop: canDrop,
           rowHeight: rowHeight,
           onDrop: onDrop
         )
@@ -89,9 +93,10 @@ private struct NavigatorDropTargetModifier: ViewModifier {
         .frame(height: 2)
     }
     .foregroundStyle(StudioPalette.accent)
-    .shadow(color: .black.opacity(0.35), radius: 1)
-    .padding(.horizontal, -4)
+    .shadow(color: .black.opacity(0.55), radius: 1.5)
+    .padding(.horizontal, 2)
     .allowsHitTesting(false)
+    .accessibilityIdentifier("Navigator insertion line")
   }
 
   private var groupTarget: some View {
@@ -100,7 +105,7 @@ private struct NavigatorDropTargetModifier: ViewModifier {
         .fill(StudioPalette.accent.opacity(0.16))
         .stroke(StudioPalette.accent, lineWidth: 2)
 
-      Label("Group", systemImage: "plus.circle.fill")
+      Label("Create Group", systemImage: "plus.circle.fill")
         .font(.caption.bold())
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
@@ -108,6 +113,7 @@ private struct NavigatorDropTargetModifier: ViewModifier {
         .padding(.trailing, 4)
     }
     .allowsHitTesting(false)
+    .accessibilityIdentifier("Navigator create group target")
   }
 }
 
@@ -115,6 +121,7 @@ private struct NavigatorRowDropDelegate: DropDelegate {
   @Binding var activePayload: NavigatorDragPayload?
   @Binding var activeIntent: NavigatorDropIntent?
   let behavior: NavigatorDropBehavior
+  let canDrop: (NavigatorDragPayload, NavigatorDropIntent) -> Bool
   let rowHeight: CGFloat
   let onDrop: (NavigatorDragPayload, NavigatorDropIntent) -> Bool
 
@@ -147,11 +154,14 @@ private struct NavigatorRowDropDelegate: DropDelegate {
 
   private func resolvedIntent(for info: DropInfo) -> NavigatorDropIntent? {
     guard let activePayload else { return nil }
-    return behavior.intent(
-      for: activePayload,
-      verticalPosition: info.location.y,
-      rowHeight: rowHeight
-    )
+    guard
+      let intent = behavior.intent(
+        for: activePayload,
+        verticalPosition: info.location.y,
+        rowHeight: rowHeight
+      ), canDrop(activePayload, intent)
+    else { return nil }
+    return intent
   }
 }
 
@@ -192,12 +202,14 @@ extension View {
   func navigatorDropTarget(
     activePayload: Binding<NavigatorDragPayload?>,
     behavior: NavigatorDropBehavior,
+    canDrop: @escaping (NavigatorDragPayload, NavigatorDropIntent) -> Bool = { _, _ in true },
     onDrop: @escaping (NavigatorDragPayload, NavigatorDropIntent) -> Bool
   ) -> some View {
     modifier(
       NavigatorDropTargetModifier(
         activePayload: activePayload,
         behavior: behavior,
+        canDrop: canDrop,
         onDrop: onDrop
       )
     )

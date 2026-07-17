@@ -18,6 +18,14 @@ enum NavigatorItem: Hashable {
   case animation(String)
 }
 
+enum ArmIKReachState: Equatable, Sendable {
+  case idle
+  case solving
+  case reached(iterations: Int)
+  case unreachable(positionErrorMeters: Double, orientationErrorRadians: Double)
+  case failed(String)
+}
+
 @MainActor
 @Observable
 final class StudioWorkspaceModel {
@@ -43,6 +51,7 @@ final class StudioWorkspaceModel {
   var selection: Set<NavigatorItem> = [] {
     didSet {
       revealInspectorForInspectableSelection()
+      requestNavigatorRevealForPrimarySelection()
     }
   }
   var playheadSeconds = 0.0
@@ -56,6 +65,11 @@ final class StudioWorkspaceModel {
   var cameraViewpoint: PreviewCameraViewpoint = .home
   var cameraState = PreviewCameraState()
   var cameraCommandRevision = 0
+  var previousCameraState: PreviewCameraState?
+  var previousCameraProjection: PreviewCameraProjection?
+  var namedCameraViews: [PreviewNamedView] = []
+  var viewportBackground = ViewportBackgroundSettings()
+  var viewportSectionPlane = ViewportSectionPlane()
   var rigGuideVisibility = RigGuideVisibility()
   var showsCreationPalette = true
   var importedModelURL: URL?
@@ -72,11 +86,20 @@ final class StudioWorkspaceModel {
   var engineMates: [AnimaCoreJointSummary] = []
   var engineRelationTypes: [AnimaCoreRelationTypeSummary] = []
   var engineRelations: [AnimaCoreRelationSummary] = []
+  var engineKinematicChain: AnimaCoreKinematicChainSummary?
+  var armJointValues: [String: Double] = [:]
+  var armToolPose: EngineResolvedPartPose?
+  var armIKTargetPose: EngineResolvedPartPose?
+  var armIKReachState: ArmIKReachState = .idle
   var relationDraft: RelationDraft?
   var componentGroups: [NavigatorComponentGroup] = []
   var lockedComponentIDs: Set<PartID> = []
   var lockedMateIDs: Set<JointID> = []
   var componentAppearances: [PartID: PreviewPartAppearance] = [:]
+  var navigatorExpandedNodeKeys: Set<String> = []
+  var navigatorRevealItem: NavigatorItem?
+  var navigatorRevealRevision = 0
+  var documentEditRevision = 0
   var isolatedComponentID: PartID?
   var transparentComponentIDs: Set<PartID> = []
   var componentInspectorTab = ComponentInspectorTab.properties
@@ -91,6 +114,10 @@ final class StudioWorkspaceModel {
   @ObservationIgnored private var enginePartIDsByName: [String: PartID] = [:]
   @ObservationIgnored private var engineClipName: String?
   @ObservationIgnored private var engineFrameRequestRevision = 0
+  @ObservationIgnored private var armRequestRevision = 0
+  @ObservationIgnored private var manualCameraHistoryOrigin:
+    (state: PreviewCameraState, projection: PreviewCameraProjection)?
+  @ObservationIgnored private var manualCameraHistoryTask: Task<Void, Never>?
 
   private let evaluator = AnimationEvaluator()
 
@@ -347,6 +374,19 @@ final class StudioWorkspaceModel {
         clip: clip?.name,
         timeSeconds: evaluationTimeSeconds
       )
+      let armJointValues = Self.armJointValues(
+        chain: loaded.rig.kinematicChain,
+        evaluation: evaluation
+      )
+      let armForwardResult: AnimaCoreForwardKinematicsResult? =
+        if loaded.rig.kinematicChain != nil {
+          try await animaCoreClient.forwardKinematics(
+            handle: loaded.handle,
+            jointValues: armJointValues
+          )
+        } else {
+          nil
+        }
       let preview = Self.previewProject(for: loaded.rig)
 
       if let previousHandle = animaCoreHandle {
@@ -362,6 +402,8 @@ final class StudioWorkspaceModel {
       engineMates = loaded.rig.joints
       engineRelationTypes = relationCatalog.relationTypes
       engineRelations = loaded.rig.relations
+      engineKinematicChain = loaded.rig.kinematicChain
+      self.armJointValues = armJointValues
       engineEvaluation = evaluation
       engineEvaluationTimeSeconds = evaluationTimeSeconds
       enginePartIDsByName = preview.partIDsByEngineName
@@ -370,6 +412,13 @@ final class StudioWorkspaceModel {
         from: resolvedPose,
         partIDsByEngineName: preview.partIDsByEngineName
       )
+      if let chain = loaded.rig.kinematicChain, let armForwardResult {
+        applyArmForwardResult(armForwardResult, chain: chain)
+      } else {
+        armToolPose = nil
+        armIKTargetPose = nil
+      }
+      armIKReachState = .idle
       project = preview.project
       playheadSeconds = evaluationTimeSeconds
       isPlaying = false
@@ -403,7 +452,8 @@ final class StudioWorkspaceModel {
   func authorImportedModel(
     modelReference: String,
     modelNode: String? = nil,
-    suggestedPartName: String
+    suggestedPartName: String,
+    replacingSelectedPart: Bool = false
   ) async throws -> String {
     guard let animaCoreClient, let engineRigDocument else {
       throw ProjectLifecycleError.noCharacterLoaded
@@ -413,6 +463,7 @@ final class StudioWorkspaceModel {
     }.flatMap { selectedName in
       engineParts.first(where: { part in
         guard part.name == selectedName else { return false }
+        if replacingSelectedPart { return true }
         if part.model.isEmpty { return true }
         return modelNode != nil && part.model == modelReference && part.modelNode == nil
       })?.name
@@ -466,6 +517,204 @@ final class StudioWorkspaceModel {
     )
   }
 
+  func enginePart(for id: PartID) -> AnimaCorePartSummary? {
+    guard let name = enginePartName(for: id) else { return nil }
+    return engineParts.first { $0.name == name }
+  }
+
+  func enginePartName(for id: PartID) -> String? {
+    enginePartIDsByName.first { $0.value == id }?.key
+  }
+
+  func partID(forEngineName name: String) -> PartID? {
+    enginePartIDsByName[name]
+  }
+
+  func requestNavigatorReveal(_ item: NavigatorItem) {
+    navigatorRevealItem = item
+    navigatorRevealRevision += 1
+  }
+
+  func setNavigatorExpandedNodeKeys(_ keys: Set<String>) {
+    guard keys != navigatorExpandedNodeKeys else { return }
+    navigatorExpandedNodeKeys = keys
+    documentEditRevision += 1
+  }
+
+  func applyCharacterEditorMetadata(_ metadata: CharacterEditorMetadata) {
+    let orderedNames = metadata.tree.partOrder
+    if !orderedNames.isEmpty {
+      let rank = Dictionary(uniqueKeysWithValues: orderedNames.enumerated().map { ($1, $0) })
+      project.rig.parts.sort {
+        let lhsName = enginePartName(for: $0.id) ?? $0.displayName
+        let rhsName = enginePartName(for: $1.id) ?? $1.displayName
+        return (rank[lhsName] ?? Int.max) < (rank[rhsName] ?? Int.max)
+      }
+    }
+
+    let mateRank = Dictionary(
+      uniqueKeysWithValues: metadata.tree.mateOrder.enumerated().map { ($1, $0) }
+    )
+    if !mateRank.isEmpty {
+      engineMates.sort {
+        (mateRank[$0.selectionKey] ?? Int.max) < (mateRank[$1.selectionKey] ?? Int.max)
+      }
+    }
+
+    lockedComponentIDs = Set(
+      metadata.tree.lockedPartNames.compactMap { enginePartIDsByName[$0] }
+    )
+    lockedMateIDs = Set(metadata.tree.lockedMateIDs.map(JointID.init(rawValue:)))
+    componentGroups = metadata.tree.groups.map { group in
+      NavigatorComponentGroup(
+        id: group.id,
+        displayName: group.displayName,
+        componentIDs: group.partNames.compactMap { enginePartIDsByName[$0] },
+        isLocked: group.isLocked
+      )
+    }.filter { !$0.componentIDs.isEmpty }
+    navigatorExpandedNodeKeys = Set(metadata.tree.expandedNodeKeys)
+    componentAppearances = Dictionary(
+      uniqueKeysWithValues: metadata.partAppearances.compactMap { name, value in
+        guard let partID = enginePartIDsByName[name] else { return nil }
+        return (
+          partID,
+          PreviewPartAppearance(
+            red: value.red,
+            green: value.green,
+            blue: value.blue,
+            opacity: value.opacity,
+            isVisible: value.isVisible,
+            finish: ViewportMaterialFinish(rawValue: value.finish) ?? .satin,
+            proxyFilletRadiusMeters: value.proxyFilletRadiusMeters
+          )
+        )
+      }
+    )
+    let viewport = metadata.viewport
+    viewportBackground = ViewportBackgroundSettings(
+      mode: ViewportBackgroundMode(rawValue: viewport.backgroundMode) ?? .preset,
+      preset: PreviewAppearance(rawValue: viewport.appearancePreset) ?? .midnight,
+      primary: ViewportColor(
+        red: viewport.primaryColor.red,
+        green: viewport.primaryColor.green,
+        blue: viewport.primaryColor.blue
+      ),
+      secondary: ViewportColor(
+        red: viewport.secondaryColor.red,
+        green: viewport.secondaryColor.green,
+        blue: viewport.secondaryColor.blue
+      )
+    )
+    viewportSectionPlane = ViewportSectionPlane(
+      isEnabled: viewport.sectionEnabled,
+      axis: ViewportSectionAxis(rawValue: viewport.sectionAxis) ?? .x,
+      positionMeters: viewport.sectionPositionMeters
+    )
+    namedCameraViews = viewport.namedViews.compactMap(Self.namedView(from:))
+  }
+
+  func characterEditorMetadata(applyingTo metadata: CharacterEditorMetadata)
+    -> CharacterEditorMetadata
+  {
+    var updated = metadata
+    updated.formatVersion = CharacterEditorMetadata.currentFormatVersion
+    updated.partAppearances = Dictionary(
+      uniqueKeysWithValues: componentAppearances.compactMap { partID, appearance in
+        guard let name = enginePartName(for: partID) else { return nil }
+        return (
+          name,
+          CharacterPartAppearanceMetadata(
+            red: appearance.red,
+            green: appearance.green,
+            blue: appearance.blue,
+            opacity: appearance.opacity,
+            isVisible: appearance.isVisible,
+            finish: appearance.finish.rawValue,
+            proxyFilletRadiusMeters: appearance.proxyFilletRadiusMeters
+          )
+        )
+      }
+    )
+    updated.tree = CharacterTreeMetadata(
+      groups: componentGroups.map { group in
+        CharacterTreeGroupMetadata(
+          id: group.id,
+          displayName: group.displayName,
+          partNames: group.componentIDs.compactMap(enginePartName(for:)),
+          isLocked: group.isLocked
+        )
+      },
+      lockedPartNames: lockedComponentIDs.compactMap(enginePartName(for:)).sorted(),
+      lockedMateIDs: lockedMateIDs.map(\.rawValue).sorted(),
+      expandedNodeKeys: navigatorExpandedNodeKeys.sorted(),
+      partOrder: project.rig.parts.compactMap { enginePartName(for: $0.id) },
+      mateOrder: engineMates.map(\.selectionKey)
+    )
+    updated.viewport = CharacterViewportMetadata(
+      backgroundMode: viewportBackground.mode.rawValue,
+      appearancePreset: viewportBackground.preset.rawValue,
+      primaryColor: .init(
+        red: viewportBackground.primary.red,
+        green: viewportBackground.primary.green,
+        blue: viewportBackground.primary.blue
+      ),
+      secondaryColor: .init(
+        red: viewportBackground.secondary.red,
+        green: viewportBackground.secondary.green,
+        blue: viewportBackground.secondary.blue
+      ),
+      sectionEnabled: viewportSectionPlane.isEnabled,
+      sectionAxis: viewportSectionPlane.axis.rawValue,
+      sectionPositionMeters: viewportSectionPlane.positionMeters,
+      namedViews: namedCameraViews.map(Self.namedViewMetadata(from:))
+    )
+    return updated
+  }
+
+  private static func namedView(from value: CharacterNamedViewMetadata) -> PreviewNamedView? {
+    guard value.direction.count == 3, value.target.count == 3 else { return nil }
+    return PreviewNamedView(
+      id: value.id,
+      name: value.name,
+      state: PreviewCameraState(
+        orientation: PreviewCameraOrientation(
+          direction: PreviewCameraDirection(
+            x: Float(value.direction[0]), y: Float(value.direction[1]),
+            z: Float(value.direction[2])
+          ),
+          rollRadians: Float(value.rollRadians)
+        ),
+        target: PreviewCameraPoint(
+          x: Float(value.target[0]), y: Float(value.target[1]), z: Float(value.target[2])
+        ),
+        distance: Float(value.distance),
+        orthographicScale: Float(value.orthographicScale)
+      ),
+      projection: PreviewCameraProjection(rawValue: value.projection) ?? .perspective
+    )
+  }
+
+  private static func namedViewMetadata(from value: PreviewNamedView) -> CharacterNamedViewMetadata
+  {
+    CharacterNamedViewMetadata(
+      id: value.id,
+      name: value.name,
+      projection: value.projection.rawValue,
+      direction: [
+        Double(value.state.orientation.direction.x),
+        Double(value.state.orientation.direction.y),
+        Double(value.state.orientation.direction.z),
+      ],
+      rollRadians: Double(value.state.orientation.rollRadians),
+      target: [
+        Double(value.state.target.x), Double(value.state.target.y), Double(value.state.target.z),
+      ],
+      distance: Double(value.state.distance),
+      orthographicScale: Double(value.state.orthographicScale)
+    )
+  }
+
   func shutdownAnimaCore() async {
     guard let animaCoreClient else { return }
     if let animaCoreHandle {
@@ -488,6 +737,12 @@ final class StudioWorkspaceModel {
     engineMates.removeAll()
     engineRelationTypes.removeAll()
     engineRelations.removeAll()
+    engineKinematicChain = nil
+    armJointValues.removeAll()
+    armToolPose = nil
+    armIKTargetPose = nil
+    armIKReachState = .idle
+    armRequestRevision += 1
     relationDraft = nil
     animaCoreState = .unavailable
   }
@@ -544,6 +799,19 @@ final class StudioWorkspaceModel {
         clip: engineClipName,
         timeSeconds: requestedTimeSeconds
       )
+      let updatedArmJointValues = Self.armJointValues(
+        chain: engineKinematicChain,
+        evaluation: evaluation
+      )
+      let armForwardResult: AnimaCoreForwardKinematicsResult? =
+        if engineKinematicChain != nil {
+          try await animaCoreClient.forwardKinematics(
+            handle: handle,
+            jointValues: updatedArmJointValues
+          )
+        } else {
+          nil
+        }
       guard revision == engineFrameRequestRevision,
         handle == animaCoreHandle,
         abs(requestedTimeSeconds - playheadSeconds) < 0.000_001
@@ -554,12 +822,143 @@ final class StudioWorkspaceModel {
         from: resolvedPose,
         partIDsByEngineName: enginePartIDsByName
       )
+      armJointValues = updatedArmJointValues
+      if let chain = engineKinematicChain, let armForwardResult {
+        applyArmForwardResult(armForwardResult, chain: chain)
+      }
     } catch is CancellationError {
       return
     } catch {
       guard revision == engineFrameRequestRevision else { return }
       animaCoreErrorMessage = error.localizedDescription
     }
+  }
+
+  /// Jogs one DH joint through AnimaCore FK. The app keeps only the current
+  /// authoring pose; all chain math and limit enforcement remains canonical in
+  /// the engine.
+  func jogArmJoint(named name: String, to value: Double) async {
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let chain = engineKinematicChain,
+      chain.joints.contains(where: { $0.name == name })
+    else { return }
+
+    var requestedValues = armJointValues
+    requestedValues[name] = value
+    armRequestRevision += 1
+    let revision = armRequestRevision
+    do {
+      let result = try await animaCoreClient.forwardKinematics(
+        handle: handle,
+        jointValues: requestedValues
+      )
+      guard revision == armRequestRevision, handle == animaCoreHandle else { return }
+      armJointValues = requestedValues
+      applyArmForwardResult(result, chain: chain)
+      armIKTargetPose = armToolPose
+      armIKReachState = .idle
+    } catch is CancellationError {
+      return
+    } catch {
+      guard revision == armRequestRevision else { return }
+      armIKReachState = .failed(error.localizedDescription)
+    }
+  }
+
+  /// Sends a character-space tool target to AnimaCore's IK solver. An
+  /// unreachable request remains visible as the target pose while the last
+  /// valid arm pose stays rendered.
+  func solveArmIK(target: EngineResolvedPartPose) async {
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let chain = engineKinematicChain
+    else { return }
+
+    armIKTargetPose = target
+    armIKReachState = .solving
+    armRequestRevision += 1
+    let revision = armRequestRevision
+    do {
+      let result = try await animaCoreClient.solveInverseKinematics(
+        handle: handle,
+        targetPose: AnimaCoreTransformPose(
+          position: [
+            Double(target.positionMeters.x),
+            Double(target.positionMeters.y),
+            Double(target.positionMeters.z),
+          ],
+          orientation: [
+            Double(target.orientationImaginaryReal.x),
+            Double(target.orientationImaginaryReal.y),
+            Double(target.orientationImaginaryReal.z),
+            Double(target.orientationImaginaryReal.w),
+          ]
+        ),
+        seed: armJointValues
+      )
+      guard revision == armRequestRevision, handle == animaCoreHandle else { return }
+      guard result.reached else {
+        armIKReachState = .unreachable(
+          positionErrorMeters: result.positionErrorMeters,
+          orientationErrorRadians: result.orientationErrorRadians
+        )
+        return
+      }
+
+      let forward = try await animaCoreClient.forwardKinematics(
+        handle: handle,
+        jointValues: result.jointValues
+      )
+      guard revision == armRequestRevision, handle == animaCoreHandle else { return }
+      armJointValues = result.jointValues
+      applyArmForwardResult(forward, chain: chain)
+      armIKTargetPose = armToolPose
+      armIKReachState = .reached(iterations: result.iterations)
+    } catch is CancellationError {
+      return
+    } catch {
+      guard revision == armRequestRevision else { return }
+      armIKReachState = .failed(error.localizedDescription)
+    }
+  }
+
+  private func applyArmForwardResult(
+    _ result: AnimaCoreForwardKinematicsResult,
+    chain: AnimaCoreKinematicChainSummary
+  ) {
+    for (joint, frame) in zip(chain.joints, result.linkFrames) {
+      guard let partName = joint.part, let partID = enginePartIDsByName[partName],
+        let pose = Self.previewPose(frame)
+      else { continue }
+      engineResolvedPartPoses[partID] = pose
+    }
+    if let toolPart = chain.toolPart, let partID = enginePartIDsByName[toolPart],
+      let pose = Self.previewPose(result.toolPose)
+    {
+      engineResolvedPartPoses[partID] = pose
+    }
+    armToolPose = Self.previewPose(result.toolPose)
+    if armIKTargetPose == nil {
+      armIKTargetPose = armToolPose
+    }
+  }
+
+  private static func armJointValues(
+    chain: AnimaCoreKinematicChainSummary?,
+    evaluation: AnimaCoreEvaluation
+  ) -> [String: Double] {
+    guard let chain else { return [:] }
+    return Dictionary(
+      uniqueKeysWithValues: chain.joints.map { joint in
+        (joint.name, evaluation.degreesOfFreedom[joint.degreeOfFreedomPath] ?? joint.neutral)
+      }
+    )
+  }
+
+  private static func previewPose(_ pose: AnimaCoreTransformPose) -> EngineResolvedPartPose? {
+    EngineResolvedPartPose(
+      positionMeters: pose.position,
+      orientationImaginaryReal: pose.orientation
+    )
   }
 
   var canCreateRevoluteJoint: Bool {
@@ -872,20 +1271,28 @@ final class StudioWorkspaceModel {
   }
 
   func setPartPosition(id: PartID, to positionMeters: RigVector3) {
-    guard !isComponentLocked(id),
+    guard !isComponentLocked(id), isPartRestTransformEditable(id),
       positionMeters.x.isFinite, positionMeters.y.isFinite, positionMeters.z.isFinite,
       let index = project.rig.parts.firstIndex(where: { $0.id == id })
     else { return }
     project.rig.parts[index].positionMeters = positionMeters
+    updateEnginePartTransform(id: id)
   }
 
   func setPartRotation(id: PartID, to rotationEulerRadians: RigVector3) {
-    guard !isComponentLocked(id),
+    guard !isComponentLocked(id), isPartRestTransformEditable(id),
       rotationEulerRadians.x.isFinite, rotationEulerRadians.y.isFinite,
       rotationEulerRadians.z.isFinite,
       let index = project.rig.parts.firstIndex(where: { $0.id == id })
     else { return }
     project.rig.parts[index].rotationEulerRadians = rotationEulerRadians
+    updateEnginePartTransform(id: id)
+  }
+
+  func isPartRestTransformEditable(_ id: PartID) -> Bool {
+    guard let part = enginePart(for: id) else { return true }
+    if part.isGrounded { return true }
+    return !engineMates.contains { !$0.isSuppressed && $0.childPart == part.name }
   }
 
   func componentAppearance(for id: PartID) -> PreviewPartAppearance? {
@@ -902,13 +1309,92 @@ final class StudioWorkspaceModel {
       green: appearance.green,
       blue: appearance.blue,
       opacity: appearance.opacity,
-      isVisible: appearance.isVisible
+      isVisible: appearance.isVisible,
+      finish: appearance.finish,
+      proxyFilletRadiusMeters: appearance.proxyFilletRadiusMeters
     )
+    documentEditRevision += 1
+  }
+
+  func setComponentProxyFilletRadius(id: PartID, meters: Double) {
+    guard !isComponentLocked(id),
+      let part = project.rig.parts.first(where: { $0.id == id }),
+      part.primitiveKind == .box
+    else { return }
+    var appearance = componentAppearance(for: id) ?? .defaultAppearance(for: .box)
+    appearance.proxyFilletRadiusMeters = min(
+      max(meters, 0), PreviewPartAppearance.maximumProxyFilletRadiusMeters
+    )
+    componentAppearances[id] = appearance
+    documentEditRevision += 1
   }
 
   func resetComponentAppearance(id: PartID) {
     guard !isComponentLocked(id) else { return }
     componentAppearances.removeValue(forKey: id)
+    documentEditRevision += 1
+  }
+
+  func togglePartSuppressed(_ id: PartID) async {
+    guard let part = enginePart(for: id), let document = engineRigDocument else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.settingPartState(
+        named: part.name,
+        suppressed: !part.isSuppressed,
+        in: document
+      )
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  func togglePartGrounded(_ id: PartID) async {
+    guard let part = enginePart(for: id), let document = engineRigDocument else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.settingPartState(
+        named: part.name,
+        grounded: !part.isGrounded,
+        in: document
+      )
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  func toggleMateSuppressed(_ mate: AnimaCoreJointSummary) async {
+    guard let document = engineRigDocument else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.settingJointSuppressed(
+        named: mate.name,
+        suppressed: !mate.isSuppressed,
+        in: document
+      )
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  func toggleRelationSuppressed(_ relation: AnimaCoreRelationSummary) async {
+    guard let document = engineRigDocument else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.settingRelationSuppressed(
+        kind: relation.kind,
+        driver: relation.driver,
+        driven: relation.driven,
+        suppressed: !relation.isSuppressed,
+        in: document
+      )
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
   }
 
   func renameJoint(id: JointID, to name: String) {
@@ -953,6 +1439,7 @@ final class StudioWorkspaceModel {
     )
     componentGroups.append(group)
     selection = [.componentGroup(group.id)]
+    documentEditRevision += 1
     return group.id
   }
 
@@ -963,6 +1450,7 @@ final class StudioWorkspaceModel {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedName.isEmpty else { return }
     componentGroups[index].displayName = trimmedName
+    documentEditRevision += 1
   }
 
   func dissolveComponentGroup(id: UUID) {
@@ -971,6 +1459,7 @@ final class StudioWorkspaceModel {
     else { return }
     componentGroups.remove(at: index)
     selection.remove(.componentGroup(id))
+    documentEditRevision += 1
   }
 
   func moveComponent(_ id: PartID, direction: NavigatorMoveDirection) {
@@ -982,6 +1471,7 @@ final class StudioWorkspaceModel {
         value: id,
         direction: direction
       )
+      documentEditRevision += 1
       return
     }
 
@@ -1001,11 +1491,13 @@ final class StudioWorkspaceModel {
       let destinationIndex = project.rig.parts.firstIndex(where: { $0.id == destinationID })
     else { return }
     project.rig.parts.swapAt(sourceIndex, destinationIndex)
+    documentEditRevision += 1
   }
 
   func moveComponentGroup(_ id: UUID, direction: NavigatorMoveDirection) {
     guard let group = componentGroups.first(where: { $0.id == id }), !group.isLocked else { return }
     componentGroups = NavigatorOrdering.moved(componentGroups, value: group, direction: direction)
+    documentEditRevision += 1
   }
 
   @discardableResult
@@ -1032,6 +1524,7 @@ final class StudioWorkspaceModel {
     )
     guard reordered != componentGroups else { return false }
     componentGroups = reordered
+    documentEditRevision += 1
     return true
   }
 
@@ -1044,6 +1537,7 @@ final class StudioWorkspaceModel {
       value: mate,
       direction: direction
     )
+    documentEditRevision += 1
   }
 
   @discardableResult
@@ -1069,6 +1563,7 @@ final class StudioWorkspaceModel {
     )
     guard reordered != project.rig.joints else { return false }
     project.rig.joints = reordered
+    documentEditRevision += 1
     return true
   }
 
@@ -1103,7 +1598,9 @@ final class StudioWorkspaceModel {
         relativeTo: destinationID,
         placement: placement
       )
-      return componentGroups != originalGroups
+      let changed = componentGroups != originalGroups
+      if changed { documentEditRevision += 1 }
+      return changed
     }
 
     removeComponentFromGroups(id)
@@ -1119,7 +1616,10 @@ final class StudioWorkspaceModel {
     }
     let insertionIndex = placement == .before ? destinationIndex : destinationIndex + 1
     project.rig.parts.insert(component, at: insertionIndex)
-    return componentGroups != originalGroups || project.rig.parts.map(\.id) != originalPartIDs
+    let changed =
+      componentGroups != originalGroups || project.rig.parts.map(\.id) != originalPartIDs
+    if changed { documentEditRevision += 1 }
+    return changed
   }
 
   @discardableResult
@@ -1143,6 +1643,7 @@ final class StudioWorkspaceModel {
       }
       guard componentGroups != originalGroups else { return nil }
       selection = [.componentGroup(destinationGroup.id)]
+      documentEditRevision += 1
       return destinationGroup.id
     }
 
@@ -1159,6 +1660,7 @@ final class StudioWorkspaceModel {
     )
     componentGroups.append(group)
     selection = [.componentGroup(group.id)]
+    documentEditRevision += 1
     return group.id
   }
 
@@ -1177,6 +1679,7 @@ final class StudioWorkspaceModel {
       guard componentGroup(containing: id) != nil else { return false }
       removeComponentFromGroups(id)
     }
+    documentEditRevision += 1
     return true
   }
 
@@ -1195,6 +1698,7 @@ final class StudioWorkspaceModel {
     } else {
       lockedComponentIDs.insert(id)
     }
+    documentEditRevision += 1
   }
 
   func toggleMateLock(_ id: JointID) {
@@ -1203,11 +1707,13 @@ final class StudioWorkspaceModel {
     } else {
       lockedMateIDs.insert(id)
     }
+    documentEditRevision += 1
   }
 
   func toggleComponentGroupLock(_ id: UUID) {
     guard let index = componentGroups.firstIndex(where: { $0.id == id }) else { return }
     componentGroups[index].isLocked.toggle()
+    documentEditRevision += 1
   }
 
   func isComponentLocked(_ id: PartID) -> Bool {
@@ -1243,34 +1749,124 @@ final class StudioWorkspaceModel {
   }
 
   func setCameraViewpoint(_ viewpoint: PreviewCameraViewpoint) {
+    rememberCurrentCamera()
+    if viewpoint != .custom {
+      cameraState.orientation = PreviewCameraOrientation(
+        direction: cameraState.orientation.direction
+      )
+    }
     cameraViewpoint = viewpoint
     cameraCommandRevision += 1
   }
 
   func setCameraDirection(_ direction: PreviewCameraDirection) {
-    cameraState.orientation.direction = direction
+    rememberCurrentCamera()
+    cameraState.orientation = PreviewCameraOrientation(direction: direction)
     cameraViewpoint = .custom
     cameraCommandRevision += 1
   }
 
   func nudgeCamera(horizontalRadians: Float = 0, verticalRadians: Float = 0) {
-    setCameraDirection(
-      cameraState.orientation.direction.nudged(
-        horizontalRadians: horizontalRadians,
-        verticalRadians: verticalRadians
-      )
+    rememberCurrentCamera()
+    cameraState.orientation.direction = cameraState.orientation.direction.nudged(
+      horizontalRadians: horizontalRadians,
+      verticalRadians: verticalRadians
     )
+    cameraViewpoint = .custom
+    cameraCommandRevision += 1
+  }
+
+  func rollCamera(by radians: Float) {
+    rememberCurrentCamera()
+    cameraState.orientation = cameraState.orientation.rolled(by: radians)
+    cameraViewpoint = .custom
+    cameraCommandRevision += 1
   }
 
   func reportCameraState(_ state: PreviewCameraState) {
     guard state != cameraState else { return }
+    if manualCameraHistoryOrigin == nil {
+      manualCameraHistoryOrigin = (cameraState, cameraProjection)
+    }
     cameraState = state
     cameraViewpoint = .custom
+    manualCameraHistoryTask?.cancel()
+    manualCameraHistoryTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: .milliseconds(250))
+      guard !Task.isCancelled, let self, let origin = self.manualCameraHistoryOrigin else { return }
+      self.previousCameraState = origin.state
+      self.previousCameraProjection = origin.projection
+      self.manualCameraHistoryOrigin = nil
+    }
   }
 
   func frameSelection() {
     guard canFrameSelection else { return }
     setCameraViewpoint(.selection)
+  }
+
+  func setViewportBackground(_ settings: ViewportBackgroundSettings) {
+    guard settings != viewportBackground else { return }
+    viewportBackground = settings
+    documentEditRevision += 1
+  }
+
+  func setViewportSectionPlane(_ section: ViewportSectionPlane) {
+    guard section != viewportSectionPlane else { return }
+    viewportSectionPlane = section
+    documentEditRevision += 1
+  }
+
+  func saveNamedCameraView(name: String) {
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty else { return }
+    namedCameraViews.append(
+      PreviewNamedView(
+        name: name,
+        state: cameraState,
+        projection: cameraProjection
+      )
+    )
+    documentEditRevision += 1
+  }
+
+  func restoreNamedCameraView(id: UUID) {
+    guard let view = namedCameraViews.first(where: { $0.id == id }) else { return }
+    rememberCurrentCamera()
+    cameraState = view.state
+    cameraProjection = view.projection
+    cameraViewpoint = .custom
+    cameraCommandRevision += 1
+  }
+
+  func deleteNamedCameraView(id: UUID) {
+    let oldCount = namedCameraViews.count
+    namedCameraViews.removeAll { $0.id == id }
+    if namedCameraViews.count != oldCount { documentEditRevision += 1 }
+  }
+
+  func restorePreviousCameraView() {
+    guard let previousCameraState else { return }
+    let currentState = cameraState
+    let currentProjection = cameraProjection
+    cameraState = previousCameraState
+    cameraProjection = previousCameraProjection ?? cameraProjection
+    self.previousCameraState = currentState
+    previousCameraProjection = currentProjection
+    cameraViewpoint = .custom
+    cameraCommandRevision += 1
+  }
+
+  private func rememberCurrentCamera() {
+    manualCameraHistoryTask?.cancel()
+    if let origin = manualCameraHistoryOrigin {
+      previousCameraState = origin.state
+      previousCameraProjection = origin.projection
+      manualCameraHistoryOrigin = nil
+    } else {
+      previousCameraState = cameraState
+      previousCameraProjection = cameraProjection
+    }
   }
 
   func togglePlayback() {
@@ -1343,7 +1939,9 @@ final class StudioWorkspaceModel {
     let parts = summary.parts.enumerated().map { index, part in
       RigPartDefinition(
         displayName: part.name,
-        primitiveKind: index.isMultiple(of: 2) ? .cylinder : .box
+        primitiveKind: index.isMultiple(of: 2) ? .cylinder : .box,
+        positionMeters: Self.rigVector(part.positionMeters),
+        rotationEulerRadians: Self.rigVector(part.rotationEulerRadians)
       )
     }
     let partIDsByEngineName = Dictionary(
@@ -1387,6 +1985,79 @@ final class StudioWorkspaceModel {
     path.split(separator: ".", maxSplits: 1).first.map(String.init)
   }
 
+  private static func rigVector(_ values: [Double]) -> RigVector3 {
+    guard values.count == 3 else { return RigVector3() }
+    return RigVector3(x: values[0], y: values[1], z: values[2])
+  }
+
+  private func updateEnginePartTransform(id: PartID) {
+    guard let document = engineRigDocument,
+      let name = enginePartName(for: id),
+      let part = project.rig.parts.first(where: { $0.id == id })
+    else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.settingPartTransform(
+        named: name,
+        positionMeters: [part.positionMeters.x, part.positionMeters.y, part.positionMeters.z],
+        rotationEulerRadians: [
+          part.rotationEulerRadians.x,
+          part.rotationEulerRadians.y,
+          part.rotationEulerRadians.z,
+        ],
+        in: document
+      )
+      // The retained engine handle still contains the pre-edit pose. Falling
+      // back to this character-space rest transform keeps direct manipulation
+      // responsive; Save validates/serializes the edited DTO through AnimaCore.
+      engineResolvedPartPoses.removeValue(forKey: id)
+      documentEditRevision += 1
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  private func reloadEditedEngineRig() async throws {
+    guard let animaCoreClient, let engineRigDocument else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    let metadata = characterEditorMetadata(applyingTo: CharacterEditorMetadata())
+    let projectName = project.name
+    let selectedPartName = selectedPartID.flatMap(enginePartName(for:))
+    let selectedMateKey = selectedEngineMate?.selectionKey
+    let selectedRelationID = selectedEngineRelation?.id
+    let sourcesByName = Dictionary(
+      uniqueKeysWithValues: enginePartModelSources.compactMap { partID, source in
+        enginePartName(for: partID).map { ($0, source) }
+      }
+    )
+
+    let text = try await animaCoreClient.serializeCharacter(rig: engineRigDocument).text
+    try await loadAnimaCharacter(text: text)
+    project.name = projectName
+    applyCharacterEditorMetadata(metadata)
+    enginePartModelSources = Dictionary(
+      uniqueKeysWithValues: sourcesByName.compactMap { name, source in
+        guard let partID = enginePartIDsByName[name] else { return nil }
+        return (
+          partID,
+          PartModelSource(
+            partID: partID,
+            fileURL: source.fileURL,
+            modelNode: source.modelNode,
+            unitScaleToMeters: source.unitScaleToMeters
+          )
+        )
+      }
+    )
+    if let selectedPartName, let partID = enginePartIDsByName[selectedPartName] {
+      selection = [.part(partID)]
+    } else if let selectedMateKey {
+      selection = [.joint(JointID(rawValue: selectedMateKey))]
+    } else if let selectedRelationID {
+      selection = [.relation(selectedRelationID)]
+    }
+  }
+
   private func updateActivePresentation(
     _ update: (inout WorkspacePresentation) -> Void
   ) {
@@ -1406,5 +2077,15 @@ final class StudioWorkspaceModel {
     }
     guard hasInspectableSelection, !activePresentation.showsInspector else { return }
     updateActivePresentation { $0.showsInspector = true }
+  }
+
+  private func requestNavigatorRevealForPrimarySelection() {
+    guard let primarySelection else { return }
+    switch primarySelection {
+    case .part, .joint, .relation:
+      requestNavigatorReveal(primarySelection)
+    case .project, .asset, .componentGroup, .structure, .modelNode, .animation:
+      break
+    }
   }
 }

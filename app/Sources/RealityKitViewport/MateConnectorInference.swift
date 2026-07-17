@@ -43,7 +43,8 @@ public enum RigPrimitivePreviewGeometry {
 }
 
 /// Infers stable attachment choices for Studio-created proxy geometry.
-/// Imported mesh topology will plug into the same candidate contract later.
+/// Imported geometry is classified by `ImportedMeshTopologyBuilder` and then
+/// projected into this same `MateConnectorCandidate` contract by the viewport.
 public enum MateConnectorInference {
   public static func candidates(for part: RigPartDefinition) -> [MateConnectorCandidate] {
     switch part.primitiveKind {

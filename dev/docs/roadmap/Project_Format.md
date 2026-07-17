@@ -9,7 +9,7 @@
 ## Layout
 
 ```
-~/Documents/Anima Studio/
+~/Documents/AnimaStudio/
   MyRobot/                        ← the project folder (plain folder, browsable)
     project.json                  ← manifest (app-owned): name, revision, dates,
     │                               milestone, character/scene index, window/editor state
@@ -57,7 +57,7 @@ A project holds **one or more characters** (`characters/` is a folder of
 many). The **project name** and a **character name** are separate
 identities — a "MyRobot" project can contain characters "jp01",
 "gripper", "turret". Character folder names are unique within a project;
-the project name is unique within `~/Documents/Anima Studio/`. Renaming
+the project name is unique within `~/Documents/AnimaStudio/`. Renaming
 a project never touches character names, and vice versa. `project.json`
 indexes the characters (and scenes) by their folder names + display
 names.
@@ -76,8 +76,18 @@ character is portable.
 
 ## Save / Open / Save As flows
 
-- **New Project** → create `~/Documents/Anima Studio/<name>/` with an
+- **New Project** → create `~/Documents/AnimaStudio/<name>/` with an
   empty `project.json` (revision 1) and empty `characters/` / `scenes/`.
+  The parent workspace is one app preference: it defaults to
+  `~/Documents/AnimaStudio/`, can be changed under **Settings → Workspace**,
+  and is retained with an app-scoped security bookmark. New/Open/Save As
+  panels all create and then open at that exact resolved root; Studio never
+  substitutes the Documents parent merely because the default folder is absent
+  on first run. A sandboxed first launch asks the operator to select Documents
+  once, creates `AnimaStudio` under that granted parent, and persists an
+  app-scoped security bookmark; subsequent panels open there directly. Existing
+  preferences for the former `Anima Studio` default are migrated to
+  `AnimaStudio`; operator-selected custom roots are preserved.
 - **Import model** → copy the STL/OBJ/USD into the active
   character's `assets/`, and set the imported part's `model` to the
   copied file's path **relative to the character folder**
@@ -128,8 +138,9 @@ joint `description` — nothing renamed/removed).
 
 The Swift app-side P0 lifecycle shipped on 2026-07-16: `AnimaDocument`
 uses `project.json` format version 2, native New/Open/Save/Save As
-dialogs, atomic folder replacement, active-character asset copying,
-and security-scoped bookmark-backed recents. The app retains the full
+dialogs rooted at the persisted workspace preference, atomic folder
+replacement, active-character asset copying, and security-scoped
+bookmark-backed workspace/recents access. The app retains the full
 `load_character.rig` JSON value and passes it unchanged to
 `serialize_character`; it does not reconstruct or hand-format YAML.
 

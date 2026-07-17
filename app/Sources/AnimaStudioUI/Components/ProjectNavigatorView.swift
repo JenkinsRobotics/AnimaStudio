@@ -10,7 +10,6 @@ struct ProjectNavigatorView: View {
   @State private var filterText = ""
   @State private var renameTarget: NavigatorRenameTarget?
   @State private var renameText = ""
-  @State private var collapsedGroupIDs: Set<UUID> = []
   @State private var activeDragPayload: NavigatorDragPayload?
 
   var body: some View {
@@ -64,13 +63,11 @@ struct ProjectNavigatorView: View {
       projectSection
       semanticRigSection
       jointSection
-      relationSection
       sourceHierarchySection
     case .animate:
       animationSection
       semanticRigSection
       jointSection
-      relationSection
       sourceHierarchySection
     case .show:
       showSection
@@ -139,50 +136,31 @@ struct ProjectNavigatorView: View {
 
   private var semanticRigSection: some View {
     Section {
-      if workspace.project.rig.parts.isEmpty && workspace.componentGroups.isEmpty {
+      if instanceTreeNodes.isEmpty {
         Label("No components yet", systemImage: "cube.transparent")
           .foregroundStyle(.secondary)
       } else {
-        ForEach(filteredComponentGroups) { group in
-          DisclosureGroup(isExpanded: groupExpansionBinding(group.id)) {
-            ForEach(filteredParts(in: group)) { part in
-              componentRow(part)
-            }
-          } label: {
-            PartTreeRow(
-              title: group.displayName,
-              role: .componentGroup,
-              detail: "\(group.componentIDs.count)",
-              isLocked: group.isLocked
-            )
-            .navigatorDragSource(
-              .componentGroup(group.id),
-              activePayload: $activeDragPayload
-            )
-            .navigatorDropTarget(
-              activePayload: $activeDragPayload,
-              behavior: .componentGroup
-            ) { payload, intent in
-              handleDrop(payload, intent: intent, onto: group)
-            }
-          }
-          .tag(NavigatorItem.componentGroup(group.id))
-          .contextMenu {
-            componentGroupActions(group)
-          }
-        }
-
-        ForEach(filteredUngroupedParts) { part in
-          componentRow(part)
-        }
-
-        if filteredComponentGroups.isEmpty && filteredUngroupedParts.isEmpty {
+        TreeView(
+          nodes: instanceTreeNodes,
+          filterText: filterText,
+          expandedIDs: instanceExpandedIDs,
+          activeDragPayload: $activeDragPayload,
+          revealRequest: instanceRevealRequest,
+          rowContent: navigatorTreeRow,
+          dragPayload: \.payload,
+          dropBehavior: \.behavior,
+          canDrop: canDropInTree,
+          onDrop: handleTreeDrop
+        )
+        if TreeModel(roots: instanceTreeNodes).filtered(by: TreeFilterQuery(filterText)).roots
+          .isEmpty
+        {
           noFilterResults
         }
       }
     } header: {
       HStack(spacing: 6) {
-        Text("Components")
+        Text("Instances")
         Spacer(minLength: 4)
         Image(systemName: "tray.and.arrow.down")
           .font(.caption2)
@@ -198,63 +176,24 @@ struct ProjectNavigatorView: View {
   }
 
   private var jointSection: some View {
-    Section("Mates") {
-      if !workspace.engineMates.isEmpty {
-        ForEach(filteredEngineMates, id: \.selectionKey) { mate in
-          PartTreeRow(
-            title: mate.id.isEmpty ? mate.name : mate.id,
-            role: .joint,
-            detail: mateTypeLabel(for: mate)
-          )
-          .tag(NavigatorItem.joint(JointID(rawValue: mate.selectionKey)))
-          .help(
-            mate.id.isEmpty
-              ? "\(mate.name) has no stable tracking id yet"
-              : "\(mate.name) · stable id \(mate.id)"
-          )
-        }
-      } else {
-        ForEach(filteredJoints, id: \.id) { joint in
-          PartTreeRow(
-            title: joint.displayName,
-            role: .joint,
-            detail: "Revolute",
-            isLocked: workspace.isMateLocked(joint.id)
-          )
-          .tag(NavigatorItem.joint(joint.id))
-          .contextMenu {
-            mateActions(joint)
-          }
-          .navigatorDragSource(.mate(joint.id), activePayload: $activeDragPayload)
-          .navigatorDropTarget(activePayload: $activeDragPayload, behavior: .mate) {
-            payload, intent in
-            handleMateDrop(payload, intent: intent, relativeTo: joint.id)
-          }
-        }
-      }
-      if workspace.project.rig.joints.isEmpty && workspace.engineMates.isEmpty {
+    Section("Mate Features") {
+      if mateTreeNodes.isEmpty {
         Label("No mates yet", systemImage: "rotate.3d")
           .foregroundStyle(.secondary)
-      } else if filteredJoints.isEmpty && filteredEngineMates.isEmpty {
-        noFilterResults
-      }
-    }
-  }
-
-  @ViewBuilder
-  private var relationSection: some View {
-    if !workspace.engineRelations.isEmpty {
-      Section("Relations · Advanced") {
-        ForEach(filteredEngineRelations) { relation in
-          PartTreeRow(
-            title: relationTypeLabel(for: relation),
-            role: .joint,
-            detail: relation.isReversed ? "Reversed" : "Coupled"
-          )
-          .tag(NavigatorItem.relation(relation.id))
-          .help("\(relation.driver) → \(relation.driven)")
-        }
-        if filteredEngineRelations.isEmpty {
+      } else {
+        TreeView(
+          nodes: mateTreeNodes,
+          filterText: filterText,
+          expandedIDs: mateExpandedIDs,
+          activeDragPayload: $activeDragPayload,
+          revealRequest: mateRevealRequest,
+          rowContent: navigatorTreeRow,
+          dragPayload: \.payload,
+          dropBehavior: \.behavior,
+          canDrop: canDropInTree,
+          onDrop: handleTreeDrop
+        )
+        if TreeModel(roots: mateTreeNodes).filtered(by: TreeFilterQuery(filterText)).roots.isEmpty {
           noFilterResults
         }
       }
@@ -435,6 +374,296 @@ struct ProjectNavigatorView: View {
       ?? relation.kind.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
   }
 
+  private var instanceTreeNodes: [NavigatorTreeNode] {
+    let groupedIDs = Set(workspace.componentGroups.flatMap(\.componentIDs))
+    let groups = workspace.componentGroups.map { group in
+      NavigatorTreeNode(
+        id: .group(group.id),
+        selectionValue: .componentGroup(group.id),
+        title: group.displayName,
+        role: .componentGroup,
+        detail: "\(group.componentIDs.count)",
+        states: group.isLocked ? [.locked] : [],
+        children: group.componentIDs.compactMap { id in
+          workspace.project.rig.parts.first(where: { $0.id == id }).map(partTreeNode)
+        },
+        filterTokens: group.isLocked ? [.part, .locked] : [.part],
+        isLocked: group.isLocked,
+        acceptsChildren: true,
+        payload: .componentGroup(group.id),
+        behavior: .componentGroup
+      )
+    }
+    let ungrouped = workspace.project.rig.parts
+      .filter { !groupedIDs.contains($0.id) }
+      .map(partTreeNode)
+    return groups + ungrouped
+  }
+
+  private var mateTreeNodes: [NavigatorTreeNode] {
+    if !workspace.engineMates.isEmpty || !workspace.engineRelations.isEmpty {
+      let mates = workspace.engineMates.map { mate in
+        let id = JointID(rawValue: mate.selectionKey)
+        let states = navigatorStates(
+          locked: workspace.isMateLocked(id),
+          suppressed: mate.isSuppressed
+        )
+        return NavigatorTreeNode(
+          id: .mate(mate.selectionKey),
+          selectionValue: .joint(id),
+          title: mate.id.isEmpty ? mate.name : mate.id,
+          role: .joint,
+          detail: mateTypeLabel(for: mate),
+          states: states,
+          children: [],
+          filterTokens: treeTokens(type: .mate, states: states),
+          isLocked: workspace.isMateLocked(id),
+          acceptsChildren: false,
+          payload: nil,
+          behavior: nil
+        )
+      }
+      let relations = workspace.engineRelations.map { relation in
+        let states: [NavigatorRowState] = relation.isSuppressed ? [.suppressed] : []
+        return NavigatorTreeNode(
+          id: .relation(relation.id),
+          selectionValue: .relation(relation.id),
+          title: relationTypeLabel(for: relation),
+          role: .joint,
+          detail: relation.isReversed ? "Reversed" : "Coupled",
+          states: states,
+          children: [],
+          filterTokens: treeTokens(type: .mate, states: states),
+          isLocked: false,
+          acceptsChildren: false,
+          payload: nil,
+          behavior: nil
+        )
+      }
+      return mates + relations
+    }
+
+    return workspace.project.rig.joints.map { joint in
+      let states = navigatorStates(locked: workspace.isMateLocked(joint.id))
+      return NavigatorTreeNode(
+        id: .mate(joint.id.rawValue),
+        selectionValue: .joint(joint.id),
+        title: joint.displayName,
+        role: .joint,
+        detail: "Revolute",
+        states: states,
+        children: [],
+        filterTokens: treeTokens(type: .mate, states: states),
+        isLocked: workspace.isMateLocked(joint.id),
+        acceptsChildren: false,
+        payload: .mate(joint.id),
+        behavior: .mate
+      )
+    }
+  }
+
+  private func partTreeNode(_ part: RigPartDefinition) -> NavigatorTreeNode {
+    let enginePart = workspace.enginePart(for: part.id)
+    let appearance = workspace.componentAppearance(for: part.id)
+    let states = navigatorStates(
+      locked: workspace.isComponentLocked(part.id),
+      hidden: appearance?.isVisible == false,
+      suppressed: enginePart?.isSuppressed == true,
+      grounded: enginePart?.isGrounded == true
+    )
+    return NavigatorTreeNode(
+      id: .component(part.id),
+      selectionValue: .part(part.id),
+      title: part.displayName,
+      role: .semanticPart,
+      detail: part.primitiveKind.displayName,
+      states: states,
+      children: [],
+      filterTokens: treeTokens(type: .part, states: states),
+      isLocked: workspace.isComponentLocked(part.id),
+      acceptsChildren: false,
+      payload: .component(part.id),
+      behavior: .component
+    )
+  }
+
+  private func navigatorStates(
+    locked: Bool = false,
+    hidden: Bool = false,
+    suppressed: Bool = false,
+    grounded: Bool = false
+  ) -> [NavigatorRowState] {
+    NavigatorRowState.allCases.filter { state in
+      switch state {
+      case .locked: locked
+      case .hidden: hidden
+      case .suppressed: suppressed
+      case .grounded: grounded
+      }
+    }
+  }
+
+  private func treeTokens(
+    type: TreeFilterToken,
+    states: [NavigatorRowState]
+  ) -> Set<TreeFilterToken> {
+    var tokens: Set<TreeFilterToken> = [type]
+    for state in states {
+      switch state {
+      case .locked: tokens.insert(.locked)
+      case .hidden: tokens.insert(.hidden)
+      case .suppressed: tokens.insert(.suppressed)
+      case .grounded: tokens.insert(.grounded)
+      }
+    }
+    return tokens
+  }
+
+  private var instanceExpandedIDs: Binding<Set<NavigatorTreeNodeID>> {
+    expansionBinding(for: instanceTreeNodes)
+  }
+
+  private var mateExpandedIDs: Binding<Set<NavigatorTreeNodeID>> {
+    expansionBinding(for: mateTreeNodes)
+  }
+
+  private func expansionBinding(
+    for nodes: [NavigatorTreeNode]
+  ) -> Binding<Set<NavigatorTreeNodeID>> {
+    let allIDs = Set(flattenedTreeIDs(nodes))
+    return Binding(
+      get: {
+        Set(allIDs.filter { workspace.navigatorExpandedNodeKeys.contains($0.persistenceKey) })
+      },
+      set: { expanded in
+        let currentKeys = Set(allIDs.map(\.persistenceKey))
+        var keys = workspace.navigatorExpandedNodeKeys.subtracting(currentKeys)
+        keys.formUnion(expanded.map(\.persistenceKey))
+        workspace.setNavigatorExpandedNodeKeys(keys)
+      }
+    )
+  }
+
+  private func flattenedTreeIDs(_ nodes: [NavigatorTreeNode]) -> [NavigatorTreeNodeID] {
+    nodes.flatMap { [$0.id] + flattenedTreeIDs($0.children) }
+  }
+
+  private var instanceRevealRequest: TreeRevealRequest<NavigatorTreeNodeID>? {
+    guard let item = workspace.navigatorRevealItem else { return nil }
+    let id: NavigatorTreeNodeID
+    switch item {
+    case .part(let partID): id = .component(partID)
+    case .componentGroup(let groupID): id = .group(groupID)
+    default: return nil
+    }
+    return TreeRevealRequest(id: id, revision: workspace.navigatorRevealRevision)
+  }
+
+  private var mateRevealRequest: TreeRevealRequest<NavigatorTreeNodeID>? {
+    guard let item = workspace.navigatorRevealItem else { return nil }
+    let id: NavigatorTreeNodeID
+    switch item {
+    case .joint(let jointID): id = .mate(jointID.rawValue)
+    case .relation(let relationID): id = .relation(relationID)
+    default: return nil
+    }
+    return TreeRevealRequest(id: id, revision: workspace.navigatorRevealRevision)
+  }
+
+  @ViewBuilder
+  private func navigatorTreeRow(_ node: NavigatorTreeNode) -> some View {
+    switch node.id {
+    case .component(let id):
+      if let part = workspace.project.rig.parts.first(where: { $0.id == id }) {
+        PartTreeRow(
+          title: node.title,
+          role: node.role,
+          detail: node.detail,
+          states: node.states
+        )
+        .contextMenu { componentActions(part) }
+      }
+    case .group(let id):
+      if let group = workspace.componentGroups.first(where: { $0.id == id }) {
+        PartTreeRow(
+          title: node.title,
+          role: node.role,
+          detail: node.detail,
+          states: node.states
+        )
+        .contextMenu { componentGroupActions(group) }
+      }
+    case .mate(let id):
+      PartTreeRow(
+        title: node.title,
+        role: node.role,
+        detail: node.detail,
+        states: node.states
+      )
+      .contextMenu {
+        if let mate = workspace.engineMates.first(where: { $0.selectionKey == id }) {
+          engineMateActions(mate)
+        } else if let mate = workspace.project.rig.joints.first(where: { $0.id.rawValue == id }) {
+          mateActions(mate)
+        }
+      }
+    case .relation(let id):
+      PartTreeRow(
+        title: node.title,
+        role: node.role,
+        detail: node.detail,
+        states: node.states
+      )
+      .contextMenu {
+        if let relation = workspace.engineRelations.first(where: { $0.id == id }) {
+          relationActions(relation)
+        }
+      }
+    }
+  }
+
+  private func handleTreeDrop(
+    _ payload: NavigatorDragPayload,
+    intent: NavigatorDropIntent,
+    destination: NavigatorTreeNode
+  ) -> Bool {
+    switch destination.id {
+    case .component(let id):
+      return handleComponentDrop(payload, intent: intent, relativeTo: id)
+    case .group(let id):
+      guard let group = workspace.componentGroups.first(where: { $0.id == id }) else {
+        return false
+      }
+      return handleDrop(payload, intent: intent, onto: group)
+    case .mate(let id):
+      return handleMateDrop(payload, intent: intent, relativeTo: JointID(rawValue: id))
+    case .relation:
+      return false
+    }
+  }
+
+  private func canDropInTree(
+    _ payload: NavigatorDragPayload,
+    intent: NavigatorDropIntent,
+    destination: NavigatorTreeNode
+  ) -> Bool {
+    guard !destination.isLocked else { return false }
+    switch (payload, destination.id) {
+    case (.component(let source), .component(let destinationID)):
+      return source != destinationID && !workspace.isComponentLocked(source)
+    case (.component(let source), .group):
+      return intent == .group && !workspace.isComponentLocked(source)
+    case (.componentGroup(let source), .group(let destinationID)):
+      return source != destinationID && intent != .group
+    case (.mate(let source), .mate(let destinationID)):
+      return source.rawValue != destinationID
+        && intent != .group
+        && !workspace.isMateLocked(source)
+    default:
+      return false
+    }
+  }
+
   private var filteredComponentGroups: [NavigatorComponentGroup] {
     workspace.componentGroups.filter { group in
       matchesFilter(group.displayName)
@@ -480,24 +709,6 @@ struct ProjectNavigatorView: View {
       .foregroundStyle(StudioPalette.muted)
   }
 
-  private func componentRow(_ part: RigPartDefinition) -> some View {
-    PartTreeRow(
-      title: part.displayName,
-      role: .semanticPart,
-      detail: part.primitiveKind.displayName,
-      isLocked: workspace.isComponentLocked(part.id)
-    )
-    .tag(NavigatorItem.part(part.id))
-    .contextMenu {
-      componentActions(part)
-    }
-    .navigatorDragSource(.component(part.id), activePayload: $activeDragPayload)
-    .navigatorDropTarget(activePayload: $activeDragPayload, behavior: .component) {
-      payload, intent in
-      handleComponentDrop(payload, intent: intent, relativeTo: part.id)
-    }
-  }
-
   private func handleComponentDrop(
     _ payload: NavigatorDragPayload,
     intent: NavigatorDropIntent,
@@ -510,7 +721,7 @@ struct ProjectNavigatorView: View {
     case .group:
       guard let groupID = workspace.groupComponents(draggedID: sourceID, onto: destinationID)
       else { return false }
-      collapsedGroupIDs.remove(groupID)
+      expandGroup(groupID)
       return true
     case .after:
       return workspace.moveComponent(sourceID, relativeTo: destinationID, placement: .after)
@@ -526,7 +737,7 @@ struct ProjectNavigatorView: View {
     case .component(let sourceID):
       guard intent == .group else { return false }
       let didMove = workspace.moveDraggedComponents(startingWith: sourceID, toGroup: group.id)
-      if didMove { collapsedGroupIDs.remove(group.id) }
+      if didMove { expandGroup(group.id) }
       return didMove
     case .componentGroup(let sourceID):
       guard intent != .group else { return false }
@@ -555,6 +766,10 @@ struct ProjectNavigatorView: View {
 
   @ViewBuilder
   private func componentActions(_ part: RigPartDefinition) -> some View {
+    Button("Go to Item in List", systemImage: "list.bullet.rectangle") {
+      workspace.requestNavigatorReveal(.part(part.id))
+    }
+
     Button("Rename", systemImage: "pencil") {
       beginRename(.component(part.id), currentName: part.displayName)
     }
@@ -601,6 +816,22 @@ struct ProjectNavigatorView: View {
       }
     }
     .disabled(workspace.isComponentLocked(part.id) || workspace.componentGroups.isEmpty)
+
+    if let enginePart = workspace.enginePart(for: part.id) {
+      Divider()
+      Button(
+        enginePart.isSuppressed ? "Unsuppress" : "Suppress",
+        systemImage: enginePart.isSuppressed ? "checkmark.circle" : "nosign"
+      ) {
+        Task { await workspace.togglePartSuppressed(part.id) }
+      }
+      Button(
+        enginePart.isGrounded ? "Unground" : "Ground",
+        systemImage: enginePart.isGrounded ? "pin.slash" : "pin"
+      ) {
+        Task { await workspace.togglePartGrounded(part.id) }
+      }
+    }
   }
 
   @ViewBuilder
@@ -659,24 +890,45 @@ struct ProjectNavigatorView: View {
     .disabled(workspace.isMateLocked(mate.id))
   }
 
+  @ViewBuilder
+  private func engineMateActions(_ mate: AnimaCoreJointSummary) -> some View {
+    Button("Go to Item in List", systemImage: "list.bullet.rectangle") {
+      workspace.requestNavigatorReveal(.joint(JointID(rawValue: mate.selectionKey)))
+    }
+    Button(
+      mate.isSuppressed ? "Unsuppress Mate" : "Suppress Mate",
+      systemImage: mate.isSuppressed ? "checkmark.circle" : "nosign"
+    ) {
+      Task { await workspace.toggleMateSuppressed(mate) }
+    }
+    Divider()
+    Button(
+      workspace.isMateLocked(JointID(rawValue: mate.selectionKey)) ? "Unlock" : "Lock",
+      systemImage: workspace.isMateLocked(JointID(rawValue: mate.selectionKey))
+        ? "lock.open" : "lock"
+    ) {
+      workspace.toggleMateLock(JointID(rawValue: mate.selectionKey))
+    }
+  }
+
+  @ViewBuilder
+  private func relationActions(_ relation: AnimaCoreRelationSummary) -> some View {
+    Button("Go to Item in List", systemImage: "list.bullet.rectangle") {
+      workspace.requestNavigatorReveal(.relation(relation.id))
+    }
+    Button(
+      relation.isSuppressed ? "Unsuppress Relation" : "Suppress Relation",
+      systemImage: relation.isSuppressed ? "checkmark.circle" : "nosign"
+    ) {
+      Task { await workspace.toggleRelationSuppressed(relation) }
+    }
+  }
+
   private var renameIsPresented: Binding<Bool> {
     Binding(
       get: { renameTarget != nil },
       set: { isPresented in
         if !isPresented { renameTarget = nil }
-      }
-    )
-  }
-
-  private func groupExpansionBinding(_ id: UUID) -> Binding<Bool> {
-    Binding(
-      get: { !collapsedGroupIDs.contains(id) || !filterText.isEmpty },
-      set: { isExpanded in
-        if isExpanded {
-          collapsedGroupIDs.remove(id)
-        } else {
-          collapsedGroupIDs.insert(id)
-        }
       }
     )
   }
@@ -712,7 +964,13 @@ struct ProjectNavigatorView: View {
 
   private func createGroupFromSelection() {
     let groupID = workspace.createComponentGroup()
-    collapsedGroupIDs.remove(groupID)
+    expandGroup(groupID)
+  }
+
+  private func expandGroup(_ id: UUID) {
+    var keys = workspace.navigatorExpandedNodeKeys
+    keys.insert(NavigatorTreeNodeID.group(id).persistenceKey)
+    workspace.setNavigatorExpandedNodeKeys(keys)
   }
 }
 

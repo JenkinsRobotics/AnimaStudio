@@ -140,6 +140,29 @@ public actor AnimaCoreClient {
     )
   }
 
+  public func forwardKinematics(
+    handle: String,
+    jointValues: [String: Double]
+  ) async throws -> AnimaCoreForwardKinematicsResult {
+    _ = try await start()
+    return try request(
+      method: "forward_kinematics",
+      params: ForwardKinematicsParameters(handle: handle, jointValues: jointValues)
+    )
+  }
+
+  public func solveInverseKinematics(
+    handle: String,
+    targetPose: AnimaCoreTransformPose,
+    seed: [String: Double]
+  ) async throws -> AnimaCoreInverseKinematicsResult {
+    _ = try await start()
+    return try request(
+      method: "solve_ik",
+      params: InverseKinematicsParameters(handle: handle, targetPose: targetPose, seed: seed)
+    )
+  }
+
   public func release(handle: String) async throws {
     guard process != nil else { return }
     let _: EmptyResult = try request(
@@ -281,6 +304,15 @@ public protocol AnimaCoreServing: Actor {
     clip: String?,
     timeSeconds: Double
   ) async throws -> AnimaCoreResolvedPose
+  func forwardKinematics(
+    handle: String,
+    jointValues: [String: Double]
+  ) async throws -> AnimaCoreForwardKinematicsResult
+  func solveInverseKinematics(
+    handle: String,
+    targetPose: AnimaCoreTransformPose,
+    seed: [String: Double]
+  ) async throws -> AnimaCoreInverseKinematicsResult
   func release(handle: String) async throws
   func shutdown() async
 }
@@ -336,3 +368,24 @@ private struct EvaluationParameters: Encodable {
 
 private struct EmptyParameters: Encodable {}
 private struct EmptyResult: Decodable {}
+
+private struct ForwardKinematicsParameters: Encodable {
+  let handle: String
+  let jointValues: [String: Double]
+
+  enum CodingKeys: String, CodingKey {
+    case handle
+    case jointValues = "joint_values"
+  }
+}
+
+private struct InverseKinematicsParameters: Encodable {
+  let handle: String
+  let targetPose: AnimaCoreTransformPose
+  let seed: [String: Double]
+
+  enum CodingKeys: String, CodingKey {
+    case handle, seed
+    case targetPose = "target_pose"
+  }
+}

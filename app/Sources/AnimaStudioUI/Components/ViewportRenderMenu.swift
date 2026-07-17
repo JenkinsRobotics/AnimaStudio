@@ -2,6 +2,7 @@ import RealityKitViewport
 import SwiftUI
 
 struct ViewportRenderMenu: View {
+  @Bindable var workspace: StudioWorkspaceModel
   @Binding var projection: PreviewCameraProjection
   @Binding var renderStyle: ViewportRenderStyle
   @Binding var edgeDisplay: ViewportEdgeDisplay
@@ -12,6 +13,10 @@ struct ViewportRenderMenu: View {
   @Binding var showsGrid: Bool
   @Binding var appearance: PreviewAppearance
   @Binding var fieldOfViewDegrees: Float
+  @Binding var lightingIntensity: Double
+  @Binding var environmentPreset: ViewportEnvironmentPreset
+  @Binding var environmentRotationDegrees: Double
+  @Binding var renderQuality: ViewportRenderQuality
   @Binding var navigationProfile: PreviewNavigationProfile
   @Binding var customRotateDrag: NavigationDragBinding
   @Binding var customPanDrag: NavigationDragBinding
@@ -22,6 +27,9 @@ struct ViewportRenderMenu: View {
   @Binding var reversesWheelZoom: Bool
   let canFrameSelection: Bool
   let frameSelection: () -> Void
+  @State private var showsEnvironmentSettings = false
+  @State private var showsSaveViewPrompt = false
+  @State private var newViewName = ""
 
   var body: some View {
     Menu {
@@ -43,6 +51,31 @@ struct ViewportRenderMenu: View {
 
         Button("Frame Selection", systemImage: "viewfinder", action: frameSelection)
           .disabled(!canFrameSelection)
+
+        Button("Previous View", systemImage: "arrow.uturn.backward") {
+          workspace.restorePreviousCameraView()
+        }
+        .disabled(workspace.previousCameraState == nil)
+
+        Menu("Named Views", systemImage: "bookmark") {
+          ForEach(workspace.namedCameraViews) { view in
+            Button(view.name) { workspace.restoreNamedCameraView(id: view.id) }
+          }
+          if !workspace.namedCameraViews.isEmpty { Divider() }
+          Button("Save Current View…", systemImage: "plus") {
+            newViewName = "View \(workspace.namedCameraViews.count + 1)"
+            showsSaveViewPrompt = true
+          }
+          if !workspace.namedCameraViews.isEmpty {
+            Menu("Delete Named View") {
+              ForEach(workspace.namedCameraViews) { view in
+                Button(view.name, role: .destructive) {
+                  workspace.deleteNamedCameraView(id: view.id)
+                }
+              }
+            }
+          }
+        }
       }
 
       Section("Viewport Display") {
@@ -65,14 +98,14 @@ struct ViewportRenderMenu: View {
             Text(finish.title).tag(finish)
           }
         }
-        .disabled(renderStyle != .shaded)
+        .disabled(renderStyle != .shaded && renderStyle != .shadedWithEdges)
 
         Picker("Reflections", selection: $reflectionMode) {
           ForEach(ViewportReflectionMode.allCases) { mode in
             Text(mode.title).tag(mode)
           }
         }
-        .disabled(renderStyle != .shaded)
+        .disabled(renderStyle != .shaded && renderStyle != .shadedWithEdges)
 
         Toggle("Cast Shadows", systemImage: "shadow", isOn: $showsShadows)
 
@@ -85,6 +118,18 @@ struct ViewportRenderMenu: View {
         .disabled(renderStyle == .wireframe)
 
         Toggle("Show Grid", systemImage: "grid", isOn: $showsGrid)
+
+        Toggle(
+          "Section View",
+          systemImage: "square.split.diagonal",
+          isOn: sectionEnabledBinding
+        )
+
+        Toggle(
+          "View in High Quality",
+          systemImage: "sparkles",
+          isOn: highQualityBinding
+        )
       }
 
       Section("Viewport Appearance") {
@@ -92,6 +137,9 @@ struct ViewportRenderMenu: View {
           ForEach(PreviewAppearance.allCases) { appearance in
             Text(appearance.title).tag(appearance)
           }
+        }
+        Button("Environment & Background…", systemImage: "mountain.2") {
+          showsEnvironmentSettings = true
         }
       }
 
@@ -163,9 +211,57 @@ struct ViewportRenderMenu: View {
     .menuIndicator(.hidden)
     .help("Camera and render options")
     .accessibilityLabel("Camera and render options")
+    .popover(isPresented: $showsEnvironmentSettings) {
+      ViewportEnvironmentSettingsView(
+        background: viewportBackgroundBinding,
+        sectionPlane: viewportSectionBinding,
+        lightingIntensity: $lightingIntensity,
+        environmentPreset: $environmentPreset,
+        environmentRotationDegrees: $environmentRotationDegrees
+      )
+    }
+    .alert("Save Named View", isPresented: $showsSaveViewPrompt) {
+      TextField("View name", text: $newViewName)
+      Button("Cancel", role: .cancel) {}
+      Button("Save") { workspace.saveNamedCameraView(name: newViewName) }
+    } message: {
+      Text("Save the current camera orientation, target, distance, and projection.")
+    }
   }
 
   private static let fieldOfViewPresets: [Float] = [30, 45, 60, 75, 90]
+
+  private var viewportBackgroundBinding: Binding<ViewportBackgroundSettings> {
+    Binding(
+      get: { workspace.viewportBackground },
+      set: { workspace.setViewportBackground($0) }
+    )
+  }
+
+  private var viewportSectionBinding: Binding<ViewportSectionPlane> {
+    Binding(
+      get: { workspace.viewportSectionPlane },
+      set: { workspace.setViewportSectionPlane($0) }
+    )
+  }
+
+  private var sectionEnabledBinding: Binding<Bool> {
+    Binding(
+      get: { workspace.viewportSectionPlane.isEnabled },
+      set: { value in
+        var section = workspace.viewportSectionPlane
+        section.isEnabled = value
+        workspace.setViewportSectionPlane(section)
+      }
+    )
+  }
+
+  private var highQualityBinding: Binding<Bool> {
+    Binding(
+      get: { renderQuality == .high },
+      set: { renderQuality = $0 ? .high : .standard }
+    )
+  }
 
   @ViewBuilder
   private var speedChoices: some View {

@@ -3,7 +3,9 @@ import RealityKit
 
 public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   case shaded
+  case shadedWithEdges
   case wireframe
+  case unshaded
   case translucent
 
   public var id: String { rawValue }
@@ -11,7 +13,9 @@ public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   public var title: String {
     switch self {
     case .shaded: "Shaded"
+    case .shadedWithEdges: "Shaded with Edges"
     case .wireframe: "Wireframe"
+    case .unshaded: "Unshaded"
     case .translucent: "Translucent"
     }
   }
@@ -19,7 +23,9 @@ public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   public var systemImage: String {
     switch self {
     case .shaded: "cube.fill"
+    case .shadedWithEdges: "cube"
     case .wireframe: "square.grid.3x3"
+    case .unshaded: "square.fill"
     case .translucent: "cube.transparent"
     }
   }
@@ -27,7 +33,9 @@ public enum ViewportRenderStyle: String, CaseIterable, Identifiable, Sendable {
   public var detail: String {
     switch self {
     case .shaded: "Source materials and normal lighting"
+    case .shadedWithEdges: "Shaded surfaces with visible mesh edges"
     case .wireframe: "Triangle mesh lines without filled surfaces"
+    case .unshaded: "Flat color independent of scene lighting"
     case .translucent: "Shaded surfaces at reduced opacity"
     }
   }
@@ -94,7 +102,7 @@ enum ViewportRenderStyleApplier {
     baseColor: NSColor
   ) -> any Material {
     switch style {
-    case .shaded:
+    case .shaded, .shadedWithEdges:
       var material = PhysicallyBasedMaterial()
       material.baseColor = .init(tint: baseColor)
       material.roughness = .init(floatLiteral: finish.roughness)
@@ -105,6 +113,10 @@ enum ViewportRenderStyleApplier {
       return material
     case .wireframe:
       return lineMaterial(color: baseColor)
+    case .unshaded:
+      var material = UnlitMaterial()
+      material.color = .init(tint: baseColor)
+      return material
     case .translucent:
       return SimpleMaterial(
         color: baseColor.withAlphaComponent(0.34),
@@ -119,7 +131,7 @@ enum ViewportRenderStyleApplier {
     to root: Entity
   ) {
     switch style {
-    case .shaded:
+    case .shaded, .shadedWithEdges, .unshaded:
       break
     case .translucent:
       root.components.set(OpacityComponent(opacity: 0.38))
@@ -135,9 +147,10 @@ enum ViewportRenderStyleApplier {
       }
     }
 
-    guard edgeDisplay == .mesh, style != .wireframe else { return }
+    let effectiveEdges: ViewportEdgeDisplay = style == .shadedWithEdges ? .mesh : edgeDisplay
+    guard effectiveEdges == .mesh, style != .wireframe else { return }
     for entity in modelEntities(below: root) {
-      addMeshEdgeOverlayIfNeeded(edgeDisplay, renderStyle: style, to: entity)
+      addMeshEdgeOverlayIfNeeded(effectiveEdges, renderStyle: style, to: entity)
     }
   }
 

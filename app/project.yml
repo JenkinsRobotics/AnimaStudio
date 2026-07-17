@@ -15,7 +15,7 @@ packages:
     path: .
 
 targets:
-  AnimaStudio:
+  Anima Studio:
     type: application
     platform: macOS
     productName: Anima Studio
@@ -40,6 +40,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: App/AnimaStudio.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: Anima Studio
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
+        INFOPLIST_KEY_NSDocumentsFolderUsageDescription: Anima Studio creates and manages project folders in Documents/AnimaStudio.
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
 
@@ -49,7 +50,7 @@ targets:
     sources:
       - path: AppUITests
     dependencies:
-      - target: AnimaStudio
+      - target: Anima Studio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.animastudio.studio.uitests
@@ -59,7 +60,7 @@ schemes:
   AnimaStudio:
     build:
       targets:
-        AnimaStudio: all
+        Anima Studio: all
         AnimaStudioAppUITests:
           - test
     run:
