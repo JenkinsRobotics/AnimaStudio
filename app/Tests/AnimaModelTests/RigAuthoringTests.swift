@@ -52,8 +52,13 @@ final class RigAuthoringTests: XCTestCase {
   func testEveryPrimitiveKindHasAStableRawValue() {
     XCTAssertEqual(
       RigPrimitiveKind.allCases.map(\.rawValue),
-      ["box", "cylinder", "sphere", "locator"]
+      ["box", "cylinder", "sphere", "locator", "mesh"]
     )
+  }
+
+  func testMeshKindIsImportOnlyAndNotOfferedByThePalette() {
+    XCTAssertFalse(RigPrimitiveKind.creatableCases.contains(.mesh))
+    XCTAssertEqual(RigPrimitiveKind.creatableCases, [.box, .cylinder, .sphere, .locator])
   }
 
   func testJointConnectorFramesRoundTripAndRemainOptional() throws {
