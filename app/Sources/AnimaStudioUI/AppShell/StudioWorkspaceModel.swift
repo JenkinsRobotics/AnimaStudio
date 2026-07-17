@@ -81,6 +81,8 @@ final class StudioWorkspaceModel {
   var engineEvaluationTimeSeconds: Double?
   var engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:]
   var enginePartModelSources: [PartID: PartModelSource] = [:]
+  @ObservationIgnored private var configuredAssetDirectoryURL: URL?
+  @ObservationIgnored private var configuredEditorMetadata: CharacterEditorMetadata?
   var engineParts: [AnimaCorePartSummary] = []
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
   var engineMates: [AnimaCoreJointSummary] = []
@@ -428,7 +430,9 @@ final class StudioWorkspaceModel {
       lockedMateIDs.removeAll()
       relationDraft = nil
       componentAppearances.removeAll()
-      enginePartModelSources.removeAll()
+      // Rebuild (not wipe) render sources from the retained asset directory so
+      // a reload keeps the imported meshes instead of dropping to proxies.
+      rebuildPartModelSources()
       importedModelURL = nil
       importedModelHierarchy = nil
       cameraViewpoint = .home
@@ -496,10 +500,40 @@ final class StudioWorkspaceModel {
     return partName
   }
 
+  func deleteEngineParts(named partNames: Set<String>) async throws {
+    guard let animaCoreClient, let engineRigDocument else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    let edited = try AnimaCoreRigDocumentEditor.removingParts(
+      named: partNames,
+      from: engineRigDocument
+    )
+    let text = try await animaCoreClient.serializeCharacter(rig: edited).text
+    try await loadAnimaCharacter(text: text)
+  }
+
   func configurePartModelSources(
     characterDirectoryURL: URL,
     editorMetadata: CharacterEditorMetadata
   ) {
+    // Retain the asset context so every subsequent engine reload can rebuild
+    // the render sources itself. Without this, any reload (suppress, mate
+    // edit, re-evaluation) wiped enginePartModelSources and the viewport fell
+    // back to primitive proxies instead of the imported meshes.
+    configuredAssetDirectoryURL = characterDirectoryURL
+    configuredEditorMetadata = editorMetadata
+    rebuildPartModelSources()
+  }
+
+  /// Rederive `enginePartModelSources` from the current engine parts and the
+  /// retained asset directory. Called on every character load so no code path
+  /// can leave the viewport without its meshes.
+  private func rebuildPartModelSources() {
+    guard let characterDirectoryURL = configuredAssetDirectoryURL else {
+      enginePartModelSources.removeAll()
+      return
+    }
+    let editorMetadata = configuredEditorMetadata ?? CharacterEditorMetadata()
     enginePartModelSources = Dictionary(
       uniqueKeysWithValues: engineParts.compactMap { part in
         guard !part.model.isEmpty, let partID = enginePartIDsByName[part.name] else { return nil }
@@ -510,7 +544,8 @@ final class StudioWorkspaceModel {
             partID: partID,
             fileURL: characterDirectoryURL.appendingPathComponent(part.model),
             modelNode: part.modelNode,
-            unitScaleToMeters: metadata?.unitScaleToMeters ?? 1
+            unitScaleToMeters: metadata?.unitScaleToMeters ?? 1,
+            assetVersion: max(editorMetadata.partAssetVersions[part.name] ?? 1, 1)
           )
         )
       }
