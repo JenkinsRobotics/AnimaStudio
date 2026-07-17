@@ -828,9 +828,22 @@ public struct RobotPreviewView: View {
     )
     let entity: ModelEntity
     switch part.primitiveKind {
-    case .box, .mesh:
-      // .mesh only reaches makePart when its imported model failed to load
-      // (the failure is logged); show a bounding-box placeholder, not silence.
+    case .mesh:
+      // A .mesh part only reaches makePart when its imported model FAILED to
+      // load (the failure is also logged). Draw a red warning marker — never a
+      // clean box that masquerades as real geometry. A failure must look like
+      // a failure, not like a part.
+      let size = Float(RigPrimitivePreviewGeometry.boxSizeMeters)
+      let warningMaterial = ViewportRenderStyleApplier.partMaterial(
+        renderStyle,
+        finish: appearance.finish,
+        baseColor: .systemRed
+      )
+      entity = ModelEntity(
+        mesh: .generateBox(width: size, height: size, depth: size),
+        materials: [warningMaterial]
+      )
+    case .box:
       let size = Float(RigPrimitivePreviewGeometry.boxSizeMeters)
       let filletRadius = Float(appearance.proxyFilletRadiusMeters)
       let mesh: MeshResource =

@@ -49,6 +49,39 @@ struct WorkspaceLocationPreference {
     return defaultWorkspaceRootURL.standardizedFileURL
   }
 
+  /// Held for the whole app session (never stopped until replaced). The
+  /// sandboxed app reads project meshes lazily during async rendering, long
+  /// after any operation's own scoped access has stopped. Projects created
+  /// under the workspace root have NO bookmark of their own, so their files
+  /// are readable only through the root's security scope — without a lifetime
+  /// hold the viewport shows placeholders instead of the imported geometry.
+  @MainActor private static var retainedRootURL: URL?
+
+  /// Resolve the bookmarked workspace root and hold its security-scoped access
+  /// for the app session. Must access the URL returned directly from the
+  /// bookmark (a `.standardizedFileURL` copy can drop the security scope).
+  @MainActor @discardableResult
+  func activatePersistentWorkspaceRootAccess() -> Bool {
+    guard
+      let bookmarkData = userDefaults.data(forKey: StudioPreferenceKey.workspaceRootBookmark)
+    else { return Self.retainedRootURL != nil }
+    var isStale = false
+    guard
+      let rootURL = try? URL(
+        resolvingBookmarkData: bookmarkData,
+        options: [.withSecurityScope],
+        relativeTo: nil,
+        bookmarkDataIsStale: &isStale
+      )
+    else { return false }
+    if let current = Self.retainedRootURL {
+      if current == rootURL { return true }
+      current.stopAccessingSecurityScopedResource()
+    }
+    Self.retainedRootURL = rootURL.startAccessingSecurityScopedResource() ? rootURL : nil
+    return Self.retainedRootURL != nil
+  }
+
   var usesDefaultWorkspaceRoot: Bool {
     workspaceRootURL.standardizedFileURL == defaultWorkspaceRootURL.standardizedFileURL
   }

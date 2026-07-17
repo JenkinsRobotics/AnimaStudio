@@ -38,6 +38,13 @@ public struct AnimaStudioRootView: View {
         )
       }
     }
+    .onAppear {
+      // Hold the workspace-root security scope for the whole app session so the
+      // sandbox permits lazy mesh reads during rendering. Verified in the real
+      // sandboxed process: without this a project STL is unreadable and the
+      // viewport falls back to placeholders. Idempotent.
+      WorkspaceLocationPreference().activatePersistentWorkspaceRootAccess()
+    }
     .alert(
       "Project Could Not Be Opened or Saved",
       isPresented: Binding(

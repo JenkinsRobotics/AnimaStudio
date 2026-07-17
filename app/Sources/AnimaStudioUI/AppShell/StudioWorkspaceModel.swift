@@ -83,6 +83,7 @@ final class StudioWorkspaceModel {
   var enginePartModelSources: [PartID: PartModelSource] = [:]
   @ObservationIgnored private var configuredAssetDirectoryURL: URL?
   @ObservationIgnored private var configuredEditorMetadata: CharacterEditorMetadata?
+  @ObservationIgnored private var retainedProjectAccessURL: URL?
   var engineParts: [AnimaCorePartSummary] = []
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
   var engineMates: [AnimaCoreJointSummary] = []
@@ -510,6 +511,30 @@ final class StudioWorkspaceModel {
     )
     let text = try await animaCoreClient.serializeCharacter(rig: edited).text
     try await loadAnimaCharacter(text: text)
+  }
+
+  /// Holds security-scoped access to the open project's folder for the whole
+  /// time it is open. The sandboxed app reads imported meshes lazily during
+  /// async rendering — long after the load operation's own scoped access has
+  /// stopped — so without a retained hold `MDLAsset(url:)` is denied and the
+  /// viewport falls back to placeholder geometry. Pass the bookmarked project
+  /// root (subfolder access flows from it). Idempotent per URL.
+  func retainProjectAssetAccess(_ projectURL: URL) {
+    // In-root projects have no bookmark of their own; their files are readable
+    // only through the workspace root's security scope, so hold that for the
+    // app session. Out-of-root projects additionally carry their own scope.
+    WorkspaceLocationPreference().activatePersistentWorkspaceRootAccess()
+    if let current = retainedProjectAccessURL {
+      if current == projectURL { return }
+      current.stopAccessingSecurityScopedResource()
+    }
+    retainedProjectAccessURL =
+      projectURL.startAccessingSecurityScopedResource() ? projectURL : nil
+  }
+
+  func releaseProjectAssetAccess() {
+    retainedProjectAccessURL?.stopAccessingSecurityScopedResource()
+    retainedProjectAccessURL = nil
   }
 
   func configurePartModelSources(
