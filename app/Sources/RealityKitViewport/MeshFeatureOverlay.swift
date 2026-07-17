@@ -18,12 +18,26 @@ struct MeshFeatureComponent: Component {
 enum MeshFeatureOverlayFactory {
   static let layerName = "importedMeshFeatureLayer"
 
+  /// Per-part budget for hover/selection overlay entities (faces + edge
+  /// segments + corners). Creating each one costs a RealityKit entity with
+  /// mesh + collision on the main thread; a dense CAD part can project tens of
+  /// thousands, which froze scene build for minutes (infinite spinner). Above
+  /// the budget the part keeps whole-part selection and skips feature overlays,
+  /// mirroring the topology triangle cap.
+  static let maxOverlayEntities = 1_500
+
   static func make(
     partID: PartID,
     topology: ImportedMeshTopology
   ) async -> Entity {
     let layer = Entity()
     layer.name = layerName
+    let edgeSegmentCount = topology.edges.reduce(0) { $0 + max($1.points.count - 1, 0) }
+    let overlayEntityCount = topology.faces.count + edgeSegmentCount + topology.corners.count
+    guard overlayEntityCount <= maxOverlayEntities else {
+      // Too dense for per-feature selection; whole-part selection remains.
+      return layer
+    }
     let extent = max(topology.boundsExtent, 0.1)
     let surfaceOffset = max(extent * 0.000_35, 0.000_02)
     let edgeRadius = min(max(extent * 0.002_2, 0.000_8), 0.008)
@@ -239,10 +253,18 @@ enum MeshFeatureOverlayFactory {
     )
   }
 
+  /// Materials cached by (kind, state) — only nine combinations exist, but
+  /// RealityKit material creation compiles a material definition each time.
+  /// Uncached, a fresh material per overlay entity dominated scene build
+  /// (sampled: most of the freeze was inside UnlitMaterial.init).
+  private static var materialCache: [String: UnlitMaterial] = [:]
+
   private static func material(
     for kind: MeshFeatureVisualKind,
     state: InteractionState
   ) -> UnlitMaterial {
+    let cacheKey = "\(kind)|\(state)"
+    if let cached = materialCache[cacheKey] { return cached }
     let color: NSColor
     let opacity: Float
     switch (kind, state) {
@@ -267,6 +289,7 @@ enum MeshFeatureOverlayFactory {
     }
     var material = UnlitMaterial(color: color)
     material.blending = .transparent(opacity: .init(floatLiteral: opacity))
+    materialCache[cacheKey] = material
     return material
   }
 
