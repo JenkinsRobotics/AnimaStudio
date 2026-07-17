@@ -121,14 +121,23 @@ struct TestLabView: View {
     let process = Process()
     process.executableURL = app.path
     process.arguments = arguments
-    if app.isTerminal {
-      let pipe = Pipe()
-      process.standardOutput = pipe
-      process.standardError = pipe
-      process.terminationHandler = { _ in
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        DispatchQueue.main.async {
-          output = String(data: data, encoding: .utf8) ?? "(no output)"
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    let name = app.name
+    let isTerminal = app.isTerminal
+    process.terminationHandler = { proc in
+      let data = pipe.fileHandleForReading.readDataToEndOfFile()
+      let text = String(data: data, encoding: .utf8) ?? "(no output)"
+      DispatchQueue.main.async {
+        if isTerminal {
+          output = text
+        } else if proc.terminationStatus != 0 {
+          // A GUI bench that dies should say so loudly, with its output.
+          status = "\(name) EXITED code \(proc.terminationStatus)"
+          output = text
+        } else {
+          status = "\(name) closed"
         }
       }
     }
@@ -142,6 +151,15 @@ struct TestLabView: View {
 }
 
 struct TestLabApp: App {
+  init() {
+    // Before window creation — a CLI-launched process is background-only and
+    // .onAppear never fires on a window that never shows.
+    DispatchQueue.main.async {
+      NSApp.setActivationPolicy(.regular)
+      NSApp.activate(ignoringOtherApps: true)
+    }
+  }
+
   var body: some SwiftUI.Scene {
     WindowGroup("Anima Studio Test Lab") {
       TestLabView()

@@ -220,6 +220,11 @@ final class BenchModel {
     let start = Date()
     let entity = Entity()
     var triangles = 0
+    // Build visuals first (fast), then cook all pick shapes concurrently.
+    // Serial generateStaticMesh took ~13s for a 218-face/578-edge part —
+    // to a user that reads as "loading did nothing." generateConvex would be
+    // faster but segfaults inside RealityFoundation on near-planar faces.
+    var pickTargets: [(ModelEntity, MeshResource, BenchFeatureComponent)] = []
     for i in 0..<Int(set.face_count) {
       let face = set.faces[i]
       triangles += Int(face.triangle_count)
@@ -231,11 +236,8 @@ final class BenchModel {
       let model = ModelEntity(
         mesh: resource,
         materials: [featureMaterial(kind: .face, selected: false, baseColor: baseColor)])
-      if let shape = try? await ShapeResource.generateStaticMesh(from: resource) {
-        model.components.set(CollisionComponent(shapes: [shape]))
-        model.components.set(InputTargetComponent())
-        model.components.set(BenchFeatureComponent(kind: .face, baseColor: baseColor))
-      }
+      pickTargets.append(
+        (model, resource, BenchFeatureComponent(kind: .face, baseColor: baseColor)))
       entity.addChild(model)
     }
     let bounds = entity.visualBounds(relativeTo: nil)
@@ -251,12 +253,28 @@ final class BenchModel {
       else { continue }
       let model = ModelEntity(
         mesh: resource, materials: [featureMaterial(kind: .edge, selected: false)])
-      if let shape = try? await ShapeResource.generateStaticMesh(from: resource) {
-        model.components.set(CollisionComponent(shapes: [shape]))
-        model.components.set(InputTargetComponent())
-        model.components.set(BenchFeatureComponent(kind: .edge))
-      }
+      pickTargets.append((model, resource, BenchFeatureComponent(kind: .edge)))
       entity.addChild(model)
+    }
+    status = "\(name): cooking \(pickTargets.count) pick targets…"
+    let shapes: [ShapeResource?] = await withTaskGroup(
+      of: (Int, ShapeResource?).self
+    ) { group in
+      for (index, target) in pickTargets.enumerated() {
+        let resource = target.1
+        group.addTask {
+          (index, try? await ShapeResource.generateStaticMesh(from: resource))
+        }
+      }
+      var results = [ShapeResource?](repeating: nil, count: pickTargets.count)
+      for await (index, shape) in group { results[index] = shape }
+      return results
+    }
+    for (index, target) in pickTargets.enumerated() {
+      guard let shape = shapes[index] else { continue }
+      target.0.components.set(CollisionComponent(shapes: [shape]))
+      target.0.components.set(InputTargetComponent())
+      target.0.components.set(target.2)
     }
     files.append(
       LoadedFile(
@@ -306,6 +324,21 @@ struct BenchView: View {
     ZStack(alignment: .topLeading) {
       RealityView { content in
         content.add(model.workspace)
+        // Auto-load any files passed on the command line (also how the
+        // agent verifies the load path end-to-end without clicking).
+        let cliFiles = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("--") }
+        if !cliFiles.isEmpty {
+          Task { @MainActor in
+            for path in cliFiles {
+              await model.load(url: URL(fileURLWithPath: path))
+            }
+            let report = model.files.map {
+              "\($0.name) [\($0.kind)] tri=\($0.triangleCount) faces=\($0.faceCount) edges=\($0.edgeCount) \(Int($0.loadSeconds * 1000))ms"
+            }.joined(separator: "\n")
+            try? (report + "\nstatus: \(model.status)\n").write(
+              toFile: "/tmp/geombench_result.txt", atomically: true, encoding: .utf8)
+          }
+        }
         let camera = PerspectiveCamera()
         camera.name = "camera"
         camera.position = SIMD3<Float>(0, 0.22, 0.42)
@@ -409,6 +442,15 @@ struct BenchView: View {
 }
 
 struct GeomBenchApp: App {
+  init() {
+    // Must run before the window is created: a CLI-launched process starts
+    // background-only, and .onAppear never fires on a window that never shows.
+    DispatchQueue.main.async {
+      NSApp.setActivationPolicy(.regular)
+      NSApp.activate(ignoringOtherApps: true)
+    }
+  }
+
   var body: some SwiftUI.Scene {
     WindowGroup("GeomBench — OCCT + Swift + Metal test bench") {
       BenchView()
@@ -419,4 +461,25 @@ struct GeomBenchApp: App {
 // Enable Apple's Metal Performance HUD (GPU stats overlay) before any Metal
 // device is created — shows real GPU utilization/frame timing top-right.
 setenv("MTL_HUD_ENABLED", "1", 1)
-GeomBenchApp.main()
+
+if CommandLine.arguments.contains("--headless") {
+  // Verify the full load pipeline (OCCT -> MeshResource -> collision shapes)
+  // without a window: same BenchModel.load() the UI uses.
+  let paths = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("--") }
+  Task { @MainActor in
+    let model = BenchModel()
+    for path in paths {
+      await model.load(url: URL(fileURLWithPath: path))
+    }
+    for file in model.files {
+      print(
+        "\(file.name) [\(file.kind)] tri=\(file.triangleCount) faces=\(file.faceCount) edges=\(file.edgeCount) \(Int(file.loadSeconds * 1000))ms entities=\(model.workspace.children.count)"
+      )
+    }
+    print("status: \(model.status)")
+    exit(model.files.count == paths.count ? 0 : 1)
+  }
+  RunLoop.main.run()
+} else {
+  GeomBenchApp.main()
+}
