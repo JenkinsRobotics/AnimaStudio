@@ -676,8 +676,14 @@ public struct RobotPreviewView: View {
     let proxyFillets = partAppearances.map {
       "\($0.key.rawValue.uuidString):\($0.value.proxyFilletRadiusMeters)"
     }.sorted().joined(separator: ",")
+    // Only include state that requires rebuilding geometry (which meshes, the
+    // part/joint structure, proxy fillet radius). The section plane is applied
+    // live every frame by the update: closure (refreshClippingMaterials), so
+    // it must NOT be here — otherwise dragging the clip plane re-parses every
+    // STL from disk per frame. Other visual style still rebuilds until it is
+    // moved into update: too (see the Codex packet).
     return
-      "\(modelURL?.absoluteString ?? "none")|\(partModelSources.values.map { "\($0.partID.rawValue):\($0.fileURL.path):\($0.modelNode ?? ""):\($0.unitScaleToMeters)" }.sorted().joined(separator: ","))|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(lightingIntensity)|\(environmentPreset.rawValue)|\(environmentRotationDegrees)|\(sectionPlane.isEnabled)|\(sectionPlane.axis.rawValue)|\(sectionPlane.positionMeters)|\(showsShadows)|\(partIDs)|\(jointIDs)|\(proxyFillets)"
+      "\(modelURL?.absoluteString ?? "none")|\(partModelSources.values.map { "\($0.partID.rawValue):\($0.fileURL.path):\($0.modelNode ?? ""):\($0.unitScaleToMeters):v\($0.assetVersion)" }.sorted().joined(separator: ","))|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(lightingIntensity)|\(environmentPreset.rawValue)|\(environmentRotationDegrees)|\(showsShadows)|\(partIDs)|\(jointIDs)|\(proxyFillets)"
   }
 
   private static func makeScene(
