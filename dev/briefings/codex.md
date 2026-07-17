@@ -5,6 +5,45 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-16 (Claude): **Pipeline audit follow-ups (Lane A).** A read-only
+  audit of import→load→render surfaced two items for your lane (I fixed the
+  render-fallback correctness + logging myself — commits `9b0049e`, `f94526b`):
+  (a) **Surface failed parts in the UI.** I made mesh-load failures log via
+  `os.Logger` instead of silently showing a proxy, but the user still can't SEE
+  which parts failed — add a viewport/inspector badge for parts that fell back
+  to a proxy because their file failed to load (vs parts that legitimately have
+  no model). (b) **Wire the relation editor.** `RelationEditorView`'s "Create
+  Relation" button is empty + hard-disabled ("mutation not wired yet"). The
+  engine fully supports relations (round-trips them; `relation_types` +
+  `describe_relation` + the `relations` array already exist). Follow the
+  `AnimaCoreRigDocumentEditor.addingPart` pattern: add `addingRelation`, mutate
+  the rigDocument DTO, round-trip through `serialize_character` + load (engine
+  validates). No backend verb needed. Low-pri cleanup: `SampleContent.rig`/
+  `.clip` are dead (only `emptyClip` is used) — safe to delete.
+
+- [ ] 2026-07-16 (Claude): **Viewport rebuild efficiency — move visual style
+  out of `sceneIdentity` into `update:` (Lane A).** `RobotPreviewView`'s
+  `.id(sceneIdentity)` tears down the whole `RealityView` and re-parses every
+  STL from disk (`makeScene` → `loadWithTopology`) whenever `sceneIdentity`
+  changes. It included every visual-style property, so changing lighting,
+  material, reflection, environment rotation, appearance, edge display, or
+  shadows re-parsed the entire assembly. I already removed `sectionPlane.*`
+  (commit `fe919c0`) since `update:` applies it live via
+  `refreshClippingMaterials` — that killed the per-frame re-parse while
+  dragging the clip plane. **Your task:** do the same for the rest — make the
+  `update:` closure re-apply `lightingPreset`/`lightingIntensity`,
+  `materialFinish`, `reflectionMode`, `environmentPreset`/
+  `environmentRotationDegrees`, `edgeDisplay`, `showsShadows`, and the
+  `appearance` enum live, then drop them from `sceneIdentity`. After that,
+  `sceneIdentity` should contain ONLY geometry-affecting state (modelURL,
+  partModelSources, part/joint IDs, proxy fillet radius). Verify visually that
+  each still updates live (that's why this is your lane — I can't GUI-test).
+  Optional follow-up: a parsed-mesh cache in `RealityKitModelLoader` keyed by
+  (fileURL, unitScale, modelNode, assetVersion) so any remaining rebuild reuses
+  parsed geometry instead of re-reading disk. Ties into
+  `dev/docs/roadmap/Loading_At_Scale.md` P2.
+
+
 - [ ] 2026-07-16 (Claude): **Load-at-scale UI — progress/cancel for big
   imports (Lane A).** A real assembly (31 STLs, 34 MB, one 234k-triangle part)
   crashed the viewport. I fixed the root cause (commit `00c2d1b`: the eager
@@ -1074,3 +1113,16 @@ does the heavy implementation; Codex reviews it and plans what's next.
   boundaries are unchanged. Verification passed: eight focused tests, all 275
   XCTest + 20 Swift Testing tests, recursive lint, native/root builds, deep
   signature, launch, and `git diff --check`.
+
+- **2026-07-16 — Assets bulk deletion and automatic replacement complete:**
+  Parts table/grid selection is now a real set with plain-click replacement and
+  Command/Shift extension/toggling. The toolbar, context menu, and Delete key
+  confirm bulk removal, then edit the retained rig DTO and pass it through
+  AnimaCore serialization/reload; dependent mates, relations, outputs, and clip
+  references are removed, editor metadata is pruned, and embedded files are
+  deleted only when orphaned. Locked parts remain protected. Importing the same
+  original filename automatically overwrites the stable embedded asset,
+  increments the simple V counter for all parts sharing it, and forces the
+  renderer to reload same-path geometry rather than adding a duplicate. Five
+  focused tests, 279 XCTest + 22 live-bridge Swift Testing, claimed-file lint,
+  Xcode/root builds, deep signing, app launch, and `git diff --check` pass.

@@ -50,6 +50,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Assets multi-select deletion + automatic part replacement | `app/Sources/AnimaCoreClient/AnimaCoreRigDocumentEditor.swift`, `app/Sources/AnimaDocument/AnimaDocumentStore.swift`, `app/Sources/RealityKitViewport/{PartModelSource,RobotPreviewView}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Assets/{AssetsWorkspaceView,AssetBuilderContentView,AssetBuilderInspector}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaDocumentTests,AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | Parts table/grid supports standard Command/Shift multi-selection and synchronized preview highlighting; toolbar/context/Delete-key removal confirms and removes selected engine parts plus dependent mate/relation/clip/output references through engine validation, persists on Save, and prunes only orphaned project assets/editor metadata; importing the same original filename automatically replaces its existing embedded asset/part(s), increments V, and forces renderer refresh rather than creating a duplicate; focused/full tests, lint, native/root sign/launch, `git diff --check` | released 2026-07-16 (5 focused tests; 279 XCTest + 22 Swift Testing; claimed-file lint; native/root build, deep sign, launch; recursive-lint warnings isolated to Claude's preserved untracked probe) |
 | Codex | Flatten the Asset Builder project tree | `app/Sources/AnimaStudioUI/Workspaces/Assets/{AssetBuilderSidebar,AssetsWorkspaceModels}.swift`, `app/Tests/AnimaStudioUIUnitTests/Workspaces/Assets/AssetsWorkspaceModelsTests.swift`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | project name/revision appear once as a compact non-tree header; Characters and Parts Library are direct tree roots; character collections remain nested only beneath their character; shared `TreeView`, filtering, selection, and active-character expansion remain intact; focused/full tests, lint, native/root sign/launch, `git diff --check` | released 2026-07-16 (8 focused; 275 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
 | Codex | Repair dead Assets import buttons with native macOS panels | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, new focused import-panel helper under `app/Sources/AnimaStudioUI/Components/`, focused tests under `app/Tests/AnimaStudioUIUnitTests/Components/`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every live 3D Model/Import/drop-zone click opens one real multi-file NSOpenPanel; Anima Character opens its own single-file panel; cancel safely clears replace state; chosen files enter the existing unit/import pipeline; focused/full tests, lint, native/root sign/launch, `git diff --check` | released 2026-07-16 (2 focused; 275 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
 | Codex | Enforce the current supported model-import contract | `app/Sources/AnimaStudioUI/{AppShell/{StudioWorkspaceView,WorkspaceChrome}.swift,Components/{ModelImportFormatSupport,ModelImportUnitsSheet,InspectorView}.swift,Workspaces/{Assets/AssetBuilderInspector,WorkspaceRibbonCatalog,UIDev/{UIDevTemplateMatrixView,UIDevVariantBoardSpecimenView}}.swift}`, focused import tests, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | picker and drag/drop accept only USD/USD[A/C]/USDZ, STL, and OBJ; Assets import panel states that exact set; STEP/STP/Reality/URDF/glTF are not advertised or admitted; unit prompt remains STL/OBJ-only; full tests/lint/native/root sign/launch and `git diff --check` | released 2026-07-16 (273 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
@@ -2570,3 +2571,41 @@ change needed in the Handoff log instead of inventing commands.
   hundreds-of-parts / GB: LOD, bounded-parallel + progress, lazy topology,
   streaming) and queued the Lane A progress/cancel packet in codex.md IN. STATUS
   updated. `swift build` + 84 RealityKitViewport tests pass.
+- **2026-07-16 (Codex, Assets bulk deletion + automatic replacement):** The
+  Parts table and grid now share a semantic selection set: a plain click
+  replaces the selection, Command/Shift-click toggles or extends it, and the
+  preview highlights every selected part. The toolbar, context menu, and Delete
+  key route through one confirmation flow. Confirmed deletion edits the retained
+  engine rig DTO, removes dependent joints, relations, outputs, and deleted-DOF
+  clip values, then serializes and reloads through canonical AnimaCore before
+  pruning app metadata. Embedded files are physically removed only when no
+  surviving part references them; locked parts reject the operation. Reimporting
+  the same original filename now atomically replaces the stable embedded asset,
+  increments the small app-side V counter for every part sharing it, and changes
+  renderer identity so same-path geometry reloads instead of creating a
+  duplicate part. Changed the claimed Assets/workspace, bridge-editor,
+  document-store, and viewport-source files plus focused tests and STATUS. Five
+  focused tests, all 279 XCTest + 22 live-bridge Swift Testing tests,
+  claimed-file lint, native Xcode build, root-app rebuild/deep-sign, launch, and
+  `git diff --check` pass. Recursive lint's only warnings are in Claude's
+  preserved untracked `CarReproProbe.swift`; Codex recorded that in Claude's
+  mailbox rather than modifying another agent's file.
+- **2026-07-16 (Claude, imported-mesh render bug + pipeline audit):** Jonathan's
+  32-part car imported but rendered as box/cylinder proxies. Root cause was NOT
+  the loader (proven: loads fine; 32/32 render-ID hits) — `loadAnimaCharacter`
+  wiped `enginePartModelSources` on every reload and only a separate
+  `configurePartModelSources` call (not on all paths) repopulated it, so any
+  engine reload after open dropped every part to a proxy (probe: `afterReload
+  sources=0`). Fix (commit `9b0049e`): the workspace retains the asset dir +
+  editor metadata and rebuilds sources inside `loadAnimaCharacter`, so no path
+  can forget; portable regression test `PartModelSourceReloadTests`. Also:
+  (`fe919c0`) removed `sectionPlane.*` from `sceneIdentity` so dragging the clip
+  plane no longer re-parses every STL from disk (update: applies it live);
+  (`f94526b`) mesh-load failures now log via os.Logger instead of silently
+  faking a proxy. Read-only audit (subagent) confirmed the AnimaCore bridge is
+  genuinely wired (no mocked engine results) and flagged: the car's STLs are in
+  shared assembly space so they'll lay out correctly (no origin-overlap for this
+  file); import does NOT capture assembly positions for local-space exports (real
+  gap, noted); the relation editor is a dead stub (Codex lane — engine supports
+  it). Codex packets queued in codex.md IN. `swift build` + 84 viewport tests +
+  the new regression test pass; lint clean on changed files.
