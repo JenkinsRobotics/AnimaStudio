@@ -3,8 +3,15 @@ import AppKit
 import Foundation
 import RealityKit
 import SwiftUI
+import os
 
 public struct RobotPreviewView: View {
+  /// A part WITH a model source that fails to load is a real error, not a
+  /// reason to silently show proxy geometry. Log the specific failure so a
+  /// bad import is diagnosable instead of being disguised as an intended box.
+  private static let modelLoadLog = Logger(
+    subsystem: "studio.anima.AnimaStudio", category: "ModelLoad")
+
   @State private var transformDragState: TransformDragState?
   @State private var armIKDragState: ArmIKDragState?
   @State private var navigationAction: CADNavigationAction?
@@ -715,13 +722,25 @@ public struct RobotPreviewView: View {
     root.addChild(makeGrid(appearance: appearance))
 
     for part in rig.parts {
-      if let source = partModelSources[part.id],
-        let loaded = try? await RealityKitModelLoader.loadWithTopology(
-          contentsOf: source.fileURL,
-          unitScaleToMeters: source.unitScaleToMeters,
-          modelNode: source.modelNode
-        )
-      {
+      var loadedModel: LoadedRealityKitModel?
+      if let source = partModelSources[part.id] {
+        do {
+          loadedModel = try await RealityKitModelLoader.loadWithTopology(
+            contentsOf: source.fileURL,
+            unitScaleToMeters: source.unitScaleToMeters,
+            modelNode: source.modelNode
+          )
+        } catch {
+          Self.modelLoadLog.error(
+            """
+            Part \(part.displayName, privacy: .public) could not load \
+            \(source.fileURL.lastPathComponent, privacy: .public): \
+            \(error.localizedDescription, privacy: .public) — showing proxy.
+            """
+          )
+        }
+      }
+      if let loaded = loadedModel {
         characterRoot.addChild(
           await makeImportedPart(
             part,
