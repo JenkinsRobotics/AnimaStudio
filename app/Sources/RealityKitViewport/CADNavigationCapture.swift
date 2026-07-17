@@ -55,18 +55,20 @@ enum CADNavigationMapping {
       return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
     case .right:
       switch profile {
-      case .onshape:
+      // Default and Onshape: right-drag orbits.
+      case .default, .onshape:
         return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
       case .custom:
         return customAction(for: input, mapping: customMapping)
-      case .default, .solidWorks, .fusion360:
+      case .solidWorks, .fusion360:
         return nil
       }
     case .middle:
       switch profile {
-      case .onshape:
+      // Default and Onshape: middle-drag pans.
+      case .default, .onshape:
         return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-      case .default, .solidWorks:
+      case .solidWorks:
         if input.isShiftDown {
           return .preciseZoom(delta: input.deltaY)
         }

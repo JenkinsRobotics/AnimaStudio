@@ -18,19 +18,20 @@ final class CADNavigationTests: XCTestCase {
     )
   }
 
-  func testDefaultProfileMirrorsSolidWorksMapping() {
-    XCTAssertNil(action(button: .right, profile: .default))
+  func testDefaultProfileRightOrbitMiddlePan() {
+    // Default: right-drag orbits, middle-drag pans, scroll zooms.
     XCTAssertEqual(
-      action(button: .middle, profile: .default),
+      action(button: .right, profile: .default),
       .orbit(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
-      action(button: .middle, option: true, profile: .default),
+      action(button: .middle, profile: .default),
       .pan(deltaX: 3, deltaY: -2)
     )
+    // Modifiers on middle stay a plain pan in the default profile.
     XCTAssertEqual(
       action(button: .middle, shift: true, profile: .default),
-      .preciseZoom(delta: -2)
+      .pan(deltaX: 3, deltaY: -2)
     )
   }
 
@@ -256,7 +257,8 @@ final class CADNavigationTests: XCTestCase {
   }
 
   func testPresetSummariesMatchExecutableMappings() {
-    XCTAssertEqual(PreviewNavigationProfile.default.summary().orbit, "Middle drag")
+    XCTAssertEqual(PreviewNavigationProfile.default.summary().orbit, "Right drag")
+    XCTAssertEqual(PreviewNavigationProfile.default.summary().pan, "Middle drag")
     XCTAssertEqual(PreviewNavigationProfile.solidWorks.summary().pan, "Option + middle drag")
     XCTAssertEqual(PreviewNavigationProfile.onshape.summary().orbit, "Right drag")
     XCTAssertTrue(PreviewNavigationProfile.fusion360.summary().special.contains("Double"))

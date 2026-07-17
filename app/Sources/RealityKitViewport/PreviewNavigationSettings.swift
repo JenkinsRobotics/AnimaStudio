@@ -63,7 +63,14 @@ extension PreviewNavigationProfile {
     customMapping: CustomNavigationMapping = CustomNavigationMapping()
   ) -> PreviewNavigationProfileSummary {
     switch self {
-    case .default, .solidWorks:
+    case .default:
+      PreviewNavigationProfileSummary(
+        orbit: "Right drag",
+        pan: "Middle drag",
+        zoom: "Scroll wheel",
+        special: "Left drag — box select · right click — menu"
+      )
+    case .solidWorks:
       PreviewNavigationProfileSummary(
         orbit: "Middle drag",
         pan: "Option + middle drag",
