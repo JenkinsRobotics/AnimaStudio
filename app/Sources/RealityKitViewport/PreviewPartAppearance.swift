@@ -80,7 +80,7 @@ public struct PreviewPartAppearance: Equatable, Sendable {
     switch kind {
     case .locator:
       Self(red: 0.95, green: 0.74, blue: 0.18)
-    case .box, .cylinder, .sphere:
+    case .box, .cylinder, .sphere, .mesh:
       Self(red: 0.22, green: 0.73, blue: 0.68)
     }
   }

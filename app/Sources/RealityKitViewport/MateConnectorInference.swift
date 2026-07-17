@@ -48,7 +48,7 @@ public enum RigPrimitivePreviewGeometry {
 public enum MateConnectorInference {
   public static func candidates(for part: RigPartDefinition) -> [MateConnectorCandidate] {
     switch part.primitiveKind {
-    case .box:
+    case .box, .mesh:
       boxCandidates(partID: part.id)
     case .cylinder:
       cylinderCandidates(partID: part.id)

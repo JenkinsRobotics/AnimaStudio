@@ -205,7 +205,7 @@ struct InspectorView: View {
       } else {
         LabeledContent("Name", value: asset.name)
       }
-      LabeledContent("Type", value: "USD / RealityKit")
+      LabeledContent("Type", value: "USD / STL / OBJ")
       LabeledContent("Source", value: asset.sourcePath)
         .lineLimit(3)
     }
@@ -272,9 +272,15 @@ struct InspectorView: View {
         placeholder: "Part name",
         help: "The project-owned name used by the rig and later mappings."
       )
-      LabeledContent("Proxy Shape", value: part.primitiveKind.displayName)
-      Label("Project-owned rig proxy", systemImage: "pencil.and.outline")
-        .foregroundStyle(StudioPalette.semanticPart)
+      if part.primitiveKind == .mesh {
+        LabeledContent("Source", value: "Imported model")
+        Label("Renders its imported mesh", systemImage: "shippingbox")
+          .foregroundStyle(StudioPalette.semanticPart)
+      } else {
+        LabeledContent("Proxy Shape", value: part.primitiveKind.displayName)
+        Label("Project-owned rig proxy", systemImage: "pencil.and.outline")
+          .foregroundStyle(StudioPalette.semanticPart)
+      }
     }
 
     if part.primitiveKind == .box {

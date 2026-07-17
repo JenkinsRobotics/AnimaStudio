@@ -34,7 +34,8 @@ enum TransformGizmoFactory {
 
     let entity: ModelEntity
     switch kind {
-    case .box:
+    case .box, .mesh:
+      // A mesh part uses a bounding-box-style selection highlight.
       entity = ModelEntity(
         mesh: .generateBox(width: 0.57, height: 0.57, depth: 0.57, cornerRadius: 0.04),
         materials: [material]

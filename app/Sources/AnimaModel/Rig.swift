@@ -11,6 +11,15 @@ public enum RigPrimitiveKind: String, CaseIterable, Codable, Sendable {
   case cylinder
   case sphere
   case locator
+  /// A model-backed part: it renders its imported mesh, never a primitive
+  /// proxy. Import-only — not offered by the Add-to-Rig palette.
+  case mesh
+
+  /// Kinds a user can create from the palette. `mesh` is excluded because a
+  /// mesh comes from importing a model, not from picking a proxy shape.
+  public static var creatableCases: [RigPrimitiveKind] {
+    [.box, .cylinder, .sphere, .locator]
+  }
 }
 
 public struct RigVector3: Equatable, Codable, Sendable {

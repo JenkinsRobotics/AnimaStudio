@@ -10,6 +10,7 @@ extension RigPrimitiveKind {
     case .cylinder: "Cylinder"
     case .sphere: "Sphere"
     case .locator: "Empty Point"
+    case .mesh: "Model"
     }
   }
 
@@ -19,6 +20,7 @@ extension RigPrimitiveKind {
     case .cylinder: "cylinder"
     case .sphere: "circle.grid.cross"
     case .locator: "scope"
+    case .mesh: "shippingbox"
     }
   }
 }
@@ -132,7 +134,7 @@ struct CreationPaletteView: View {
       systemImage: "cube.fill",
       tint: StudioPalette.semanticPart
     ) {
-      ForEach(RigPrimitiveKind.allCases, id: \.self) { kind in
+      ForEach(RigPrimitiveKind.creatableCases, id: \.self) { kind in
         CreationToolButton(
           title: kind.displayName,
           systemImage: kind.systemImage,

@@ -1972,9 +1972,14 @@ final class StudioWorkspaceModel {
   /// `resolve_pose`, never from a Swift reconstruction of the mate graph.
   private static func previewProject(for summary: AnimaCoreRigSummary) -> EnginePreviewProject {
     let parts = summary.parts.enumerated().map { index, part in
-      RigPartDefinition(
+      // A part that carries an imported model is a mesh — never a fabricated
+      // box/cylinder proxy. Only genuinely model-less parts fall back to a
+      // primitive (and even that shape is a guess the engine cannot supply).
+      let kind: RigPrimitiveKind =
+        part.model.isEmpty ? (index.isMultiple(of: 2) ? .cylinder : .box) : .mesh
+      return RigPartDefinition(
         displayName: part.name,
-        primitiveKind: index.isMultiple(of: 2) ? .cylinder : .box,
+        primitiveKind: kind,
         positionMeters: Self.rigVector(part.positionMeters),
         rotationEulerRadians: Self.rigVector(part.rotationEulerRadians)
       )

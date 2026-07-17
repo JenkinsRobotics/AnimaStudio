@@ -828,7 +828,9 @@ public struct RobotPreviewView: View {
     )
     let entity: ModelEntity
     switch part.primitiveKind {
-    case .box:
+    case .box, .mesh:
+      // .mesh only reaches makePart when its imported model failed to load
+      // (the failure is logged); show a bounding-box placeholder, not silence.
       let size = Float(RigPrimitivePreviewGeometry.boxSizeMeters)
       let filletRadius = Float(appearance.proxyFilletRadiusMeters)
       let mesh: MeshResource =
