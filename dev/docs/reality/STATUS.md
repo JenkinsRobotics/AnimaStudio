@@ -92,9 +92,12 @@
   hand-formats its YAML. The new character then enters an in-app 3D loading
   stage with file drop/picker controls, progress, and inline errors. The
   Assets workspace now uses the same three-column grammar as the other
-  authoring workspaces: a persistent shared-`TreeView` project/character tree
-  on the left, one context-sensitive collection surface in the center, and a
-  compact import tool plus live RealityKit selection preview on the right.
+  authoring workspaces: a persistent shared-`TreeView` character tree on the
+  left, one context-sensitive collection surface in the center, and a compact
+  import tool plus live RealityKit selection preview on the right. The current
+  project name and revision appear once in a compact non-tree header;
+  **Characters** and **Parts Library** are direct tree roots, so the active
+  project is not redundantly nested as a folder around its own contents.
   The tree does not invent a parallel catalog: Parts, mates/relations/groups,
   clips, and scene scripts project the retained engine/project data, while
   material/appearance rows project the active character's `editor.json`.
@@ -108,7 +111,15 @@
   the one-file **Replace Part** action increments the integer in `editor.json`;
   no PDM/history system is implied. The collection surface is pinned to the top
   and fills the center column. The right Preview always remains a live 3D
-  viewport, even before geometry is selected or imported. A separate user-level Parts Library branch is visibly scaffolded
+  viewport, even before geometry is selected or imported. Dense CAD imports no
+  longer crash the viewport: the CAD-selection topology (coplanar-face / edge /
+  corner extraction) is skipped above a per-file triangle budget
+  (`maxTopologyTriangles`, 40k), so a heavy part still loads and renders with
+  whole-part selection while small parts keep face/edge selection. Model
+  parsing already runs off the main thread and per-file import errors fall back
+  to a placeholder body, so one bad file cannot crash an assembly load. Scaling
+  further (hundreds of parts, GB workspaces) is planned in
+  `dev/docs/roadmap/Loading_At_Scale.md`. A separate user-level Parts Library branch is visibly scaffolded
   for future cross-project reuse and is not stored in `.character.anima`.
   The
   workspace-model initializer accepts an alternate startup
@@ -508,10 +519,17 @@
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
   optional reference plane, and a highlighted limit arc with independent layer
   toggles on every created mate. Project and asset names are also editable in
-  memory. Users can batch-import USD/Reality, STL, and OBJ models. USD loads natively;
-  ModelIO converts STL/OBJ geometry into RealityKit meshes after an explicit
-  mm/cm/m prompt (STL defaults to mm). STEP selection displays truthful
-  conversion guidance. A single unit-preparation sheet reviews the batch and
+  memory. The operator-facing import contract is deliberately closed to USD,
+  USDA, USDC, USDZ, STL, and OBJ models; picker and drop flows reject STEP,
+  Reality, URDF, glTF/GLB, and other extensions before loading. USD-family
+  files load natively; ModelIO converts STL/OBJ geometry into RealityKit meshes
+  after an explicit mm/cm/m prompt (STL defaults to mm). Every live model-import
+  entry point — the Assets ribbon, center Import/Replace controls, right-hand
+  drop-zone click, and navigator footer — calls one explicit native macOS
+  `NSOpenPanel`; the Anima Character command uses a separate single-file native
+  panel. This replaces competing SwiftUI importer modifiers that could accept a
+  click without presenting a chooser. A single
+  unit-preparation sheet reviews the batch and
   gives each unitless file its own mm/cm/m setting; loading remains asynchronous
   and reports the current file. Imports are copied into the active character's portable
   `assets/` directory, authored into AnimaCore's full rig DTO as safe relative
@@ -580,7 +598,8 @@
   character's `assets/`, validated as a safe relative path — no
   absolute/`..`/empty segments) alongside its optional `model_node`
   (node within a multi-node file), round-tripped for the app and never
-  parsed by the engine, so STL/OBJ/STEP/USD are treated identically;
+  parsed by the engine, so asset references are format-opaque there even though
+  Studio currently admits only its documented USD-family/STL/OBJ import set;
   per-DOF limits are optional per Kinematics.md §2: an
   unlimited DOF is legal and never clamped, but mapping one to a
   bounded output channel is a load error naming the fix; per-joint

@@ -50,6 +50,9 @@ change needed in the Handoff log instead of inventing commands.
 
 | Agent | Task | Claimed files | Acceptance | State |
 |---|---|---|---|---|
+| Codex | Flatten the Asset Builder project tree | `app/Sources/AnimaStudioUI/Workspaces/Assets/{AssetBuilderSidebar,AssetsWorkspaceModels}.swift`, `app/Tests/AnimaStudioUIUnitTests/Workspaces/Assets/AssetsWorkspaceModelsTests.swift`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | project name/revision appear once as a compact non-tree header; Characters and Parts Library are direct tree roots; character collections remain nested only beneath their character; shared `TreeView`, filtering, selection, and active-character expansion remain intact; focused/full tests, lint, native/root sign/launch, `git diff --check` | released 2026-07-16 (8 focused; 275 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
+| Codex | Repair dead Assets import buttons with native macOS panels | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, new focused import-panel helper under `app/Sources/AnimaStudioUI/Components/`, focused tests under `app/Tests/AnimaStudioUIUnitTests/Components/`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every live 3D Model/Import/drop-zone click opens one real multi-file NSOpenPanel; Anima Character opens its own single-file panel; cancel safely clears replace state; chosen files enter the existing unit/import pipeline; focused/full tests, lint, native/root sign/launch, `git diff --check` | released 2026-07-16 (2 focused; 275 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
+| Codex | Enforce the current supported model-import contract | `app/Sources/AnimaStudioUI/{AppShell/{StudioWorkspaceView,WorkspaceChrome}.swift,Components/{ModelImportFormatSupport,ModelImportUnitsSheet,InspectorView}.swift,Workspaces/{Assets/AssetBuilderInspector,WorkspaceRibbonCatalog,UIDev/{UIDevTemplateMatrixView,UIDevVariantBoardSpecimenView}}.swift}`, focused import tests, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | picker and drag/drop accept only USD/USD[A/C]/USDZ, STL, and OBJ; Assets import panel states that exact set; STEP/STP/Reality/URDF/glTF are not advertised or admitted; unit prompt remains STL/OBJ-only; full tests/lint/native/root sign/launch and `git diff --check` | released 2026-07-16 (273 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
 | Codex | Three-column Asset Builder workspace + consistent collection views | `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, focused Assets tests, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every center collection uses one Table/Grid presentation; Table is default; type-appropriate headers remain visible at zero rows; every empty body says `No <collection> yet` without duplicate actions; Parts behavior and right preview/import remain intact; full tests/lint/native/root sign/launch and `git diff --check` | released 2026-07-16 (272 XCTest + 20 Swift Testing; recursive lint; native/root build, deep sign, launch) |
 | Codex | Sharp box proxies + contextual mate snap points + persistent fillet inspector | `app/Sources/RealityKitViewport/{PreviewPartAppearance,RobotPreviewView,MateConnectorMarkers}.swift`, `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceModel.swift,Components/{InspectorView,ComponentAppearanceEditor}.swift}`, focused tests under `app/Tests/{AnimaDocumentTests,RealityKitViewportTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | box proxies default to mathematically sharp edges; per-box fillet radius is an explicit mm Inspector value persisted in editor JSON; inferred face/edge/corner point markers are absent during normal selection and appear only during active mate-connector snapping; focused/full tests, lint, root-app build/sign/launch, `git diff --check` | released 2026-07-16 (267 XCTest + 20 Swift Testing; recursive lint; Xcode/root app build, deep sign, launch) |
 | Codex | Live navigator drag/drop regression: insertion feedback + drop-to-group | `app/project.yml`, `app/Sources/AnimaStudioUI/Components/{NavigatorDropInteraction,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Components/Tree/TreeView.swift`, `app/AppUITests/AnimaStudioAppUITests.swift`, focused navigator tests under `app/Tests/AnimaStudioUIUnitTests/Components/**`, generated `app/AnimaStudio.xcodeproj/project.pbxproj`, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | row-wide drag source/targets; visible animated before/after line and center + Create Group state; center drop creates and expands a real folder containing target plus dragged selection; a native UI test performs the drag in the app; full tests/lint/root build/sign/launch; `git diff --check` | implemented 2026-07-16; awaiting operator drag confirmation (263 XCTest + 20 Swift Testing green; root app built/signed; UI-test app association fixed, but macOS canceled UI automation authentication before gesture execution) |
@@ -2524,3 +2527,46 @@ change needed in the Handoff log instead of inventing commands.
   capture was not attempted after the environment rejected it as potentially
   exposing unrelated screen contents; operator visual review remains the final
   pixel-level check.
+- **2026-07-16 (Codex, closed model-import contract + URDF direction):**
+  Centralized Studio's operator import contract and now use it for both the
+  file picker and drag/drop admission. The only admitted extensions are USD,
+  USDA, USDC, USDZ, STL, and OBJ; every import surface states the same set, and
+  STEP/STP, Reality, URDF, glTF/GLB, and unknown files fail before model
+  loading. STL/OBJ retain the per-file unit prompt. Jonathan approved URDF as a
+  future conventional-robot interchange importer that maps links/joints into
+  canonical `.character.anima`, not as Anima's canonical character format.
+  Four focused format tests, all 273 XCTest + 20 live-bridge Swift Testing
+  tests, recursive lint, native Xcode build, root-app rebuild/deep-sign, launch,
+  and `git diff --check` pass.
+- **2026-07-16 (Codex, native import-panel repair):** Reproduced the structural
+  risk behind Jonathan's report: the workspace root carried two independent
+  SwiftUI `fileImporter` modifiers and live buttons only toggled presentation
+  booleans. Replaced both with explicit native `NSOpenPanel` commands following
+  the same proven app-modal pattern as project Open/Save. The Assets ribbon,
+  center Import/Replace buttons, right-hand drop-zone click, and navigator
+  footer now converge on one multi-file model chooser; Anima Character uses a
+  single-file chooser. Cancel clears pending replace state and selections enter
+  the existing unit-review/import pipeline. Two focused tests, all 275 XCTest +
+  20 live-bridge Swift Testing tests, recursive lint, native/root builds, deep
+  sign, launch, and `git diff --check` pass.
+- **2026-07-16 (Codex, flattened Assets navigator):** Removed the redundant
+  project-folder node from Asset Builder. A compact `PROJECT: <NAME>` header
+  with a separate revision badge preserves context without behaving like a
+  folder, while Characters and Parts Library are now the shared TreeView's
+  direct roots. Character collections remain nested only beneath their owning
+  character. Eight focused tests, all 275 XCTest + 20 Swift Testing tests,
+  recursive lint, native/root builds, deep signing, launch, and
+  `git diff --check` pass.
+- **2026-07-16 (Claude, dense-CAD import crash fixed + scale plan):** Jonathan's
+  real assembly (31 STLs, 34 MB, one 234k-triangle part) OOM-killed the
+  viewport. Root cause: the CAD-selection topology (coplanar-face grouping with
+  per-face triangle geometry, plus edges/corners) was computed eagerly for every
+  part on load with no bound. Fix (commit `00c2d1b`): skip feature-topology above
+  `maxTopologyTriangles = 40k` per file — heavy parts still load/render with
+  whole-part selection, small parts keep face/edge selection; scales per-file at
+  any part count. Confirmed the load path is otherwise robust (parse already runs
+  off-main via `Task.detached`; per-file `try?` isolates a bad file to a
+  placeholder). Wrote `dev/docs/roadmap/Loading_At_Scale.md` (phased plan for
+  hundreds-of-parts / GB: LOD, bounded-parallel + progress, lazy topology,
+  streaming) and queued the Lane A progress/cancel packet in codex.md IN. STATUS
+  updated. `swift build` + 84 RealityKitViewport tests pass.

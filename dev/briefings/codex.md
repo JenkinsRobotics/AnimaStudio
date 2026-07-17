@@ -5,6 +5,22 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-16 (Claude): **Load-at-scale UI — progress/cancel for big
+  imports (Lane A).** A real assembly (31 STLs, 34 MB, one 234k-triangle part)
+  crashed the viewport. I fixed the root cause (commit `00c2d1b`: the eager
+  per-part CAD-selection topology OOM'd on dense meshes — now skipped above a
+  40k-triangle per-file budget) and wrote the phased plan in
+  `dev/docs/roadmap/Loading_At_Scale.md`. Jonathan wants the pipeline hardened
+  for **hundreds of parts / GB workspaces**. Two pieces are Lane A / yours:
+  **(P2) per-part load progress + a cancel button** in the viewport load path
+  (`RobotPreviewView.makeCharacterEntity` currently loads parts serially with
+  no feedback — a big load looks like a hang), and later **the LOD toggle UI**
+  (P1). The enabling engine-side refactor (splitting `loadWithTopology` into an
+  off-main parse stage + on-main entity-build so parses can run bounded-parallel)
+  I can take if you'd rather own the UI only — say which in OUT. Don't start the
+  full streaming layer (P4); it's measure-first. See the doc for the full phase
+  list and which are already robust (off-main parse, per-file error isolation).
+
 - [x] 2026-07-15 (Claude): **AnimaCore is now canonical — bridge work,
   and STOP extending the Swift engine.** Policy ratified in
   CONVENTIONS + AGENTS: `animacore/` owns all animation *meaning*; the
@@ -1030,3 +1046,31 @@ does the heavy implementation; Codex reviews it and plans what's next.
   The final collection pass adds one shared Table/Grid switch across every
   center option. Table is the default, each type keeps its headers at zero rows,
   and empty bodies consistently show `No … yet`.
+
+- **2026-07-16 — model-import contract closed; URDF direction agreed:** The
+  Assets picker, drop path, ribbon/help, inspector, and UI Dev specimens now
+  share one supported-format contract: USD, USDA, USDC, USDZ, STL, and OBJ.
+  STEP/STP, Reality, URDF, glTF/GLB, and unknown extensions are rejected before
+  loading, while STL/OBJ retain explicit unit handling. Jonathan agreed that a
+  future URDF feature should be an interchange importer into canonical
+  `.character.anima`, not a competing character format. Verification passed:
+  four focused tests, 273 XCTest + 20 Swift Testing, recursive lint, native and
+  root-app builds, deep signature, launch, and `git diff --check`.
+
+- **2026-07-16 — dead import-button presentation repaired:** Replaced the two
+  competing root SwiftUI file-importer modifiers with explicit native macOS
+  `NSOpenPanel` routes. All live model-import buttons/drop-zone clicks now share
+  the same multi-file chooser and existing unit/import pipeline; Anima
+  Character uses its own single-file chooser, and cancel safely clears Replace
+  Part state. Verification passed: two focused tests, 275 XCTest + 20 Swift
+  Testing, recursive lint, native/root builds, deep signature, launch, and
+  `git diff --check`.
+
+- **2026-07-16 — Asset Builder hierarchy flattened:** Removed the redundant
+  project folder surrounding the Assets tree. Project name/revision now live in
+  a compact non-tree header; Characters and Parts Library are direct roots, and
+  collections remain nested only under their character. The shared TreeView,
+  filtering, selection, active-character expansion, and engine/editor data
+  boundaries are unchanged. Verification passed: eight focused tests, all 275
+  XCTest + 20 Swift Testing tests, recursive lint, native/root builds, deep
+  signature, launch, and `git diff --check`.
