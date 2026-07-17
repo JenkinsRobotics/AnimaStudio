@@ -4,11 +4,21 @@
 import AppKit
 import SwiftUI
 
-// dev/labs, resolved from this binary's location (…/OcctSwift/.build/debug/TestLab).
-let labsRoot = URL(fileURLWithPath: Bundle.main.executablePath ?? ".")
-  .deletingLastPathComponent()  // debug
-  .deletingLastPathComponent()  // .build
-  .deletingLastPathComponent()  // OcctSwift
+// dev/labs, found by walking up from this binary until the folder containing
+// build.sh appears. (A fixed number of deletingLastPathComponent calls breaks
+// because SwiftPM's .build/debug is a symlink — the resolved real path has an
+// extra arm64-apple-macosx component.)
+let labsRoot: URL = {
+  var url = URL(fileURLWithPath: Bundle.main.executablePath ?? ".")
+    .resolvingSymlinksInPath()
+  for _ in 0..<8 {
+    url.deleteLastPathComponent()
+    if FileManager.default.fileExists(atPath: url.appendingPathComponent("build.sh").path) {
+      return url
+    }
+  }
+  return URL(fileURLWithPath: "/Users/jonathanjenkins/GITHUB/AnimaStudio/dev/labs")
+}()
 let repoRoot = labsRoot.deletingLastPathComponent().deletingLastPathComponent()
 
 struct LabApp: Identifiable {
