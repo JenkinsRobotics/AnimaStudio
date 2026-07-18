@@ -3,6 +3,7 @@
 // launcher (or another bench) down. Build everything with dev/labs/build.sh.
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 // dev/labs, found by walking up from this binary until the folder containing
 // build.sh appears. (A fixed number of deletingLastPathComponent calls breaks
@@ -73,12 +74,32 @@ let apps: [LabApp] = [
 struct TestLabView: View {
   @State private var output = "Terminal-style results appear here."
   @State private var status = ""
+  @State private var comparisonFile: URL?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text("Anima Studio — Test Lab").font(.title2.bold())
       Text("Standalone benches, each its own process. Rebuild all: dev/labs/build.sh")
         .font(.caption).foregroundStyle(.secondary)
+
+      // Side-by-side comparison: one file, every pipeline opens it at once.
+      HStack {
+        Button("Choose Comparison File…") {
+          let panel = NSOpenPanel()
+          panel.allowsMultipleSelection = false
+          panel.allowedContentTypes = ["step", "stp", "stl", "obj"].compactMap {
+            UTType(filenameExtension: $0)
+          }
+          if panel.runModal() == .OK { comparisonFile = panel.url }
+        }
+        Button("Launch ALL Pipelines with it") { launchAll() }
+          .disabled(comparisonFile == nil)
+        Text(comparisonFile?.lastPathComponent ?? "no file chosen")
+          .font(.system(.caption, design: .monospaced))
+          .foregroundStyle(.secondary)
+      }
+      .padding(8)
+      .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
       ForEach(apps) { app in
         HStack(alignment: .top) {
           VStack(alignment: .leading, spacing: 2) {
@@ -121,14 +142,28 @@ struct TestLabView: View {
     FileManager.default.fileExists(atPath: app.path.path)
   }
 
-  private func launch(_ app: LabApp) {
+  private func launchAll() {
+    guard let file = comparisonFile else { return }
+    for app in apps
+    where app.disabledReason == nil
+      && (app.name.hasPrefix("PIPELINE") || app.name.hasPrefix("BASELINE"))
+      && exists(app)
+    {
+      launch(app, fileOverride: file)
+    }
+    status = "Launched all pipelines with \(file.lastPathComponent)"
+  }
+
+  private func launch(_ app: LabApp, fileOverride: URL? = nil) {
     if app.path.pathExtension == "app" {
       NSWorkspace.shared.open(app.path)
       status = "Opened \(app.name)"
       return
     }
     var arguments: [String] = []
-    if app.needsFile {
+    if let fileOverride {
+      arguments = [fileOverride.path, "0.001"]
+    } else if app.needsFile {
       let panel = NSOpenPanel()
       panel.allowsMultipleSelection = false
       guard panel.runModal() == .OK, let url = panel.url else { return }
