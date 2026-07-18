@@ -543,9 +543,9 @@ struct BenchView: View {
 
       Divider()
       Text("External Qt pipelines").font(.caption).foregroundStyle(.secondary)
-      Button("Launch P4 — Qt + OCCT GL") { launchQt() }
+      Button("Launch: Qt + Open CASCADE viewer") { launchQt() }
         .disabled(model.lastFileURL == nil)
-      Text("P5 — Qt + GLES + MetalANGLE: blocked (needs MetalANGLE built from source AND OCCT rebuilt with GLES; revisit only if P1–P4 all fail)")
+      Text("Qt + OpenGL-ES + MetalANGLE: blocked (needs MetalANGLE built from source AND Open CASCADE rebuilt with GLES). Unity: not installed — needs the Unity editor + account sign-in.")
         .font(.system(size: 9))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -559,6 +559,7 @@ struct BenchView: View {
       case .realityKit: AnyView(RealityKitViewportView(model: model))
       case .metalKit: AnyView(MetalViewport(model: model))
       case .occtGL: AnyView(OcctGLViewport(model: model))
+      case .webGL: AnyView(WebGLViewport(model: model))
       case .modelIO: AnyView(ModelIOViewport(model: model))
       }
 

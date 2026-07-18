@@ -53,3 +53,17 @@ hits unsupported STEP entities ("Lookup failed for #NNN", degenerate knot
 vectors) and PANICS in tessellation, while OCCT reads every file cleanly.
 Verdict strengthened: the Rust B-rep ecosystem is not mature enough to be
 the kernel; Pipeline 1 (OCCT) remains the champion.
+
+## Requested-pipeline findings (2026-07-17, later)
+
+- **WebGL in Swift**: built as a Claude Bench backend — the Open CASCADE shim
+  tessellates STEP, and a Three.js page inside a WKWebView renders it (CAD
+  colors included, its own OrbitControls mouse).
+- **OpenGeometry** (npm 2.0.11, Rust/WASM web kernel): inspected the actual
+  API — STEP appears ONLY as an export (`exportBrepToStep` etc.); there is no
+  STEP import/reader. It cannot load Jonathan's files → disqualified for the
+  STEP-only evaluation. (Its keyword "step" refers to export.)
+- **Unity**: not installed on this machine. A Unity demo pipeline requires the
+  Unity editor (+account sign-in, multi-GB) and either the paid Pixyz plugin
+  for CAD import or our shim converting STEP→OBJ/glTF as a feed. Bottango
+  precedent noted; deferred until Jonathan decides to install Unity.

@@ -7,32 +7,35 @@ import SwiftUI
 /// The six architectural pipelines under evaluation. 1/2/3/6 are in-process
 /// viewport backends; 4/5 are external Qt processes launched from the bench.
 enum PipelineBackend: String, CaseIterable, Identifiable {
-  case realityKit = "P1 RealityKit"
-  case metalKit = "P2 MetalKit"
-  case occtGL = "P3 OCCT-GL"
+  case realityKit = "Open CASCADE → RealityKit"
+  case metalKit = "Open CASCADE → Metal (custom)"
+  case occtGL = "Open CASCADE built-in viewer"
+  case webGL = "Open CASCADE → WebGL (Three.js)"
   // STEP-only bench per Jonathan: the ModelIO backend (cannot read STEP,
   // ever — Apple framework) is kept in code for reference but not offered.
-  case modelIO = "P6 ModelIO"
+  case modelIO = "ModelIO (no STEP)"
 
-  static var allCases: [PipelineBackend] { [.realityKit, .metalKit, .occtGL] }
+  static var allCases: [PipelineBackend] { [.realityKit, .metalKit, .occtGL, .webGL] }
 
   var id: String { rawValue }
 
   var fullName: String {
     switch self {
-    case .realityKit: "Pipeline 1 — OCCT C-shim → Swift → RealityKit"
-    case .metalKit: "Pipeline 2 — OCCT C-shim → Swift → custom MetalKit renderer"
-    case .occtGL: "Pipeline 3 — OCCT built-in GL viewer → SwiftUI (NSViewRepresentable)"
-    case .modelIO: "Pipeline 6 — ModelIO → RealityKit quick-parser (no B-rep)"
+    case .realityKit: "Open CASCADE C-shim → Swift → RealityKit"
+    case .metalKit: "Open CASCADE C-shim → Swift → custom MetalKit renderer"
+    case .occtGL: "Open CASCADE built-in viewer (OpenGL) → SwiftUI"
+    case .webGL: "Open CASCADE C-shim → WebGL (Three.js) in a Swift WKWebView"
+    case .modelIO: "ModelIO → RealityKit quick-parser (no B-rep)"
     }
   }
 
   var capabilities: String {
     switch self {
-    case .realityKit: "STEP/STL/OBJ · face+edge select · XDE colors · Metal"
-    case .metalKit: "STEP/STL/OBJ · raw MTLBuffers · XDE colors · display only"
-    case .occtGL: "STEP only · OCCT-native hover/select · deprecated OpenGL"
-    case .modelIO: "STL/OBJ/USD only · STEP fails (that's the baseline point)"
+    case .realityKit: "STEP · face+edge select · CAD colors · native Metal"
+    case .metalKit: "STEP · raw Metal buffers · CAD colors · display only"
+    case .occtGL: "STEP · Open CASCADE-native hover/select · deprecated OpenGL"
+    case .webGL: "STEP · CAD colors · WebGL in-app · own mouse (drag orbit/right pan/scroll zoom)"
+    case .modelIO: "STL/OBJ/USD only · STEP fails"
     }
   }
 }
