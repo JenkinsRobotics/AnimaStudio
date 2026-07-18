@@ -744,7 +744,7 @@ struct BenchView: View {
   private func launchQt() {
     guard let file = model.lastFileURL else { return }
     let qt = labsRootURL().appendingPathComponent(
-      "qtbench/build/qtbench.app/Contents/MacOS/qtbench")
+      "UnifiedBench/pipelines/qt/build/qtbench.app/Contents/MacOS/qtbench")
     let process = Process()
     process.executableURL = qt
     process.arguments = [file.path]
@@ -754,8 +754,8 @@ struct BenchView: View {
   private func launchUnity() {
     guard let file = model.lastFileURL else { return }
     let labs = labsRootURL()
-    let converter = labs.appendingPathComponent("unity-bench/step_to_obj")
-    let modelsDir = labs.appendingPathComponent("unity-bench/UnityBench/Assets/Models")
+    let converter = labs.appendingPathComponent("UnifiedBench/pipelines/unity/step_to_obj")
+    let modelsDir = labs.appendingPathComponent("UnifiedBench/pipelines/unity/UnityBench/Assets/Models")
     let base = modelsDir.appendingPathComponent(
       file.deletingPathExtension().lastPathComponent).path
     // Convert the current STEP via the Open CASCADE shim, then open the project.
@@ -766,7 +766,7 @@ struct BenchView: View {
       try? convert.run()
       convert.waitUntilExit()
     }
-    let project = labs.appendingPathComponent("unity-bench/UnityBench")
+    let project = labs.appendingPathComponent("UnifiedBench/pipelines/unity/UnityBench")
     let unity = URL(fileURLWithPath:
       "/Applications/Unity/Hub/Editor/2022.3.30f1/Unity.app/Contents/MacOS/Unity")
     if FileManager.default.fileExists(atPath: unity.path) {

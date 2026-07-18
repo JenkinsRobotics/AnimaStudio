@@ -111,7 +111,7 @@ struct OpenGeometryViewport: NSViewRepresentable {
   func updateNSView(_ view: WKWebView, context: Context) {
     guard !context.coordinator.loaded else { return }
     context.coordinator.loaded = true
-    let dir = labsRootURL().appendingPathComponent("opengeometry-bench", isDirectory: true)
+    let dir = labsRootURL().appendingPathComponent("UnifiedBench/pipelines/opengeometry", isDirectory: true)
     let index = dir.appendingPathComponent("index.html")
     if FileManager.default.fileExists(atPath: index.path) {
       view.loadFileURL(index, allowingReadAccessTo: dir)

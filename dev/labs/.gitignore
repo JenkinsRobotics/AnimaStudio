@@ -1,4 +1,7 @@
 .build/
 bin/
-target/
 apps/
+**/build/
+**/node_modules/
+**/target/
+**/UnityBench/

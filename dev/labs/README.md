@@ -1,69 +1,29 @@
-# dev/labs — standalone test apps
+# dev/labs — the CAD-pipeline benchmark
 
-Isolated dev apps for proving rendering/geometry combinations before anything
-touches the main app. Each is its own process: one crashing never takes the
-others down. Born 2026-07-17 while diagnosing the STL import failures.
+One app now: **Unified Bench** (harvests the best of the three demo apps).
+Everything else here supports it or is archived.
 
-## Quick start
-
-```bash
-brew install opencascade   # once
-./build.sh                 # builds everything
-./OcctSwift/.build/debug/TestLab   # the launcher
+```
+dev/labs/
+  UnifiedBench/            THE benchmark app (self-contained)
+    Package.swift, Sources/
+    pipelines/             the external pipelines the app drives
+      qt/                  Qt6 + Open CASCADE viewer (separate window)
+      opengeometry/        OpenGeometry WASM page (loaded in a WKWebView)
+      unity/               STEP→OBJ converter + Unity project
+    README.md              what was harvested from Codex/Claude/Gemini
+  apps/                    built app bundle (gitignored) — UnifiedBench.app
+  archive/                 superseded standalone experiments (dead code):
+                             OldClaudeBench, StlViewer, rustbench, kernel_test
+  build.sh                 builds Unified Bench + the Qt pipeline
 ```
 
-## The apps
+## Run it
 
-| App | What it proves |
-|---|---|
-| **TestLab** | Launcher — buttons for every bench, captures the kernel report's output |
-| **GeomBench** | OCCT → C shim → Swift → RealityKit (Metal). Multi-file workspace (STL/STEP/OBJ), per-face/per-edge click-selection on B-rep, FPS/CPU/MEM telemetry, Apple Metal GPU HUD |
-| **OcctSwiftViewer** | Minimal kernel→Metal proof: OCCT demo part + one STL |
-| **StlViewer** | The production loader (ModelIO → RealityKit) in isolation |
-| **kernel_test/occt_test** | Headless OCCT precision report: boolean exactness (1e-16), fillets, STEP round-trip, tessellation quality dial |
-| kernel_test/occt_viewer.mm | Parked: OCCT's built-in GL viewer in Cocoa (deprecated-GL path; 2 compile errors, only worth finishing if we ever evaluate MetalANGLE) |
+```bash
+./build.sh                                   # first time / after changes
+open apps/UnifiedBench.app                    # launch
+```
 
-## Findings so far (2026-07-17, Jonathan's ARCADA001 car in `CAD DEMO/`)
-
-- The same part as STL = 234,414 frozen triangles (11.7 MB, crashed the app);
-  as **STEP = 228 faces / 605 edges / 3,564 triangles** at 0.05 mm deflection —
-  66× lighter, better shading (exact surface normals), fully selectable.
-- OCCT kernel math is exact to ~1e-16; STEP round-trip preserves volume; all
-  operations single-digit ms on Apple Silicon.
-- STEP also carries **appearance**: via XCAF (`STEPCAFControl_Reader` +
-  `XCAFDoc_ColorTool`) the shim extracts the CAD-authored color per face, with
-  body-level fallback (Onshape exports one STYLED_ITEM per solid). Verified on
-  the demo files: ARCADP001 = blue, LCD = dark gray, motor = black.
-- STL also *destroys mating information*: a tessellated cylinder is flat quads
-  with no axis; the B-rep face knows it IS a cylinder with an exact axis and
-  radius — which is what mate connectors need. Surface-type extraction from
-  STEP faces is the natural next lab experiment.
-- Conclusion so far: **STEP import via OCCT (shim) feeding the existing
-  RealityKit viewport** is the long-term architecture. No Qt, no MetalANGLE,
-  no framework switch. STL/OBJ remain as fallback imports.
-
-The C shim (`OcctSwift/Sources/OcctShim`) is deliberately app-shaped: when the
-combination is approved, it becomes a package the app links and STEP joins the
-import contract.
-
-## Pipeline 2 finding (2026-07-17, later)
-
-On several of the ARCADA001 STEP files the Rust kernel (truck 0.3/0.4)
-hits unsupported STEP entities ("Lookup failed for #NNN", degenerate knot
-vectors) and PANICS in tessellation, while OCCT reads every file cleanly.
-Verdict strengthened: the Rust B-rep ecosystem is not mature enough to be
-the kernel; Pipeline 1 (OCCT) remains the champion.
-
-## Requested-pipeline findings (2026-07-17, later)
-
-- **WebGL in Swift**: built as a Claude Bench backend — the Open CASCADE shim
-  tessellates STEP, and a Three.js page inside a WKWebView renders it (CAD
-  colors included, its own OrbitControls mouse).
-- **OpenGeometry** (npm 2.0.11, Rust/WASM web kernel): inspected the actual
-  API — STEP appears ONLY as an export (`exportBrepToStep` etc.); there is no
-  STEP import/reader. It cannot load Jonathan's files → disqualified for the
-  STEP-only evaluation. (Its keyword "step" refers to export.)
-- **Unity**: not installed on this machine. A Unity demo pipeline requires the
-  Unity editor (+account sign-in, multi-GB) and either the paid Pixyz plugin
-  for CAD import or our shim converting STEP→OBJ/glTF as a feed. Bottango
-  precedent noted; deferred until Jonathan decides to install Unity.
+8 pipelines, one workspace, one file — compare, then cull. See
+`UnifiedBench/README.md` for the pipeline list and the harvest provenance.
