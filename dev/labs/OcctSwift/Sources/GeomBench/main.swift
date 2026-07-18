@@ -250,6 +250,7 @@ final class BenchModel {
       bake(&gpu, scale: transform.scale, center: transform.center, slot: transform.slot)
       gpuMeshes.append(gpu)
       gpuRevision += 1
+      fitView()
       status = "\(url.lastPathComponent): mesh only (no B-rep faces/edges)"
     }
   }
@@ -344,6 +345,7 @@ final class BenchModel {
     bake(&gpu, scale: transform.scale, center: transform.center, slot: transform.slot)
     gpuMeshes.append(gpu)
     gpuRevision += 1
+    fitView()
     status =
       "\(name): \(set.face_count) faces, \(set.edge_count) edges — click to select"
   }
@@ -402,11 +404,20 @@ final class BenchModel {
     cameraDistance = min(max(cameraDistance * (1 - delta * 0.03), 0.02), 20)
   }
 
+  /// Center the orbit on the actual loaded geometry and pull back to frame
+  /// it. Without this the camera orbits a fixed point while parts (laid out
+  /// in a grid) swing out of view — the "rotation isn't centered" bug.
   func fitView() {
-    cameraTarget = SIMD3<Float>(0, 0, -0.05)
+    let bounds = workspace.visualBounds(relativeTo: nil)
+    if bounds.boundingRadius.isFinite && bounds.boundingRadius > 0 {
+      cameraTarget = bounds.center
+      cameraDistance = bounds.boundingRadius * 2.4
+    } else {
+      cameraTarget = .zero
+      cameraDistance = 0.55
+    }
     cameraYaw = 0.5
     cameraPitch = -0.35
-    cameraDistance = 0.55
   }
 }
 
