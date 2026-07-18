@@ -18,6 +18,9 @@ struct CADTheme: Identifiable, Hashable {
   // Surface
   let roughness: Float
   let metallic: Float
+  /// Edge prominence: 0 = no outlines, 1 = thick dark edges. Drives edge tube
+  /// radius and darkness — a per-theme "level" for the outlined/cartoon look.
+  let edgeStrength: Float
   /// Neutral fallback when a STEP file assigns no face color.
   let neutralColor: SIMD4<Float>
 
@@ -85,7 +88,7 @@ extension CADTheme {
   // matte 0.5, charcoal background.
   static let studioBlue = CADTheme(
     name: "Studio Blue",
-    roughness: 0.5, metallic: 0.0, neutralColor: [0.72, 0.74, 0.78, 1],
+    roughness: 0.5, metallic: 0.0, edgeStrength: 0.7, neutralColor: [0.72, 0.74, 0.78, 1],
     background: [0.16, 0.17, 0.19],
     selectedFace: .systemOrange, selectedEdge: .systemTeal,
     edge: NSColor(red: 0.16, green: 0.18, blue: 0.22, alpha: 1),
@@ -96,7 +99,7 @@ extension CADTheme {
   // Clean, bright, whiter light + lighter background — showroom/marketing feel.
   static let showroom = CADTheme(
     name: "Showroom",
-    roughness: 0.42, metallic: 0.05, neutralColor: [0.82, 0.84, 0.87, 1],
+    roughness: 0.42, metallic: 0.05, edgeStrength: 0.25, neutralColor: [0.82, 0.84, 0.87, 1],
     background: [0.36, 0.38, 0.42],
     selectedFace: .systemOrange, selectedEdge: .systemBlue,
     edge: NSColor(red: 0.3, green: 0.32, blue: 0.36, alpha: 1),
@@ -107,7 +110,7 @@ extension CADTheme {
   // Flat, even, matte — engineering-drawing / inspection feel, gray bg.
   static let technical = CADTheme(
     name: "Technical Matte",
-    roughness: 0.85, metallic: 0.0, neutralColor: [0.70, 0.72, 0.74, 1],
+    roughness: 0.85, metallic: 0.0, edgeStrength: 1.0, neutralColor: [0.70, 0.72, 0.74, 1],
     background: [0.22, 0.23, 0.24],
     selectedFace: .systemGreen, selectedEdge: .systemYellow,
     edge: NSColor(red: 0.12, green: 0.13, blue: 0.14, alpha: 1),
@@ -118,7 +121,7 @@ extension CADTheme {
   // Warm, dramatic — darker background, amber key. Presentation/hero shot.
   static let workshop = CADTheme(
     name: "Warm Workshop",
-    roughness: 0.55, metallic: 0.12, neutralColor: [0.74, 0.72, 0.68, 1],
+    roughness: 0.55, metallic: 0.12, edgeStrength: 0.5, neutralColor: [0.74, 0.72, 0.68, 1],
     background: [0.09, 0.08, 0.07],
     selectedFace: .systemTeal, selectedEdge: .systemOrange,
     edge: NSColor(red: 0.2, green: 0.16, blue: 0.12, alpha: 1),

@@ -12,7 +12,10 @@ using namespace metal;
 
 struct Uniforms {
   float4x4 viewProjection;
-  float3 cameraPosition;
+  float4 cameraPosition;   // xyz
+  float4 lightDir[3];      // xyz = direction toward light (normalized)
+  float4 lightColor[3];    // rgb = color * weight
+  float4 params;           // x=ambient, y=specStrength, z=specPower
 };
 
 struct VertexOut {
@@ -41,21 +44,27 @@ fragment float4 fragmentMain(
     VertexOut in [[stage_in]],
     constant Uniforms &uniforms [[buffer(3)]]) {
   float3 n = normalize(in.normal);
-  float3 toCamera = normalize(uniforms.cameraPosition - in.worldPosition);
+  float3 toCamera = normalize(uniforms.cameraPosition.xyz - in.worldPosition);
   if (dot(n, toCamera) < 0.0) { n = -n; }  // shade back faces sanely
-  float3 key = normalize(float3(0.5, 0.9, 0.6));
-  float3 fill = normalize(float3(-0.7, 0.3, 0.4));
-  float diffuse = max(dot(n, key), 0.0) * 0.75 + max(dot(n, fill), 0.0) * 0.3;
-  float3 halfway = normalize(key + toCamera);
-  float specular = pow(max(dot(n, halfway), 0.0), 48.0) * 0.35;
-  float3 shaded = in.color * (0.18 + diffuse) + float3(specular);
+  float3 diffuse = float3(0.0);
+  float specular = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float3 L = uniforms.lightDir[i].xyz;
+    diffuse += uniforms.lightColor[i].rgb * max(dot(n, L), 0.0);
+    float3 halfway = normalize(L + toCamera);
+    specular += pow(max(dot(n, halfway), 0.0), uniforms.params.z) * uniforms.params.y;
+  }
+  float3 shaded = in.color * (uniforms.params.x + diffuse) + float3(specular);
   return float4(shaded, 1.0);
 }
 """
 
 struct MetalUniforms {
   var viewProjection: simd_float4x4
-  var cameraPosition: SIMD3<Float>
+  var cameraPosition: SIMD4<Float>
+  var lightDir: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>)
+  var lightColor: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>)
+  var params: SIMD4<Float>
 }
 
 @MainActor
@@ -145,8 +154,25 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
     let projection = perspectiveMatrix(fovYRadians: 0.9, aspect: aspect, near: 0.005, far: 50)
     let viewMatrix = lookAtMatrix(
       eye: model.cameraPosition, center: model.cameraTarget, up: SIMD3<Float>(0, 1, 0))
+    // Theme-driven lighting: same key/fill/rim the RealityKit view uses.
+    let theme = model.theme
+    func lightDir(_ l: CADTheme.Light) -> SIMD4<Float> {
+      let d = simd_normalize(l.from)
+      return SIMD4<Float>(d.x, d.y, d.z, 0)
+    }
+    func lightColor(_ l: CADTheme.Light) -> SIMD4<Float> {
+      let w = l.intensity / 3_000  // key≈1.0, fill≈0.4, rim≈0.3
+      return SIMD4<Float>(l.color.x * w, l.color.y * w, l.color.z * w, 0)
+    }
+    let cam = model.cameraPosition
+    let specStrength = (1 - theme.roughness) * 0.4
+    let specPower = 8 + (1 - theme.roughness) * 56  // matte→broad, glossy→tight
     var uniforms = MetalUniforms(
-      viewProjection: projection * viewMatrix, cameraPosition: model.cameraPosition)
+      viewProjection: projection * viewMatrix,
+      cameraPosition: SIMD4<Float>(cam.x, cam.y, cam.z, 0),
+      lightDir: (lightDir(theme.key), lightDir(theme.fill), lightDir(theme.rim)),
+      lightColor: (lightColor(theme.key), lightColor(theme.fill), lightColor(theme.rim)),
+      params: SIMD4<Float>(0.18, specStrength, specPower, 0))
 
     encoder.setRenderPipelineState(pipeline)
     encoder.setDepthStencilState(depthState)

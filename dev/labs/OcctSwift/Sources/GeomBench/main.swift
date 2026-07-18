@@ -350,8 +350,10 @@ final class BenchModel {
       appendGpu(&gpu, mesh: face, fallbackColor: baseColor)
     }
     let bounds = entity.visualBounds(relativeTo: nil)
+    // Edge prominence is a per-theme level (Technical = thick, Showroom = thin).
     let edgeRadius = max(bounds.boundingRadius, 0.001) * 0.006
-    for i in 0..<Int(set.edge_count) {
+      * (0.3 + theme.edgeStrength * 1.4)
+    for i in 0..<Int(set.edge_count) where theme.edgeStrength > 0.02 {
       let edge = set.edges[i]
       let points = (0..<Int(edge.point_count)).map { p in
         SIMD3<Float>(
