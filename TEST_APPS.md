@@ -24,6 +24,8 @@ flip the backend radio buttons — same file, different renderer each click.
 | Codex Qt GL | Codex's Qt variant | `cad-test/build/qt/GeomBenchQtGL.app` |
 | rustbench | Rust kernel (truck) → browser page. Known: panics on several real STEPs | `dev/labs/rustbench/run.sh "<file.step>"` |
 | StlViewer | Baseline: today's app loader (ModelIO). STEP fails in red on purpose | `dev/labs/apps/StlViewer.app` (double-click) |
+| **OpenGeometry** | Rust/WASM browser CAD kernel. Builds primitives live; **has no STEP importer** (export-only) so your files can't load — the bench shows this honestly | `dev/labs/opengeometry-bench/run.sh` (opens in browser) |
+| **Unity** | STEP→OBJ+MTL via the Open CASCADE shim (real CAD colors), imported into a Unity scene. Shows: Unity renders, our kernel did the CAD work | `dev/labs/unity-bench/`: converter is `step_to_obj`; open `UnityBench/` in Unity, scene `Assets/Bench.unity` |
 | OCCT kernel report | Headless precision numbers (1e-16 boolean exactness, STEP round-trip, quality dial) | `dev/labs/bin/occt_test` in Terminal |
 | Anima Studio | The real app, for comparison | `Anima Studio.app` at the repo root |
 
