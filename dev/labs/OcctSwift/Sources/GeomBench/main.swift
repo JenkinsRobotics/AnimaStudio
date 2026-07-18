@@ -608,10 +608,10 @@ struct BenchView: View {
       .listStyle(.sidebar)
 
       Divider()
-      Text("External Qt pipelines").font(.caption).foregroundStyle(.secondary)
+      Text("External (separate window)").font(.caption).foregroundStyle(.secondary)
       Button("Launch: Qt + Open CASCADE viewer") { launchQt() }
         .disabled(model.lastFileURL == nil)
-      Text("Qt + OpenGL-ES + MetalANGLE: blocked (needs MetalANGLE built from source AND Open CASCADE rebuilt with GLES). Unity: not installed — needs the Unity editor + account sign-in.")
+      Text("Qt has its own event loop, so it CAN'T embed in this Swift app — the window is separate by necessity. Same OCCT viewer is already embedded here as the \"Open CASCADE built-in viewer\" backend above (that's the Swift-native version). Qt + GLES + MetalANGLE and Unity: not built (see notes).")
         .font(.system(size: 9))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
