@@ -28,27 +28,34 @@ struct LabApp: Identifiable {
   let path: URL
   let needsFile: Bool
   let isTerminal: Bool  // capture stdout into the output pane instead of a window
+  var disabledReason: String? = nil  // listed but deliberately not built
 }
 
 let apps: [LabApp] = [
   LabApp(
-    name: "GeomBench",
-    detail: "OCCT → Swift → Metal test bench. Multi-file workspace (STL/STEP/OBJ), face/edge click-select, FPS/CPU/MEM telemetry + Metal GPU HUD.",
+    name: "PIPELINE 1 — Native: SwiftUI + OCCT shim + RealityKit (GeomBench)",
+    detail: "The champion config. Loads STEP (faces/edges selectable, CAD colors), STL, OBJ into one workspace. Telemetry HUD + Metal GPU HUD. THIS is the STEP viewer.",
     path: labsRoot.appendingPathComponent("OcctSwift/.build/debug/GeomBench"),
     needsFile: false, isTerminal: false),
   LabApp(
-    name: "OcctSwiftViewer",
-    detail: "OCCT kernel demo part + one mesh file of your choice, rendered by RealityKit. The minimal kernel→Metal proof.",
-    path: labsRoot.appendingPathComponent("OcctSwift/.build/debug/OcctSwiftViewer"),
-    needsFile: true, isTerminal: false),
+    name: "PIPELINE 2 — Rust kernel → web viewport (truck + Three.js/WebGPU)",
+    detail: "Rust B-rep kernel parses/tessellates the file, browser renders it. Pick a STEP file; a viewer page opens in your browser. Output/timing below.",
+    path: labsRoot.appendingPathComponent("rustbench/run.sh"),
+    needsFile: true, isTerminal: true),
   LabApp(
-    name: "StlViewer (ModelIO)",
-    detail: "The production app's loader (ModelIO → RealityKit) in isolation. Pick an STL to view.",
+    name: "PIPELINE 3 — Qt + OCCT built-in GL + MetalANGLE",
+    detail: "Legacy hybrid. Deliberately not built: Jonathan ruled out Qt for now, and MetalANGLE exists only to life-support Apple-deprecated OpenGL. Revisit only if 1 and 2 both fail.",
+    path: labsRoot.appendingPathComponent("nonexistent"),
+    needsFile: false, isTerminal: false,
+    disabledReason: "skipped by decision"),
+  LabApp(
+    name: "BASELINE — today's app loader (ModelIO → RealityKit)",
+    detail: "What Anima Studio ships now. STL/OBJ/USD only — STEP ALWAYS FAILS here, which is the baseline problem the pipelines above solve.",
     path: labsRoot.appendingPathComponent("StlViewer/.build/debug/StlViewer"),
     needsFile: true, isTerminal: false),
   LabApp(
     name: "OCCT kernel report",
-    detail: "Headless precision test: boolean exactness, fillets, STEP round-trip, tessellation dial, STL read. Output shown below.",
+    detail: "Headless precision numbers: boolean exactness, fillets, STEP round-trip, tessellation dial. Output shown below.",
     path: labsRoot.appendingPathComponent("bin/occt_test"),
     needsFile: false, isTerminal: true),
   LabApp(
@@ -75,8 +82,12 @@ struct TestLabView: View {
               .fixedSize(horizontal: false, vertical: true)
           }
           Spacer()
-          Button(exists(app) ? "Launch" : "Missing — run build.sh") { launch(app) }
-            .disabled(!exists(app))
+          if let reason = app.disabledReason {
+            Button(reason) {}.disabled(true)
+          } else {
+            Button(exists(app) ? "Launch" : "Missing — run build.sh") { launch(app) }
+              .disabled(!exists(app))
+          }
         }
         .padding(8)
         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))

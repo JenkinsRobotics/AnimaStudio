@@ -21,7 +21,14 @@ struct ViewerView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      Text(status).font(.system(.caption, design: .monospaced)).padding(4)
+      // A failed load must be unmissable — not a caption. This loader is
+      // ModelIO (today's app stack): STL/OBJ/USD only. STEP will always fail
+      // here; that inability is the baseline this bench exists to show.
+      Text(status)
+        .font(.system(status.hasPrefix("LOAD FAILED") ? .title3 : .caption,
+                      design: .monospaced))
+        .foregroundStyle(status.hasPrefix("LOAD FAILED") ? .red : .primary)
+        .padding(4)
       RealityView { content in
         let camera = PerspectiveCamera()
         do {

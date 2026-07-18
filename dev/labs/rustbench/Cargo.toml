@@ -1,0 +1,13 @@
+[package]
+name = "rustbench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+truck-stepio = "0.3"
+truck-meshalgo = "0.4"
+truck-modeling = "0.6"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
