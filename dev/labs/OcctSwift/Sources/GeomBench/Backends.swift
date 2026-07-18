@@ -10,7 +10,11 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
   case realityKit = "P1 RealityKit"
   case metalKit = "P2 MetalKit"
   case occtGL = "P3 OCCT-GL"
+  // STEP-only bench per Jonathan: the ModelIO backend (cannot read STEP,
+  // ever — Apple framework) is kept in code for reference but not offered.
   case modelIO = "P6 ModelIO"
+
+  static var allCases: [PipelineBackend] { [.realityKit, .metalKit, .occtGL] }
 
   var id: String { rawValue }
 
