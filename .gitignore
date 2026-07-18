@@ -74,3 +74,4 @@ xcuserdata/
 
 # pyproject.toml is tracked in this repo (real product, not a template
 # instance) — the template's ignore rule is intentionally dropped.
+Test Lab.app/

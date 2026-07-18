@@ -13,8 +13,14 @@ let labsRoot: URL = {
     .resolvingSymlinksInPath()
   for _ in 0..<8 {
     url.deleteLastPathComponent()
+    // Direct build location (…/dev/labs/OcctSwift/.build/…):
     if FileManager.default.fileExists(atPath: url.appendingPathComponent("build.sh").path) {
       return url
+    }
+    // App-bundle location ("Test Lab.app" at the repo root):
+    let nested = url.appendingPathComponent("dev/labs", isDirectory: true)
+    if FileManager.default.fileExists(atPath: nested.appendingPathComponent("build.sh").path) {
+      return nested
     }
   }
   return URL(fileURLWithPath: "/Users/jonathanjenkins/GITHUB/AnimaStudio/dev/labs")
@@ -43,11 +49,10 @@ let apps: [LabApp] = [
     path: labsRoot.appendingPathComponent("rustbench/run.sh"),
     needsFile: true, isTerminal: true),
   LabApp(
-    name: "PIPELINE 3 — Qt + OCCT built-in GL + MetalANGLE",
-    detail: "Legacy hybrid. Deliberately not built: Jonathan ruled out Qt for now, and MetalANGLE exists only to life-support Apple-deprecated OpenGL. Revisit only if 1 and 2 both fail.",
-    path: labsRoot.appendingPathComponent("nonexistent"),
-    needsFile: false, isTerminal: false,
-    disabledReason: "skipped by decision"),
+    name: "PIPELINE 3 — Qt + OCCT built-in GL viewer",
+    detail: "Legacy hybrid. Qt window, OCCT's own AIS renderer with native face hover/selection. Runs on Apple's deprecated system OpenGL (no MetalANGLE) — that trade-off is the point. Pick a STEP file.",
+    path: labsRoot.appendingPathComponent("qtbench/build/qtbench.app/Contents/MacOS/qtbench"),
+    needsFile: true, isTerminal: false),
   LabApp(
     name: "BASELINE — today's app loader (ModelIO → RealityKit)",
     detail: "What Anima Studio ships now. STL/OBJ/USD only — STEP ALWAYS FAILS here, which is the baseline problem the pipelines above solve.",
