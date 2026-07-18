@@ -38,9 +38,9 @@ let apps: [LabApp] = [
     needsFile: false, isTerminal: false),
   LabApp(
     name: "OcctSwiftViewer",
-    detail: "OCCT kernel demo part + one STL, rendered by RealityKit. The minimal kernel→Metal proof.",
+    detail: "OCCT kernel demo part + one mesh file of your choice, rendered by RealityKit. The minimal kernel→Metal proof.",
     path: labsRoot.appendingPathComponent("OcctSwift/.build/debug/OcctSwiftViewer"),
-    needsFile: false, isTerminal: false),
+    needsFile: true, isTerminal: false),
   LabApp(
     name: "StlViewer (ModelIO)",
     detail: "The production app's loader (ModelIO → RealityKit) in isolation. Pick an STL to view.",
