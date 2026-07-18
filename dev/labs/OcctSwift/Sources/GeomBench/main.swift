@@ -36,8 +36,12 @@ func meshResource(from mesh: OcctMesh) throws -> MeshResource {
   return try MeshResource.generate(from: [descriptor])
 }
 
-/// Thin square tube along a polyline, one merged mesh per edge.
-func tubeResource(points: [SIMD3<Float>], radius: Float) throws -> MeshResource {
+/// Thin square tube along a polyline — the raw geometry, so it can feed both
+/// a RealityKit MeshResource and the flat GPU buffers (Metal/WebGL) that need
+/// the dark edges to get the same "outlined" look.
+func tubeGeometry(points: [SIMD3<Float>], radius: Float)
+  -> (positions: [SIMD3<Float>], normals: [SIMD3<Float>], indices: [UInt32])
+{
   var positions: [SIMD3<Float>] = []
   var normals: [SIMD3<Float>] = []
   var indices: [UInt32] = []
@@ -60,10 +64,15 @@ func tubeResource(points: [SIMD3<Float>], radius: Float) throws -> MeshResource 
       indices.append(contentsOf: [p0, q0, p1, q0, q1, p1])
     }
   }
+  return (positions, normals, indices)
+}
+
+func tubeResource(points: [SIMD3<Float>], radius: Float) throws -> MeshResource {
+  let g = tubeGeometry(points: points, radius: radius)
   var descriptor = MeshDescriptor(name: "edge")
-  descriptor.positions = MeshBuffers.Positions(positions)
-  descriptor.normals = MeshBuffers.Normals(normals)
-  descriptor.primitives = .triangles(indices)
+  descriptor.positions = MeshBuffers.Positions(g.positions)
+  descriptor.normals = MeshBuffers.Normals(g.normals)
+  descriptor.primitives = .triangles(g.indices)
   return try MeshResource.generate(from: [descriptor])
 }
 
@@ -305,6 +314,19 @@ final class BenchModel {
     }
   }
 
+  /// Append raw triangle geometry (e.g. an edge tube) with one flat color, so
+  /// the Metal/WebGL buffers carry the dark edges that give the outlined look.
+  private func appendRaw(
+    _ gpu: inout GpuMeshData, positions: [SIMD3<Float>],
+    normals: [SIMD3<Float>], indices: [UInt32], color: SIMD3<Float>
+  ) {
+    let base = UInt32(gpu.positions.count / 3)
+    for p in positions { gpu.positions.append(contentsOf: [p.x, p.y, p.z]) }
+    for n in normals { gpu.normals.append(contentsOf: [n.x, n.y, n.z]) }
+    for _ in positions { gpu.colors.append(contentsOf: [color.x, color.y, color.z]) }
+    for idx in indices { gpu.indices.append(base + idx) }
+  }
+
   private func addShapeSet(_ set: OcctShapeSet, name: String, kind: String) async {
     let start = Date()
     let entity = Entity()
@@ -335,13 +357,25 @@ final class BenchModel {
         SIMD3<Float>(
           edge.points[p * 3], edge.points[p * 3 + 1], edge.points[p * 3 + 2])
       }
-      guard points.count > 1,
-        let resource = try? tubeResource(points: points, radius: edgeRadius)
+      guard points.count > 1 else { continue }
+      let geometry = tubeGeometry(points: points, radius: edgeRadius)
+      guard
+        let resource = try? {
+          var d = MeshDescriptor(name: "edge")
+          d.positions = MeshBuffers.Positions(geometry.positions)
+          d.normals = MeshBuffers.Normals(geometry.normals)
+          d.primitives = .triangles(geometry.indices)
+          return try MeshResource.generate(from: [d])
+        }()
       else { continue }
       let model = ModelEntity(
         mesh: resource, materials: [featureMaterial(kind: .edge, selected: false, theme: theme)])
       pickTargets.append((model, resource, BenchFeatureComponent(kind: .edge)))
       entity.addChild(model)
+      // Feed the same dark edges into the GPU buffers (Metal/WebGL).
+      appendRaw(
+        &gpu, positions: geometry.positions, normals: geometry.normals,
+        indices: geometry.indices, color: theme.edgeColorRGB)
     }
     status = "\(name): cooking \(pickTargets.count) pick targets…"
     let shapes: [ShapeResource?] = await withTaskGroup(

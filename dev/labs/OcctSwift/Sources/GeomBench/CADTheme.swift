@@ -72,6 +72,12 @@ struct CADTheme: Identifiable, Hashable {
       red: CGFloat(background.x), green: CGFloat(background.y),
       blue: CGFloat(background.z), alpha: 1)
   }
+
+  /// The dark edge color as RGB, for the GPU-buffer edge tubes.
+  var edgeColorRGB: SIMD3<Float> {
+    let c = edge.usingColorSpace(.deviceRGB) ?? edge
+    return SIMD3<Float>(Float(c.redComponent), Float(c.greenComponent), Float(c.blueComponent))
+  }
 }
 
 extension CADTheme {
