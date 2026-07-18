@@ -101,16 +101,11 @@ func featureMaterial(
     material.roughness = 0.4
     return material
   case (.edge, false):
-    var material = PhysicallyBasedMaterial()
-    material.baseColor = .init(tint: theme.edge)
-    material.roughness = 0.7
-    return material
+    // Unlit = flat, no shading/specular, so an edge reads as a LINE drawn on
+    // the model, not a shaded 3D tube sitting on top of it.
+    return UnlitMaterial(color: theme.edge)
   case (.edge, true):
-    var material = PhysicallyBasedMaterial()
-    material.baseColor = .init(tint: theme.selectedEdge)
-    material.emissiveColor = .init(color: theme.selectedEdge.withAlphaComponent(0.6))
-    material.roughness = 0.3
-    return material
+    return UnlitMaterial(color: theme.selectedEdge)
   }
 }
 
@@ -360,9 +355,10 @@ final class BenchModel {
       appendGpu(&gpu, mesh: face, fallbackColor: baseColor)
     }
     let bounds = entity.visualBounds(relativeTo: nil)
-    // Edge prominence is a per-theme level (Technical = thick, Showroom = thin).
-    let edgeRadius = max(bounds.boundingRadius, 0.001) * 0.006
-      * (0.3 + theme.edgeStrength * 1.4)
+    // Thin, line-like — an edge should read as a drawn line, not a tube.
+    // Per-theme level only nudges the width; it never gets object-thick.
+    let edgeRadius = max(bounds.boundingRadius, 0.001) * 0.0016
+      * (0.6 + theme.edgeStrength * 0.7)
     for i in 0..<Int(set.edge_count) where theme.edgeStrength > 0.02 {
       let edge = set.edges[i]
       let points = (0..<Int(edge.point_count)).map { p in
