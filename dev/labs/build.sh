@@ -44,7 +44,7 @@ PLIST
 }
 make_bundle "../../Test Lab.app" TestLab OcctSwift/.build/debug/TestLab
 mkdir -p apps
-make_bundle "apps/GeomBench.app" GeomBench OcctSwift/.build/debug/GeomBench
+make_bundle "apps/Claude Bench.app" ClaudeBench OcctSwift/.build/debug/GeomBench
 make_bundle "apps/StlViewer.app" StlViewer StlViewer/.build/debug/StlViewer
 
 echo

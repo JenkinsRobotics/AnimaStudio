@@ -40,9 +40,9 @@ struct LabApp: Identifiable {
 
 let apps: [LabApp] = [
   LabApp(
-    name: "PIPELINE 1 — Native: SwiftUI + OCCT shim + RealityKit (GeomBench)",
+    name: "PIPELINE 1 — Claude Bench: SwiftUI + OCCT shim + RealityKit",
     detail: "The champion config. Loads STEP (faces/edges selectable, CAD colors), STL, OBJ into one workspace. Telemetry HUD + Metal GPU HUD. THIS is the STEP viewer.",
-    path: labsRoot.appendingPathComponent("apps/GeomBench.app"),
+    path: labsRoot.appendingPathComponent("apps/Claude Bench.app"),
     needsFile: false, isTerminal: false),
   LabApp(
     name: "PIPELINE 2 — Rust kernel → web viewport (truck + Three.js/WebGPU)",

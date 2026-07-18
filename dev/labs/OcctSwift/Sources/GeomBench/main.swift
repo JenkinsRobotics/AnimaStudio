@@ -507,7 +507,7 @@ struct BenchView: View {
 
   private var sidebar: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("GeomBench").font(.title3.bold())
+      Text("Claude Bench").font(.title3.bold())
       Text("Viewport backend").font(.caption).foregroundStyle(.secondary)
       Picker("", selection: $backend) {
         ForEach(PipelineBackend.allCases) { pipeline in
@@ -632,7 +632,7 @@ struct GeomBenchApp: App {
   }
 
   var body: some SwiftUI.Scene {
-    WindowGroup("GeomBench — six-pipeline CAD workspace") {
+    WindowGroup("Claude Bench — six-pipeline CAD workspace") {
       BenchView()
     }
   }
