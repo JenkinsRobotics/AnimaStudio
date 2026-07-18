@@ -42,7 +42,7 @@ let apps: [LabApp] = [
   LabApp(
     name: "PIPELINE 1 — Native: SwiftUI + OCCT shim + RealityKit (GeomBench)",
     detail: "The champion config. Loads STEP (faces/edges selectable, CAD colors), STL, OBJ into one workspace. Telemetry HUD + Metal GPU HUD. THIS is the STEP viewer.",
-    path: labsRoot.appendingPathComponent("OcctSwift/.build/debug/GeomBench"),
+    path: labsRoot.appendingPathComponent("apps/GeomBench.app"),
     needsFile: false, isTerminal: false),
   LabApp(
     name: "PIPELINE 2 — Rust kernel → web viewport (truck + Three.js/WebGPU)",
@@ -57,7 +57,7 @@ let apps: [LabApp] = [
   LabApp(
     name: "BASELINE — today's app loader (ModelIO → RealityKit)",
     detail: "What Anima Studio ships now. STL/OBJ/USD only — STEP ALWAYS FAILS here, which is the baseline problem the pipelines above solve.",
-    path: labsRoot.appendingPathComponent("StlViewer/.build/debug/StlViewer"),
+    path: labsRoot.appendingPathComponent("apps/StlViewer.app"),
     needsFile: true, isTerminal: false),
   LabApp(
     name: "OCCT kernel report",
@@ -155,11 +155,6 @@ struct TestLabView: View {
   }
 
   private func launch(_ app: LabApp, fileOverride: URL? = nil) {
-    if app.path.pathExtension == "app" {
-      NSWorkspace.shared.open(app.path)
-      status = "Opened \(app.name)"
-      return
-    }
     var arguments: [String] = []
     if let fileOverride {
       arguments = [fileOverride.path, "0.001"]
@@ -168,6 +163,21 @@ struct TestLabView: View {
       panel.allowsMultipleSelection = false
       guard panel.runModal() == .OK, let url = panel.url else { return }
       arguments = [url.path, "0.001"]
+    }
+    if app.path.pathExtension == "app" {
+      // Real bundles go through NSWorkspace: full window-server treatment
+      // (bare binaries spawned via Process often never get a window).
+      let configuration = NSWorkspace.OpenConfiguration()
+      configuration.arguments = arguments
+      configuration.createsNewApplicationInstance = true
+      let name = app.name
+      NSWorkspace.shared.openApplication(at: app.path, configuration: configuration) {
+        _, error in
+        DispatchQueue.main.async {
+          status = error == nil ? "Launched \(name)" : "\(name) failed: \(error!.localizedDescription)"
+        }
+      }
+      return
     }
     let process = Process()
     process.executableURL = app.path

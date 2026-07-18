@@ -25,22 +25,27 @@ else
   echo "   qt not installed — skipping (brew install qt)"
 fi
 
-echo "== Test Lab.app (double-clickable, at the repo root) =="
-APP="../../Test Lab.app"
-mkdir -p "$APP/Contents/MacOS"
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+echo "== App bundles (window server only fully trusts real .apps) =="
+make_bundle() { # $1 = bundle path, $2 = executable name, $3 = binary
+  mkdir -p "$1/Contents/MacOS"
+  cat > "$1/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleExecutable</key><string>TestLab</string>
-  <key>CFBundleIdentifier</key><string>org.animastudio.testlab</string>
-  <key>CFBundleName</key><string>Anima Studio Test Lab</string>
+  <key>CFBundleExecutable</key><string>$2</string>
+  <key>CFBundleIdentifier</key><string>org.animastudio.lab.$2</string>
+  <key>CFBundleName</key><string>$2</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
 </dict></plist>
 PLIST
-cp OcctSwift/.build/debug/TestLab "$APP/Contents/MacOS/TestLab"
-codesign --force --sign - "$APP" 2>/dev/null || true
+  cp "$3" "$1/Contents/MacOS/$2"
+  codesign --force --sign - "$1" 2>/dev/null || true
+}
+make_bundle "../../Test Lab.app" TestLab OcctSwift/.build/debug/TestLab
+mkdir -p apps
+make_bundle "apps/GeomBench.app" GeomBench OcctSwift/.build/debug/GeomBench
+make_bundle "apps/StlViewer.app" StlViewer StlViewer/.build/debug/StlViewer
 
 echo
 echo "All built. Double-click 'Test Lab.app' at the repo root,"
