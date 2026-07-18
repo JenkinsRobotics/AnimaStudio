@@ -12,15 +12,21 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
   case occtGL = "Open CASCADE built-in viewer"
   case webGL = "Open CASCADE → WebGL (Three.js)"
   case openGeometry = "OpenGeometry (Rust/WASM)"
+  case qtOCCT = "Qt + Open CASCADE viewer"
+  case unity = "Unity (Bottango's engine)"
   // STEP-only bench per Jonathan: the ModelIO backend (cannot read STEP,
   // ever — Apple framework) is kept in code for reference but not offered.
   case modelIO = "ModelIO (no STEP)"
 
   static var allCases: [PipelineBackend] {
-    [.realityKit, .metalKit, .occtGL, .webGL, .openGeometry]
+    [.realityKit, .metalKit, .occtGL, .webGL, .openGeometry, .qtOCCT, .unity]
   }
 
   var id: String { rawValue }
+
+  /// True for pipelines that are a separate process (Qt/Unity own their own
+  /// event loop and cannot embed in a Swift app) — shown as a launch panel.
+  var isExternal: Bool { self == .qtOCCT || self == .unity }
 
   var fullName: String {
     switch self {
@@ -29,6 +35,8 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
     case .occtGL: "Open CASCADE built-in viewer (OpenGL) → SwiftUI"
     case .webGL: "Open CASCADE C-shim → WebGL (Three.js) in a Swift WKWebView"
     case .openGeometry: "OpenGeometry Rust/WASM kernel in a Swift WKWebView"
+    case .qtOCCT: "Qt6 + Open CASCADE built-in viewer (separate window)"
+    case .unity: "Open CASCADE shim → OBJ+colors → Unity (separate window)"
     case .modelIO: "ModelIO → RealityKit quick-parser (no B-rep)"
     }
   }
@@ -40,6 +48,8 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
     case .occtGL: "STEP · Open CASCADE-native hover/select · deprecated OpenGL"
     case .webGL: "STEP · CAD colors · WebGL in-app · own mouse (drag orbit/right pan/scroll zoom)"
     case .openGeometry: "Builds primitives in-code · NO STEP import (export-only) · your files can't load"
+    case .qtOCCT: "STEP · Qt owns its window — can't embed in Swift (event-loop conflict)"
+    case .unity: "STEP via shim→OBJ · Unity renders converted mesh · separate editor window"
     case .modelIO: "STL/OBJ/USD only · STEP fails"
     }
   }

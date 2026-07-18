@@ -649,12 +649,9 @@ struct BenchView: View {
       .listStyle(.sidebar)
 
       Divider()
-      Text("External (separate window)").font(.caption).foregroundStyle(.secondary)
-      Button("Launch: Qt + Open CASCADE viewer") { launchQt() }
-        .disabled(model.lastFileURL == nil)
-      Text("Qt has its own event loop, so it CAN'T embed in this Swift app — the window is separate by necessity. Same OCCT viewer is already embedded here as the \"Open CASCADE built-in viewer\" backend above (that's the Swift-native version). Qt + GLES + MetalANGLE and Unity: not built (see notes).")
+      Text("Qt + GLES + MetalANGLE: not built (needs MetalANGLE + Open CASCADE rebuilt with GLES).")
         .font(.system(size: 9))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.tertiary)
         .fixedSize(horizontal: false, vertical: true)
     }
     .padding(10)
@@ -668,6 +665,22 @@ struct BenchView: View {
       case .occtGL: AnyView(OcctGLViewport(model: model))
       case .webGL: AnyView(WebGLViewport(model: model))
       case .openGeometry: AnyView(OpenGeometryViewport())
+      case .qtOCCT:
+        AnyView(
+          ExternalPipelineView(
+            title: "Qt6 + Open CASCADE built-in viewer",
+            detail:
+              "Qt has its own event loop, so it can't share this Swift app's process — it opens as a separate window. (The same Open CASCADE viewer is embedded here as the \"Open CASCADE built-in viewer\" backend.)",
+            launchTitle: "Open Qt window with current file",
+            canLaunch: model.lastFileURL != nil, action: { launchQt() }))
+      case .unity:
+        AnyView(
+          ExternalPipelineView(
+            title: "Unity (what Bottango is built on)",
+            detail:
+              "Unity can't read STEP. Our Open CASCADE shim converts the file to OBJ + CAD colors, then Unity renders it — proving Unity is only the renderer, our kernel does the CAD. Opens in the Unity editor (separate app).",
+            launchTitle: "Convert current file + open in Unity",
+            canLaunch: model.lastFileURL != nil, action: { launchUnity() }))
       case .modelIO: AnyView(ModelIOViewport(model: model))
       }
 
@@ -713,6 +726,61 @@ struct BenchView: View {
     process.executableURL = qt
     process.arguments = [file.path]
     try? process.run()
+  }
+
+  private func launchUnity() {
+    guard let file = model.lastFileURL else { return }
+    let labs = labsRootURL()
+    let converter = labs.appendingPathComponent("unity-bench/step_to_obj")
+    let modelsDir = labs.appendingPathComponent("unity-bench/UnityBench/Assets/Models")
+    let base = modelsDir.appendingPathComponent(
+      file.deletingPathExtension().lastPathComponent).path
+    // Convert the current STEP via the Open CASCADE shim, then open the project.
+    if FileManager.default.fileExists(atPath: converter.path) {
+      let convert = Process()
+      convert.executableURL = converter
+      convert.arguments = [file.path, base]
+      try? convert.run()
+      convert.waitUntilExit()
+    }
+    let project = labs.appendingPathComponent("unity-bench/UnityBench")
+    let unity = URL(fileURLWithPath:
+      "/Applications/Unity/Hub/Editor/2022.3.30f1/Unity.app/Contents/MacOS/Unity")
+    if FileManager.default.fileExists(atPath: unity.path) {
+      let process = Process()
+      process.executableURL = unity
+      process.arguments = ["-projectPath", project.path]
+      try? process.run()
+    } else {
+      NSWorkspace.shared.open(project)  // fall back to opening the folder
+    }
+  }
+}
+
+/// Panel for pipelines that must run as a separate process (Qt / Unity own
+/// their event loop — no in-Swift embedding). Keeps them as radio buttons for
+/// a consistent list, while being honest about the separate window.
+struct ExternalPipelineView: View {
+  let title: String
+  let detail: String
+  let launchTitle: String
+  let canLaunch: Bool
+  let action: () -> Void
+
+  var body: some View {
+    VStack(spacing: 14) {
+      Image(systemName: "macwindow.on.rectangle").font(.system(size: 40))
+        .foregroundStyle(.secondary)
+      Text(title).font(.title3.bold())
+      Text(detail).font(.callout).foregroundStyle(.secondary)
+        .multilineTextAlignment(.center).frame(maxWidth: 460)
+      Button(launchTitle, action: action).disabled(!canLaunch)
+      if !canLaunch {
+        Text("Load a file first.").font(.caption).foregroundStyle(.tertiary)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color(NSColor(red: 0.1, green: 0.11, blue: 0.13, alpha: 1)))
   }
 }
 
