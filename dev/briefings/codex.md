@@ -5,6 +5,38 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-17 (Claude → whoever builds `cad-test/`): **Landmine list for the
+  GeomBench spec build** — every one of these cost real debugging time in
+  `dev/labs/` today, with evidence on file. Skip them:
+  1. **Do NOT set `MTL_HUD_ENABLED=1`.** Apple's libMTLHud crashes at
+     RealityKit window creation on this OS (null jump in
+     `HUDMTLLayerTracking safeAreaInsets`; crash report on file). This
+     silently kills windows — the app runs, no window ever appears.
+  2. **`ShapeResource.generateConvex` segfaults** inside RealityFoundation on
+     near-planar CAD faces. Use `generateStaticMesh` — but cook the shapes
+     CONCURRENTLY (TaskGroup): serially, a 218-face/578-edge part takes ~13
+     silent seconds; parallel ≈1.3s. Show progress while cooking.
+  3. **CLI/Process-launched GUI apps start background-only**: activation in
+     `.onAppear` never fires (window never shows → onAppear never runs).
+     Activate in `App.init` via `DispatchQueue.main.async`, and prefer real
+     `.app` bundles launched with `NSWorkspace.openApplication(at:configuration:)`.
+  4. **XCAF colors need a body-level fallback**: Onshape STEP exports carry ONE
+     `STYLED_ITEM` per solid, not per-face colors — query face color first
+     (`XCAFDoc_ColorSurf` then `ColorGen`), else the solid/root label's color.
+  5. **OCCT 7.9 renamed data-exchange libs**: `TKDESTEP`, `TKDESTL`, `TKDEOBJ`
+     (not TKSTEP/TKSTL). XCAF needs `TKCDF TKLCAF TKVCAF TKXCAF`.
+  6. **brew OCCT is desktop-GL only** — Pipeline 5 (GLES + MetalANGLE) needs
+     OCCT rebuilt with `USE_GLES2` AND MetalANGLE built from source. Treat as
+     blocked, not a checkbox.
+  7. **Validation numbers** from Jonathan's real files (`CAD DEMO/`):
+     `ARCADA001 - ARCADP001.step` → 218 faces / 578 edges / 23,522 tris at
+     0.02mm, body color RGB(0.34,0.62,0.85); kernel boolean exactness 1.67e-16;
+     `Part 1 (8)` STL=234k tris vs STEP=3.5k at 0.05mm. If your shim disagrees,
+     it's wrong.
+  8. Working reference code for all of the above is in `dev/labs/`
+     (`OcctSwift/Sources/{OcctShim,OcctGLKit,GeomBench}`, `qtbench/`), commit
+     `b2fbfac`. Reuse freely.
+
 - [ ] 2026-07-16 (Claude): **Pipeline audit follow-ups (Lane A).** A read-only
   audit of import→load→render surfaced two items for your lane (I fixed the
   render-fallback correctness + logging myself — commits `9b0049e`, `f94526b`):
@@ -1126,3 +1158,25 @@ does the heavy implementation; Codex reviews it and plans what's next.
   renderer to reload same-path geometry rather than adding a duplicate. Five
   focused tests, 279 XCTest + 22 live-bridge Swift Testing, claimed-file lint,
   Xcode/root builds, deep signing, app launch, and `git diff --check` pass.
+
+- **2026-07-17 — Assets Shift-range selection and keyboard deletion repaired:**
+  Selection now follows standard macOS semantics: plain click replaces and
+  anchors, Command-click toggles, Shift-click selects the complete inclusive
+  visible range, and Command-Shift adds a range. A row click explicitly focuses
+  the collection, and both Backspace/Delete and Forward Delete open the same
+  confirmed engine-backed deletion path as the toolbar/context menu. Twelve
+  focused Assets tests, all 282 XCTest + 22 live-bridge Swift Testing tests,
+  claimed-file lint, Xcode/root builds, deep signing, launch, and
+  `git diff --check` pass.
+
+- **2026-07-17 — GeomBench standalone CAD test app complete:** Built the
+  isolated `cad-test/` package and clickable `GeomBench.app`. It owns a real
+  assembly-aware STEPCAF/XDE C shim, shared multi-file SwiftUI workspace,
+  live load/FPS/CPU/memory telemetry, RealityKit and custom Metal renderers,
+  OCCT native AppKit/OpenGL viewer, Qt6/OCCT helper, an honest MetalANGLE
+  capability gate, ModelIO mesh baseline, and headless importer probe. Camera
+  mappings are right-drag orbit/tilt, MMB pan, Shift-RMB roll, Shift-LMB pan,
+  scroll zoom, and Fit. Three tests pass; the real ARCADA 2,631-face STEP probe,
+  Swift release build, Qt release build, deep signature verification, and app
+  launch all pass. No Anima Studio app or pre-existing `dev/labs/**` file was
+  changed.
