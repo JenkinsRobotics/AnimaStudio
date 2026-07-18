@@ -79,29 +79,30 @@ struct BenchFeatureComponent: Component {
 @MainActor
 func featureMaterial(
   kind: BenchFeatureComponent.Kind, selected: Bool,
-  baseColor: SIMD4<Float> = SIMD4<Float>(0.72, 0.74, 0.78, 1)
+  baseColor: SIMD4<Float> = SIMD4<Float>(0.72, 0.74, 0.78, 1),
+  theme: CADTheme = .studioBlue
 ) -> RealityKit.Material {
-  var material = PhysicallyBasedMaterial()
   switch (kind, selected) {
   case (.face, false):
-    material.baseColor = .init(
-      tint: NSColor(
-        red: CGFloat(baseColor.x), green: CGFloat(baseColor.y),
-        blue: CGFloat(baseColor.z), alpha: CGFloat(baseColor.w)))
-    material.roughness = 0.5
+    return theme.surfaceMaterial(baseColor: baseColor)
   case (.face, true):
-    material.baseColor = .init(tint: .systemOrange)
-    material.emissiveColor = .init(color: NSColor.systemOrange.withAlphaComponent(0.4))
+    var material = PhysicallyBasedMaterial()
+    material.baseColor = .init(tint: theme.selectedFace)
+    material.emissiveColor = .init(color: theme.selectedFace.withAlphaComponent(0.4))
     material.roughness = 0.4
+    return material
   case (.edge, false):
-    material.baseColor = .init(tint: NSColor(red: 0.16, green: 0.18, blue: 0.22, alpha: 1))
+    var material = PhysicallyBasedMaterial()
+    material.baseColor = .init(tint: theme.edge)
     material.roughness = 0.7
+    return material
   case (.edge, true):
-    material.baseColor = .init(tint: .systemTeal)
-    material.emissiveColor = .init(color: NSColor.systemTeal.withAlphaComponent(0.6))
+    var material = PhysicallyBasedMaterial()
+    material.baseColor = .init(tint: theme.selectedEdge)
+    material.emissiveColor = .init(color: theme.selectedEdge.withAlphaComponent(0.6))
     material.roughness = 0.3
+    return material
   }
-  return material
 }
 
 // ---------- Model / telemetry ------------------------------------------------
@@ -134,7 +135,35 @@ final class BenchModel {
   var fps: Double = 0
   var cpuPercent: Double = 0
   var memoryMB: Double = 0
+  var theme: CADTheme = .studioBlue
+  var themeRevision = 0
+  var appliedThemeRevisionRK = -1  // last theme revision the RealityKit lights reflect
   var status = "Add Files… (STEP / STL / OBJ) or Add Demo Part"
+
+  /// Apply a theme live: re-material every loaded face/edge, and signal the
+  /// views to refresh lighting/background. No reload, no re-parse.
+  func setTheme(_ newTheme: CADTheme) {
+    theme = newTheme
+    for entity in workspace.children {
+      reMaterial(entity)
+    }
+    themeRevision += 1
+    gpuRevision += 1  // nudge Metal/WebGL to redraw with the theme background
+    status = "Theme: \(newTheme.name)"
+  }
+
+  private func reMaterial(_ entity: Entity) {
+    if let feature = entity.components[BenchFeatureComponent.self],
+      let model = entity as? ModelEntity
+    {
+      model.model?.materials = [
+        featureMaterial(
+          kind: feature.kind, selected: feature.isSelected,
+          baseColor: feature.baseColor, theme: theme)
+      ]
+    }
+    for child in entity.children { reMaterial(child) }
+  }
 
   let workspace = Entity()
   var frameCount = 0
@@ -231,7 +260,7 @@ final class BenchModel {
       var gpu = GpuMeshData()
       if let resource = try? meshResource(from: mesh) {
         let model = ModelEntity(
-          mesh: resource, materials: [featureMaterial(kind: .face, selected: false)])
+          mesh: resource, materials: [featureMaterial(kind: .face, selected: false, theme: theme)])
         if let shape = try? await ShapeResource.generateStaticMesh(from: resource) {
           model.components.set(CollisionComponent(shapes: [shape]))
           model.components.set(InputTargetComponent())
@@ -292,7 +321,7 @@ final class BenchModel {
         : SIMD4<Float>(0.72, 0.74, 0.78, 1)
       let model = ModelEntity(
         mesh: resource,
-        materials: [featureMaterial(kind: .face, selected: false, baseColor: baseColor)])
+        materials: [featureMaterial(kind: .face, selected: false, baseColor: baseColor, theme: theme)])
       pickTargets.append(
         (model, resource, BenchFeatureComponent(kind: .face, baseColor: baseColor)))
       entity.addChild(model)
@@ -310,7 +339,7 @@ final class BenchModel {
         let resource = try? tubeResource(points: points, radius: edgeRadius)
       else { continue }
       let model = ModelEntity(
-        mesh: resource, materials: [featureMaterial(kind: .edge, selected: false)])
+        mesh: resource, materials: [featureMaterial(kind: .edge, selected: false, theme: theme)])
       pickTargets.append((model, resource, BenchFeatureComponent(kind: .edge)))
       entity.addChild(model)
     }
@@ -358,7 +387,8 @@ final class BenchModel {
     entity.components.set(feature)
     model.model?.materials = [
       featureMaterial(
-        kind: feature.kind, selected: feature.isSelected, baseColor: feature.baseColor)
+        kind: feature.kind, selected: feature.isSelected,
+        baseColor: feature.baseColor, theme: theme)
     ]
     status = "\(feature.kind == .face ? "Face" : "Edge") \(feature.isSelected ? "selected" : "deselected")"
   }
@@ -432,7 +462,7 @@ struct RealityKitViewportView: View {
       let camera = PerspectiveCamera()
       camera.name = "camera"
       content.add(camera)
-      addBenchLighting(to: content)
+      model.theme.addLighting(to: content)
       model.subscription = content.subscribe(to: SceneEvents.Update.self) { _ in
         Task { @MainActor in model.frameCount += 1 }
       }
@@ -441,7 +471,16 @@ struct RealityKitViewportView: View {
         camera.position = model.cameraPosition
         camera.look(at: model.cameraTarget, from: camera.position, relativeTo: nil)
       }
+      // Re-light when the theme changes (materials are re-applied by setTheme).
+      if model.themeRevision != model.appliedThemeRevisionRK {
+        for light in content.entities.filter({ $0.name == "themeLight" }) {
+          content.remove(light)
+        }
+        model.theme.addLighting(to: content)
+        model.appliedThemeRevisionRK = model.themeRevision
+      }
     }
+    .background(Color(model.theme.backgroundNSColor))
     .gesture(
       SpatialTapGesture().targetedToAnyEntity().onEnded { value in
         model.toggle(value.entity)
@@ -516,6 +555,10 @@ struct BenchView: View {
     }
   }
 
+  private var themeBinding: Binding<CADTheme> {
+    Binding(get: { model.theme }, set: { model.setTheme($0) })
+  }
+
   private var sidebar: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text("Claude Bench").font(.title3.bold())
@@ -527,6 +570,18 @@ struct BenchView: View {
       }
       .pickerStyle(.radioGroup)
       .labelsHidden()
+
+      Divider()
+      Text("Theme").font(.caption).foregroundStyle(.secondary)
+      Picker("", selection: themeBinding) {
+        ForEach(CADTheme.all) { theme in
+          Text(theme.name).tag(theme)
+        }
+      }
+      .pickerStyle(.menu)
+      .labelsHidden()
+      Text("Applies to the RealityKit / Metal views live — same look, switchable.")
+        .font(.system(size: 9)).foregroundStyle(.tertiary)
 
       Divider()
       HStack {

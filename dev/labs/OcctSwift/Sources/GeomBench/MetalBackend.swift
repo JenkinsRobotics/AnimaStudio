@@ -212,5 +212,9 @@ struct MetalViewport: NSViewRepresentable {
     return view
   }
 
-  func updateNSView(_ view: MTKView, context: Context) {}
+  func updateNSView(_ view: MTKView, context: Context) {
+    let bg = model.theme.background
+    view.clearColor = MTLClearColor(
+      red: Double(bg.x), green: Double(bg.y), blue: Double(bg.z), alpha: 1)
+  }
 }

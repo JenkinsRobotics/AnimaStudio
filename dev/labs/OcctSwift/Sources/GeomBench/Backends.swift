@@ -134,22 +134,8 @@ struct ModelIOViewport: View {
   }
 }
 
-// Shared three-point lighting for the RealityKit-based backends.
+// Shared lighting for the ModelIO baseline view (uses the default theme).
 @MainActor
 func addBenchLighting(to content: some RealityViewContentProtocol) {
-  let key = Entity()
-  key.components.set(DirectionalLightComponent(color: .white, intensity: 3_000))
-  key.look(at: .zero, from: SIMD3<Float>(0.5, 0.9, 0.6), relativeTo: nil)
-  content.add(key)
-  let fill = Entity()
-  fill.components.set(
-    DirectionalLightComponent(
-      color: NSColor(calibratedRed: 0.75, green: 0.82, blue: 1.0, alpha: 1),
-      intensity: 1_200))
-  fill.look(at: .zero, from: SIMD3<Float>(-0.7, 0.3, 0.4), relativeTo: nil)
-  content.add(fill)
-  let rim = Entity()
-  rim.components.set(DirectionalLightComponent(color: .white, intensity: 900))
-  rim.look(at: .zero, from: SIMD3<Float>(0.1, 0.5, -0.8), relativeTo: nil)
-  content.add(rim)
+  CADTheme.studioBlue.addLighting(to: content)
 }
