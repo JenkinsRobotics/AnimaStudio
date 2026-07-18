@@ -308,15 +308,52 @@ final class BenchModel {
     slotIndex = 0
     status = "Cleared"
   }
+
+  // ---- CAD camera: orbit / pan / zoom, accumulated (no jump between drags)
+  var cameraYaw: Float = 0.5
+  var cameraPitch: Float = -0.35
+  var cameraDistance: Float = 0.55
+  var cameraTarget = SIMD3<Float>(0, 0, -0.05)
+
+  var cameraPosition: SIMD3<Float> {
+    cameraTarget
+      + cameraDistance
+      * SIMD3<Float>(
+        cos(cameraPitch) * sin(cameraYaw),
+        -sin(cameraPitch),
+        cos(cameraPitch) * cos(cameraYaw))
+  }
+
+  func orbit(dx: Float, dy: Float) {
+    cameraYaw -= dx * 0.008
+    cameraPitch = min(max(cameraPitch + dy * 0.008, -1.5), 1.5)
+  }
+
+  func pan(dx: Float, dy: Float) {
+    let forward = simd_normalize(cameraTarget - cameraPosition)
+    let right = simd_normalize(simd_cross(forward, SIMD3<Float>(0, 1, 0)))
+    let up = simd_cross(right, forward)
+    let factor = cameraDistance * 0.0016
+    cameraTarget += right * (-dx * factor) + up * (dy * factor)
+  }
+
+  func zoom(delta: Float) {
+    cameraDistance = min(max(cameraDistance * (1 - delta * 0.03), 0.02), 20)
+  }
+
+  func fitView() {
+    cameraTarget = SIMD3<Float>(0, 0, -0.05)
+    cameraYaw = 0.5
+    cameraPitch = -0.35
+    cameraDistance = 0.55
+  }
 }
 
 // ---------- UI --------------------------------------------------------------
 
 struct BenchView: View {
   @State private var model = BenchModel()
-  @State private var yaw: Float = 0.5
-  @State private var pitch: Float = -0.4
-  @State private var zoom: Float = 1.0
+  @State private var eventMonitor: Any?
   private let telemetryTimer = Timer.publish(every: 1, on: .main, in: .common)
     .autoconnect()
 
@@ -368,13 +405,10 @@ struct BenchView: View {
           Task { @MainActor in model.frameCount += 1 }
         }
       } update: { content in
-        model.workspace.orientation =
-          simd_quatf(angle: pitch, axis: [1, 0, 0])
-          * simd_quatf(angle: yaw, axis: [0, 1, 0])
         if let camera = content.entities.first(where: { $0.name == "camera" }) {
-          camera.position = SIMD3<Float>(0, 0.22, 0.42) * zoom
+          camera.position = model.cameraPosition
           camera.look(
-            at: SIMD3<Float>(0, 0, -0.05), from: camera.position, relativeTo: nil)
+            at: model.cameraTarget, from: camera.position, relativeTo: nil)
         }
       }
       .gesture(
@@ -382,24 +416,16 @@ struct BenchView: View {
           model.toggle(value.entity)
         }
       )
-      .simultaneousGesture(
-        DragGesture(minimumDistance: 4).onChanged { value in
-          yaw = 0.5 + Float(value.translation.width) * 0.008
-          pitch = -0.4 + Float(value.translation.height) * 0.008
-        }
-      )
-      .simultaneousGesture(
-        MagnifyGesture().onChanged { value in
-          zoom = min(max(1.0 / Float(value.magnification), 0.15), 6.0)
-        }
-      )
 
       VStack(alignment: .leading, spacing: 8) {
         HStack {
           Button("Add Files…") { pickFiles() }
           Button("Add Demo Part") { Task { await model.loadDemoPart() } }
+          Button("Fit View") { model.fitView() }
           Button("Clear") { model.clear() }
         }
+        Text("drag orbit · middle-drag pan · scroll zoom · shift+scroll pan · click select")
+          .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
         Text(model.status).font(.system(.caption, design: .monospaced))
         Text(String(
           format: "FPS %3.0f   CPU %5.1f%%   MEM %6.1f MB   files %d   tris %d",
@@ -424,6 +450,38 @@ struct BenchView: View {
     .onAppear {
       NSApp.setActivationPolicy(.regular)
       NSApp.activate(ignoringOtherApps: true)
+      // CAD mouse controls, matching the app's default profile where possible:
+      // right-drag (or left-drag) orbit · middle-drag pan · scroll zoom
+      // (shift+scroll pans) · pinch zoom. Left CLICK stays face/edge select.
+      eventMonitor = NSEvent.addLocalMonitorForEvents(
+        matching: [
+          .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
+          .scrollWheel, .magnify,
+        ]
+      ) { event in
+        switch event.type {
+        case .leftMouseDragged, .rightMouseDragged:
+          model.orbit(dx: Float(event.deltaX), dy: Float(event.deltaY))
+        case .otherMouseDragged:
+          model.pan(dx: Float(event.deltaX), dy: Float(event.deltaY))
+        case .scrollWheel:
+          if event.modifierFlags.contains(.shift) {
+            model.pan(
+              dx: Float(event.scrollingDeltaX + event.scrollingDeltaY),
+              dy: 0)
+          } else {
+            model.zoom(delta: Float(event.scrollingDeltaY) * 0.4)
+          }
+        case .magnify:
+          model.zoom(delta: Float(event.magnification) * 8)
+        default:
+          break
+        }
+        return event
+      }
+    }
+    .onDisappear {
+      if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
     }
   }
 

@@ -45,3 +45,11 @@ brew install opencascade   # once
 The C shim (`OcctSwift/Sources/OcctShim`) is deliberately app-shaped: when the
 combination is approved, it becomes a package the app links and STEP joins the
 import contract.
+
+## Pipeline 2 finding (2026-07-17, later)
+
+On several of the ARCADA001 STEP files the Rust kernel (truck 0.3/0.4)
+hits unsupported STEP entities ("Lookup failed for #NNN", degenerate knot
+vectors) and PANICS in tessellation, while OCCT reads every file cleanly.
+Verdict strengthened: the Rust B-rep ecosystem is not mature enough to be
+the kernel; Pipeline 1 (OCCT) remains the champion.
