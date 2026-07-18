@@ -11,11 +11,14 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
   case metalKit = "Open CASCADE → Metal (custom)"
   case occtGL = "Open CASCADE built-in viewer"
   case webGL = "Open CASCADE → WebGL (Three.js)"
+  case openGeometry = "OpenGeometry (Rust/WASM)"
   // STEP-only bench per Jonathan: the ModelIO backend (cannot read STEP,
   // ever — Apple framework) is kept in code for reference but not offered.
   case modelIO = "ModelIO (no STEP)"
 
-  static var allCases: [PipelineBackend] { [.realityKit, .metalKit, .occtGL, .webGL] }
+  static var allCases: [PipelineBackend] {
+    [.realityKit, .metalKit, .occtGL, .webGL, .openGeometry]
+  }
 
   var id: String { rawValue }
 
@@ -25,6 +28,7 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
     case .metalKit: "Open CASCADE C-shim → Swift → custom MetalKit renderer"
     case .occtGL: "Open CASCADE built-in viewer (OpenGL) → SwiftUI"
     case .webGL: "Open CASCADE C-shim → WebGL (Three.js) in a Swift WKWebView"
+    case .openGeometry: "OpenGeometry Rust/WASM kernel in a Swift WKWebView"
     case .modelIO: "ModelIO → RealityKit quick-parser (no B-rep)"
     }
   }
@@ -35,6 +39,7 @@ enum PipelineBackend: String, CaseIterable, Identifiable {
     case .metalKit: "STEP · raw Metal buffers · CAD colors · display only"
     case .occtGL: "STEP · Open CASCADE-native hover/select · deprecated OpenGL"
     case .webGL: "STEP · CAD colors · WebGL in-app · own mouse (drag orbit/right pan/scroll zoom)"
+    case .openGeometry: "Builds primitives in-code · NO STEP import (export-only) · your files can't load"
     case .modelIO: "STL/OBJ/USD only · STEP fails"
     }
   }

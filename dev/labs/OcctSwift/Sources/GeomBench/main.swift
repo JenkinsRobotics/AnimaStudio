@@ -571,6 +571,7 @@ struct BenchView: View {
       case .metalKit: AnyView(MetalViewport(model: model))
       case .occtGL: AnyView(OcctGLViewport(model: model))
       case .webGL: AnyView(WebGLViewport(model: model))
+      case .openGeometry: AnyView(OpenGeometryViewport())
       case .modelIO: AnyView(ModelIOViewport(model: model))
       }
 

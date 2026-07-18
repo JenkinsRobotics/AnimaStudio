@@ -77,3 +77,34 @@ struct WebGLViewport: NSViewRepresentable {
     view.loadHTMLString(threeJSPage(meshes: model.gpuMeshes), baseURL: nil)
   }
 }
+
+/// OpenGeometry (Rust/WASM CAD kernel) hosted INSIDE the Swift app via a
+/// WKWebView — no separate browser. Loads the bench page from disk with read
+/// access to its node_modules so the WASM + ES modules resolve.
+struct OpenGeometryViewport: NSViewRepresentable {
+  final class Coordinator { var loaded = false }
+  func makeCoordinator() -> Coordinator { Coordinator() }
+
+  func makeNSView(context: Context) -> WKWebView {
+    let config = WKWebViewConfiguration()
+    config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+    let view = WKWebView(frame: .zero, configuration: config)
+    view.setValue(false, forKey: "drawsBackground")
+    return view
+  }
+
+  func updateNSView(_ view: WKWebView, context: Context) {
+    guard !context.coordinator.loaded else { return }
+    context.coordinator.loaded = true
+    let dir = labsRootURL().appendingPathComponent("opengeometry-bench", isDirectory: true)
+    let index = dir.appendingPathComponent("index.html")
+    if FileManager.default.fileExists(atPath: index.path) {
+      view.loadFileURL(index, allowingReadAccessTo: dir)
+    } else {
+      view.loadHTMLString(
+        "<body style='background:#14161a;color:#ff6b6b;font:13px monospace;padding:20px'>"
+          + "opengeometry-bench not found. Run: npm install in dev/labs/opengeometry-bench</body>",
+        baseURL: nil)
+    }
+  }
+}
