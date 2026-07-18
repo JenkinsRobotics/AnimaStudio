@@ -93,7 +93,7 @@ func featureMaterial(
 ) -> RealityKit.Material {
   switch (kind, selected) {
   case (.face, false):
-    return theme.surfaceMaterial(baseColor: baseColor)
+    return theme.surfaceMaterial(baseColor: theme.faceColor(fileColor: baseColor))
   case (.face, true):
     var material = PhysicallyBasedMaterial()
     material.baseColor = .init(tint: theme.selectedFace)
@@ -310,12 +310,14 @@ final class BenchModel {
       gpu.positions.append(mesh.positions[i])
       gpu.normals.append(mesh.normals[i])
     }
-    let color =
+    let fileColor =
       mesh.has_color == 1
-      ? SIMD3<Float>(mesh.color.0, mesh.color.1, mesh.color.2)
-      : SIMD3<Float>(fallbackColor.x, fallbackColor.y, fallbackColor.z)
+      ? SIMD4<Float>(mesh.color.0, mesh.color.1, mesh.color.2, mesh.color.3)
+      : fallbackColor
+    // Honor the theme's whole-part color override (SolidWorks/Onshape/etc.).
+    let c = theme.faceColor(fileColor: fileColor)
     for _ in 0..<vertexCount {
-      gpu.colors.append(contentsOf: [color.x, color.y, color.z])
+      gpu.colors.append(contentsOf: [c.x, c.y, c.z])
     }
     for i in 0..<(Int(mesh.triangle_count) * 3) {
       gpu.indices.append(base + mesh.indices[i])
