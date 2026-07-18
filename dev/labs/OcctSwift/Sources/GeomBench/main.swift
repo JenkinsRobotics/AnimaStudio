@@ -147,18 +147,25 @@ final class BenchModel {
   var theme: CADTheme = .studioBlue
   var themeRevision = 0
   var appliedThemeRevisionRK = -1  // last theme revision the RealityKit lights reflect
+  var loadedURLs: [URL] = []
   var status = "Add Files… (STEP / STL / OBJ) or Add Demo Part"
 
-  /// Apply a theme live: re-material every loaded face/edge, and signal the
-  /// views to refresh lighting/background. No reload, no re-parse.
+  /// Apply a theme: re-material + relight immediately (instant lighting/color
+  /// feedback), then reload loaded files so edge PROMINENCE re-bakes per theme
+  /// (Technical = thick outlines, Showroom = none). No re-parse if nothing is
+  /// loaded.
   func setTheme(_ newTheme: CADTheme) {
     theme = newTheme
-    for entity in workspace.children {
-      reMaterial(entity)
-    }
+    for entity in workspace.children { reMaterial(entity) }
     themeRevision += 1
-    gpuRevision += 1  // nudge Metal/WebGL to redraw with the theme background
+    gpuRevision += 1
     status = "Theme: \(newTheme.name)"
+    let urls = loadedURLs
+    guard !urls.isEmpty else { return }
+    Task {
+      clear()
+      for url in urls { await load(url: url) }
+    }
   }
 
   private func reMaterial(_ entity: Entity) {
@@ -247,6 +254,7 @@ final class BenchModel {
 
   func load(url: URL) async {
     lastFileURL = url
+    if !loadedURLs.contains(url) { loadedURLs.append(url) }
     let ext = url.pathExtension.lowercased()
     if ext == "step" || ext == "stp" {
       status = "Loading \(url.lastPathComponent)…"
@@ -432,6 +440,7 @@ final class BenchModel {
   func clear() {
     workspace.children.removeAll()
     files.removeAll()
+    loadedURLs.removeAll()
     gpuMeshes.removeAll()
     gpuRevision += 1
     slotIndex = 0
@@ -507,15 +516,11 @@ struct RealityKitViewportView: View {
         camera.position = model.cameraPosition
         camera.look(at: model.cameraTarget, from: camera.position, relativeTo: nil)
       }
-      // Re-light when the theme changes (materials are re-applied by setTheme).
-      if model.themeRevision != model.appliedThemeRevisionRK {
-        for light in content.entities.filter({ $0.name == "themeLight" }) {
-          content.remove(light)
-        }
-        model.theme.addLighting(to: content)
-        model.appliedThemeRevisionRK = model.themeRevision
-      }
     }
+    // Rebuild the RealityView when the theme changes — make: re-runs, so the
+    // theme's lights are added fresh (materials are already re-applied by
+    // setTheme). This is the reliable way to get lighting to actually change.
+    .id(model.themeRevision)
     .background(Color(model.theme.backgroundNSColor))
     .gesture(
       SpatialTapGesture().targetedToAnyEntity().onEnded { value in

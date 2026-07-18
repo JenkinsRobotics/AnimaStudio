@@ -96,38 +96,38 @@ extension CADTheme {
     fill: .init(color: [0.75, 0.82, 1.0], intensity: 1_200, from: [-0.7, 0.3, 0.4]),
     rim: .init(color: [1, 1, 1], intensity: 900, from: [0.1, 0.5, -0.8]))
 
-  // Clean, bright, whiter light + lighter background — showroom/marketing feel.
+  // Bright, flat, near-shadowless — showroom/marketing. Light bg, subtle edges.
   static let showroom = CADTheme(
     name: "Showroom",
-    roughness: 0.42, metallic: 0.05, edgeStrength: 0.25, neutralColor: [0.82, 0.84, 0.87, 1],
-    background: [0.36, 0.38, 0.42],
+    roughness: 0.35, metallic: 0.1, edgeStrength: 0.0, neutralColor: [0.85, 0.87, 0.9, 1],
+    background: [0.42, 0.45, 0.5],
     selectedFace: .systemOrange, selectedEdge: .systemBlue,
-    edge: NSColor(red: 0.3, green: 0.32, blue: 0.36, alpha: 1),
-    key: .init(color: [1, 1, 1], intensity: 4_200, from: [0.4, 1.0, 0.7]),
-    fill: .init(color: [0.9, 0.93, 1.0], intensity: 2_400, from: [-0.8, 0.4, 0.5]),
-    rim: .init(color: [1, 1, 1], intensity: 1_400, from: [0.0, 0.4, -0.9]))
+    edge: NSColor(red: 0.4, green: 0.42, blue: 0.46, alpha: 1),
+    key: .init(color: [1, 1, 1], intensity: 6_000, from: [0.4, 1.0, 0.7]),
+    fill: .init(color: [1, 1, 1], intensity: 5_000, from: [-0.8, 0.4, 0.5]),
+    rim: .init(color: [1, 1, 1], intensity: 3_000, from: [0.0, 0.4, -0.9]))
 
-  // Flat, even, matte — engineering-drawing / inspection feel, gray bg.
+  // Flat even matte, thick outlines — engineering-drawing / inspection feel.
   static let technical = CADTheme(
     name: "Technical Matte",
-    roughness: 0.85, metallic: 0.0, edgeStrength: 1.0, neutralColor: [0.70, 0.72, 0.74, 1],
-    background: [0.22, 0.23, 0.24],
+    roughness: 0.95, metallic: 0.0, edgeStrength: 1.0, neutralColor: [0.62, 0.66, 0.70, 1],
+    background: [0.20, 0.21, 0.22],
     selectedFace: .systemGreen, selectedEdge: .systemYellow,
-    edge: NSColor(red: 0.12, green: 0.13, blue: 0.14, alpha: 1),
-    key: .init(color: [1, 1, 1], intensity: 2_200, from: [0.3, 0.9, 0.5]),
-    fill: .init(color: [1, 1, 1], intensity: 2_000, from: [-0.6, 0.5, 0.5]),
-    rim: .init(color: [0.9, 0.9, 0.9], intensity: 1_400, from: [-0.2, 0.3, -0.8]))
+    edge: NSColor(red: 0.05, green: 0.06, blue: 0.07, alpha: 1),
+    key: .init(color: [0.85, 0.9, 1.0], intensity: 2_600, from: [0.2, 0.9, 0.3]),
+    fill: .init(color: [0.85, 0.9, 1.0], intensity: 2_500, from: [-0.9, 0.6, 0.4]),
+    rim: .init(color: [0.85, 0.9, 1.0], intensity: 2_400, from: [-0.3, 0.4, -0.9]))
 
-  // Warm, dramatic — darker background, amber key. Presentation/hero shot.
+  // Warm, dramatic single-key — deep shadows, dark bg. Hero/presentation shot.
   static let workshop = CADTheme(
     name: "Warm Workshop",
-    roughness: 0.55, metallic: 0.12, edgeStrength: 0.5, neutralColor: [0.74, 0.72, 0.68, 1],
-    background: [0.09, 0.08, 0.07],
+    roughness: 0.5, metallic: 0.2, edgeStrength: 0.5, neutralColor: [0.78, 0.72, 0.6, 1],
+    background: [0.07, 0.06, 0.05],
     selectedFace: .systemTeal, selectedEdge: .systemOrange,
-    edge: NSColor(red: 0.2, green: 0.16, blue: 0.12, alpha: 1),
-    key: .init(color: [1.0, 0.9, 0.72], intensity: 3_400, from: [0.6, 0.8, 0.5]),
-    fill: .init(color: [0.6, 0.7, 0.9], intensity: 800, from: [-0.8, 0.2, 0.3]),
-    rim: .init(color: [1.0, 0.95, 0.85], intensity: 1_600, from: [0.2, 0.6, -0.9]))
+    edge: NSColor(red: 0.22, green: 0.15, blue: 0.09, alpha: 1),
+    key: .init(color: [1.0, 0.78, 0.45], intensity: 4_500, from: [0.7, 0.7, 0.5]),
+    fill: .init(color: [0.35, 0.5, 0.9], intensity: 500, from: [-0.8, 0.1, 0.3]),
+    rim: .init(color: [1.0, 0.85, 0.6], intensity: 2_400, from: [0.2, 0.5, -0.9]))
 
   static let all: [CADTheme] = [.studioBlue, .showroom, .technical, .workshop]
 }
