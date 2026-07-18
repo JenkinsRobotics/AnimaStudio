@@ -3,27 +3,29 @@
 > 2026-07-17. Two agents built benches for the six-pipeline CAD evaluation:
 > Claude's live in `dev/labs/`, Codex's live in `cad-test/`. This page is the
 > single map. Rebuild Claude's set with `dev/labs/build.sh`; Codex's with
-> `cad-test/scripts/build.sh`.
+> `cad-test/scripts/build.sh`. (The old "Test Lab" launcher is removed — it
+> had no pipeline of its own.)
 
-## Launchers (start here)
-
-| App | Author | How to launch |
-|---|---|---|
-| **Test Lab** | Claude | Double-click `Test Lab.app` at the repo root. Menu of every Claude bench + one-file "Launch ALL Pipelines" side-by-side compare |
-| **Codex GeomBench** | Codex | Double-click `cad-test/GeomBench.app` (or `cad-test/scripts/launch.sh`) |
-
-## The benches
+## The two main apps
 
 | App | Author | Pipelines | Launch |
 |---|---|---|---|
-| **Claude Bench** | Claude | P1 RealityKit / P2 MetalKit / P3 OCCT-GL / P6 ModelIO as in-app radio buttons; P4 Qt via sidebar button; P5 documented-blocked | Double-click `dev/labs/apps/Claude Bench.app`, or Test Lab → Pipeline 1 row |
-| **Codex GeomBench** | Codex | Its own build of the same six-pipeline spec | `cad-test/GeomBench.app` |
-| **Codex Qt GL bench** | Codex | Qt + OCCT GL | `cad-test/build/qt/GeomBenchQtGL.app` |
-| **qtbench** | Claude | P4 — Qt6 + OCCT built-in GL viewer (native face hover/select) | Test Lab → Pipeline 3 row (pick a STEP), or Claude Bench sidebar → "Launch P4" |
-| **rustbench** | Claude | Rust kernel (truck) → Three.js browser page | Test Lab → Pipeline 2 row (pick a STEP; page opens in browser). Known: panics on several real STEPs |
-| **StlViewer** | Claude | Baseline — today's app loader (ModelIO). STEP fails in red on purpose | Test Lab → BASELINE row (pick a file) |
-| **OCCT kernel report** | Claude | Headless precision numbers | Test Lab → kernel report row (output shows in the pane) |
-| **Anima Studio** | both lanes | The real app, for comparison | `Anima Studio.app` at the repo root |
+| **Claude Bench** | Claude | P1 RealityKit / P2 MetalKit / P3 OCCT-GL / P6 ModelIO as radio buttons in one workspace; P4 Qt via sidebar button; P5 documented-blocked | Double-click **`dev/labs/apps/Claude Bench.app`** |
+| **Codex GeomBench** | Codex | Codex's build of the same six-pipeline spec | Double-click **`cad-test/GeomBench.app`** (or `cad-test/scripts/launch.sh`) |
+
+Compare workflow: load the same STEP in both apps, and inside Claude Bench
+flip the backend radio buttons — same file, different renderer each click.
+
+## Supporting benches (command line)
+
+| Bench | What | Run |
+|---|---|---|
+| qtbench (P4) | Qt6 + OCCT built-in GL viewer, native face hover/select | Claude Bench sidebar → "Launch P4", or `dev/labs/qtbench/build/qtbench.app/Contents/MacOS/qtbench "<file.step>"` |
+| Codex Qt GL | Codex's Qt variant | `cad-test/build/qt/GeomBenchQtGL.app` |
+| rustbench | Rust kernel (truck) → browser page. Known: panics on several real STEPs | `dev/labs/rustbench/run.sh "<file.step>"` |
+| StlViewer | Baseline: today's app loader (ModelIO). STEP fails in red on purpose | `dev/labs/apps/StlViewer.app` (double-click) |
+| OCCT kernel report | Headless precision numbers (1e-16 boolean exactness, STEP round-trip, quality dial) | `dev/labs/bin/occt_test` in Terminal |
+| Anima Studio | The real app, for comparison | `Anima Studio.app` at the repo root |
 
 Test file sets: `CAD DEMO/ARCADA001` (31 STL) · `ARCADA001-2` (46 STEP) ·
 `ARCADA001-3` (46 OBJ).

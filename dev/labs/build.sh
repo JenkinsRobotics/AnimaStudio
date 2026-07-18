@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 OCCT=$(brew --prefix opencascade)
 
-echo "== OcctSwift package (GeomBench, OcctSwiftViewer, TestLab) =="
+echo "== OcctSwift package (Claude Bench) =="
 (cd OcctSwift && swift build)
 
 echo "== StlViewer (ModelIO baseline) =="
@@ -42,11 +42,9 @@ PLIST
   cp "$3" "$1/Contents/MacOS/$2"
   codesign --force --sign - "$1" 2>/dev/null || true
 }
-make_bundle "../../Test Lab.app" TestLab OcctSwift/.build/debug/TestLab
 mkdir -p apps
 make_bundle "apps/Claude Bench.app" ClaudeBench OcctSwift/.build/debug/GeomBench
 make_bundle "apps/StlViewer.app" StlViewer StlViewer/.build/debug/StlViewer
 
 echo
-echo "All built. Double-click 'Test Lab.app' at the repo root,"
-echo "or run: ./OcctSwift/.build/debug/TestLab"
+echo "All built. Double-click 'dev/labs/apps/Claude Bench.app'"

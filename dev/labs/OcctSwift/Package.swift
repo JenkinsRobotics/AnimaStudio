@@ -59,8 +59,5 @@ let package = Package(
       name: "OcctSwiftViewer",
       dependencies: ["OcctShim"]
     ),
-    .executableTarget(
-      name: "TestLab"
-    ),
   ]
 )
