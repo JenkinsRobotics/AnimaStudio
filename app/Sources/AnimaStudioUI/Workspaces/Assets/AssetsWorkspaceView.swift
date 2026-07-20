@@ -21,6 +21,7 @@ struct AssetsWorkspaceView: View {
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
   let replaceModel: () -> Void
+  let deleteParts: (Set<PartID>) -> Void
   let dropModels: ([URL]) -> Void
 
   @State private var selection = AssetBuilderSelection.characters
@@ -53,11 +54,12 @@ struct AssetsWorkspaceView: View {
         renders: renderItems,
         scripts: scriptItems,
         isSwitchingCharacter: isSwitchingCharacter,
-        selectedPartID: selectedPartBinding,
+        selectedPartIDs: selectedPartIDsBinding,
         newCharacter: newCharacter,
         selectCharacter: selectCharacter,
         importModels: importModels,
-        replaceModel: replaceModel
+        replaceModel: replaceModel,
+        deleteParts: deleteParts
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
@@ -66,6 +68,7 @@ struct AssetsWorkspaceView: View {
       AssetBuilderInspector(
         activeCharacter: activeCharacter,
         selectedPart: selectedPart,
+        selectedPartIDs: selectedPartIDs,
         workspace: workspace,
         importProgress: importProgress,
         importErrorMessage: importErrorMessage,
@@ -93,24 +96,19 @@ struct AssetsWorkspaceView: View {
   }
 
   private var selectedPart: AssetBuilderPartRow? {
-    guard let selectedPartID = workspace.selectedPartID else { return nil }
-    return partRows.first { $0.id == selectedPartID }
+    partRows.first { selectedPartIDs.contains($0.id) }
   }
+
+  private var selectedPartIDs: Set<PartID> { Set(workspace.selectedComponentIDs) }
 
   private var activeCharacter: ProjectCharacterReference? {
     characters.first { $0.id == activeCharacterID }
   }
 
-  private var selectedPartBinding: Binding<PartID?> {
+  private var selectedPartIDsBinding: Binding<Set<PartID>> {
     Binding(
-      get: { workspace.selectedPartID },
-      set: { value in
-        if let value {
-          workspace.selectPart(id: value, extendingSelection: false)
-        } else {
-          workspace.clearSelection()
-        }
-      }
+      get: { Set(workspace.selectedComponentIDs) },
+      set: { workspace.selectParts(ids: $0) }
     )
   }
 
@@ -213,6 +211,7 @@ struct AssetsWorkspaceView: View {
     selectCharacter: { _ in },
     importModels: {},
     replaceModel: {},
+    deleteParts: { _ in },
     dropModels: { _ in }
   )
   .frame(width: 1380, height: 760)

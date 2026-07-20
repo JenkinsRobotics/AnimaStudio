@@ -292,6 +292,42 @@ public struct AnimaDocumentStore: Sendable {
     return updated
   }
 
+  /// Replaces the bytes of an existing embedded asset without changing its
+  /// stable ID or package-relative path. This is the document-layer primitive
+  /// used by automatic part re-import/versioning.
+  public func replaceEmbeddedAsset(
+    _ asset: DocumentAssetReference,
+    from sourceURL: URL,
+    in projectURL: URL
+  ) throws {
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: sourceURL.path) else {
+      throw AnimaDocumentError.missingAsset(path: sourceURL.path)
+    }
+    guard case .embedded(let relativePath) = asset.storage else {
+      throw AnimaDocumentError.writeFailed(
+        path: asset.originalFilename,
+        detail: "Only project-embedded assets can be replaced automatically."
+      )
+    }
+    try Self.validateProjectRelativePath(relativePath)
+    let destinationURL = projectURL.appendingPathComponent(relativePath)
+    if sourceURL.standardizedFileURL == destinationURL.standardizedFileURL { return }
+    do {
+      let replacement = try Data(contentsOf: sourceURL, options: .mappedIfSafe)
+      try fileManager.createDirectory(
+        at: destinationURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try replacement.write(to: destinationURL, options: .atomic)
+    } catch {
+      throw AnimaDocumentError.writeFailed(
+        path: destinationURL.path,
+        detail: error.localizedDescription
+      )
+    }
+  }
+
   private static func availableAssetFilename(
     _ requestedFilename: String,
     characterFolderName: String,

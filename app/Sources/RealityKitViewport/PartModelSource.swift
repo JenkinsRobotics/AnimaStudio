@@ -10,16 +10,21 @@ public struct PartModelSource: Equatable, Sendable {
   public let fileURL: URL
   public let modelNode: String?
   public let unitScaleToMeters: Double
+  /// App-owned re-import counter. It participates in renderer identity so
+  /// replacing bytes at the same package path reloads visible geometry.
+  public let assetVersion: Int
 
   public init(
     partID: PartID,
     fileURL: URL,
     modelNode: String? = nil,
-    unitScaleToMeters: Double = 1
+    unitScaleToMeters: Double = 1,
+    assetVersion: Int = 1
   ) {
     self.partID = partID
     self.fileURL = fileURL
     self.modelNode = modelNode
     self.unitScaleToMeters = unitScaleToMeters
+    self.assetVersion = assetVersion
   }
 }

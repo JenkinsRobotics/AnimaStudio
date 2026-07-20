@@ -354,7 +354,7 @@ struct UIDevVariantBoardSpecimenView: View {
       Text(
         destructive
           ? "The mate and its animation tracks will be removed."
-          : "Choose a supported USD, USDZ, or RealityKit model."
+          : "Choose a supported USD-family, STL, or OBJ model."
       )
       .font(.caption2)
       .foregroundStyle(StudioPalette.muted)

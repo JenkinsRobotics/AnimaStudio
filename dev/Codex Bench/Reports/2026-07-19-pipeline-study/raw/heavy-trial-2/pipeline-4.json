@@ -1,0 +1,30 @@
+{
+  "caveats" : [
+    "FPS uses the same 60 Hz scripted orbit workload and counts delivered renderer frames.",
+    "CPU may exceed 100% when multiple cores are active.",
+    "Combined CPU\/memory includes the Swift host and the dedicated Qt helper."
+  ],
+  "combinedCPUPercent" : 128.93558274358554,
+  "combinedMemoryMegabytes" : 211.50820922851562,
+  "contributor" : "Codex",
+  "edges" : 0,
+  "faces" : 0,
+  "finalStatus" : "Starting the hosted Qt 6 and Open CASCADE Technology renderer…",
+  "framesPerSecond" : 42.49305828795135,
+  "helperCPUPercent" : 48.49020943677581,
+  "helperMemoryMegabytes" : 175.01983947753905,
+  "loadMetricScope" : "Hosted Qt\/Open CASCADE viewer STEP load",
+  "mainCPUPercent" : 80.44537330680974,
+  "mainMemoryMegabytes" : 36.48836975097656,
+  "pipeline" : "Qt 6 + Open CASCADE Technology OpenGL (Hosted)",
+  "pipelineID" : 4,
+  "readyWaitMilliseconds" : 2984.3549728393555,
+  "renderedFrames" : 301,
+  "reportedLoadMilliseconds" : 2328.475375,
+  "sourceBytes" : 5531766,
+  "sourceFile" : "\/Users\/jonathanjenkins\/GITHUB\/AnimaStudio\/CAD DEMO\/ARCADA001-2\/ARCADA001 - Part 1 (12).step",
+  "success" : true,
+  "timestamp" : "2026-07-19T07:21:36Z",
+  "triangles" : 0,
+  "workloadSeconds" : 7.083509922027588
+}

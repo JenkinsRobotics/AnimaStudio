@@ -1,0 +1,28 @@
+{
+  "caveats" : [
+    "FPS uses the same 60 Hz scripted orbit workload and counts delivered renderer frames.",
+    "CPU may exceed 100% when multiple cores are active.",
+    "Main-process memory excludes system-managed WebKit content\/GPU processes."
+  ],
+  "combinedCPUPercent" : 10.890191207492359,
+  "combinedMemoryMegabytes" : 155.90746307373047,
+  "contributor" : "Codex",
+  "edges" : 7443,
+  "faces" : 2631,
+  "finalStatus" : "OpenGeometry 2.0.3 kernel probe 7.0 ms · Three.js rendered 54830 STEP triangles in 14.0 ms",
+  "framesPerSecond" : 63.37691920389906,
+  "loadMetricScope" : "OpenGeometry probe + Three.js upload after shared import",
+  "mainCPUPercent" : 10.890191207492359,
+  "mainMemoryMegabytes" : 155.90746307373047,
+  "pipeline" : "Open CASCADE Technology → OpenGeometry WebAssembly + Three.js",
+  "pipelineID" : 7,
+  "readyWaitMilliseconds" : 2884.842038154602,
+  "renderedFrames" : 361,
+  "reportedLoadMilliseconds" : 14,
+  "sourceBytes" : 5531766,
+  "sourceFile" : "\/Users\/jonathanjenkins\/GITHUB\/AnimaStudio\/CAD DEMO\/ARCADA001-2\/ARCADA001 - Part 1 (12).step",
+  "success" : true,
+  "timestamp" : "2026-07-19T07:22:16Z",
+  "triangles" : 54830,
+  "workloadSeconds" : 5.696079969406128
+}

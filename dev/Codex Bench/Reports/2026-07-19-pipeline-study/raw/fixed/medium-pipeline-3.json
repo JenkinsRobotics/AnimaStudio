@@ -1,0 +1,27 @@
+{
+  "caveats" : [
+    "FPS uses the same 60 Hz scripted orbit workload and counts delivered renderer frames.",
+    "CPU may exceed 100% when multiple cores are active."
+  ],
+  "combinedCPUPercent" : 40.82653286723505,
+  "combinedMemoryMegabytes" : 148.10093841552734,
+  "contributor" : "Codex",
+  "edges" : 0,
+  "faces" : 0,
+  "finalStatus" : "ARCADA001 - ARCADP001.step loaded in 261.4 ms",
+  "framesPerSecond" : 38.8852885314073,
+  "loadMetricScope" : "Native Open CASCADE viewer STEP load",
+  "mainCPUPercent" : 40.82653286723505,
+  "mainMemoryMegabytes" : 148.10093841552734,
+  "pipeline" : "Open CASCADE Technology Native OpenGL Viewer",
+  "pipelineID" : 3,
+  "readyWaitMilliseconds" : 0.035881996154785156,
+  "renderedFrames" : 600,
+  "reportedLoadMilliseconds" : 0,
+  "sourceBytes" : 291142,
+  "sourceFile" : "\/Users\/jonathanjenkins\/GITHUB\/AnimaStudio\/CAD DEMO\/ARCADA001-2\/ARCADA001 - ARCADP001.step",
+  "success" : true,
+  "timestamp" : "2026-07-19T07:14:49Z",
+  "triangles" : 0,
+  "workloadSeconds" : 15.429999947547913
+}

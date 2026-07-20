@@ -13,16 +13,18 @@ open dev/labs/apps/UnifiedBench.app
 open -n dev/labs/apps/UnifiedBench.app --args "CAD DEMO/ARCADA001-2/ARCADA001 - ARCADP001.step" 0.001
 ```
 
-## The 8 pipelines (radio buttons in one workspace)
+## The 4 in-app pipelines (radio buttons in one workspace)
+
+All embed directly in the Swift app — no external process, no separate install.
 
 1. Open CASCADE → **RealityKit** — face/edge select, CAD colors, themes. **The one that ships (option A).**
 2. Open CASCADE → **Metal** (custom MTKView)
 3. Open CASCADE → **SceneKit** (harvested from Gemini)
-4. Open CASCADE **built-in GL viewer**
-5. Open CASCADE → **WebGL** (Three.js in a WKWebView)
-6. **OpenGeometry** (Rust/WASM — no STEP import; shows its own primitives)
-7. **Qt + Open CASCADE** (separate window — Qt owns its event loop)
-8. **Unity** (shim → OBJ+colors → Unity editor; separate window)
+4. Open CASCADE → **WebGL** (Three.js in a WKWebView)
+
+**Cut when finalized:** Unity + Qt (external window — needed a separate app),
+OpenGeometry + ModelIO (can't import STEP), OCCT built-in GL viewer (deprecated
+OpenGL — wouldn't render on macOS 26).
 
 Controls: drag orbit · **shift+drag roll** · middle-drag pan · scroll zoom ·
 click face/edge · Theme dropdown (10) · Fit View.
@@ -33,15 +35,14 @@ click face/edge · Theme dropdown (10) · Fit View.
 - **Claude** → theme system (10) + face/edge selection
 - **Gemini** → SceneKit engine
 
-## The three original demo apps (for the record)
+## The original demo apps (for the record)
 
-- **Claude**: `dev/labs/archive/OldClaudeBench` (superseded by Unified Bench)
-- **Codex**: `cad-test/`
-- **Gemini**: `gemeniARCADA001-2/GeomBench`
+Unified Bench harvested the best of three, then finalized down to five in-app
+pipelines:
 
-`dev/labs/archive/` also holds `StlViewer` (old ModelIO baseline), `rustbench`
-(the Rust pipeline that panicked on real files), and `kernel_test` (OCCT
-precision report) — all dead/reference-only.
+- **Claude** → became **Unified Bench** itself (the old standalone + archive were deleted)
+- **Codex** → `dev/Codex Bench/`
+- **Gemini** → `gemeniARCADA001-2/`
 
 ---
 
@@ -52,11 +53,7 @@ precision report) — all dead/reference-only.
 | 1. RealityKit | | | | | | |
 | 2. Metal | | | | | | |
 | 3. SceneKit | | | | | | |
-| 4. OCCT built-in GL | | | | | | |
-| 5. WebGL | | | | | | |
-| 6. OpenGeometry | | | | (no STEP) | | |
-| 7. Qt | | | | | | |
-| 8. Unity | | | | | | |
+| 4. WebGL | | | | | | |
 
 ### Verdict
 - Winner:

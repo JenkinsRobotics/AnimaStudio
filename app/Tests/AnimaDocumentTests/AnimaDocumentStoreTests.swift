@@ -246,6 +246,36 @@ final class AnimaDocumentStoreTests: XCTestCase {
     XCTAssertEqual(try String(contentsOf: resolved, encoding: .utf8), "mesh")
   }
 
+  func testReplacingEmbeddedAssetKeepsItsIdentityAndPath() throws {
+    let url = projectURL("Replacement")
+    let reference = ProjectCharacterReference(folderName: "robot", displayName: "Robot")
+    var document = document(name: "Replacement", characters: [reference])
+    let first = workDirectory.appendingPathComponent("head.stl")
+    try Data("first".utf8).write(to: first)
+    document = try store.embedAsset(
+      from: first,
+      into: url,
+      document: document,
+      characterFolderName: "robot",
+      kind: "model3D"
+    )
+    let asset = try XCTUnwrap(document.assets.first)
+    guard case .embedded(let relativePath) = asset.storage else {
+      return XCTFail("Expected an embedded asset")
+    }
+    let replacement = workDirectory.appendingPathComponent("replacement.stl")
+    try Data("second".utf8).write(to: replacement)
+
+    try store.replaceEmbeddedAsset(asset, from: replacement, in: url)
+
+    XCTAssertEqual(document.assets.first?.id, asset.id)
+    XCTAssertEqual(document.assets.first?.storage, asset.storage)
+    XCTAssertEqual(
+      try Data(contentsOf: url.appendingPathComponent(relativePath)),
+      Data("second".utf8)
+    )
+  }
+
   func testRepeatedAssetFilenameGetsPortableCollisionSuffix() throws {
     let url = projectURL()
     var saved = try store.save(

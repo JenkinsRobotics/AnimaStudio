@@ -62,7 +62,7 @@ enum WorkspaceRibbonCatalog {
           "Load and validate a canonical .character.anima file through AnimaCore.",
           .importAnimaCharacter),
         tool(
-          "3D Model", "cube.transparent", "Import an STL, OBJ, USD, USDZ, or RealityKit model.",
+          "3D Model", "cube.transparent", "Import a USD-family, STL, or OBJ model.",
           .importModel),
         tool("Audio", "waveform", "Import reference or show audio."),
         tool("Video", "play.rectangle", "Import video for screens or reference."),

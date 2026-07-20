@@ -6,6 +6,7 @@ import SwiftUI
 struct AssetBuilderInspector: View {
   let activeCharacter: ProjectCharacterReference?
   let selectedPart: AssetBuilderPartRow?
+  let selectedPartIDs: Set<PartID>
   @Bindable var workspace: StudioWorkspaceModel
   let importProgress: CharacterImportProgress?
   let importErrorMessage: String?
@@ -81,7 +82,7 @@ struct AssetBuilderInspector: View {
       }
 
       HStack {
-        Text("STL · OBJ · USD · USDZ")
+        Text(ModelImportFormatSupport.operatorLabel)
           .font(.caption2.weight(.bold))
           .foregroundStyle(StudioPalette.muted)
         Spacer()
@@ -104,7 +105,7 @@ struct AssetBuilderInspector: View {
     VStack(spacing: 0) {
       panelHeader(
         title: "PREVIEW",
-        subtitle: selectedPart?.name ?? activeCharacter?.displayName ?? "Nothing selected",
+        subtitle: previewSubtitle,
         systemImage: "viewfinder"
       )
       .padding(14)
@@ -119,8 +120,8 @@ struct AssetBuilderInspector: View {
           showsGrid: true,
           cameraState: previewCameraState,
           focusedPartID: nil,
-          highlightedPartIDs: selectedPart.map { [$0.id] } ?? [],
-          selectionCount: selectedPart == nil ? 0 : 1,
+          highlightedPartIDs: selectedPartIDs,
+          selectionCount: selectedPartIDs.count,
           partAppearances: previewAppearances,
           rigGuideVisibility: .hidden,
           appearance: .graphite,
@@ -146,6 +147,11 @@ struct AssetBuilderInspector: View {
     }
   }
 
+  private var previewSubtitle: String {
+    if selectedPartIDs.count > 1 { return "\(selectedPartIDs.count) parts selected" }
+    return selectedPart?.name ?? activeCharacter?.displayName ?? "Nothing selected"
+  }
+
   private func panelHeader(title: String, subtitle: String, systemImage: String) -> some View {
     HStack(spacing: 9) {
       Image(systemName: systemImage)
@@ -162,7 +168,7 @@ struct AssetBuilderInspector: View {
     Dictionary(
       uniqueKeysWithValues: workspace.project.rig.parts.compactMap { part in
         guard var appearance = workspace.componentAppearance(for: part.id) else { return nil }
-        if let selectedPart, part.id != selectedPart.id {
+        if !selectedPartIDs.isEmpty, !selectedPartIDs.contains(part.id) {
           appearance.opacity = min(appearance.opacity, 0.12)
         }
         appearance.isVisible = true

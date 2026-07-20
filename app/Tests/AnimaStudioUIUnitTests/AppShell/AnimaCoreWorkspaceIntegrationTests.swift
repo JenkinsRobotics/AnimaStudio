@@ -101,6 +101,38 @@ struct AnimaCoreWorkspaceIntegrationTests {
   }
 
   @Test
+  func deletingPartsRoundTripsThroughTheCanonicalEngine() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    await workspace.importAnimaCharacter(
+      from: repositoryRoot.appendingPathComponent("examples/rc_car.character.anima")
+    )
+
+    try await workspace.deleteEngineParts(named: ["front_axle"])
+
+    #expect(!workspace.engineParts.contains { $0.name == "front_axle" })
+    #expect(!workspace.engineMates.contains { $0.name == "steering" })
+    #expect(workspace.engineRelations.isEmpty)
+    let serialized = try await workspace.serializedCharacterText()
+    let reloaded = try await client.loadCharacter(text: serialized)
+    #expect(!reloaded.rig.parts.contains { $0.name == "front_axle" })
+    #expect(!reloaded.rig.joints.contains { $0.name == "steering" })
+    #expect(reloaded.rig.relations.isEmpty)
+    #expect(!reloaded.rig.outputs.contains { $0.targetPath == "steering.rotation" })
+
+    await workspace.shutdownAnimaCore()
+  }
+
+  @Test
   func articulatedArmJogAndIKStayEngineDriven() async throws {
     let repositoryRoot = try repositoryRootURL()
     let client = AnimaCoreClient(

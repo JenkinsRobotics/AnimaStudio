@@ -105,6 +105,93 @@ public enum AnimaCoreRigDocumentEditor {
     return (.object(root), partName)
   }
 
+  /// Removes parts and every rig-semantic reference that would otherwise
+  /// become invalid. The edited DTO must still be serialized by AnimaCore,
+  /// which remains the final validator and canonical file author.
+  public static func removingParts(
+    named partNames: Set<String>,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    guard !partNames.isEmpty else { return document }
+    var root = try rootObject(document)
+    var parts = try partObjects(root)
+    let existingNames = Set(parts.compactMap { stringValue($0["name"]) })
+    if let unknown = partNames.subtracting(existingNames).sorted().first {
+      throw AnimaCoreRigDocumentEditingError.unknownPart(unknown)
+    }
+
+    parts.removeAll { part in
+      stringValue(part["name"]).map(partNames.contains) ?? false
+    }
+    for index in parts.indices {
+      if let parent = stringValue(parts[index]["parent"]), partNames.contains(parent) {
+        parts[index]["parent"] = .null
+      }
+    }
+    root["parts"] = .array(parts.map(AnimaCoreJSONValue.object))
+
+    var removedDOFPaths = Set<String>()
+    var joints = try objectArray(root, key: "joints")
+    joints.removeAll { joint in
+      let removesJoint = [stringValue(joint["parent_part"]), stringValue(joint["child_part"])]
+        .compactMap { $0 }
+        .contains(where: partNames.contains)
+      guard removesJoint else { return false }
+      collectDOFPaths(from: joint, into: &removedDOFPaths)
+      return true
+    }
+    root["joints"] = .array(joints.map(AnimaCoreJSONValue.object))
+
+    if case .object(let chain) = root["kinematic_chain"],
+      kinematicChain(chain, referencesAny: partNames)
+    {
+      let chainName = stringValue(chain["name"]) ?? ""
+      if case .array(let chainJoints) = chain["joints"] {
+        for case .object(let joint) in chainJoints {
+          if let jointName = stringValue(joint["name"]), !chainName.isEmpty {
+            removedDOFPaths.insert("\(chainName).\(jointName)")
+          }
+        }
+      }
+      root["kinematic_chain"] = .null
+    }
+
+    root["relations"] = .array(
+      try objectArray(root, key: "relations").compactMap { relation in
+        guard !referencesRemovedDOF(relation["driver"], removedDOFPaths: removedDOFPaths),
+          !referencesRemovedDOF(relation["driven"], removedDOFPaths: removedDOFPaths)
+        else { return nil }
+        return .object(relation)
+      }
+    )
+    root["outputs"] = .array(
+      try objectArray(root, key: "outputs").compactMap { output in
+        referencesRemovedDOF(output["dof_path"], removedDOFPaths: removedDOFPaths)
+          ? nil : .object(output)
+      }
+    )
+
+    let clips = try objectArray(root, key: "clips").map { clip -> AnimaCoreJSONValue in
+      var editedClip = clip
+      if case .array(let keyframes) = clip["keyframes"] {
+        editedClip["keyframes"] = .array(
+          keyframes.compactMap { keyframe -> AnimaCoreJSONValue? in
+            guard case .object(var entry) = keyframe,
+              case .object(var values) = entry["values"]
+            else { return keyframe }
+            values = values.filter { !removedDOFPaths.contains($0.key) }
+            guard !values.isEmpty else { return nil }
+            entry["values"] = .object(values)
+            return .object(entry)
+          }
+        )
+      }
+      return .object(editedClip)
+    }
+    root["clips"] = .array(clips)
+    return .object(root)
+  }
+
   public static func settingPartTransform(
     named partName: String,
     positionMeters: [Double],
@@ -225,6 +312,48 @@ public enum AnimaCoreRigDocumentEditor {
   private static func stringValue(_ value: AnimaCoreJSONValue?) -> String? {
     guard case .string(let value) = value else { return nil }
     return value
+  }
+
+  private static func collectDOFPaths(
+    from joint: [String: AnimaCoreJSONValue],
+    into paths: inout Set<String>
+  ) {
+    if case .array(let dofs) = joint["dofs"] {
+      for case .object(let dof) in dofs {
+        if let path = stringValue(dof["path"]) { paths.insert(path) }
+      }
+    }
+    if let jointName = stringValue(joint["name"]) {
+      paths.insert(jointName)
+    }
+  }
+
+  private static func referencesRemovedDOF(
+    _ value: AnimaCoreJSONValue?,
+    removedDOFPaths: Set<String>
+  ) -> Bool {
+    guard let path = stringValue(value) else { return false }
+    return removedDOFPaths.contains(path)
+      || removedDOFPaths.contains { path.hasPrefix("\($0).") }
+  }
+
+  private static func kinematicChain(
+    _ chain: [String: AnimaCoreJSONValue],
+    referencesAny partNames: Set<String>
+  ) -> Bool {
+    if [stringValue(chain["base_part"]), stringValue(chain["tool_part"])]
+      .compactMap({ $0 })
+      .contains(where: partNames.contains)
+    {
+      return true
+    }
+    guard case .array(let joints) = chain["joints"] else { return false }
+    return joints.contains { value in
+      guard case .object(let joint) = value,
+        let part = stringValue(joint["part"])
+      else { return false }
+      return partNames.contains(part)
+    }
   }
 
   private static func validateModelReference(_ reference: String) throws {

@@ -4,12 +4,235 @@
 > this file in the same commit — see `CONVENTIONS.md` → "STATUS stays
 > truthful."
 
-## Current state — 2026-07-16
+## Current state — 2026-07-18
 
 - **Repo:** `AnimaStudio` — open-source unified character animation
   system for AI robots (digital avatars + physical animatronics from
   one rig, one format, one authoring tool)
 - **Version:** 0.1.0 (see `animacore/__init__.py`)
+- **Standalone CAD benchmark:** `dev/Codex Bench/` builds a separate clickable
+  Apple-focused `Codex Bench.app` for deciding the future CAD viewport/import
+  architecture without coupling experiments to Anima Studio. Its active catalog
+  now has four locally working STEP routes: Open CASCADE Technology feeding
+  RealityKit (P1), raw MetalKit (P2), Three.js WebGPU in Swift WebKit (P7),
+  and direct `navigator.gpu`/WGSL WebGPU in Swift WebKit (P10). P7 uses Three.js
+  `WebGPURenderer`, reports the backend actually selected, and keeps its
+  automatic WebGL 2 fallback. Historical pipeline IDs
+  remain stable; removed P3, P4, P6, P8, and P9 are not renumbered.
+  The Qt/Open CASCADE and Qt WebEngine experiments were removed from the Apple
+  catalog, runtime, Settings window, automated benchmark, Swift package
+  dependencies, and signed bundle after the normalized study showed their host
+  and event-loop cost was not competitive for the Apple-first product. The
+  `qt/` sources remain archived as implementation reference for a future
+  separate non-Apple Qt application; their current AppKit/IOSurface host is
+  macOS-specific and is not advertised as cross-platform product code.
+  The desktop Open CASCADE OpenGL viewer, per-feature RealityKit entity graph,
+  and SceneKit comparison are also absent from the active package and picker:
+  they were macOS-only, resource-prohibitive, or legacy product directions.
+  OpenGeometry and its WASM probe were removed completely because it could not
+  import the operator STEP model. P7 now uses Three.js WebGPU; P10 uses direct
+  GPU buffers, four-sample render/depth attachments, and WGSL surface/edge
+  shaders without a scene framework or WebGL fallback. P5's small raw WebGL 2
+  implementation was retained through the fair comparison and then removed
+  from the active app after P10 matched its throughput.
+  Every active renderer receives the same operator-selected STEP/STP file and
+  shared Open CASCADE extraction where applicable; no app route inserts fixture
+  geometry. The importer preserves assembly labels/transforms, B-Rep faces and
+  feature edges, XDE colors, staged timings, and model tolerance. Shared CAD
+  navigation supplies orbit/tilt, pan, roll, zoom, and fit. A standard Settings
+  window owns renderer selection and complete shared themes covering background,
+  material color policy, roughness/metallic response, edge display, selection,
+  and key/fill/rim lighting.
+  All 46 STEP files in `CAD DEMO/ARCADA001-2` pass isolated import probes
+  (8,931 faces, 24,778 edges, 247,030 triangles). The historical nine-pipeline
+  decision record and raw runs remain in
+  `dev/Codex Bench/Reports/2026-07-19-pipeline-study/`; they identify P2 Open
+  CASCADE → raw MetalKit as the production direction at 60 FPS and 19.7% median
+  CPU, while documenting why the discarded routes were retired. A new retained
+  catalog pass on the same 54,830-triangle part measured P1 at 50.7 FPS/70.6%
+  CPU, P2 at 59.8 FPS/23.5% CPU, raw WebGL at 61.2 FPS, and direct Three.js at
+  62.7 FPS. WebKit CPU/memory cover only the Swift host, so those figures are
+  not directly comparable native totals; Three.js added only 6 ms over raw
+  WebGL upload and remains a useful optional environment experiment. A true
+  combined-assembly pass loads all 46 CAD DEMO files into one shared document
+  (8,931 faces, 24,778 edges, 247,030 triangles; 230,466 compact render
+  vertices, 63 material/part batches, 46 rigid parts). The first pass exposed
+  P1's per-face entity graph as unusable; the follow-up retained every pipeline
+  and replaced that graph with one RealityKit `LowLevelMesh`, added one shared
+  renderer projection, cached STEP imports across pipeline switches, moved P2
+  static buffers to GPU-private storage with a stable per-part transform table,
+  triple-buffered uniforms and topology IDs, and changed P5/P7 to one compact
+  binary typed-array payload. On the optimized signed build P2 delivered 59.92
+  FPS at 19.71% CPU and 231.21 MB app footprint; P1 completed at 59.83
+  display-link Hz, 21.29% CPU, and 378.83 MB. P5 and P7 reported 52.71/52.68
+  WebGL animation frames per second, but their 254.43/227.81 MB figures omit
+  system-managed WebKit content/GPU processes and are not comparable native
+  totals. Roles are therefore explicit: P2 production candidate, P1 secondary
+  Apple renderer, P7 optional environment renderer, and P10 browser renderer
+  candidate.
+  A subsequent signed-app experiment moved P7 to Three.js WebGPU and confirmed
+  that this machine's `WKWebView` selected native **WebGPU**, not the fallback.
+  On the same 46-file assembly, a same-build P5/P7 comparison measured raw
+  WebGL 2 at 78.02 FPS/11.77% app CPU/286.61 MB and Three.js WebGPU at 65.54
+  FPS/9.53% app CPU/386.46 MB, with 42/45 ms buffer upload. WebKit helper
+  processes remain excluded, so this validates compatibility and relative
+  behavior rather than claiming complete GPU-process totals or a universal
+  WebGPU performance win.
+  The direct-WebGPU follow-up compared all three browser paths on that same
+  document and measured P5 raw WebGL 2 at 60.80 FPS/9.43% app CPU/376.23 MB,
+  P7 Three.js WebGPU at 61.24 FPS/8.18% app CPU/422.78 MB, and P10 raw WebGPU
+  at 60.78 FPS/10.23% app CPU/223.70 MB, with 41/47/42 ms buffer setup.
+  Repeated isolated P10 launches ranged from 51.63 to 60.78 reported FPS while
+  upload held at 41–43 ms, confirming WebKit frame-callback scheduling is too
+  variable for a finer browser FPS ranking. Direct WebGPU completed the full
+  workload and uses the modern API, so P10 replaces P5 in the active catalog as
+  a product-direction decision rather than a claimed benchmark win. P7 retains
+  an automatic WebGL 2 fallback;
+  P10 reports unsupported WebGPU as an error rather than silently changing
+  renderer APIs.
+  Historical measurements remain in
+  `dev/Codex Bench/Reports/2026-07-19-assembly-benchmark/`; the optimized run is
+  in `dev/Codex Bench/Reports/2026-07-19-optimized-pipelines/`; the WebGPU run
+  is in `dev/Codex Bench/Reports/2026-07-19-webgpu-pipeline/`; the direct-WebGPU
+  comparison is in `dev/Codex Bench/Reports/2026-07-19-raw-webgpu/`. Sixteen Swift
+  tests, recursive format lint, release packaging, deep signing, headless
+  46-file probe, and all four signed-app assembly runs pass.
+- **Standalone interface walkthrough:** `dev/CodexUI/` builds the separate,
+  clickable `CodexUI.app`, a presentation-only exploration of a modern CAD
+  animatronic authoring environment. It imports no Anima Studio or AnimaCore
+  target and performs no project, engine, model, hardware, or filesystem work.
+  One consistent native SwiftUI shell provides a workspace selector, three
+  visual themes, and a guided previous/next walkthrough across seven
+  intentionally different layouts. Its layout now follows the sibling
+  AnimaStudio Demo's canvas-first panel language: one reusable browser region,
+  inspector region, and workspace tool ribbon can each dock into the layout,
+  float inside the app window, or hide and restore. The compact floating ribbon
+  omits the workspace name already present in the centered tabs and presents
+  tool groups as unboxed icon/label targets on one quiet material pill. It can
+  float at the top or bottom: top popovers open below and bottom popovers open
+  above, always toward the workspace center; shadow direction, structured
+  content clearance, and walkthrough clearance follow the chosen edge. Its
+  existing tool groups still open as popovers. Floating, Docked, and Canvas
+  presets reconfigure all three regions together, and a native
+  Settings window exposes the same appearance/layout contract. Docked regions
+  participate in layout and reduce the center area; floating regions instead
+  overlay the full-size center so the canvas can use the complete workspace,
+  while hidden side panels remain recoverable. Browser and Inspector headers no
+  longer duplicate pin/dock controls: the combined header layout control and
+  Settings are their placement authorities; side regions have no redundant
+  wrapper title bar. In Canvas mode, moving to the thin left or right edge
+  temporarily reveals that hidden panel as a compact floating window; leaving
+  the edge dismisses it without changing the saved Canvas layout. The floating
+  ribbon retains its own edge/placement menu. The header layout control cycles
+  Floating, Docked, and Canvas, while its menu exposes both presets and the
+  individual region states. Floating presentation retains the strongest
+  pattern from the retired Codex Spatial exploration: the full-height sidebar slab and duplicate
+  outer header both disappear, and each contained panel becomes a content-sized,
+  independently rounded/material-backed widget with its own border, shadow,
+  spacing, and visible canvas between cards. Right-side context widgets can be
+  dragged independently by their header grip. Dragging uses direct,
+  animation-free state updates and temporarily replaces expensive backdrop
+  material with an opaque themed surface for smooth pointer tracking. Each
+  live update clamps the actual widget frame to an eight-point workspace
+  margin, so cards cannot be lost beyond any window edge; material returns at
+  rest. Docking clears those offsets and returns the same widgets to a flush,
+  continuous, full-height column. Spatial preview cards opt into a reusable 220-point
+  minimum content height, so the Assets 3D preview remains a usable viewport
+  instead of collapsing like a compact property card. Floating side regions
+  cap their invisible layout lane at a
+  responsive 72% of the workspace height (using all available space only in a
+  short window), leaving visible canvas below and making their detached state
+  unmistakable. The walkthrough is a constrained,
+  bottom-center in-window popup above the status bar; showing, advancing, or
+  dismissing it does not change header, ribbon, or workspace layout.
+  Floating-panel clearance is content-aware:
+  spatial 3D and node canvases remain full-bleed underneath floating chrome;
+  the Rig, Animate, and Show 3D surfaces have no generic card outline, rounded
+  mask, or center gutter, so their grids visually become the workspace itself;
+  Assets tables, Hardware tables/dashboards, and the UI Kit matrix inset to the
+  unobstructed visible area. Animate and Show treat both preview and timeline as
+  center content: each spans the full center width beneath compact floating side
+  panels, while the timeline reserves only a bottom floating-ribbon clearance.
+  The main Rig, Animate, and Show render views share an optional bottom-right
+  performance HUD for renderer, frame rate, CPU, memory, and GPU presentation.
+  A viewport gauge button and Settings toggle control it; because CodexUI has no
+  live renderer backend, its values are visibly marked **Sample** and the card
+  says that the real telemetry hook is pending.
+  CodexUI now shares the sibling AnimaStudio Demo's restrained surface system:
+  near-black/white canvas and panel layers, three-level text hierarchy,
+  intentionally subtle strokes, and common accent/success/warning/danger
+  colors. Settings offers Studio Blue, Teal, Indigo, Orange, Graphite, CAD
+  Light, and Midnight through a visual theme picker; the UI Kit exposes the
+  complete surface and semantic token set. Shared panel headers, rows,
+  property fields, pills, metrics, command buttons, project save badge, and
+  the compact icon-only floating ribbon inherit those rules, so every
+  workspace and specimen updates from the same implementation rather than
+  copied screen styling. Real light/dark SwiftUI color-scheme switching and
+  hover/press/spring feedback cover shared chrome, tree rows, workspace tabs,
+  panels, and ribbon tools. The
+  scrolling workspace row and duplicate header dropdown have been replaced by
+  one centered capsule navigator. It lists all seven workspaces—Assets, Rig,
+  Animate, Show, Hardware, Nodes, and UI Kit—with a subtle divider preserving
+  the authoring/utility distinction and a spring-traveling active capsule.
+  Workspace-tab labels are operator-configurable in Settings as Automatic,
+  All Labels, Selected Only, or Icons Only. Automatic keeps all names when
+  space permits and retains the selected workspace's name alongside icon-only
+  inactive tabs in compact windows. The former global bar plus workspace bar
+  is condensed into one 54-point header matching the sibling AnimaStudio
+  Demo's density: 24-point icon controls and 28–30-point workspace chips keep
+  the stage capsule centered without making the chrome feel oversized. The
+  first upper-left element is always the open project identity:
+  orange cube, **Atlas Animatronic**, and **SAVED**, including at compact
+  widths. The centered selected tab owns the current workspace/mode name.
+  Settings, project/file access, and undo/redo follow left. Compact **Live**
+  status and **Preview** playback capsules remain right. The layout-mode
+  control sits at the far right immediately before walkthrough Help: it is
+  icon-only, cycles on primary click, retains its complete placement menu, and
+  uses distinct cyan/purple/orange/green boxes for
+  Floating/Docked/Canvas/Custom so its current state remains readable without
+  consuming text width.
+  Master Live remains available from the Live popover and Settings rather than
+  consuming permanent header width.
+  The CodexUI app name and mark are deliberately quiet in the footer. Theme
+  and detailed layout preferences remain in the native Settings window. The
+  workspaces remain:
+  Assets (three-column content manager), Rig (semantic tree + CAD viewport +
+  mate inspector), Animate (viewport + multi-track keyframe/audio timeline),
+  Show (stage preview + multimedia cues), Hardware (device/channel/safety
+  dashboard), Nodes (typed visual logic canvas), and UI Kit (reusable panels,
+  fields, dialogs, tabs, notifications, material controls, and states). The UI
+  Kit now follows the sibling AnimaStudio Demo's living-design-system gallery:
+  a 28-point title and explanatory subtitle lead uppercase named sections,
+  adaptive 300-point specimen cells use consistent 16/28/30-point spacing
+  inside an 1180-point review width, and app chrome, timelines, viewport, and
+  Settings receive full-width specimens where their real proportions matter.
+  It presents actual shared components including workspace tabs, adaptive tool
+  ribbon, production timeline, viewport/performance HUD, panel/row/field/pill/
+  metric/button primitives, layout contract, and Settings. A visible 21-of-21
+  coverage inventory backed by `UIKitAssetCatalog` establishes the rule that
+  every new reusable UI asset must also gain a UI Kit specimen and catalog
+  entry. The UI Kit also preserves the useful pieces of the retired Codex
+  Spatial prototype. The interactive selection rail and adaptive keyframe
+  actions remain one useful grouped control without a redundant outer panel;
+  the UI Kit also includes a combined
+  hierarchy/revolute-mate/live-hardware stack, and a full-width four-track
+  Live Follow timeline with keyframes, playhead, and audio waveform. Its Nodes
+  section now renders the same reusable node card, categorized library,
+  selected-node inspector, typed-port row, and connected canvas as the Nodes
+  workspace. Input, logic, AI/media, and hardware cards show normal, selected,
+  and warning states; a full-width graph demonstrates connections, canvas
+  status, zoom, and auto-layout controls. The node graph is a full-bleed
+  workspace surface like the 3D viewport: it has no generic rounded mask or
+  enclosing outline, while its node cards and controls retain meaningful local
+  boundaries. Twelve
+  deterministic catalog/tour/layout/header-density/drag-boundary/UI-Kit-coverage tests,
+  recursive Swift format lint,
+  debug/release builds, deep signature verification, launch, and process-health
+  verification pass. The prototype stays isolated under `dev/` beside the renamed
+  `dev/Codex Bench/` renderer benchmark. Its launcher also reuses an existing
+  CodexUI process rather than forcing duplicate instances. The separate
+  `dev/Codex Spatial/` source and app were removed after those useful specimens
+  were consolidated here.
 - **JaegerOS pin:** not yet set — for now the runtime is standalone and
   Jaegers read `.anima` files natively; the `jaeger-os` dependency and
   `animation`-slot module land later (see `dev/docs/roadmap/`)
@@ -105,11 +328,21 @@
   now uses the same Table/Grid component: Table is the default, collection-
   appropriate headers remain visible at zero rows, filtering is shared, and
   empty bodies consistently say **No … yet** without duplicating actions. Grid
-  is an operator-selectable alternate view. The Parts table is selectable and
-  shows source, parent, engine state, and a deliberately simple app-side asset
-  version: initial import is V1 and a successful re-upload of that part through
-  the one-file **Replace Part** action increments the integer in `editor.json`;
-  no PDM/history system is implied. The collection surface is pinned to the top
+  is an operator-selectable alternate view. The Parts table and grid use
+  standard anchored selection: plain click selects one row and establishes the
+  anchor, Shift-click selects every visible row in the inclusive range,
+  Command-click toggles one row, and Command-Shift adds an inclusive range.
+  Selecting a row gives the collection keyboard focus, so Backspace/Delete and
+  Forward Delete reliably open the same confirmed bulk delete as the toolbar
+  and context menu. Deletion edits the retained
+  engine rig DTO, removes dependent mates, relations, outputs, and clip values,
+  validates/serializes through AnimaCore, and prunes only model files no
+  remaining part references. Parts show source, parent, engine state, and a
+  deliberately simple app-side asset version: initial import is V1, while
+  **Replace Part** or importing the same original filename again replaces the
+  existing package asset and increments the integer in `editor.json`; no
+  duplicate part or PDM/history system is implied. The collection surface is
+  pinned to the top
   and fills the center column. The right Preview always remains a live 3D
   viewport, even before geometry is selected or imported. Dense CAD imports no
   longer crash the viewport: the CAD-selection topology (coplanar-face / edge /

@@ -1,0 +1,27 @@
+{
+  "caveats" : [
+    "FPS uses the same 60 Hz scripted orbit workload and counts delivered renderer frames.",
+    "CPU may exceed 100% when multiple cores are active."
+  ],
+  "combinedCPUPercent" : 44.21357826349102,
+  "combinedMemoryMegabytes" : 321.75730285644534,
+  "contributor" : "Claude",
+  "edges" : 578,
+  "faces" : 218,
+  "finalStatus" : "Claude variant ready: hover or click 218 faces and 578 B-Rep edges",
+  "framesPerSecond" : 59.84682080965485,
+  "loadMetricScope" : "Open CASCADE read + XDE transfer + triangulation",
+  "mainCPUPercent" : 44.21357826349102,
+  "mainMemoryMegabytes" : 321.75730285644534,
+  "pipeline" : "Open CASCADE Technology → Selectable RealityKit Features",
+  "pipelineID" : 8,
+  "readyWaitMilliseconds" : 1124.5900392532349,
+  "renderedFrames" : 406,
+  "reportedLoadMilliseconds" : 166.31170799999998,
+  "sourceBytes" : 291142,
+  "sourceFile" : "\/Users\/jonathanjenkins\/GITHUB\/AnimaStudio\/CAD DEMO\/ARCADA001-2\/ARCADA001 - ARCADP001.step",
+  "success" : true,
+  "timestamp" : "2026-07-19T07:08:47Z",
+  "triangles" : 13102,
+  "workloadSeconds" : 6.7839860916137695
+}

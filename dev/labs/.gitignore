@@ -1,7 +1,0 @@
-.build/
-bin/
-apps/
-**/build/
-**/node_modules/
-**/target/
-**/UnityBench/

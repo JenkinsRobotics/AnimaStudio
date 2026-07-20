@@ -113,6 +113,92 @@ enum AssetBuilderLayoutMode: String, CaseIterable, Identifiable, Sendable {
   }
 }
 
+enum AssetBuilderPartSelection {
+  struct Result: Equatable {
+    let ids: Set<PartID>
+    let anchor: PartID
+  }
+
+  static func selecting(
+    _ id: PartID,
+    in current: Set<PartID>,
+    orderedIDs: [PartID],
+    anchor: PartID?,
+    command: Bool,
+    shift: Bool
+  ) -> Result {
+    if shift,
+      let range = inclusiveRange(from: anchor, through: id, in: orderedIDs)
+    {
+      var updated = command ? current : []
+      updated.formUnion(range)
+      return Result(ids: updated, anchor: anchor ?? id)
+    }
+
+    if command {
+      var updated = current
+      if !updated.insert(id).inserted { updated.remove(id) }
+      return Result(ids: updated, anchor: id)
+    }
+
+    return Result(ids: [id], anchor: id)
+  }
+
+  private static func inclusiveRange(
+    from anchor: PartID?,
+    through target: PartID,
+    in orderedIDs: [PartID]
+  ) -> Set<PartID>? {
+    guard let anchor,
+      let anchorIndex = orderedIDs.firstIndex(of: anchor),
+      let targetIndex = orderedIDs.firstIndex(of: target)
+    else { return nil }
+
+    let bounds = min(anchorIndex, targetIndex)...max(anchorIndex, targetIndex)
+    return Set(orderedIDs[bounds])
+  }
+}
+
+struct AssetBuilderAutomaticReplacement: Equatable {
+  let asset: DocumentAssetReference
+  let relativePath: String
+  let modelReference: String
+  let partNames: [String]
+}
+
+enum AssetBuilderImportMatching {
+  static func automaticReplacement(
+    sourceFilename: String,
+    character: ProjectCharacterReference,
+    assets: [DocumentAssetReference],
+    parts: [AnimaCorePartSummary]
+  ) -> AssetBuilderAutomaticReplacement? {
+    let prefix = character.directoryPath + "/"
+    for asset in assets {
+      guard asset.kind == "model3D",
+        asset.originalFilename.compare(
+          sourceFilename,
+          options: [.caseInsensitive, .diacriticInsensitive]
+        ) == .orderedSame,
+        case .embedded(let relativePath) = asset.storage,
+        relativePath.hasPrefix(prefix)
+      else { continue }
+      let modelReference = String(relativePath.dropFirst(prefix.count))
+      let partNames = parts.compactMap { part in
+        part.model == modelReference ? part.name : nil
+      }
+      guard !partNames.isEmpty else { continue }
+      return AssetBuilderAutomaticReplacement(
+        asset: asset,
+        relativePath: relativePath,
+        modelReference: modelReference,
+        partNames: partNames
+      )
+    }
+    return nil
+  }
+}
+
 enum AssetLibraryCategory: String, CaseIterable, Hashable, Identifiable, Sendable {
   case castings
   case motors
@@ -151,7 +237,6 @@ enum AssetBuilderSelection: Hashable, Sendable {
 }
 
 enum AssetBuilderTreeNodeID: Hashable, Sendable {
-  case project
   case characters
   case character(String)
   case collection(String, AssetBuilderCollection)
@@ -177,8 +262,6 @@ struct AssetBuilderTreeNode: TreeNode {
 
 enum AssetBuilderTreeAdapter {
   static func nodes(
-    projectName: String,
-    revision: Int,
     characters: [ProjectCharacterReference],
     activeCharacterID: String?,
     counts: [AssetBuilderCollection: Int]
@@ -204,23 +287,13 @@ enum AssetBuilderTreeAdapter {
         filterTokens: []
       )
     }
-    let project = AssetBuilderTreeNode(
-      id: .project,
+    let charactersRoot = AssetBuilderTreeNode(
+      id: .characters,
       selectionValue: .characters,
-      title: projectName,
-      systemImage: "folder.fill",
-      detail: "Project · V\(revision)",
-      children: [
-        AssetBuilderTreeNode(
-          id: .characters,
-          selectionValue: .characters,
-          title: "Characters",
-          systemImage: "person.2",
-          detail: String(characters.count),
-          children: characterNodes,
-          filterTokens: []
-        )
-      ],
+      title: "Characters",
+      systemImage: "person.2",
+      detail: String(characters.count),
+      children: characterNodes,
       filterTokens: []
     )
     let library = AssetBuilderTreeNode(
@@ -242,7 +315,7 @@ enum AssetBuilderTreeAdapter {
       },
       filterTokens: []
     )
-    return [project, library]
+    return [charactersRoot, library]
   }
 }
 

@@ -361,7 +361,7 @@ private struct WorkspaceContextualTools: View {
         Label("Import Model", systemImage: "plus.square.on.square")
       }
       .disabled(workspace.isLoadingModelHierarchy)
-      .help("Import a USD, USDZ, or RealityKit model")
+      .help("Import a USD-family, STL, or OBJ model")
 
       Button("Relink Asset", systemImage: "link") {}
         .disabled(true)

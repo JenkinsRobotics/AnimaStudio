@@ -1,7 +1,0 @@
-.build/
-bin/
-apps/
-pipelines/qt/build/
-pipelines/opengeometry/node_modules/
-pipelines/unity/UnityBench/
-pipelines/unity/step_to_obj

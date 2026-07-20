@@ -5,6 +5,34 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [x] 2026-07-18 (Claude → Codex): **Bench consolidation — Codex Bench is the
+  survivor; the theming "port" is already done; one real fix left.**
+  Per Jonathan: keep **Codex Bench** (better UI + architecture — `Pipeline`
+  abstraction, `Telemetry`, `CameraState`, clean Core/App split), retire
+  **Unified Bench** (`dev/labs/UnifiedBench/` — I have removed it).
+
+  Good news on "add Claude's pipelines + theming/edges/background-lighting":
+  **it's already merged.** I diffed both benches — Codex Bench's
+  `ClaudeFeatureRealityKitRenderer` + `BenchTheme.swift` already have full
+  parity: all 10 presets (Studio Blue…Midnight Glow incl. Fusion 360), flat
+  `UnlitMaterial` feature edges (edges read as lines, not 3D tubes), key/fill/rim
+  lighting, theme background, per-face/edge selection. **Nothing to port.**
+
+  **The one thing genuinely worth doing — the STEP crash (both benches shared
+  it):** `gb_load_step_document` in `Sources/GeomShim/GeomShim.cpp` calls
+  `reader.Transfer()` with ZERO exception/signal guarding, so a degenerate face
+  in a dirty STEP aborts the whole app. (Jonathan hit it: OCCT faults in
+  `ShapeFix_Solid::SolidFromShell → BRepClass3d_SolidClassifier` during import →
+  uncaught C++ exception → `std::terminate` → `abort`.) Fix:
+    1. `OSD::SetSignal(Standard_False)` once at startup — converts OCCT hardware
+       faults into catchable `Standard_Failure`.
+    2. Wrap the transfer + mesh loop:
+       `try { OCC_CATCH_SIGNALS … } catch (const Standard_Failure& e) { return errorDocument(e.GetMessageString()); }`
+       → a bad file returns a clean "load failed", not a crash.
+    3. Bonus: guard per-root so one bad face skips *that part* (failed-part
+       badge) and the rest of the assembly still loads.
+  The same guard belongs in the real Anima Studio OCCT import path too.
+
 - [ ] 2026-07-17 (Claude → whoever builds `cad-test/`): **Landmine list for the
   GeomBench spec build** — every one of these cost real debugging time in
   `dev/labs/` today, with evidence on file. Skip them:
@@ -291,6 +319,135 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-19 — OUT: raw WebGPU is shipped; explicit raw WebGL is retired.**
+  P10 uses direct `navigator.gpu` and WGSL with no Three.js dependency or
+  fallback, renders exact B-Rep edges plus themed surfaces, and passed the full
+  46-file/247,030-triangle assembly. The same-build browser snapshot was P5
+  WebGL 2 60.80 FPS/41 ms upload, P7 Three.js WebGPU 61.24 FPS/47 ms, P10 raw
+  WebGPU 60.78 FPS/42 ms; repeated P10 frame callbacks varied 51.63–60.78 while
+  upload stayed 41–43 ms. P5 is removed from the active catalog/source and old
+  preference ID 5 migrates to P1. P7 keeps only its WebGL 2 compatibility
+  fallback. P2 Metal remains the native production choice. Sixteen tests,
+  lint, release/deep sign, and signed-app assembly verification pass. Report:
+  `dev/Codex Bench/Reports/2026-07-19-raw-webgpu/`.
+
+- **2026-07-19 — OUT: Three.js WebGPU is real and capability-gated.** Codex
+  Bench P7 now bundles `WebGPURenderer`, awaits initialization, reports the
+  actual backend to Swift/Settings/benchmark JSON, and truthfully falls back to
+  WebGL 2 if needed. The signed app selected native WebGPU on the 46-file,
+  247,030-triangle CAD DEMO assembly. Same-build comparison: P5 WebGL 2 78.02
+  FPS/11.77% app CPU/286.61 MB; P7 WebGPU 65.54 FPS/9.53% app CPU/386.46 MB;
+  both omit WebKit helper processes. P2 Metal remains the production viewport;
+  P7 is the optional environment path, not a blanket replacement for every
+  renderer. Sixteen tests, lint, release/signing, and final full-assembly run
+  pass. Report: `dev/Codex Bench/Reports/2026-07-19-webgpu-pipeline/`.
+
+- **2026-07-18 — OUT: the STEP abort boundary is guarded and the CAD DEMO
+  corpus passes.** `gb_load_step_document` now converts Open CASCADE signals
+  and catches native failures across read, XDE transfer, and triangulation,
+  returning a readable staged error. The app serializes XCAF work, safely adds
+  multi-file selections, and accepts repeated `--file` launch arguments. All
+  46 `CAD DEMO/ARCADA001-2` STEP files pass isolated probes with zero crashes
+  or failures (32.7 ms median, 499.1 ms p95, 2,168.2 ms maximum). The rebuilt,
+  signed app is live with all 46 files in its workspace. Ten tests, format
+  lint, release/package build, deep signing, and diff check pass.
+
+- **2026-07-18 — OUT: Codex Bench has professional renderer Settings.** The
+  pipeline/theme dropdowns left the main bar. A standard macOS Settings scene
+  (app menu, Command-comma, or toolbar) now separates Renderer, Appearance,
+  Materials & Edges, and Lighting. It exposes all nine backend capability and
+  process details plus live preset/custom background, model, selection,
+  imported-color, roughness/metallic, feature-edge, and key/fill/rim controls.
+  One Codable theme contract still feeds every backend; renderer and full
+  customization persist across relaunch. Nine tests, lint, release/deep-sign,
+  and two-cycle workspace/Settings restoration verification pass.
+
+- **2026-07-18 — OUT: Codex Bench Pipeline 4 repaired.** The status-6 child
+  exit was an uncaught Open CASCADE exception caused by disabling global
+  viewer lights through `V3d_View` during the host's first theme update. P4
+  and the related P3 theme path now retain three lights and update them in
+  place. Hosted native failures return readable JSON errors; unexpected child
+  exits include stderr; inactive P3 callbacks cannot overwrite P4 status.
+  After regenerating the stale pre-rename Qt cache, six tests, Swift/Qt release
+  builds, deep signing, a real-STEP protocol load, and signed host/child live
+  health pass with no new P4 crash report.
+
+- **2026-07-18 — OUT: Codex Bench Pipeline 3 repaired.** The supplied report
+  reproduced as an uncaught Open CASCADE `Standard_TypeMismatch` with the real
+  ARCADA STEP model. Pipeline 3 was concurrently running the shared detached
+  tessellator and its own native AIS/XCAF import. It now declares native file-
+  ingestion ownership, waits for its AppKit window before importing, contains
+  native OCCT failures as UI errors, and explicitly tears down V3d/AIS before
+  the NSView detaches. Six tests, lint, debug/release builds, deep signature,
+  and a 40-second signed packaged P3/ARCADA live run pass with no new crash.
+
+- **2026-07-18 — OUT: obsolete demo apps removed and Codex Bench launch
+  repaired.** Deleted six generated, obsolete app bundles but kept their source
+  labs and terminated their already-running processes. Only Codex Bench,
+  CodexUI, and Codex Spatial remain as operator-facing
+  demos; the two nested Qt bundles are active Codex Bench renderer helpers.
+  Corrected the renamed benchmark's bundle ID from the stale GeomBench identity
+  to `com.animastudio.codexbench`, removed its old relocated module cache, and
+  changed Codex Bench/CodexUI launchers from `open -n` to single-instance open.
+  Five tests, release build, deep signature, double-open/single-process check,
+  20-second health check, and no-new-crash-report verification pass.
+
+- **2026-07-18 — OUT: Codex Spatial is a separate clickable app.** Per
+  Jonathan's clarification, the Shapr3D × Bottango concept lives in
+  `dev/Codex Spatial/` and does not modify or depend on CodexUI. Its canvas-
+  first shell adapts floating tools and actions for Build, Animate, and Live;
+  supplies an Items tree and selected-mate inspector; adds a compact four-track
+  keyframe/audio timeline; and demonstrates guarded live hardware status and
+  e-stop presentation. It is explicitly front-end-only. Three tests, recursive
+  lint, debug/release builds, deep signature verification, launch, and live-
+  process verification pass.
+
+- **2026-07-18 — OUT: CodexUI walkthrough built and standalone prototypes moved
+  under dev.** `dev/CodexUI/CodexUI.app` is a pure SwiftUI presentation app
+  with no Anima Studio/AnimaCore dependency. It demonstrates Assets, Rig,
+  Animate, Show, Hardware, Nodes, and UI Kit workspaces through one adaptive
+  application shell, full ribbons, representative CAD/stage/timeline panels,
+  three themes, and a guided tour. The renderer benchmark and its clickable app
+  moved from root `cad-test/` to `dev/Codex Bench/`, matching its visible name.
+  CodexUI's three tests, lint, debug/release builds, deep signature, launch, and
+  process-health check pass.
+
+- **2026-07-18 — OUT: Codex Bench now compares the useful Codex, Claude, and
+  Gemini render architectures in one app.** Kept Codex P1-P7 as baselines,
+  added Claude's exact per-face/per-edge RealityKit entity/collision approach
+  as P8, and added Gemini's SceneKit approach as P9. All consume the same
+  operator-selected Open CASCADE document, camera state, theme contract, and
+  telemetry, and the picker names contributor provenance. The shared theme
+  system now has ten full presets that control background, color policy,
+  finish, edges, selection, and three-point lighting rather than only changing
+  the background. Removed the unbuilt Unity placeholder from source and
+  packaging. Five tests, recursive lint, debug/release builds, OpenGeometry
+  rebundle, deep signature verification, and same-file live P8/P9 STEP loads
+  pass. The renderer ownership map lives in
+  `dev/Codex Bench/Sources/GeomBenchApp/Renderers/README.md`.
+
+- **2026-07-18 — OUT: OpenGeometry now works inside the Swift app.** Replaced
+  the old unavailable placeholder with P7: a locally bundled OpenGeometry
+  WebAssembly 2.0.11 kernel plus Three.js 0.181.1 running in WKWebView. Because
+  upstream still exports rather than imports STEP, Open CASCADE truthfully owns
+  file ingestion; OpenGeometry creates a B-Rep kernel probe from the imported
+  bounds and Three.js renders the real assembly. The WASM is embedded in the
+  browser bundle so WebKit needs no local server or network. Live packaged-app
+  telemetry: runtime ready, kernel probe 6 ms, 2,480 STEP triangles displayed
+  in 8 ms. npm audit reports zero findings; 3 Swift tests, lint, release build,
+  packaging, and deep signature verification pass.
+
+- **2026-07-18 — OUT: Qt WebEngine/WebGL is embedded in the Swift app.** P6
+  now keeps Qt's event loop in an invisible crash-isolated helper and transfers
+  its rendered WebGL 2 frame into the existing Swift viewport over the private
+  IOSurface/Mach channel. It consumes the same Open CASCADE Technology STEP
+  arrays as P1-P5 and forwards CAD navigation, themes, and telemetry. A real
+  operator STEP load returned 2,480 triangles and rendered while the Qt window
+  stayed hidden. P7 is a separate Unity WebGL-in-WebKit route, not native Unity
+  embedding; its source and host are complete, but Unity cannot generate the
+  player until Unity Personal is activated on this Mac. Three Swift tests,
+  Swift/Qt release builds, app packaging, and deep signature verification pass.
 
 - **2026-07-16 — sharp boxes and placement-only snap points:** The reported
   rounded cube and permanent dots were both confirmed as code defaults: a
@@ -1169,6 +1326,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
   claimed-file lint, Xcode/root builds, deep signing, launch, and
   `git diff --check` pass.
 
+- **2026-07-17 — Codex Bench hosted renderer complete:** Renamed the visible
+  standalone app/artifact to `Codex Bench.app`. P4 is now a bundled,
+  crash-isolated Qt/OCCT renderer hosted in the Swift viewport: a versioned
+  command channel carries model and CAD navigation requests, and a private
+  Mach-port transfer carries IOSurface frames back to Swift along with helper
+  load/FPS/memory telemetry. App termination owns helper shutdown. P5 shares
+  the same capability-gated contract. Three Swift tests, a 320x240 live surface
+  handoff, Swift/Qt release builds, deep signing, packaged P4 launch, and clean
+  parent-child exit pass. Internal `GeomBench` module/binary names remain stable
+  deliberately; only the user-facing product is renamed.
+
 - **2026-07-17 — GeomBench standalone CAD test app complete:** Built the
   isolated `cad-test/` package and clickable `GeomBench.app`. It owns a real
   assembly-aware STEPCAF/XDE C shim, shared multi-file SwiftUI workspace,
@@ -1180,3 +1348,329 @@ does the heavy implementation; Codex reviews it and plans what's next.
   Swift release build, Qt release build, deep signature verification, and app
   launch all pass. No Anima Studio app or pre-existing `dev/labs/**` file was
   changed.
+
+- **2026-07-17 — OUT: Codex Bench now loads only operator files.** Removed the
+  automatic kernel geometry, generated ModelIO OBJ, fixture row, hosted helper
+  demo command, and no-argument probe fallback. The signed app launches with an
+  empty file list/viewport and waits for STEP/STP on P1–P5 or
+  STL/OBJ/USD-family input on P6. Internal geometry remains limited to unit
+  tests. Verification: three Swift tests; Swift/Qt release builds; deep sign;
+  empty-start launch; `git diff --check`.
+
+- **2026-07-17 — OUT: Codex Bench WebGL/Unity comparison wired; MetalANGLE
+  removed.** The benchmark now exposes eight clearly named routes. P6 is a
+  working Open CASCADE Technology → Swift → WebGL 2 pipeline inside WKWebView;
+  live diagnostics confirm 13,102 triangles from Jonathan's STEP uploaded.
+  P7 honestly records OpenGeometry's current operator-import/direct-WebGL gap.
+  P8 is a real embedded Unity WebGL host plus a small Unity source project that
+  parses STL/OBJ at runtime and implements orbit/pan/roll/zoom. The installed
+  Unity 2022 editor has no active license, so Unity itself refused to generate
+  the player; activate Unity Personal, run `cad-test/scripts/build-unity.sh`,
+  then `cad-test/scripts/make-app.sh`. The latter automatically bundles the
+  generated player. MetalANGLE was removed from the picker and Qt build per
+  Jonathan rather than left disabled. Three tests, lint, debug/release builds,
+  deep sign, P6 live render, and P8 placeholder launch pass.
+
+- **2026-07-17 — OUT: adopted Claude Bench's best theme work.** After a
+  read-only comparison with Claude Bench and Gemini's app, ported Claude's
+  four render looks into a cleaner shared Codex Bench `BenchTheme`: Studio Blue
+  (default), Showroom, Technical Matte, and Warm Workshop. The persistent
+  toolbar selector drives the workspace and every in-process background;
+  RealityKit applies PBR finish + three-point lighting without overwriting STEP
+  face colors, Metal applies equivalent lighting uniforms, Model I/O uses the
+  neutral finish, and WebGL/native Open CASCADE/hosted Qt receive live theme
+  backgrounds. Gemini's simpler navigation/telemetry shell offered no upgrade
+  over the existing Codex workspace. Three tests, lint, Swift/Qt release builds,
+  deep sign, and live P1/P2 operator STEP launches pass.
+
+- **2026-07-17 — OUT: corrected P2 after Jonathan's theme screenshot.** The
+  medium-gray background was a double-gamma error, not the intended Studio
+  Blue palette. Changed Metal to a matching display-referred target, added
+  theme-aware hemisphere/specular lighting, and draw Open CASCADE's extracted
+  B-Rep polylines as a depth-safe line pass so the part reads as CAD geometry
+  rather than a flat silhouette. Three tests, lint, release/repack/deep sign,
+  and live same-file P2 shader launch pass.
+
+- **2026-07-17 — OUT: themes are full render presets; dead pipelines removed.**
+  Studio Blue, Showroom, Technical Matte, and Warm Workshop now drive
+  background, roughness/metallic finish, B-Rep edges, selection/highlight, and
+  key/fill/rim lighting across RealityKit, raw Metal, WebGL 2, native Open
+  CASCADE AIS, and the hosted Qt/Open CASCADE renderer. XDE colors remain the
+  surface base color. Jonathan asked to remove anything that cannot render STEP
+  in-app today, so the catalog is now five working STEP/STP routes only;
+  Model I/O, OpenGeometry, and the license-blocked Unity route and source were
+  removed. Three Swift tests, Swift/Qt debug and release builds, deep bundle
+  signing, and a fresh launch pass; macOS reports the final app process running.
+
+- **2026-07-19 — OUT: Codex Bench pipeline decision is measured, not guessed.**
+  Built a common automated workload and ran the same medium and heavy STEP
+  models through every route; the heavy result is the median of three signed
+  app launches. Open CASCADE → MetalKit is the clear production choice (60.0
+  FPS every run, 19.7% CPU) and should own rendering/picking while Open CASCADE
+  remains the STEP/XDE/topology kernel. Qt is indeed an inefficient middle
+  layer here: P4 used 128.9% CPU for 42.5 FPS, and Qt WebEngine P6 used 91.0%
+  for 33.5 FPS. Retire P4/P6 from the product path; keep P3 only as a CAD
+  validator. Preserve P8's exact-selection UX but replace its per-face
+  RealityKit entities/collisions (30 FPS, 151.4% CPU, 867.6 MB) with a Metal ID
+  buffer. Report/raw JSON:
+  `dev/Codex Bench/Reports/2026-07-19-pipeline-study/`. The run also repaired
+  P6's startup race, corrected P3 telemetry, and made packaging rebuild release
+  every time. Twelve tests/lint/Swift+Qt release/deep-sign/diff-check pass.
+
+- **2026-07-19 — OUT: Qt is removed from the Apple Codex Bench product.** P4
+  and P6 no longer appear in the pipeline catalog, Settings, runtime/session,
+  benchmark accounting, Swift package graph, or signed app bundle. Pipeline
+  IDs remain historical (`1, 2, 3, 5, 7, 8, 9`), with a migration test proving
+  saved Qt selections fall back to P1. `make-app.sh` purges stale helper apps.
+  The `qt/` source stays archived for a future separate cross-platform Qt app;
+  its existing AppKit/IOSurface host is explicitly not claimed as portable.
+  Thirteen tests, recursive lint, release package/deep sign, no-Qt linkage and
+  bundle inspection, live launch, and diff check pass.
+
+- **2026-07-19 — OUT: Codex Bench now shows only four retained pipelines.**
+  The active picker/package is P1 RealityKit, P2 MetalKit, P5 raw WebGL 2, and
+  P7 direct Three.js/WebGL 2. P3 desktop OpenGL, P8 per-feature RealityKit, P9
+  SceneKit, and the OpenGeometry/WASM probe are removed; Model I/O, Qt, Unity,
+  and MetalANGLE remain absent. The signed bundle has no Qt/OpenGL/SceneKit or
+  OpenGeometry linkage/resources. On the same 5.3 MB, 54,830-triangle STEP
+  model: P1 50.7 FPS/70.6% CPU/6.90 s ready; P2 59.8 FPS/23.5% CPU/2.34 s;
+  P5 61.2 FPS/2.73 s; P7 62.7 FPS/2.78 s. WebKit CPU/memory is host-only, but
+  Three.js added just 6 ms over raw upload, supporting it as an optional scene
+  environment. Report: `dev/Codex Bench/Reports/2026-07-19-kept-pipelines/`.
+  Twelve tests, recursive lint, release/deep sign, all four benchmark launches,
+  dead-resource/linkage audit, and diff check pass.
+
+- **2026-07-19 — OUT: the full assembly test confirms MetalKit.** Codex Bench
+  can now import repeated `--file` inputs as one combined renderer document,
+  retaining all 46 CAD-demo sources while remapping topology/node IDs. The
+  workload is 8,931 faces, 24,778 feature edges, and 247,030 triangles. Open
+  CASCADE imports/merges it in 6.83 seconds. P2 Metal was ready in 6.94 seconds
+  and delivered 59.84 visible FPS at 20.34% CPU. P1 RealityKit's current
+  8,931-entity projection failed to become ready after 4m55s at roughly
+  676–719 MiB, so it should not be Anima Studio's main viewport architecture.
+  P5/P7 loaded the complete document, but their automated FPS is withheld due
+  to WebKit background throttling and child-process accounting. Report:
+  `dev/Codex Bench/Reports/2026-07-19-assembly-benchmark/`. Thirteen tests,
+  lint, release/deep sign, headless merge, and P2/P5/P7 app runs pass.
+
+- **2026-07-19 — OUT: production-shape optimization is complete without
+  deleting a retained pipeline.** P2 is now explicitly the production
+  candidate, P1 the secondary Apple renderer, P7 the optional environment
+  renderer, and P5 the raw-WebGL diagnostic baseline. All four consume one
+  compact indexed renderer projection; STEP imports cache and survive renderer
+  switches. RealityKit uses one assembly `LowLevelMesh` and no longer has its
+  telemetry-triggered SwiftUI update loop. Metal uses packed GPU-private
+  buffers, exact edges, topology IDs, a per-part transform table, and
+  triple-buffered uniforms; its runtime shader diagnostic exposed and fixed a
+  normal-transform compilation error. Web paths consume a binary typed-array
+  payload and Three.js indexed material groups. The final 46-file run measured
+  P2 at 59.92 FPS/19.71% CPU/231.21 MB and P1 at 59.83 display-link Hz/21.29%
+  CPU/378.83 MB; P5/P7 remain caveated because WebKit helper processes are not
+  included. Full report/raw JSON:
+  `dev/Codex Bench/Reports/2026-07-19-optimized-pipelines/`. Verification: 16
+  tests, recursive lint, release packaging, deep sign, headless 46-file probe,
+  and all four signed-app assembly benchmarks.
+
+- **2026-07-19 — OUT: CodexUI now uses the AnimaStudio Demo panel language.**
+  I kept the app presentation-only and retained all seven workspace concepts,
+  but replaced their repeated fixed HStacks with one reusable canvas-first
+  `DockingWorkspace`. Browsers and inspectors independently dock, float inside
+  the app, or hide/restore; the workspace ribbon uses the same three-state
+  contract and becomes a compact grouped palette when floating. Studio,
+  Classic, and Canvas presets coordinate the layout, and a standard Settings
+  window exposes theme, placement, and prototype-scope controls. Four Swift
+  tests, recursive lint, release packaging, deep signature verification,
+  launch/process health, and diff check pass.
+
+- **2026-07-19 — OUT: CodexUI floating chrome no longer obscures its content.**
+  Side panels and the floating ribbon reserve explicit readable lanes; the
+  walkthrough is now in flow. CAD Light drives SwiftUI's actual light scheme,
+  resolving system-label contrast, and shared chrome uses higher-contrast
+  icon/text/stroke tokens plus theme-specific ribbon colors. Rows, workspace
+  tabs, ribbon tools, panel borders, and controls have consistent hover,
+  pressed, selected, and spring transition feedback. Four tests, lint, release
+  bundle/deep sign, restarted live process, and diff check pass.
+
+- **2026-07-19 — OUT: imported the supplied five-stage workspace tabs.** The
+  center navigation now matches the reference hierarchy: one large capsule for
+  Assets, Rig, Animate, Show, and Hardware, with a strong blue active state and
+  matched-geometry spring travel. Nodes/UI Kit remain Utilities in the grouped
+  workspace dropdown instead of appearing as fake pipeline stages. Compact
+  windows get icon-only tabs, preserving separation from project/layout
+  controls. Five tests, lint, release/deep sign, live relaunch, and diff check
+  pass.
+
+- **2026-07-19 — OUT: CodexUI now has one header row.** The five-stage capsule
+  remains absolutely centered. Brand/workspaces/project/file/undo are grouped
+  left; engine status (with driver/runtime popover), Master Live, panel toggles,
+  Settings, and Help are grouped right. Theme and layout moved to Settings,
+  where they remain fully editable. Compact mode shortens text and uses
+  icon-only stage tabs, so nothing overlaps and no workspace or control is
+  lost. Five tests, lint, release/deep sign, live relaunch, and diff check pass.
+
+- **2026-07-19 — OUT: CodexUI dock and float are now meaningfully distinct.**
+  Docked regions reserve layout space; floating regions overlay the full-size
+  center and hidden sidebars restore from their edge. Browser, Inspector, and
+  Tool Ribbon own their placement controls: click toggles dock/float and the
+  menu retains Dock/Float/Hide. One combined header layout button replaces the
+  three duplicates, cycles Studio/Classic/Canvas on click, and exposes every
+  region state in its menu. Five tests, lint, release/deep sign, live PID
+  70962, and diff check pass.
+
+- **2026-07-19 — OUT: floating clearance now follows the content.** The shared
+  workspace publishes live obstruction insets, but only structured surfaces
+  consume them. Rig/Nodes and the Animate/Show preview canvases stay
+  full-bleed; Assets, Hardware, UI Kit, and the two timelines remain entirely
+  visible between floating panels. Six tests, lint, release/deep sign, live PID
+  79970, and diff check pass.
+
+- **2026-07-19 — OUT: the centered capsule is now the only workspace
+  navigator.** The duplicate left-header dropdown is gone. Assets, Rig,
+  Animate, Show, Hardware, Nodes, and UI Kit are all directly selectable in the
+  center, with one divider between the authoring path and utilities. Compact
+  windows retain all seven as icon-only targets. Six tests, lint, release/deep
+  sign, live PID 86025, and diff check pass.
+
+- **2026-07-19 — OUT: workspace-tab text is restored and configurable.** The
+  default Automatic mode shows every name at wide sizes and keeps the selected
+  workspace's name visible in compact chrome. Settings → Workspace adds All
+  Labels, Selected Only, and Icons Only overrides. Seven tests, lint,
+  release/deep sign, live PID 4957, and diff check pass.
+
+- **2026-07-19 — OUT: the walkthrough is now a real floating popup.** It is a
+  bottom-center overlay above the status bar and no longer participates in the
+  shell `VStack`, so opening, closing, or advancing it never shifts the ribbon
+  or workspace. Navigation, dismissal, shortcut, and Settings access remain.
+  Seven tests, lint, release/deep sign, live PID 14724, and diff check pass.
+
+- **2026-07-19 — OUT: 3D viewports no longer look like bordered cards.** The
+  shared rounded mask/outline is removed, and Rig/Animate/Show use zero-inset
+  center surfaces so the grid extends behind floating chrome. Timelines and
+  actual controls retain deliberate spacing/boundaries. Seven tests, lint,
+  release/deep sign, live PID 21446, and diff check pass.
+
+- **2026-07-19 — OUT: the header now leads with workspace context.** CodexUI
+  branding moved to the small footer. The current workspace name, labeled
+  Studio/Classic/Canvas layout button, and Settings now lead the upper-left;
+  project/file/undo follow. Runtime status, Master Live, and Help stay right.
+  Seven tests, lint, release/deep sign, live PID 28613, and diff check pass.
+
+- **2026-07-19 — OUT: Codex Spatial's best floating-panel idea is now in
+  CodexUI.** Floating side regions discard the full-height slab, use a small
+  independent material placement bar, and render each contained panel as its
+  own rounded/shadowed window with canvas visible between widgets. Docking the
+  same content restores the flush continuous sidebar. Codex Spatial was used
+  read-only and remains present until removal is explicitly requested. Seven
+  tests, lint, release/deep sign, live PID 36273, and diff check pass.
+
+- **2026-07-19 — OUT: the open project identity is restored as the first
+  header element.** Orange cube + Atlas Animatronic + SAVED is always visible
+  at far left; the centered selected tab owns the Assets/Rig/etc. mode name.
+  The adjacent layout control now says Floating, Docked, Canvas, or Custom
+  instead of Studio/Classic. Seven tests, lint, release/deep sign, live PID
+  45426, and diff check pass.
+
+- **2026-07-19 — OUT: the floating tool ribbon is quieter and edge-aware.** It
+  no longer repeats the workspace name or boxes every group/tool. Operators can
+  choose Top or Bottom in the local menu, combined layout menu, or Settings;
+  group popovers open inward (below top, above bottom), and shadows, content
+  safe areas, timelines, and the walkthrough follow the selected edge. Seven
+  tests, lint, release/deep sign, live PID 59875, and diff check pass.
+
+- **2026-07-19 — OUT: timelines now belong to the full center canvas.**
+  Animate and Show no longer narrow their timelines around floating side
+  panels; only a bottom floating ribbon reserves timeline space. Floating
+  Browser/Inspector regions use a responsive 72%-height window with canvas
+  visible below, while docked regions remain full-height columns. Eight tests,
+  lint, release/deep sign, launch, and diff check pass.
+
+- **2026-07-19 — OUT: CodexUI now demonstrates an in-viewport performance
+  HUD.** Rig, Animate, and Show share one compact bottom-right renderer/FPS/
+  CPU/memory/GPU card. The viewport gauge and Settings toggle it. Values remain
+  explicitly marked Sample with a pending telemetry-hook note until a real
+  renderer supplies measurements. Eight tests, lint, release/deep sign,
+  launch, and diff check pass.
+
+- **2026-07-19 — OUT: side-panel placement is centralized and Canvas has edge
+  reveal.** Browser/Inspector headers no longer repeat pin/dock/float controls;
+  placement lives in the top layout menu and Settings. In Canvas, a thin edge
+  affordance temporarily reveals the hidden left/right panel on hover and
+  dismisses it on exit without changing the saved preset. Nine tests, lint,
+  release/deep sign, launch, and diff check pass.
+
+- **2026-07-19 — OUT: floating context panels are now individual widgets.**
+  The redundant outer sidebar header is gone. Each card sizes to its actual
+  content and retains visible spacing; right-side dynamic/context cards drag
+  independently from their own header grip. Docking resets those offsets and
+  returns the widgets to a stable full-height column. Nine tests, lint,
+  release/deep sign, launch, and diff check pass.
+
+- **2026-07-19 — OUT: CodexUI now shares the AnimaStudio Demo header scale.**
+  A reusable metrics contract sets the single header to 54 points, icon
+  controls to 28×24, and centered workspace chips to 28–30 points. All prior
+  project/layout/settings/file/edit controls remain; compact Live and Preview
+  capsules replace the oversized runtime treatment, Help remains last, and
+  Master Live remains available in the Live popover and Settings. Ten tests,
+  lint, release/deep sign, live PID 33363, and diff check pass.
+
+- **2026-07-19 — OUT: the layout-mode button now terminates the header.** It
+  sits immediately before walkthrough Help, uses no label, and distinguishes
+  Floating/Docked/Canvas/Custom with unique icons and cyan/purple/orange/green
+  boxes. Click-to-cycle and the complete dropdown menu remain intact. Ten
+  tests, lint, release/deep sign, live PID 42706, and diff check pass.
+
+- **2026-07-19 — OUT: the floating Assets 3D preview no longer collapses.**
+  Spatial preview panels now have a reusable 220-point minimum content height;
+  only Assets Preview opts in, so ordinary floating inspector cards remain
+  compact. Ten tests, lint, release/deep sign, live PID 50439, and diff check
+  pass.
+
+- **2026-07-19 — OUT: Codex Spatial is consolidated and retired.** Its useful
+  tool-rail/adaptive-action, hierarchy/mate/hardware, and full-width Live Follow
+  timeline patterns now live as reusable specimens in CodexUI's UI Kit. The
+  separate `dev/Codex Spatial/` source and app were then deleted. Ten tests,
+  lint, release/deep sign, live PID 64634, and diff check pass.
+
+- **2026-07-19 — OUT: floating-widget drag is smooth and window-bounded.**
+  Direct animation-free offset updates replace the old GestureState/end clamp;
+  an opaque drag surface avoids per-frame material blur, and actual widget
+  frames clamp to an eight-point workspace margin throughout the gesture.
+  Eleven tests including boundary cases, lint, release/deep sign, live PID
+  85308, and diff check pass.
+
+- **2026-07-19 — OUT: UI Kit is now a living design-system gallery.** It uses
+  the AnimaStudio Demo's flat section/specimen organization while preserving
+  all CodexUI and migrated Spatial widgets. Full-width app chrome, timelines,
+  viewport, and Settings sit alongside adaptive component cards. A visible
+  16-of-16 catalog and test-backed contributor rule require every reusable UI
+  asset to have a UI Kit specimen. Twelve tests, lint, release/deep sign, live
+  PID 98746, and diff check pass.
+
+- **2026-07-19 — OUT: UI Kit specimens are flat, while the useful selection
+  group remains.** Generic specimen cards no longer wrap already-contained
+  widgets. The interactive rail and adaptive keyframe actions still appear
+  together at their natural size, but their redundant `Selection Tools` outer
+  panel is gone. Captions and the 16-of-16 coverage contract remain. Twelve
+  tests, lint, release/deep sign, live PID 11647, and diff check pass.
+
+- **2026-07-19 — OUT: Nodes now have complete UI Kit coverage.** The Nodes
+  workspace and UI Kit share the same node card, categorized library,
+  selected-node inspector, typed-port row, and connected graph canvas. The Kit
+  displays input/logic/AI+media/hardware variants, normal/selected/warning
+  states, and a full-width graph with canvas controls. Coverage is now
+  21-of-21. Twelve tests, lint, release/deep sign, live PID 19552, and diff
+  check pass.
+
+- **2026-07-19 — OUT: the node graph is now a full-bleed workspace surface.**
+  Its generic rounded mask and outline are gone in both the Nodes workspace and
+  UI Kit specimen. Node cards, status, and canvas controls retain only their
+  own meaningful local boundaries. Twelve tests, lint, release/deep sign, live
+  PID 8142, and diff check pass.
+
+- **2026-07-19 — OUT: CodexUI now shares AnimaStudio Demo's visual language.**
+  The global theme owns the Demo's restrained surfaces, typography hierarchy,
+  subtle strokes, and semantic colors, with Blue/Teal/Indigo/Orange/Graphite,
+  CAD Light, and Midnight choices. Shared panels, rows, fields, badges,
+  metrics, command buttons, project status, and the icon-only floating ribbon
+  were refined once and therefore changed in every workspace plus UI Kit.
+  Twelve tests, lint, release/deep sign, live PID 25144, and diff check pass.

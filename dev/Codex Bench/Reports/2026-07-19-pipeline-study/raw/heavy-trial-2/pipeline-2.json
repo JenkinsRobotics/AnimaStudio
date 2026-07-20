@@ -1,0 +1,27 @@
+{
+  "caveats" : [
+    "FPS uses the same 60 Hz scripted orbit workload and counts delivered renderer frames.",
+    "CPU may exceed 100% when multiple cores are active."
+  ],
+  "combinedCPUPercent" : 23.249789802183674,
+  "combinedMemoryMegabytes" : 272.06050567626954,
+  "contributor" : "Codex",
+  "edges" : 7443,
+  "faces" : 2631,
+  "finalStatus" : "1 nodes · 2631 faces · 54830 triangles",
+  "framesPerSecond" : 60.00452946562942,
+  "loadMetricScope" : "Open CASCADE read + XDE transfer + triangulation",
+  "mainCPUPercent" : 23.249789802183674,
+  "mainMemoryMegabytes" : 272.06050567626954,
+  "pipeline" : "Open CASCADE Technology → Apple MetalKit",
+  "pipelineID" : 2,
+  "readyWaitMilliseconds" : 2328.768014907837,
+  "renderedFrames" : 345,
+  "reportedLoadMilliseconds" : 2107.681999,
+  "sourceBytes" : 5531766,
+  "sourceFile" : "\/Users\/jonathanjenkins\/GITHUB\/AnimaStudio\/CAD DEMO\/ARCADA001-2\/ARCADA001 - Part 1 (12).step",
+  "success" : true,
+  "timestamp" : "2026-07-19T07:20:52Z",
+  "triangles" : 54830,
+  "workloadSeconds" : 5.749565958976746
+}

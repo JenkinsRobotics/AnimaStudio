@@ -275,6 +275,77 @@ struct AnimaCoreClientTests {
   }
 
   @Test
+  func rigDocumentEditorRemovesPartsAndDependentSemantics() throws {
+    let source: AnimaCoreJSONValue = .object([
+      "identity": .object(["name": .string("assembly")]),
+      "parts": .array([
+        .object(["name": .string("base"), "parent": .null]),
+        .object(["name": .string("arm"), "parent": .string("base")]),
+        .object(["name": .string("tool"), "parent": .string("arm")]),
+      ]),
+      "joints": .array([
+        .object([
+          "name": .string("arm_joint"),
+          "parent_part": .string("base"),
+          "child_part": .string("arm"),
+          "dofs": .array([.object(["path": .string("arm_joint.rotation")])]),
+        ])
+      ]),
+      "parameters": .array([]),
+      "clips": .array([
+        .object([
+          "name": .string("move"),
+          "keyframes": .array([
+            .object([
+              "time_s": .number(0),
+              "values": .object([
+                "arm_joint.rotation": .number(1),
+                "expression": .number(0.5),
+              ]),
+            ])
+          ]),
+        ])
+      ]),
+      "outputs": .array([
+        .object(["dof_path": .string("arm_joint.rotation"), "channel": .number(1)])
+      ]),
+      "relations": .array([
+        .object([
+          "kind": .string("gear"),
+          "driver": .string("arm_joint.rotation"),
+          "driven": .string("other.rotation"),
+        ])
+      ]),
+    ])
+
+    let edited = try AnimaCoreRigDocumentEditor.removingParts(named: ["arm"], from: source)
+    guard case .object(let root) = edited,
+      case .array(let parts) = root["parts"],
+      case .array(let joints) = root["joints"],
+      case .array(let outputs) = root["outputs"],
+      case .array(let relations) = root["relations"],
+      case .array(let clips) = root["clips"],
+      case .object(let clip) = clips.first,
+      case .array(let keyframes) = clip["keyframes"],
+      case .object(let keyframe) = keyframes.first,
+      case .object(let values) = keyframe["values"]
+    else {
+      Issue.record("Removal must retain a valid full-fidelity rig DTO")
+      return
+    }
+    #expect(parts.count == 2)
+    #expect(joints.isEmpty)
+    #expect(outputs.isEmpty)
+    #expect(relations.isEmpty)
+    #expect(values == ["expression": .number(0.5)])
+    guard let lastPart = parts.last, case .object(let tool) = lastPart else {
+      Issue.record("Remaining tool part must be an object")
+      return
+    }
+    #expect(tool["parent"] == .null)
+  }
+
+  @Test
   func rigDocumentEditorBuildsEmptyRigidPartsCharacterDTO() {
     let document = AnimaCoreRigDocumentEditor.emptyCharacter(
       name: "walle",

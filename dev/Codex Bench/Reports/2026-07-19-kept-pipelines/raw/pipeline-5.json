@@ -1,0 +1,28 @@
+{
+  "caveats" : [
+    "FPS uses the same 60 Hz scripted orbit workload and counts delivered renderer frames.",
+    "CPU may exceed 100% when multiple cores are active.",
+    "Main-process memory excludes system-managed WebKit content\/GPU processes."
+  ],
+  "combinedCPUPercent" : 15.702764616949166,
+  "combinedMemoryMegabytes" : 374.05138702392577,
+  "contributor" : "Codex",
+  "edges" : 7443,
+  "faces" : 2631,
+  "finalStatus" : "WebGL 2: 54830 triangles uploaded in Swift's WKWebView",
+  "framesPerSecond" : 61.17922616130584,
+  "loadMetricScope" : "WebGL buffer upload after shared Open CASCADE import",
+  "mainCPUPercent" : 15.702764616949166,
+  "mainMemoryMegabytes" : 374.05138702392577,
+  "pipeline" : "Open CASCADE Technology → Swift → WebGL 2",
+  "pipelineID" : 5,
+  "readyWaitMilliseconds" : 2726.9680500030518,
+  "renderedFrames" : 359,
+  "reportedLoadMilliseconds" : 3,
+  "sourceBytes" : 5531766,
+  "sourceFile" : "\/Users\/jonathanjenkins\/GITHUB\/AnimaStudio\/CAD DEMO\/ARCADA001-2\/ARCADA001 - Part 1 (12).step",
+  "success" : true,
+  "timestamp" : "2026-07-19T07:57:49Z",
+  "triangles" : 54830,
+  "workloadSeconds" : 5.86800491809845
+}

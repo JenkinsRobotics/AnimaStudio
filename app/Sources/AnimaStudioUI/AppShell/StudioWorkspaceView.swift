@@ -4,7 +4,6 @@ import AnimaModel
 import AppKit
 import RealityKitViewport
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct StudioWorkspaceView: View {
   @Environment(\.openSettings) private var openSettings
@@ -16,10 +15,8 @@ struct StudioWorkspaceView: View {
   @Binding var designProfile: StudioDesignProfile
 
   @State private var workspace: StudioWorkspaceModel
-  @State private var isImportingModel = false
   @State private var replacesSelectedPartOnNextImport = false
   @State private var pendingModelImportURLs: [URL] = []
-  @State private var stepConversionMessage: String?
   @State private var showsNewCharacterSheet = false
   @State private var isCreatingCharacter = false
   @State private var showsCharacterLoadingStage = false
@@ -28,7 +25,6 @@ struct StudioWorkspaceView: View {
   @State private var isSwitchingCharacter = false
   @State private var characterEditorMetadata = CharacterEditorMetadata()
   @State private var activeImportedModelReference: String?
-  @State private var isImportingAnimaCharacter = false
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
@@ -138,8 +134,8 @@ struct StudioWorkspaceView: View {
         viewportAppearance: viewportAppearanceBinding,
         isUIDevWorkspace: $isUIDevWorkspace,
         uiDevSection: $uiDevSection,
-        importModel: { isImportingModel = true },
-        importAnimaCharacter: { isImportingAnimaCharacter = true },
+        importModel: presentModelImportPanel,
+        importAnimaCharacter: presentAnimaCharacterImportPanel,
         toggleAgentPanel: { showsUIDevAgentPanel.toggle() }
       )
       Divider()
@@ -155,19 +151,6 @@ struct StudioWorkspaceView: View {
         workspace.cancelMatePlacement()
       } else {
         workspace.clearSelection()
-      }
-    }
-    .fileImporter(
-      isPresented: $isImportingModel,
-      allowedContentTypes: Self.modelContentTypes,
-      allowsMultipleSelection: true
-    ) { result in
-      switch result {
-      case .success(let urls):
-        beginModelImport(from: urls)
-      case .failure(let error):
-        replacesSelectedPartOnNextImport = false
-        presentModelImportError(error.localizedDescription)
       }
     }
     .sheet(
@@ -197,34 +180,6 @@ struct StudioWorkspaceView: View {
         cancel: { showsNewCharacterSheet = false },
         create: { name in Task { await createCharacter(named: name) } }
       )
-    }
-    .alert(
-      "STEP Needs Conversion",
-      isPresented: Binding(
-        get: { stepConversionMessage != nil },
-        set: { if !$0 { stepConversionMessage = nil } }
-      )
-    ) {
-      Button("OK", role: .cancel) {}
-    } message: {
-      Text(stepConversionMessage ?? "Export this model as STL or USD from your CAD tool.")
-    }
-    .fileImporter(
-      isPresented: $isImportingAnimaCharacter,
-      allowedContentTypes: Self.animaCharacterContentTypes,
-      allowsMultipleSelection: false
-    ) { result in
-      switch result {
-      case .success(let urls):
-        if let url = urls.first {
-          Task { @MainActor in
-            await workspace.importAnimaCharacter(from: url)
-            registerLoadedCharacter(markDirty: true)
-          }
-        }
-      case .failure(let error):
-        workspace.animaCoreErrorMessage = error.localizedDescription
-      }
     }
     .alert(
       "Could Not Import Model",
@@ -363,10 +318,12 @@ struct StudioWorkspaceView: View {
           selectCharacter: { character in
             Task { await selectCharacter(character) }
           },
-          importModels: { isImportingModel = true },
+          importModels: presentModelImportPanel,
           replaceModel: {
-            replacesSelectedPartOnNextImport = true
-            isImportingModel = true
+            presentModelImportPanel(replacingSelectedPart: true)
+          },
+          deleteParts: { ids in
+            Task { await deleteParts(ids) }
           },
           dropModels: beginModelImport
         )
@@ -392,7 +349,7 @@ struct StudioWorkspaceView: View {
         if workspace.activePresentation.showsNavigator {
           ProjectNavigatorView(
             workspace: workspace,
-            importModel: { isImportingModel = true }
+            importModel: presentModelImportPanel
           )
           .frame(width: StudioMetrics.navigatorWidth)
         }
@@ -881,14 +838,6 @@ struct StudioWorkspaceView: View {
     )
   }
 
-  private static let modelContentTypes: [UTType] = [
-    "usd", "usda", "usdc", "usdz", "reality", "stl", "obj", "step", "stp",
-  ].compactMap { UTType(filenameExtension: $0) }
-
-  private static let animaCharacterContentTypes: [UTType] = [
-    UTType(filenameExtension: "anima") ?? .data
-  ]
-
   @MainActor
   private func loadIndexedCharacterIfNeeded() async {
     guard !didLoadIndexedCharacter, let character = session.document.activeCharacter else {
@@ -906,8 +855,11 @@ struct StudioWorkspaceView: View {
   ) async -> Bool {
     do {
       let projectURL = try session.resolvedProjectURL()
-      let accessed = projectURL.startAccessingSecurityScopedResource()
-      defer { if accessed { projectURL.stopAccessingSecurityScopedResource() } }
+      // Hold access for the whole time the project is open — the sandboxed app
+      // reads imported meshes lazily during async rendering, long after this
+      // load returns, so a defer-scoped access would be gone by then and the
+      // viewport would fall back to placeholders.
+      workspace.retainProjectAssetAccess(projectURL)
       await workspace.importAnimaCharacter(
         from: projectURL.appendingPathComponent(character.characterPath)
       )
@@ -1062,6 +1014,35 @@ struct StudioWorkspaceView: View {
   }
 
   @MainActor
+  private func presentModelImportPanel() {
+    presentModelImportPanel(replacingSelectedPart: false)
+  }
+
+  @MainActor
+  private func presentModelImportPanel(replacingSelectedPart: Bool) {
+    replacesSelectedPartOnNextImport = replacingSelectedPart
+    guard
+      let urls = NativeImportPanel.chooseFiles(configuration: .models),
+      !urls.isEmpty
+    else {
+      replacesSelectedPartOnNextImport = false
+      return
+    }
+    beginModelImport(from: urls)
+  }
+
+  @MainActor
+  private func presentAnimaCharacterImportPanel() {
+    guard
+      let url = NativeImportPanel.chooseFiles(configuration: .animaCharacter)?.first
+    else { return }
+    Task { @MainActor in
+      await workspace.importAnimaCharacter(from: url)
+      registerLoadedCharacter(markDirty: true)
+    }
+  }
+
+  @MainActor
   private func beginModelImport(from urls: [URL]) {
     guard !urls.isEmpty else { return }
     if replacesSelectedPartOnNextImport && urls.count != 1 {
@@ -1069,16 +1050,16 @@ struct StudioWorkspaceView: View {
       presentModelImportError("Replace Part accepts one model file at a time.")
       return
     }
-    let stepFiles = urls.filter { ["step", "stp"].contains($0.pathExtension.lowercased()) }
-    if !stepFiles.isEmpty {
+    let unsupportedFiles = urls.filter { !ModelImportFormatSupport.supports($0) }
+    if !unsupportedFiles.isEmpty {
       replacesSelectedPartOnNextImport = false
-      let filenames = stepFiles.map(\.lastPathComponent).joined(separator: ", ")
+      let filenames = unsupportedFiles.map(\.lastPathComponent).joined(separator: ", ")
       let message =
-        "STEP needs conversion. Export \(filenames) as STL or USD from SolidWorks, Onshape, Fusion 360, or your CAD tool, then import the converted files."
+        "Unsupported model file: \(filenames). Import \(ModelImportFormatSupport.operatorLabel) files only."
       if workspace.activeWorkspace == .assets {
         characterImportErrorMessage = message
       } else {
-        stepConversionMessage = message
+        presentModelImportError(message)
       }
       return
     }
@@ -1154,6 +1135,49 @@ struct StudioWorkspaceView: View {
         if accessedProject { projectURL.stopAccessingSecurityScopedResource() }
         if accessedSource { sourceURL.stopAccessingSecurityScopedResource() }
       }
+      if !replacingSelectedPart,
+        let replacement = AssetBuilderImportMatching.automaticReplacement(
+          sourceFilename: sourceURL.lastPathComponent,
+          character: character,
+          assets: updated.document.assets,
+          parts: workspace.engineParts
+        )
+      {
+        try ProjectLifecycle.store.replaceEmbeddedAsset(
+          replacement.asset,
+          from: sourceURL,
+          in: projectURL
+        )
+        characterEditorMetadata.modelImports[replacement.modelReference] = ModelImportMetadata(
+          unitName: sourceUnit.rawValue,
+          unitScaleToMeters: sourceUnit.scaleToMeters
+        )
+        var versionedPartNames = Set<String>()
+        for partName in replacement.partNames {
+          recordAssetVersion(
+            for: partName,
+            replacesExisting: true,
+            versionedPartNames: &versionedPartNames
+          )
+        }
+        activeImportedModelReference = replacement.modelReference
+        workspace.importedModelURL = projectURL.appendingPathComponent(replacement.relativePath)
+        workspace.importedModelHierarchy = importedHierarchy
+        workspace.retainProjectAssetAccess(projectURL)
+        workspace.configurePartModelSources(
+          characterDirectoryURL: projectURL.appendingPathComponent(
+            character.directoryPath,
+            isDirectory: true
+          ),
+          editorMetadata: characterEditorMetadata
+        )
+        workspace.selectParts(
+          ids: Set(replacement.partNames.compactMap(workspace.partID(forEngineName:)))
+        )
+        updated.isDirty = true
+        session = updated
+        return true
+      }
       updated.document = try ProjectLifecycle.store.embedAsset(
         from: sourceURL,
         into: projectURL,
@@ -1189,7 +1213,7 @@ struct StudioWorkspaceView: View {
         let fileExtension = sourceURL.pathExtension.lowercased()
         let renderableNodes = importedHierarchy?.flattened.filter(\.hasRenderableGeometry) ?? []
         if !replacingSelectedPart,
-          ["usd", "usda", "usdc", "usdz", "reality"].contains(fileExtension),
+          ["usd", "usda", "usdc", "usdz"].contains(fileExtension),
           renderableNodes.count > 1
         {
           for node in renderableNodes {
@@ -1208,6 +1232,7 @@ struct StudioWorkspaceView: View {
         activeImportedModelReference = modelReference
         workspace.importedModelURL = copiedURL
         workspace.importedModelHierarchy = importedHierarchy
+        workspace.retainProjectAssetAccess(projectURL)
         workspace.configurePartModelSources(
           characterDirectoryURL: projectURL.appendingPathComponent(
             character.directoryPath,
@@ -1244,6 +1269,70 @@ struct StudioWorkspaceView: View {
     guard versionedPartNames.insert(partName).inserted else { return }
     let current = max(characterEditorMetadata.partAssetVersions[partName] ?? 1, 1)
     characterEditorMetadata.partAssetVersions[partName] = replacesExisting ? current + 1 : current
+  }
+
+  @MainActor
+  private func deleteParts(_ partIDs: Set<PartID>) async {
+    guard !partIDs.isEmpty, let character = session.document.activeCharacter else { return }
+    let locked = partIDs.filter(workspace.isComponentLocked)
+    guard locked.isEmpty else {
+      characterImportErrorMessage = "Unlock the selected parts before deleting them."
+      return
+    }
+    let partNames = Set(partIDs.compactMap(workspace.enginePartName(for:)))
+    guard !partNames.isEmpty else { return }
+    let removedModelReferences = Set(
+      workspace.engineParts.compactMap { part in
+        partNames.contains(part.name) && !part.model.isEmpty ? part.model : nil
+      }
+    )
+    do {
+      try await workspace.deleteEngineParts(named: partNames)
+      characterEditorMetadata.partAssetVersions = characterEditorMetadata.partAssetVersions.filter {
+        !partNames.contains($0.key)
+      }
+      characterEditorMetadata.partAppearances = characterEditorMetadata.partAppearances.filter {
+        !partNames.contains($0.key)
+      }
+      let remainingModelReferences = Set(workspace.engineParts.map(\.model).filter { !$0.isEmpty })
+      let orphanedModelReferences = removedModelReferences.subtracting(remainingModelReferences)
+      for reference in orphanedModelReferences {
+        characterEditorMetadata.modelImports.removeValue(forKey: reference)
+      }
+      workspace.applyCharacterEditorMetadata(characterEditorMetadata)
+
+      var updated = session
+      let prefix = character.directoryPath + "/"
+      let orphanedRelativePaths = Set(orphanedModelReferences.map { prefix + $0 })
+      updated.document.assets.removeAll { asset in
+        guard case .embedded(let path) = asset.storage else { return false }
+        return orphanedRelativePaths.contains(path)
+      }
+      updated.isDirty = true
+      session = updated
+      let projectURL = try updated.resolvedProjectURL()
+      workspace.retainProjectAssetAccess(projectURL)
+      workspace.configurePartModelSources(
+        characterDirectoryURL: projectURL.appendingPathComponent(
+          character.directoryPath,
+          isDirectory: true
+        ),
+        editorMetadata: characterEditorMetadata
+      )
+      guard await saveProject() else { return }
+      let accessedProject = projectURL.startAccessingSecurityScopedResource()
+      defer { if accessedProject { projectURL.stopAccessingSecurityScopedResource() } }
+      for path in orphanedRelativePaths {
+        let url = projectURL.appendingPathComponent(path)
+        if FileManager.default.fileExists(atPath: url.path) {
+          try FileManager.default.removeItem(at: url)
+        }
+      }
+      showsCharacterLoadingStage = workspace.engineParts.isEmpty
+      characterImportErrorMessage = nil
+    } catch {
+      characterImportErrorMessage = error.localizedDescription
+    }
   }
 
   @MainActor
@@ -1286,6 +1375,7 @@ struct StudioWorkspaceView: View {
       workspace.project.name = updated.document.displayName
       characterEditorMetadata = emptyEditorMetadata
       activeImportedModelReference = nil
+      workspace.retainProjectAssetAccess(projectURL)
       workspace.configurePartModelSources(
         characterDirectoryURL: projectURL.appendingPathComponent(
           reference.directoryPath,
@@ -1341,6 +1431,7 @@ struct StudioWorkspaceView: View {
       workspace.importedModelHierarchy = hierarchy
       workspace.importedModelURL = importedURL
       let projectURL = try session.resolvedProjectURL()
+      workspace.retainProjectAssetAccess(projectURL)
       workspace.configurePartModelSources(
         characterDirectoryURL: projectURL.appendingPathComponent(
           character.directoryPath,

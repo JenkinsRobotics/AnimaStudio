@@ -753,7 +753,7 @@ struct UIDevTemplateMatrixView: View {
 
   private var alertTemplate: some View {
     dialogShell(title: "Model Could Not Be Imported", systemImage: "exclamationmark.triangle") {
-      Text("The selected file is not a supported USD, USDZ, or RealityKit model.")
+      Text("The selected file is not a supported USD-family, STL, or OBJ model.")
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
       HStack {

@@ -13,7 +13,7 @@ struct AssetBuilderSidebar: View {
   let selectCharacter: (ProjectCharacterReference) -> Void
 
   @State private var filterText = ""
-  @State private var expandedIDs: Set<AssetBuilderTreeNodeID> = [.project, .characters, .library]
+  @State private var expandedIDs: Set<AssetBuilderTreeNodeID> = [.characters, .library]
   @State private var activeDragPayload: NavigatorDragPayload?
 
   var body: some View {
@@ -26,6 +26,26 @@ struct AssetBuilderSidebar: View {
       .buttonStyle(.borderedProminent)
       .controlSize(.large)
       .padding(12)
+
+      Divider()
+
+      HStack(spacing: 8) {
+        Text("PROJECT: \(projectName.uppercased())")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+        Spacer(minLength: 4)
+        Text("V\(revision)")
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(StudioPalette.field, in: Capsule())
+      }
+      .padding(.horizontal, 12)
+      .frame(height: 32)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Project \(projectName), revision \(revision)")
 
       Divider()
 
@@ -65,8 +85,6 @@ struct AssetBuilderSidebar: View {
 
   private var nodes: [AssetBuilderTreeNode] {
     AssetBuilderTreeAdapter.nodes(
-      projectName: projectName,
-      revision: revision,
       characters: characters,
       activeCharacterID: activeCharacterID,
       counts: counts
@@ -86,14 +104,11 @@ struct AssetBuilderSidebar: View {
           Text(node.title)
             .font(.callout.weight(isActiveCharacter(node) ? .semibold : .regular))
             .lineLimit(1)
-          if case .project = node.id, let detail = node.detail {
-            Text(detail).font(.caption2).foregroundStyle(.secondary)
-          }
         }
         Spacer(minLength: 5)
         if isSwitchingCharacter && isActiveCharacter(node) {
           ProgressView().controlSize(.mini)
-        } else if let detail = node.detail, !isProject(node) {
+        } else if let detail = node.detail {
           Text(detail)
             .font(.system(size: 9, weight: .semibold))
             .foregroundStyle(.secondary)
@@ -103,7 +118,7 @@ struct AssetBuilderSidebar: View {
         }
       }
       .padding(.horizontal, 6)
-      .frame(maxWidth: .infinity, minHeight: isProject(node) ? 38 : 28, alignment: .leading)
+      .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
       .background(
         node.selectionValue == selection ? StudioPalette.accent.opacity(0.24) : Color.clear,
         in: RoundedRectangle(cornerRadius: 6)
@@ -127,11 +142,6 @@ struct AssetBuilderSidebar: View {
   private func expandActiveCharacter() {
     guard let activeCharacterID else { return }
     expandedIDs.insert(.character(activeCharacterID))
-  }
-
-  private func isProject(_ node: AssetBuilderTreeNode) -> Bool {
-    if case .project = node.id { return true }
-    return false
   }
 
   private func isActiveCharacter(_ node: AssetBuilderTreeNode) -> Bool {

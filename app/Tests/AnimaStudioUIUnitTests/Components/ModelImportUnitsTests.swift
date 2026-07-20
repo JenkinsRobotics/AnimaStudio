@@ -3,6 +3,27 @@ import XCTest
 @testable import AnimaStudioUI
 
 final class ModelImportUnitsTests: XCTestCase {
+  func testSupportedModelImportContractIsExplicitAndClosed() {
+    XCTAssertEqual(
+      ModelImportFormatSupport.supportedFileExtensions,
+      ["usd", "usda", "usdc", "usdz", "stl", "obj"]
+    )
+    for fileExtension in ModelImportFormatSupport.supportedFileExtensions {
+      XCTAssertTrue(
+        ModelImportFormatSupport.supports(
+          URL(fileURLWithPath: "/tmp/model.\(fileExtension)")
+        )
+      )
+    }
+    for fileExtension in ["step", "stp", "reality", "urdf", "gltf", "glb"] {
+      XCTAssertFalse(
+        ModelImportFormatSupport.supports(
+          URL(fileURLWithPath: "/tmp/model.\(fileExtension)")
+        )
+      )
+    }
+  }
+
   func testUnitlessModelScalesAreExplicitSIConversions() {
     XCTAssertEqual(ModelImportUnit.millimeters.scaleToMeters, 0.001)
     XCTAssertEqual(ModelImportUnit.centimeters.scaleToMeters, 0.01)

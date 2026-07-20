@@ -1,5 +1,6 @@
 import AnimaDocument
 import AnimaModel
+import AppKit
 import SwiftUI
 
 struct AssetBuilderContentView: View {
@@ -13,14 +14,18 @@ struct AssetBuilderContentView: View {
   let renders: [AssetBuilderListItem]
   let scripts: [AssetBuilderListItem]
   let isSwitchingCharacter: Bool
-  @Binding var selectedPartID: PartID?
+  @Binding var selectedPartIDs: Set<PartID>
   let newCharacter: () -> Void
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
   let replaceModel: () -> Void
+  let deleteParts: (Set<PartID>) -> Void
 
   @State private var searchText = ""
   @State private var layoutMode = AssetBuilderLayoutMode.defaultMode
+  @State private var pendingDeletion = Set<PartID>()
+  @State private var selectionAnchorID: PartID?
+  @FocusState private var partsHaveKeyboardFocus: Bool
 
   var body: some View {
     VStack(spacing: 0) {
@@ -33,6 +38,44 @@ struct AssetBuilderContentView: View {
     .background(StudioPalette.canvas)
     .onChange(of: selection) { _, _ in
       searchText = ""
+      selectionAnchorID = nil
+      partsHaveKeyboardFocus = false
+    }
+    .onChange(of: Set(parts.map(\.id))) { _, availableIDs in
+      selectedPartIDs.formIntersection(availableIDs)
+      if let selectionAnchorID, !availableIDs.contains(selectionAnchorID) {
+        self.selectionAnchorID = nil
+      }
+    }
+    .focusable()
+    .focused($partsHaveKeyboardFocus)
+    .focusEffectDisabled()
+    .onKeyPress(keys: [.delete, .deleteForward]) { _ in
+      guard !selectedPartIDs.isEmpty else { return .ignored }
+      requestDeletion(selectedPartIDs)
+      return .handled
+    }
+    .onDeleteCommand {
+      requestDeletion(selectedPartIDs)
+    }
+    .confirmationDialog(
+      deletionTitle,
+      isPresented: Binding(
+        get: { !pendingDeletion.isEmpty },
+        set: { if !$0 { pendingDeletion.removeAll() } }
+      ),
+      titleVisibility: .visible
+    ) {
+      Button(deletionActionTitle, role: .destructive) {
+        let ids = pendingDeletion
+        pendingDeletion.removeAll()
+        deleteParts(ids)
+      }
+      Button("Cancel", role: .cancel) { pendingDeletion.removeAll() }
+    } message: {
+      Text(
+        "Dependent mates and relations will also be removed. Unused model files are removed from this project only."
+      )
     }
   }
 
@@ -76,7 +119,7 @@ struct AssetBuilderContentView: View {
       if case .characterCollection(_, let collection) = selection,
         collection == .parts || collection == .sourceAssets
       {
-        if collection == .parts, selectedPartID != nil {
+        if collection == .parts, selectedPartIDs.count == 1 {
           Button(action: replaceModel) {
             Label("Replace Part", systemImage: "arrow.triangle.2.circlepath")
           }
@@ -87,6 +130,18 @@ struct AssetBuilderContentView: View {
           Label("Import", systemImage: "plus")
         }
         .buttonStyle(.bordered)
+        if collection == .parts, !selectedPartIDs.isEmpty {
+          Button(role: .destructive) {
+            requestDeletion(selectedPartIDs)
+          } label: {
+            Label(
+              selectedPartIDs.count == 1 ? "Delete" : "Delete \(selectedPartIDs.count)",
+              systemImage: "trash"
+            )
+          }
+          .buttonStyle(.bordered)
+          .help("Delete the selected parts from this character")
+        }
       }
     }
     .padding(.horizontal, 18)
@@ -340,7 +395,7 @@ struct AssetBuilderContentView: View {
 
   private func partTableRow(_ part: AssetBuilderPartRow) -> some View {
     Button {
-      selectedPartID = part.id
+      selectPart(part.id)
     } label: {
       HStack(spacing: 12) {
         HStack(spacing: 10) {
@@ -376,10 +431,13 @@ struct AssetBuilderContentView: View {
       }
       .padding(.horizontal, 16)
       .frame(height: 54)
-      .background(selectedPartID == part.id ? StudioPalette.accent.opacity(0.22) : Color.clear)
+      .background(
+        selectedPartIDs.contains(part.id) ? StudioPalette.accent.opacity(0.22) : Color.clear
+      )
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .contextMenu { partContextMenu(part.id) }
   }
 
   private func listTableRow(_ item: AssetBuilderListItem) -> some View {
@@ -408,7 +466,7 @@ struct AssetBuilderContentView: View {
 
   private func partGridCard(_ part: AssetBuilderPartRow) -> some View {
     Button {
-      selectedPartID = part.id
+      selectPart(part.id)
     } label: {
       VStack(alignment: .leading, spacing: 10) {
         HStack {
@@ -425,16 +483,57 @@ struct AssetBuilderContentView: View {
       .padding(14)
       .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
       .background(
-        selectedPartID == part.id ? StudioPalette.accent.opacity(0.18) : StudioPalette.panel,
+        selectedPartIDs.contains(part.id)
+          ? StudioPalette.accent.opacity(0.18) : StudioPalette.panel,
         in: RoundedRectangle(cornerRadius: 11)
       )
       .overlay {
         RoundedRectangle(cornerRadius: 11).stroke(
-          selectedPartID == part.id ? StudioPalette.accent : StudioPalette.border
+          selectedPartIDs.contains(part.id) ? StudioPalette.accent : StudioPalette.border
         )
       }
     }
     .buttonStyle(.plain)
+    .contextMenu { partContextMenu(part.id) }
+  }
+
+  private func selectPart(_ id: PartID) {
+    let modifiers = NSEvent.modifierFlags
+    let result = AssetBuilderPartSelection.selecting(
+      id,
+      in: selectedPartIDs,
+      orderedIDs: filteredParts.map(\.id),
+      anchor: selectionAnchorID,
+      command: modifiers.contains(.command),
+      shift: modifiers.contains(.shift)
+    )
+    selectedPartIDs = result.ids
+    selectionAnchorID = result.anchor
+    partsHaveKeyboardFocus = true
+  }
+
+  @ViewBuilder
+  private func partContextMenu(_ id: PartID) -> some View {
+    let deletion = selectedPartIDs.contains(id) ? selectedPartIDs : Set([id])
+    Button(role: .destructive) {
+      requestDeletion(deletion)
+    } label: {
+      Label(deletion.count == 1 ? "Delete Part" : "Delete Selected Parts", systemImage: "trash")
+    }
+  }
+
+  private func requestDeletion(_ ids: Set<PartID>) {
+    guard !ids.isEmpty else { return }
+    pendingDeletion = ids
+  }
+
+  private var deletionTitle: String {
+    pendingDeletion.count == 1
+      ? "Delete the selected part?" : "Delete \(pendingDeletion.count) selected parts?"
+  }
+
+  private var deletionActionTitle: String {
+    pendingDeletion.count == 1 ? "Delete Part" : "Delete \(pendingDeletion.count) Parts"
   }
 
   private func listGridCard(_ item: AssetBuilderListItem) -> some View {
