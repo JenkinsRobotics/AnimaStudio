@@ -18,7 +18,22 @@ struct ImportedPart: Identifiable {
   var parts: [ImportedPart] = []
   var selectedID: UUID?
   var status = "No model loaded — import a STEP file"
+  var projectName = "Untitled"
   var loading = false
+  var importTotal = 0
+  var importDone = 0
+  var importingName = ""
+  // Character workspace sidebar. Model-owned, not @State, so it survives the
+  // float/dock flip that rebuilds the workspace view.
+  let characterPanels = PanelStackState(
+    order: ["Characters", "Parts"],
+    defaults: ["Characters"], side: .left)
+  @ObservationIgnored private var importError: String?
+
+  /// 0...1 across the whole import batch (nil while the first file is parsing).
+  var importProgress: Double? {
+    importTotal > 0 ? Double(importDone) / Double(importTotal) : nil
+  }
 
   var selected: ImportedPart? { parts.first { $0.id == selectedID } }
 
@@ -28,38 +43,86 @@ struct ImportedPart: Identifiable {
     panel.canChooseDirectories = false
     panel.allowedContentTypes = ["step", "stp"].compactMap { UTType(filenameExtension: $0) }
     guard panel.runModal() == .OK else { return }
-    let urls = panel.urls
+    load(panel.urls)
+  }
+
+  /// Re-imports the part files recorded in a project document.
+  func reimport(paths: [String], projectName: String) {
+    self.projectName = projectName
+    parts.removeAll()
+    selectedID = nil
+    let urls = paths.map { URL(fileURLWithPath: $0) }
+      .filter { FileManager.default.fileExists(atPath: $0.path) }
+    guard !urls.isEmpty else {
+      status = paths.isEmpty
+        ? "Opened \(projectName) — no parts in this project"
+        : "Opened \(projectName) — part files not found at their saved paths"
+      return
+    }
+    load(urls)
+  }
+
+  func load(_ urls: [URL]) {
+    guard !urls.isEmpty else { return }
     let deflection = RenderState.shared.deflectionMillimetres / 1000.0   // mm → metres
     loading = true
+    importTotal = urls.count
+    importDone = 0
+    importError = nil
     status = "Importing \(urls.count) file\(urls.count == 1 ? "" : "s")…"
-    Task.detached {
-      var results: [(String, Result<GeometryDocument, Error>)] = []
+
+    Task { @MainActor in
+      // One file at a time so progress advances and the first part appears early.
       for url in urls {
+        importingName = url.lastPathComponent
         do {
-          results.append(
-            (url.lastPathComponent, .success(try GeometryDocument.loadSTEP(url, linearDeflectionMetres: deflection))))
-        } catch { results.append((url.lastPathComponent, .failure(error))) }
+          let document = try await Task.detached(priority: .userInitiated) {
+            try GeometryDocument.loadSTEP(url, linearDeflectionMetres: deflection)
+          }.value
+          let part = ImportedPart(name: url.lastPathComponent, document: document)
+          parts.append(part)
+          selectedID = part.id
+          // Commit the asset's nodes as parts of the active character.
+          ProjectModel.shared.addAsset(part)
+        } catch {
+          importError = "\(url.lastPathComponent): \(error.localizedDescription)"
+        }
+        importDone += 1
       }
-      await MainActor.run {
-        var lastError: String?
-        for (name, res) in results {
-          switch res {
-          case .success(let doc):
-            let part = ImportedPart(name: name, document: doc)
-            self.parts.append(part)
-            self.selectedID = part.id
-          case .failure(let err):
-            lastError = "\(name): \(err.localizedDescription)"
-          }
-        }
-        self.loading = false
-        if let e = lastError {
-          self.status = "Import failed — \(e)"
-        } else if let s = self.selected {
-          self.status = "\(s.name) · \(s.document.faces.count) faces · \(s.document.triangleCount) tris"
-        }
+      loading = false
+      importingName = ""
+      importTotal = 0
+      importDone = 0
+      if let importError {
+        status = "Import failed — \(importError)"
+      } else if let s = selected {
+        status = "\(s.name) · \(s.document.faces.count) faces · \(s.document.triangleCount) tris"
       }
     }
+  }
+
+  func documentsByName() -> [String: GeometryDocument] {
+    Dictionary(parts.map { ($0.name, $0.document) }, uniquingKeysWith: { a, _ in a })
+  }
+
+  /// Per-asset, per-node bounding boxes in part space (used for centering + pivots).
+  func nodeBounds() -> [String: [Int: (SIMD3<Float>, SIMD3<Float>)]] {
+    var out: [String: [Int: (SIMD3<Float>, SIMD3<Float>)]] = [:]
+    for part in parts {
+      var byNode: [Int: (SIMD3<Float>, SIMD3<Float>)] = [:]
+      let g = part.document.renderGeometry
+      for batch in g.batches where batch.assemblyNode >= 0 {
+        var lo = byNode[batch.assemblyNode]?.0 ?? SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var hi = byNode[batch.assemblyNode]?.1 ?? SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        for i in batch.vertexRange {
+          lo = simd_min(lo, g.positions[i])
+          hi = simd_max(hi, g.positions[i])
+        }
+        byNode[batch.assemblyNode] = (lo, hi)
+      }
+      out[part.name] = byNode
+    }
+    return out
   }
 
   func remove(_ id: UUID) {
@@ -70,15 +133,23 @@ struct ImportedPart: Identifiable {
 
 struct PartViewport: View {
   var document: GeometryDocument
+  var assetName: String
   var session: BenchSession
   @State private var yaw: Float = 0.7
   @State private var pitch: Float = 0.42
   @State private var dist: Float = 2.6
   @State private var target = SIMD3<Float>(0, 0, 0)
   @State private var builtTris = -1
+  @State private var builtSelection = ""
 
   var body: some View {
-    ZStack {
+    // Read selection here in `body` so SwiftUI actually observes it. Reading it
+    // only inside the RealityView update closure does NOT register a dependency,
+    // so deselecting never re-ran the update and the highlight stuck on.
+    let selected = session.isModelSelected
+    let pick = SelectionModel.shared
+    let selectionKey = "\(pick.assemblyNode ?? -1)|\(pick.faceID.map(String.init) ?? "-")|\(pick.level)"
+    return ZStack {
       RenderState.shared.theme.backgroundColor
       PerspectiveGrid()
       RealityView { content in
@@ -92,25 +163,42 @@ struct PartViewport: View {
         light.name = name
         content.add(light)
       }
+      content.add(Self.makeOriginAxes())
     } update: { content in
       let theme = RenderState.shared.theme
-      if builtTris != document.triangleCount {
-        Task { @MainActor in builtTris = document.triangleCount }
+      if builtTris != document.triangleCount || builtSelection != selectionKey {
+        Task { @MainActor in
+          builtTris = document.triangleCount
+          builtSelection = selectionKey
+        }
         content.entities.filter { $0.name == "part" }.forEach { $0.removeFromParent() }
-        if let mesh = try? Self.mesh(from: document) {
-          let entity = ModelEntity(mesh: mesh, materials: Self.materials(document, theme: theme, selected: session.isModelSelected))
-          entity.name = "part"
-          entity.components.set(GroundingShadowComponent(castsShadow: true))   // soft contact shadow
-          let bounds = entity.visualBounds(relativeTo: nil)
-          let scale = 1.0 / max(bounds.boundingRadius, 0.0001)
-          entity.scale = SIMD3(repeating: scale)
-          entity.position = -bounds.center * scale
-          content.add(entity)
+        // One entity per assembly node so mates can move parts independently.
+        let container = Entity()
+        container.name = "part"
+        for group in Self.nodeGroups(document) {
+          if let entity = Self.entity(for: group, document: document, theme: theme,
+            selected: selected, pick: pick) {
+            entity.components.set(GroundingShadowComponent(castsShadow: true))
+            container.addChild(entity)
+          }
+        }
+        let bounds = container.visualBounds(relativeTo: nil)
+        let scale = 1.0 / max(bounds.boundingRadius, 0.0001)
+        container.scale = SIMD3(repeating: scale)
+        container.position = -bounds.center * scale
+        content.add(container)
+      }
+      // Re-apply themed materials + the live rig pose every update.
+      if let container = content.entities.first(where: { $0.name == "part" }) {
+        let pose = RigModel.shared.poseByNode(assetName: assetName)
+        for group in Self.nodeGroups(document) {
+          guard let child = container.children.first(where: { $0.name == "node-\(group.node)" })
+          else { continue }
+          child.transform = Transform(matrix: pose[group.node] ?? matrix_identity_float4x4)
         }
       }
-      // Re-apply themed material + lights every update (theme is live-editable).
-      if let part = content.entities.first(where: { $0.name == "part" }) as? ModelEntity {
-        part.model?.materials = Self.materials(document, theme: theme, selected: session.isModelSelected)
+      if let origin = content.entities.first(where: { $0.name == "origin" }) {
+        origin.isEnabled = RenderState.shared.showOrigin
       }
       for (name, light) in [("light-key", theme.key), ("light-fill", theme.fill), ("light-rim", theme.rim)] {
         if let e = content.entities.first(where: { $0.name == name }) {
@@ -124,35 +212,101 @@ struct PartViewport: View {
         camera.look(at: target, from: pos, relativeTo: nil)
       }
     }
-    .overlay {
-      CADNavigationView(
-        onRotate: { dx, dy in
-          let n = NavState.shared
-          yaw -= Float(dx) * 0.008 * Float(n.orbitSpeed) * (n.invertOrbitX ? -1 : 1)
-          pitch = max(-1.5, min(1.5,
-            pitch + Float(dy) * 0.008 * Float(n.orbitSpeed) * (n.invertOrbitY ? -1 : 1)))
-        },
-        onPan: { dx, dy in
-          let n = NavState.shared
-          let dir = orbitDir()
-          let right = simd_normalize(simd_cross(SIMD3<Float>(0, 1, 0), dir))
-          let up = simd_cross(dir, right)
-          target += (-right * Float(dx) + up * Float(dy)) * (dist * 0.0016 * Float(n.panSpeed))
-        },
-        onZoom: { delta in
-          let n = NavState.shared
-          let d = Float(delta) * (n.invertZoom ? -1 : 1)
-          dist = max(0.35, min(20, dist * (1 - d * 0.01 * Float(n.zoomSpeed))))
-        },
-        onFit: {
-          withAnimation(.easeInOut(duration: 0.25)) {
-            target = .zero; dist = 2.6; yaw = 0.7; pitch = 0.42
-          }
-        },
-        onClick: { session.toggleModelSelection() }   // whole-object select (like the bench)
-      )
-    }
+    .overlay { GeometryReader { geo in navigation(viewport: geo.size) } }
     .overlay(alignment: .topLeading) { engineBadge.padding(12).allowsHitTesting(false) }
+    .overlay(alignment: .topLeading) { moveGizmoLayer }
+    .overlay(alignment: .topTrailing) {
+      if RenderState.shared.showViewCube {
+        ViewCube(yaw: yaw, pitch: pitch) { newYaw, newPitch in
+          withAnimation(.easeInOut(duration: 0.28)) { yaw = newYaw; pitch = newPitch }
+        }
+        .padding(.top, 18).padding(.trailing, 18)
+      }
+    }
+    }
+  }
+
+  /// Move controls, anchored where the body was double-clicked.
+  @ViewBuilder private var moveGizmoLayer: some View {
+    let pick = SelectionModel.shared
+    if pick.showsMoveControls, let point = pick.gizmoPoint {
+      MoveGizmo(
+        onNudge: { dx, dy in nudgeSelectedPart(dx: dx, dy: dy) },
+        onDismiss: { withAnimation(.easeOut(duration: 0.12)) { pick.clear() } })
+        .position(x: point.x, y: point.y)
+    }
+  }
+
+  /// Drag the selected part in the camera's screen plane (character space).
+  private func nudgeSelectedPart(dx: CGFloat, dy: CGFloat) {
+    guard let partID = SelectionModel.shared.partID,
+      let index = ProjectModel.shared.activeIndex,
+      let part = ProjectModel.shared.characters[index].parts.firstIndex(where: { $0.id == partID })
+    else { return }
+    let dir = orbitDir()
+    let right = simd_normalize(simd_cross(SIMD3<Float>(0, 1, 0), dir))
+    let up = simd_cross(dir, right)
+    let metresPerPoint = dist * 0.0016
+    let delta = (right * Float(dx) - up * Float(dy)) * metresPerPoint
+    ProjectModel.shared.characters[index].parts[part].restTransform.translation += delta
+  }
+
+  /// Mouse navigation + CAD picking. Extracted from `body` to keep the
+  /// type-checker fast.
+  private func navigation(viewport: CGSize) -> some View {
+    CADNavigationView(
+      onRotate: { dx, dy in
+        let n = NavState.shared
+        yaw -= Float(dx) * 0.008 * Float(n.orbitSpeed) * (n.invertOrbitX ? -1 : 1)
+        let next = pitch + Float(dy) * 0.008 * Float(n.orbitSpeed) * (n.invertOrbitY ? -1 : 1)
+        pitch = max(-1.5, min(1.5, next))
+      },
+      onPan: { dx, dy in
+        let n = NavState.shared
+        let dir = orbitDir()
+        let right = simd_normalize(simd_cross(SIMD3<Float>(0, 1, 0), dir))
+        let up = simd_cross(dir, right)
+        target += (-right * Float(dx) + up * Float(dy)) * (dist * 0.0016 * Float(n.panSpeed))
+      },
+      onZoom: { delta in
+        let n = NavState.shared
+        let d = Float(delta) * (n.invertZoom ? -1 : 1)
+        dist = max(0.35, min(20, dist * (1 - d * 0.01 * Float(n.zoomSpeed))))
+      },
+      onFit: {
+        withAnimation(.easeInOut(duration: 0.25)) {
+          target = .zero
+          dist = 2.6
+          yaw = 0.7
+          pitch = 0.42
+        }
+      },
+      onClick: { point in select(at: point, viewport: viewport, body: false) },
+      onDoubleClick: { point in select(at: point, viewport: viewport, body: true) })
+  }
+
+  /// Ray-cast the click; single click picks a face, double click the whole body.
+  private func select(at point: CGPoint, viewport: CGSize, body: Bool) {
+    let geometry = document.renderGeometry
+    let ray = Picking.cameraRay(
+      point: point, viewport: viewport,
+      position: target + orbitDir() * dist, target: target)
+    let container = Picking.containerMatrix(for: geometry)
+    let pose = RigModel.shared.poseByNode(assetName: assetName)
+    guard let hit = Picking.pick(ray: ray, geometry: geometry, container: container, pose: pose)
+    else {
+      SelectionModel.shared.clear()
+      return
+    }
+    let part = RigModel.shared.parts.first {
+      $0.assetName == assetName && $0.node == hit.node
+    }?.id
+    withAnimation(.easeOut(duration: 0.12)) {
+      if body {
+        SelectionModel.shared.selectBody(node: hit.node, part: part, at: point)
+      } else {
+        SelectionModel.shared.selectFace(hit.face, node: hit.node, part: part, at: point)
+      }
     }
   }
 
@@ -173,57 +327,112 @@ struct PartViewport: View {
     .overlay(Capsule().stroke(UI.stroke, lineWidth: 1))
   }
 
-  // One mesh part per RenderGeometry batch (a rigid part + material identity), so
-  // imported STEP/XDE face colors survive. Buffers are flattened once at import.
-  static func mesh(from doc: GeometryDocument) throws -> MeshResource {
-    let g = doc.renderGeometry
+  // Batches grouped by assembly node — one rendered entity per part so the rig
+  // can pose parts independently. Within a node, each batch keeps its STEP color.
+  struct NodeGroup { let node: Int; let batches: [RenderBatch] }
+
+  static func nodeGroups(_ doc: GeometryDocument) -> [NodeGroup] {
+    var byNode: [Int: [RenderBatch]] = [:]
+    for batch in doc.renderGeometry.batches { byNode[batch.assemblyNode, default: []].append(batch) }
+    return byNode.keys.sorted().map { NodeGroup(node: $0, batches: byNode[$0] ?? []) }
+  }
+
+  static func entity(for group: NodeGroup, document: GeometryDocument, theme: BenchTheme,
+    selected: Bool, pick: SelectionModel) -> ModelEntity?
+  {
+    let g = document.renderGeometry
     var descriptors: [MeshDescriptor] = []
-    for (i, batch) in g.batches.enumerated() {
+    var materials: [RealityKit.Material] = []
+
+    for (i, batch) in group.batches.enumerated() {
       let base = UInt32(batch.vertexRange.lowerBound)
-      var d = MeshDescriptor(name: "batch\(i)")
-      d.positions = MeshBuffers.Positions(Array(g.positions[batch.vertexRange]))
-      d.normals = MeshBuffers.Normals(Array(g.normals[batch.vertexRange]))
-      d.primitives = .triangles(g.indices[batch.indexRange].map { $0 - base })
-      d.materials = .allFaces(UInt32(i))   // maps to materials[i]
-      descriptors.append(d)
+      let positions = Array(g.positions[batch.vertexRange])
+      let normals = Array(g.normals[batch.vertexRange])
+
+      // Split this batch's triangles by whether the pick highlights their face.
+      var plain: [UInt32] = []
+      var highlighted: [UInt32] = []
+      var k = batch.indexRange.lowerBound
+      while k + 2 < batch.indexRange.upperBound {
+        let a = g.indices[k], b = g.indices[k + 1], c = g.indices[k + 2]
+        let face = Int(a) < g.faceIDs.count ? g.faceIDs[Int(a)] : 0
+        let hot = pick.highlights(face: face, node: group.node)
+        if hot {
+          highlighted.append(contentsOf: [a - base, b - base, c - base])
+        } else {
+          plain.append(contentsOf: [a - base, b - base, c - base])
+        }
+        k += 3
+      }
+
+      func add(_ indices: [UInt32], highlight: Bool) {
+        guard !indices.isEmpty else { return }
+        var d = MeshDescriptor(name: "n\(group.node)-b\(i)-\(highlight ? "hot" : "base")")
+        d.positions = MeshBuffers.Positions(positions)
+        d.normals = MeshBuffers.Normals(normals)
+        d.primitives = .triangles(indices)
+        d.materials = .allFaces(UInt32(materials.count))
+        descriptors.append(d)
+        materials.append(highlight
+          ? highlightMaterial(theme: theme)
+          : material(batch.materialColor, theme: theme, selected: selected))
+      }
+      add(plain, highlight: false)
+      add(highlighted, highlight: true)
     }
-    if descriptors.isEmpty {   // fallback: one part, whole mesh
-      var d = MeshDescriptor(name: "part")
-      d.positions = MeshBuffers.Positions(g.positions)
-      d.normals = MeshBuffers.Normals(g.normals)
-      d.primitives = .triangles(g.indices)
-      descriptors = [d]
+
+    guard !descriptors.isEmpty, let mesh = try? MeshResource.generate(from: descriptors) else {
+      return nil
     }
-    return try MeshResource.generate(from: descriptors)
+    let entity = ModelEntity(mesh: mesh, materials: materials)
+    entity.name = "node-\(group.node)"
+    return entity
   }
 
-  // One material per batch — imported color passed through the theme (which may
-  // override it). `overrideColor == nil` preserves the STEP color per part.
-  // Note: whole-part "selected" no longer recolors — that washed real CAD colors.
-  // Selection highlighting will target the picked sub-part once 3D picking lands.
-  static func materials(_ doc: GeometryDocument, theme: BenchTheme, selected: Bool) -> [RealityKit.Material] {
-    let batches = doc.renderGeometry.batches
-    if batches.isEmpty { return [material(nil, theme: theme, selected: selected)] }
-    return batches.map { material($0.materialColor, theme: theme, selected: selected) }
-  }
-
-  static func material(_ imported: SIMD4<UInt8>?, theme: BenchTheme, selected: Bool) -> RealityKit.Material {
+  /// One material per batch — imported colour passed through the theme
+  /// (`overrideColor == nil` preserves the STEP colour per part).
+  static func material(_ imported: SIMD4<UInt8>?, theme: BenchTheme, selected: Bool)
+    -> RealityKit.Material
+  {
     var m = PhysicallyBasedMaterial()
     let importedF = imported.map {
       SIMD4<Float>(Float($0.x) / 255, Float($0.y) / 255, Float($0.z) / 255, Float($0.w) / 255)
     } ?? theme.neutralColor
-    let disp = theme.displayColor(for: importedF)   // overrideColor ?? imported
-    var base = nsColor4(disp)
+    let disp = theme.displayColor(for: importedF)
     m.roughness = .init(floatLiteral: theme.roughness)
     m.metallic = .init(floatLiteral: theme.metallic)
-    if selected {   // selection highlight — mix toward the theme's selection color + glow
-      let sel = nsColor3(theme.selectionColor)
-      base = base.blended(withFraction: 0.55, of: sel) ?? base
-      m.emissiveColor = .init(color: sel)
-      m.emissiveIntensity = 0.35
-    }
-    m.baseColor = .init(tint: base)
+    m.baseColor = .init(tint: nsColor4(disp))
     return m
+  }
+
+  /// The picked face/body — the theme's selection colour, as in CAD.
+  static func highlightMaterial(theme: BenchTheme) -> RealityKit.Material {
+    var m = PhysicallyBasedMaterial()
+    let tint = nsColor3(theme.selectionColor)
+    m.baseColor = .init(tint: tint)
+    m.emissiveColor = .init(color: tint)
+    m.emissiveIntensity = 0.35
+    m.roughness = .init(floatLiteral: 0.35)
+    m.metallic = .init(floatLiteral: 0)
+    return m
+  }
+
+  /// X/Y/Z axes at the character origin (unlit so they read at any lighting).
+  static func makeOriginAxes(length: Float = 0.62, thickness: Float = 0.005) -> Entity {
+    let origin = Entity()
+    origin.name = "origin"
+    let axes: [(SIMD3<Float>, SIMD3<Float>, NSColor)] = [
+      ([length, thickness, thickness], [length / 2, 0, 0], .systemRed),
+      ([thickness, length, thickness], [0, length / 2, 0], .systemGreen),
+      ([thickness, thickness, length], [0, 0, length / 2], .systemBlue),
+    ]
+    for (size, position, color) in axes {
+      let mesh = MeshResource.generateBox(size: size)
+      let entity = ModelEntity(mesh: mesh, materials: [UnlitMaterial(color: color)])
+      entity.position = position
+      origin.addChild(entity)
+    }
+    return origin
   }
 
   static func nsColor4(_ c: SIMD4<Float>) -> NSColor {
@@ -242,12 +451,14 @@ struct CADNavigationView: NSViewRepresentable {
   var onPan: (CGFloat, CGFloat) -> Void
   var onZoom: (CGFloat) -> Void
   var onFit: () -> Void
-  var onClick: () -> Void = {}
+  var onClick: (CGPoint) -> Void = { _ in }
+  var onDoubleClick: (CGPoint) -> Void = { _ in }
 
   func makeNSView(context: Context) -> NavNSView { let v = NavNSView(); apply(v); return v }
   func updateNSView(_ v: NavNSView, context: Context) { apply(v) }
   private func apply(_ v: NavNSView) {
-    v.onRotate = onRotate; v.onPan = onPan; v.onZoom = onZoom; v.onFit = onFit; v.onClick = onClick
+    v.onRotate = onRotate; v.onPan = onPan; v.onZoom = onZoom; v.onFit = onFit
+    v.onClick = onClick; v.onDoubleClick = onDoubleClick
   }
 
   final class NavNSView: NSView {
@@ -255,13 +466,20 @@ struct CADNavigationView: NSViewRepresentable {
     var onPan: ((CGFloat, CGFloat) -> Void)?
     var onZoom: ((CGFloat) -> Void)?
     var onFit: (() -> Void)?
-    var onClick: (() -> Void)?
+    var onClick: ((CGPoint) -> Void)?
+    var onDoubleClick: ((CGPoint) -> Void)?
     private var dragged = false   // distinguishes a select-click from a rotate-drag
     override var acceptsFirstResponder: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { self }
     override func mouseDown(with e: NSEvent) { dragged = false }
     override func mouseDragged(with e: NSEvent) { dragged = true; onRotate?(e.deltaX, e.deltaY) }
-    override func mouseUp(with e: NSEvent) { if !dragged { onClick?() } }
+    override func mouseUp(with e: NSEvent) {
+      guard !dragged else { return }
+      // AppKit y grows upward; SwiftUI/pick space grows downward.
+      let local = convert(e.locationInWindow, from: nil)
+      let point = CGPoint(x: local.x, y: bounds.height - local.y)
+      if e.clickCount >= 2 { onDoubleClick?(point) } else { onClick?(point) }
+    }
     override func rightMouseDragged(with e: NSEvent) { onRotate?(e.deltaX, e.deltaY) }
     override func otherMouseDragged(with e: NSEvent) { onPan?(e.deltaX, e.deltaY) }
     override func otherMouseDown(with e: NSEvent) { if e.clickCount == 2 { onFit?() } }

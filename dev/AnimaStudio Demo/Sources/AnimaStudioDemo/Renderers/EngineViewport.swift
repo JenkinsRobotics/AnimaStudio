@@ -9,7 +9,7 @@ import SwiftUI
 @MainActor @Observable final class BenchSession {
   var theme: BenchTheme { RenderState.shared.theme }   // shared across all engines
   var camera = CADCameraState()
-  var isModelSelected = true
+  var isModelSelected = false   // start unselected so true STEP colors show
   var renderRevision = 0
   var benchmarkPulse = 0
   var status = ""
@@ -27,13 +27,14 @@ import SwiftUI
 
 struct EngineViewport: View {
   let document: GeometryDocument
+  var assetName: String = ""
   @State private var session = BenchSession()
 
   var body: some View {
     Group {
       switch RenderState.shared.engine {
       case .realityKit:
-        PartViewport(document: document, session: session)
+        PartViewport(document: document, assetName: assetName, session: session)
       case .metal:
         MetalBenchView(session: session, document: document)
       case .rayTraced:

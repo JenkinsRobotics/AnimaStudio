@@ -4,7 +4,7 @@ import GeomKit
 import SwiftUI
 import simd
 
-enum MateType: String, CaseIterable, Identifiable {
+enum MateType: String, CaseIterable, Identifiable, Codable {
   case fastened, revolute, slider, cylindrical, planar, ball
   var id: String { rawValue }
   var label: String { rawValue.capitalized }
@@ -23,7 +23,7 @@ enum MateType: String, CaseIterable, Identifiable {
   var unit: String { self == .slider || self == .cylindrical ? "mm" : "°" }
 }
 
-enum MateAxis: String, CaseIterable, Identifiable {
+enum MateAxis: String, CaseIterable, Identifiable, Codable {
   case x = "X", y = "Y", z = "Z"
   var id: String { rawValue }
   var vector: SIMD3<Float> {
@@ -35,21 +35,21 @@ enum MateAxis: String, CaseIterable, Identifiable {
   }
 }
 
-struct Mate: Identifiable {
-  let id = UUID()
+struct Mate: Identifiable, Codable, Equatable {
+  var id = UUID()          // var so Codable actually decodes it (identity must survive save/load)
   var name: String
   var type: MateType
-  var parent: Int          // assembly-node id
-  var child: Int           // assembly-node id
+  var parent: PartID       // stable character-part id
+  var child: PartID        // stable character-part id
   var axis: MateAxis = .z
   var minValue: Double = -90
   var maxValue: Double = 90
   var value: Double = 0
 }
 
-// A flattened row of the assembly tree (depth drives indentation).
+// A flattened row of the character's part list (depth drives indentation).
 struct RigPartRow: Identifiable {
-  let id: Int
+  let id: PartID
   let name: String
   let depth: Int
   let faceCount: Int
@@ -58,12 +58,23 @@ struct RigPartRow: Identifiable {
 @MainActor @Observable final class RigModel {
   static let shared = RigModel()
 
-  var mates: [Mate] = []
-  var selectedParts: Set<Int> = []
+  var selectedParts: Set<PartID> = []
   var selectedMateID: UUID?
+  // Rig workspace sidebar. Model-owned, not @State, so it survives the
+  // float/dock flip that rebuilds the workspace view.
+  let rigPanels = PanelStackState(
+    order: ["Structure", "Mates"],
+    defaults: ["Structure"], side: .left)
 
-  var document: GeometryDocument? { DemoModel.shared.selected?.document }
-  var nodes: [AssemblyNode] { document?.nodes ?? [] }
+  private var project: ProjectModel { ProjectModel.shared }
+
+  /// Mates belong to the active character.
+  var mates: [Mate] {
+    get { project.active?.mates ?? [] }
+    set { if let i = project.activeIndex { project.characters[i].mates = newValue } }
+  }
+
+  var parts: [CharacterPart] { project.active?.parts ?? [] }
 
   var selectedMate: Mate? {
     get { mates.first { $0.id == selectedMateID } }
@@ -73,48 +84,60 @@ struct RigPartRow: Identifiable {
     }
   }
 
-  /// Depth-first flattening of the assembly so the tree renders in order.
+  /// Character parts, indented by their depth in the source asset's node tree.
   var partRows: [RigPartRow] {
-    let nodes = self.nodes
-    guard !nodes.isEmpty else { return [] }
-    var faceCounts: [Int: Int] = [:]
-    for face in document?.faces ?? [] where face.assemblyNode >= 0 {
-      faceCounts[face.assemblyNode, default: 0] += 1
+    let docs = DemoModel.shared.documentsByName()
+    return parts.map { part in
+      let doc = docs[part.assetName]
+      let depth = doc.map { Self.nodeDepth(part.node, in: $0) } ?? 0
+      let faces = doc?.faces.reduce(0) { $0 + ($1.assemblyNode == part.node ? 1 : 0) } ?? 0
+      return RigPartRow(id: part.id, name: part.name, depth: depth, faceCount: faces)
     }
-    var childrenByParent: [Int: [Int]] = [:]
-    var roots: [Int] = []
-    for (index, node) in nodes.enumerated() {
-      if let parent = node.parentIndex, parent >= 0, parent < nodes.count {
-        childrenByParent[parent, default: []].append(index)
-      } else {
-        roots.append(index)
-      }
-    }
-    var rows: [RigPartRow] = []
-    func walk(_ index: Int, _ depth: Int) {
-      guard index < nodes.count, depth < 12 else { return }   // depth guard: cyclic STEP data
-      let node = nodes[index]
-      rows.append(RigPartRow(
-        id: index,
-        name: node.name.isEmpty ? "Part \(index)" : node.name,
-        depth: depth,
-        faceCount: faceCounts[index] ?? 0))
-      for child in childrenByParent[index] ?? [] { walk(child, depth + 1) }
-    }
-    for root in roots { walk(root, 0) }
-    return rows
   }
 
-  func partName(_ id: Int) -> String {
-    guard id >= 0, id < nodes.count else { return "—" }
-    let name = nodes[id].name
-    return name.isEmpty ? "Part \(id)" : name
+  static func nodeDepth(_ node: Int, in doc: GeometryDocument) -> Int {
+    var depth = 0
+    var current = node
+    while current >= 0, current < doc.nodes.count, depth < 12,
+      let parent = doc.nodes[current].parentIndex, parent >= 0 {
+      current = parent
+      depth += 1
+    }
+    return depth
   }
 
-  /// Creates a mate from the current two-part selection (parent = first picked).
+  func partName(_ id: PartID) -> String { parts.first { $0.id == id }?.name ?? "—" }
+
+  /// Rotation pivot per part: the part's centroid in CHARACTER space.
+  func pivots() -> [PartID: SIMD3<Float>] {
+    let bounds = DemoModel.shared.nodeBounds()
+    var out: [PartID: SIMD3<Float>] = [:]
+    for part in parts {
+      guard let box = bounds[part.assetName]?[part.node] else { continue }
+      let centre = (box.0 + box.1) * 0.5
+      let p = part.restTransform.matrix * SIMD4<Float>(centre, 1)
+      out[part.id] = SIMD3(p.x, p.y, p.z)
+    }
+    return out
+  }
+
+  func pose() -> [PartID: simd_float4x4] { RigPose.evaluate(mates: mates, pivots: pivots()) }
+
+  /// Pose keyed by assembly node, for rendering one asset's document.
+  func poseByNode(assetName: String) -> [Int: simd_float4x4] {
+    let pose = self.pose()
+    var out: [Int: simd_float4x4] = [:]
+    for part in parts where part.assetName == assetName {
+      if let m = pose[part.id] { out[part.node] = m }
+    }
+    return out
+  }
+
+  /// Creates a mate between the two selected parts (parent = first picked).
   @discardableResult
   func addMate(_ type: MateType) -> Mate? {
-    let picked = selectedParts.sorted()
+    let ordered = parts.map(\.id).filter { selectedParts.contains($0) }
+    let picked = ordered.count >= 2 ? ordered : Array(selectedParts)
     guard picked.count >= 2 else { return nil }
     let mate = Mate(
       name: "\(type.label) \(mates.filter { $0.type == type }.count + 1)",
@@ -130,7 +153,7 @@ struct RigPartRow: Identifiable {
     if selectedMateID == id { selectedMateID = mates.last?.id }
   }
 
-  func togglePart(_ id: Int, extending: Bool) {
+  func togglePart(_ id: PartID, extending: Bool) {
     if extending {
       if selectedParts.contains(id) { selectedParts.remove(id) } else { selectedParts.insert(id) }
     } else {

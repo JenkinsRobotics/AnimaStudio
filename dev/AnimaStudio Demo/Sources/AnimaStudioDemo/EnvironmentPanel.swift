@@ -48,6 +48,16 @@ struct EnvironmentPanel: View {
           set: { render.theme.key.intensity = Float($0) }), in: 0...6000)
       }
 
+      Toggle(isOn: $render.showOrigin) {
+        Text("Show origin").font(.system(size: 11)).foregroundStyle(UI.text2)
+      }
+      .toggleStyle(.switch).controlSize(.mini)
+
+      Toggle(isOn: $render.showViewCube) {
+        Text("View cube").font(.system(size: 11)).foregroundStyle(UI.text2)
+      }
+      .toggleStyle(.switch).controlSize(.mini)
+
       Toggle(isOn: preserve) {
         Text("Keep STEP colors").font(.system(size: 11)).foregroundStyle(UI.text2)
       }

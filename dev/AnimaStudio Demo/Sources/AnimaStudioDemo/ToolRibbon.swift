@@ -14,6 +14,34 @@ enum ToolPopupStyle: String, CaseIterable, Identifiable {
 @Observable final class RibbonSettings {
   static let shared = RibbonSettings()
   var popupStyle: ToolPopupStyle = .list
+  var density: ToolDensity = .standard
+  var activeCategory = ""   // expanded tool sidebar: selected category tab
+}
+
+/// The armed tool, shared app-wide so the viewport, prompt bar, and ribbon all
+/// agree on what the pointer is currently doing. One tool armed at a time.
+@MainActor @Observable final class ToolState {
+  static let shared = ToolState()
+
+  private(set) var tool: RibbonTool?
+  private(set) var groupName = ""
+  private(set) var tint: Color = .accentColor
+  /// Stays armed after a commit, so you can place several in a row (CAD idiom).
+  var repeats = true
+
+  var isArmed: Bool { tool != nil }
+  var prompt: String { tool.map { "\($0.label) — click in the viewport. Esc to cancel." } ?? "" }
+
+  func arm(_ tool: RibbonTool, in group: RibbonGroup) {
+    self.tool = tool
+    groupName = group.name
+    tint = group.tint
+  }
+
+  func disarm() { tool = nil }
+
+  /// Call after a tool commits; honours `repeats`.
+  func committed() { if !repeats { disarm() } }
 }
 
 struct RibbonTool: Identifiable {
@@ -37,8 +65,8 @@ struct RibbonGroup: Identifiable {
 struct ToolRibbon: View {
   let groups: [RibbonGroup]
   @State private var openGroupID: UUID?    // floating: which category popup is open
-  @State private var activeToolID: UUID?
   private var layout: LayoutState { LayoutState.shared }
+  private var activeToolID: UUID? { ToolState.shared.tool?.id }
 
   var body: some View {
     if layout.ribbonDocked { docked } else { floating }
@@ -77,18 +105,19 @@ struct ToolRibbon: View {
         .foregroundStyle(UI.text3).padding(.horizontal, 10).padding(.top, 9)
       if RibbonSettings.shared.popupStyle == .grid {
         LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 6), count: 4), spacing: 6) {
-          ForEach(g.tools) { t in gridTool(t, g.tint) }
+          ForEach(g.tools) { t in gridTool(t, g) }
         }.padding(.horizontal, 6).padding(.bottom, 6)
       } else {
-        VStack(spacing: 2) { ForEach(g.tools) { t in listRow(t, g.tint) } }
+        VStack(spacing: 2) { ForEach(g.tools) { t in listRow(t, g) } }
           .padding(.horizontal, 6).padding(.bottom, 6)
       }
     }
     .frame(width: 190)
   }
 
-  private func listRow(_ t: RibbonTool, _ tint: Color) -> some View {
-    Button { activeToolID = t.id; openGroupID = nil } label: {
+  private func listRow(_ t: RibbonTool, _ g: RibbonGroup) -> some View {
+    let tint = g.tint
+    return Button { ToolState.shared.arm(t, in: g); openGroupID = nil } label: {
       HStack(spacing: 10) {
         Image(systemName: t.icon).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).frame(width: 20)
         Text(t.label).font(.system(size: 12.5)).foregroundStyle(UI.text)
@@ -103,9 +132,10 @@ struct ToolRibbon: View {
     }.buttonStyle(.plain)
   }
 
-  private func gridTool(_ t: RibbonTool, _ tint: Color) -> some View {
+  private func gridTool(_ t: RibbonTool, _ g: RibbonGroup) -> some View {
+    let tint = g.tint
     let active = activeToolID == t.id
-    return Button { activeToolID = t.id; openGroupID = nil } label: {
+    return Button { ToolState.shared.arm(t, in: g); openGroupID = nil } label: {
       Image(systemName: t.icon).font(.system(size: 16, weight: .medium))
         .foregroundStyle(active ? .white : tint)
         .frame(width: 40, height: 40)
@@ -119,7 +149,7 @@ struct ToolRibbon: View {
       ForEach(Array(groups.enumerated()), id: \.element.id) { i, g in
         VStack(alignment: .leading, spacing: 5) {
           HStack(spacing: 4) {
-            ForEach(g.tools) { t in dockedTool(t, tint: g.tint) }
+            ForEach(g.tools) { t in dockedTool(t, in: g) }
           }
           Text(g.name.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.6)
             .foregroundStyle(UI.text3).padding(.leading, 6)
@@ -134,9 +164,10 @@ struct ToolRibbon: View {
     .background(UI.panel.opacity(0.6))
   }
 
-  private func dockedTool(_ t: RibbonTool, tint: Color) -> some View {
+  private func dockedTool(_ t: RibbonTool, in g: RibbonGroup) -> some View {
+    let tint = g.tint
     let active = activeToolID == t.id
-    return Button { activeToolID = t.id } label: {
+    return Button { ToolState.shared.arm(t, in: g) } label: {
       VStack(spacing: 5) {
         Image(systemName: t.icon).font(.system(size: 19, weight: .regular)).foregroundStyle(tint)
         Text(t.label).font(.system(size: 10.5)).foregroundStyle(UI.text2)

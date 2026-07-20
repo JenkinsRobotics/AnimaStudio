@@ -183,3 +183,120 @@ struct InspectorTabs: View {
     .background(UI.inset, in: RoundedRectangle(cornerRadius: 9))
   }
 }
+
+// MARK: - Feature timeline
+
+/// One node in a horizontal feature/parametric timeline.
+struct FeatureTimelineItem: Identifiable {
+  let id = UUID()
+  var icon: String
+  var title: String
+  init(_ icon: String, _ title: String) { self.icon = icon; self.title = title }
+}
+
+/// A horizontal timeline of feature nodes: a play head, then chips separated by
+/// reorder handles, ending in an add button. Onshape/Fusion history-bar idiom.
+struct FeatureTimeline: View {
+  var items: [FeatureTimelineItem]
+  var selectedID: UUID?
+  var onSelect: (UUID) -> Void = { _ in }
+  var onPlay: () -> Void = {}
+  var onAdd: () -> Void = {}
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Button(action: onPlay) {
+        Image(systemName: "play.fill").font(.system(size: 11))
+          .foregroundStyle(UI.text2).frame(width: 26, height: 30)
+      }.buttonStyle(.plain)
+
+      ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+        chip(item)
+        if index < items.count - 1 {
+          Image(systemName: "ellipsis").font(.system(size: 10))
+            .foregroundStyle(UI.text3).rotationEffect(.degrees(90))
+        }
+      }
+
+      Button(action: onAdd) {
+        Image(systemName: "plus").font(.system(size: 12, weight: .medium))
+          .foregroundStyle(UI.text2).frame(width: 26, height: 30)
+      }.buttonStyle(.plain)
+    }
+    .padding(.horizontal, 6).padding(.vertical, 4)
+    .background(UI.panel, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(UI.stroke, lineWidth: 1))
+  }
+
+  private func chip(_ item: FeatureTimelineItem) -> some View {
+    let selected = selectedID == item.id
+    return Button { onSelect(item.id) } label: {
+      HStack(spacing: 7) {
+        Image(systemName: item.icon).font(.system(size: 12))
+          .foregroundStyle(selected ? UI.accent : UI.text2)
+        Text(item.title).font(.system(size: 12, weight: .medium))
+          .foregroundStyle(selected ? UI.accent : UI.text)
+      }
+      .padding(.horizontal, 11).padding(.vertical, 6)
+      .background(selected ? UI.accent.opacity(0.12) : UI.panelHi,
+        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(selected ? UI.accent.opacity(0.5) : UI.stroke, lineWidth: 1))
+    }.buttonStyle(.plain)
+  }
+}
+
+// MARK: - Document tabs
+
+/// One document/part-studio tab.
+struct DocumentTab: Identifiable {
+  let id = UUID()
+  var name: String
+  init(_ name: String) { self.name = name }
+}
+
+/// A floating pill of document tabs (DocumentTabBar) (part studios / assemblies), with a trailing
+/// add button. The active tab carries an accent underline. Onshape bottom-bar idiom.
+struct DocumentTabBar: View {
+  var tabs: [DocumentTab]
+  var selectedID: UUID?
+  var onSelect: (UUID) -> Void = { _ in }
+  var onAdd: () -> Void = {}
+
+  var body: some View {
+    HStack(spacing: 0) {
+      ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+        tabButton(tab)
+        if index < tabs.count - 1 {
+          Divider().frame(height: 18).overlay(UI.stroke)
+        }
+      }
+      Divider().frame(height: 18).overlay(UI.stroke)
+      Button(action: onAdd) {
+        Image(systemName: "plus").font(.system(size: 12, weight: .medium))
+          .foregroundStyle(UI.text2).frame(width: 34, height: 34)
+      }.buttonStyle(.plain)
+    }
+    .background(UI.panel, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(UI.stroke, lineWidth: 1))
+    .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
+  }
+
+  private func tabButton(_ tab: DocumentTab) -> some View {
+    let selected = selectedID == tab.id
+    return Button { onSelect(tab.id) } label: {
+      HStack(spacing: 7) {
+        Image(systemName: "doc").font(.system(size: 11))
+          .foregroundStyle(selected ? UI.accent : UI.text3)
+        Text(tab.name).font(.system(size: 12, weight: selected ? .medium : .regular))
+          .foregroundStyle(selected ? UI.text : UI.text2)
+      }
+      .padding(.horizontal, 13).padding(.vertical, 9)
+      .background(selected ? UI.panelHi : .clear)
+      .overlay(alignment: .bottom) {
+        if selected { Rectangle().fill(UI.accent).frame(height: 2) }
+      }
+      .contentShape(Rectangle())
+    }.buttonStyle(.plain)
+  }
+}

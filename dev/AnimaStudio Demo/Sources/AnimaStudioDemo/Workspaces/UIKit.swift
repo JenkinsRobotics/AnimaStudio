@@ -13,6 +13,7 @@ struct UIKitWorkspace: View {
   @State private var demoSearch = ""
   @State private var demoStepper = 45.0
   @State private var demoInspectorTab = 0
+  @State private var sampleMate = Mate(name: "Revolute 1", type: .revolute, parent: UUID(), child: UUID(), value: 42)
   private let cols = [GridItem(.adaptive(minimum: 300), spacing: 16)]
 
   var body: some View {
@@ -75,7 +76,9 @@ struct UIKitWorkspace: View {
         }
 
         section("Contextual Widgets") {
-          specimen("Context inspector") { ContextInspector(mate: "Knee", type: "revolute") }
+          specimen("Mate inspector") {
+            MateInspector(mate: $sampleMate, parentName: "Hub", childName: "Rim")
+          }
           specimen("Curve card") { CurveCard() }
           specimen("Environment") { EnvironmentPanel() }
           specimen("Performance HUD") {
@@ -89,10 +92,8 @@ struct UIKitWorkspace: View {
           Text("TIMELINE & GRAPH").font(.system(size: 11, weight: .semibold)).tracking(0.7)
             .foregroundStyle(UI.text3)
           specimen("Dope-sheet timeline · full width") {
-            DopeSheetTimeline(
-              tracks: [("Hip", UI.accent), ("Knee", UI.accent), ("Ankle", UI.accent2), ("Jaw", UI.warn)],
-              playhead: .constant(0.36)
-            ).frame(height: 230)
+            DopeSheetTimeline(tracks: Self.sampleTracks, progress: 0.36, duration: 8)
+              .frame(height: 230)
           }
           LazyVGrid(columns: cols, alignment: .leading, spacing: 16) {
             specimen("Graph node") {
@@ -141,6 +142,25 @@ struct UIKitWorkspace: View {
           }
         }
 
+        section("Visualization") {
+          specimen("Material spheres") {
+            HStack(spacing: 10) {
+              MaterialSphere(color: [0.90, 0.13, 0.15], glossy: true)
+              MaterialSphere(color: [0.16, 0.16, 0.17], glossy: false)
+              MaterialSphere(color: [0.83, 0.68, 0.32], glossy: true)
+              MaterialSphere(color: [0.72, 0.73, 0.76], glossy: true, checkered: true)
+            }
+          }
+          specimen("Visualization icon") {
+            HStack(spacing: 8) {
+              VisualizationIcon()
+              Text("Visualization").font(.system(size: 12, weight: .medium)).foregroundStyle(UI.text)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(UI.panelHi, in: RoundedRectangle(cornerRadius: 8))
+            }
+          }
+        }
+
         section("Node Graph") {
           specimen("Typed logic nodes") {
             VStack(spacing: 10) {
@@ -165,6 +185,12 @@ struct UIKitWorkspace: View {
               NodeLibraryRow(title: "Servo Bus", category: "hardware", icon: "cpu", color: UI.accent2)
             }
           }
+          specimen("Feature timeline") {
+            FeatureTimeline(items: Self.sampleFeatures, selectedID: Self.sampleFeatures[1].id)
+          }
+          specimen("Document tabs · floating pill") {
+            DocumentTabBar(tabs: Self.sampleDocs, selectedID: Self.sampleDocs[0].id)
+          }
         }
 
         section("Inputs") {
@@ -174,6 +200,10 @@ struct UIKitWorkspace: View {
           }
           specimen("Inspector tabs") {
             InspectorTabs(tabs: ["Properties", "Appearance", "Output"], selection: $demoInspectorTab)
+          }
+          specimen("View cube") {
+            ZStack { UI.viewportBottom; ViewCube(yaw: 0.7, pitch: 0.42) }
+              .frame(height: 150).clipShape(RoundedRectangle(cornerRadius: 10))
           }
           specimen("Axis gizmo") {
             ZStack { UI.viewportBottom; AxisGizmo() }
@@ -263,6 +293,10 @@ struct UIKitWorkspace: View {
               message: "Physics is deferred — motion is evaluated, not simulated.")
           }
           specimen("Toggle row") { ToggleRow(label: "Show edges", isOn: $demoToggle) }
+          specimen("Progress card · busy state") {
+            ProgressCard(title: "Importing model", detail: "wheel_assembly.step",
+              progress: 0.45, countText: "2 of 4")
+          }
           specimen("Progress bar") {
             VStack(spacing: 8) { ProgressBar(value: 0.62); ProgressBar(value: 0.28, tint: UI.warn) }
           }
@@ -312,6 +346,24 @@ struct UIKitWorkspace: View {
       }
     }
   }
+
+  static let sampleTracks: [TimelineTrack] = [
+    TimelineTrack(mateID: UUID(), name: "Hip", color: UI.accent, keys: [0.05, 0.3, 0.62, 0.9]),
+    TimelineTrack(mateID: UUID(), name: "Knee", color: UI.accent, keys: [0.12, 0.44, 0.78]),
+    TimelineTrack(mateID: UUID(), name: "Jaw", color: UI.warn, keys: [0.2, 0.55]),
+  ]
+
+  static let sampleDocs: [DocumentTab] = [
+    DocumentTab("ARCADP001"), DocumentTab("ARCADP002"),
+    DocumentTab("ARCADP002 Copy 1"), DocumentTab("ARCADP003"), DocumentTab("ARCADP004"),
+  ]
+
+  static let sampleFeatures: [FeatureTimelineItem] = [
+    FeatureTimelineItem("pencil", "Sketch 1"),
+    FeatureTimelineItem("square.stack.3d.up", "Extrude 1"),
+    FeatureTimelineItem("circle.lefthalf.filled", "Fillet 1"),
+    FeatureTimelineItem("flip.horizontal", "Mirror 1"),
+  ]
 
   static let sampleRibbon: [RibbonGroup] = [
     RibbonGroup("Structure", "cube.transparent", .teal, [

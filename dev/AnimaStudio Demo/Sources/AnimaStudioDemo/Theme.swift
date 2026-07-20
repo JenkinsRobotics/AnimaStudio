@@ -92,6 +92,8 @@ enum RenderEngine: String, CaseIterable, Identifiable {
   var deflectionMillimetres: Double = 0.2   // tessellation quality (lower = finer)
   var theme: BenchTheme = .studioBlue       // shading/lighting/color/edges/selection — shared by every engine
   var pinPerformance = false                // pinned live-stats HUD in the viewport corner
+  var showOrigin = true                     // character-origin axes in the 3D view
+  var showViewCube = true                   // orientation cube in the viewport corner
 }
 
 // Navigation preferences — speed/scale + invert, adjustable in Settings.

@@ -6,7 +6,8 @@ import SwiftUI
 
 enum Workspace: String, CaseIterable, Identifiable {
   case home = "Home"
-  case assets = "Assets"
+  case character = "Character"
+  case design = "Design"
   case rig = "Rig"
   case animate = "Animate"
   case show = "Show"
@@ -16,7 +17,8 @@ enum Workspace: String, CaseIterable, Identifiable {
   var icon: String {
     switch self {
     case .home: return "square.grid.2x2"
-    case .assets: return "cube.transparent"
+    case .character: return "figure.stand"
+    case .design: return "square.on.square"
     case .rig: return "point.3.connected.trianglepath.dotted"
     case .animate: return "waveform.path"
     case .show: return "rectangle.3.group"
@@ -26,14 +28,19 @@ enum Workspace: String, CaseIterable, Identifiable {
   }
   // The directed pipeline order (downstream stages gate on upstream ones).
   var stageIndex: Int { Workspace.pipeline.firstIndex(of: self) ?? 0 }
-  static let pipeline: [Workspace] = [.assets, .rig, .animate, .show, .hardware, .uiKit]
+  static let pipeline: [Workspace] = [.character, .design, .rig, .animate, .show, .hardware, .uiKit]
 }
 
 @main
 struct ClaudeUIApp: App {
+  init() {
+    // `AnimaStudioDemo --selftest` runs the headless engine checks and exits.
+    if CommandLine.arguments.contains("--selftest") { SelfTest.runAndExit() }
+  }
+
   var body: some Scene {
     WindowGroup("AnimaStudio Demo") {
-      Shell()
+      Shell(initial: .home)
         .frame(minWidth: 1180, minHeight: 740)
     }
     .windowStyle(.hiddenTitleBar)
@@ -45,7 +52,8 @@ struct ClaudeUIApp: App {
 }
 
 struct Shell: View {
-  @State private var current: Workspace = .assets
+  var initial: Workspace = .character
+  @State private var current: Workspace = .character
 
   var body: some View {
     VStack(spacing: 0) {
@@ -54,7 +62,8 @@ struct Shell: View {
       Group {
         switch current {
         case .home: HomeWorkspace(go: { current = $0 })
-        case .assets: AssetsWorkspace()
+        case .character: CharacterWorkspace()
+        case .design: DesignWorkspace()
         case .rig: RigWorkspace()
         case .animate: AnimateWorkspace()
         case .show: ShowWorkspace()
@@ -68,8 +77,27 @@ struct Shell: View {
         StatusBar(current: current)
       }
     }
+    .onAppear { current = initial }
     .background(UI.bg)
+    .overlay { importOverlay }
     .preferredColorScheme(ThemeState.shared.resolvedScheme)
+  }
+
+  /// Shown while a STEP import is running so the app never looks frozen.
+  @ViewBuilder private var importOverlay: some View {
+    let model = DemoModel.shared
+    if model.loading {
+      ZStack {
+        Color.black.opacity(0.28).ignoresSafeArea()
+        ProgressCard(
+          title: "Importing model",
+          detail: model.importingName,
+          progress: model.importProgress,
+          countText: model.importTotal > 0
+            ? "\(model.importDone) of \(model.importTotal)" : nil)
+      }
+      .transition(.opacity)
+    }
   }
 }
 
@@ -116,17 +144,96 @@ struct TopBar: View {
   private var theme: ThemeState { ThemeState.shared }
 
   var body: some View {
-    ZStack {
-      // Pipeline stages — absolutely centered in the window, independent of the
-      // side clusters' widths.
-      pipelineTabs
+    GeometryReader { geo in
+      // Progressive collapse: the header must never let the centred tabs
+      // collide with the side clusters.
+      let width = geo.size.width
+      let collapseIcons = width < 1320        // file icons -> overflow menu
+      let compactTabs = width < 1060          // tabs -> icon only
+      let compactRight = width < 880          // Live/Preview -> icons
 
-      HStack(spacing: 14) {
-        // Brand + project
-        HStack(spacing: 9) {
-        Image(systemName: "hexagon.fill").font(.system(size: 16)).foregroundStyle(UI.accent)
-          .onTapGesture { current = .home }
-        Text("Rex Animatronic").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(UI.text)
+      Group {
+        if current == .home {
+          homeHeader
+        } else {
+          // Side clusters hug their edges; the tabs are an overlay so they
+          // center on the WINDOW, not on the leftover space between clusters.
+          HStack(spacing: 10) {
+            HStack(spacing: 10) {
+              brand(compact: collapseIcons)
+              if collapseIcons { overflowMenu } else { fileIcons }
+            }
+            .fixedSize()
+
+            Spacer(minLength: 8)
+
+            globalActions(compact: compactRight).fixedSize()
+          }
+          .overlay { pipelineTabs(compact: compactTabs) }
+        }
+      }
+      .padding(.horizontal, 14)
+      .frame(width: width, height: 54)
+    }
+    .frame(height: 54)
+    .frame(maxWidth: .infinity)
+    .background(UI.panel.opacity(0.6))
+  }
+
+  /// Home gets its own chrome: identity on the left, project controls on the
+  /// right. No workspace name, Live, or Preview — there's nothing open to run.
+  private var homeHeader: some View {
+    HStack(spacing: 12) {
+      Image(systemName: "hexagon.fill").font(.system(size: 16)).foregroundStyle(UI.accent)
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Anima Studio").font(.system(size: 14, weight: .semibold)).foregroundStyle(UI.text)
+        Text("Animate digital characters and physical robots.")
+          .font(.system(size: 10)).foregroundStyle(UI.text3).lineLimit(1)
+      }
+      Spacer(minLength: 8)
+      HStack(spacing: 7) {
+        headerIcon("plus", "New character") { HomeState.shared.showNewCharacter = true }
+        headerIcon("square.and.arrow.down", "Import model") { DemoModel.shared.importFiles() }
+        headerIcon("folder", "Open a project") { ProjectStore.open() }
+        headerIcon("square.and.arrow.up", "Save") { ProjectStore.save() }
+        Divider().frame(height: 16).overlay(UI.stroke)
+        Button { withAnimation(.easeInOut(duration: 0.15)) { theme.toggleLightDark() } } label: {
+          Image(systemName: theme.isDark ? "sun.max" : "moon").font(.system(size: 12))
+            .foregroundStyle(UI.text2)
+            .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
+        }.buttonStyle(.plain).help("Toggle light / dark")
+        headerIcon("gearshape", "Settings") { openSettings() }
+      }
+      .fixedSize()
+    }
+  }
+
+  private func headerIcon(_ icon: String, _ help: String, _ action: @escaping () -> Void)
+    -> some View
+  {
+    Button(action: action) {
+      Image(systemName: icon).font(.system(size: 12)).foregroundStyle(UI.text2)
+        .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
+    }.buttonStyle(.plain).help(help)
+  }
+
+  // MARK: - Header clusters
+
+  private func brand(compact: Bool) -> some View {
+    HStack(spacing: 9) {
+      Button { withAnimation(.easeInOut(duration: 0.16)) { current = .home } } label: {
+        Image(systemName: current == .home ? "house.fill" : "house")
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(current == .home ? .white : UI.accent)
+          .frame(width: 28, height: 24)
+          .background(current == .home ? UI.accent : UI.accent.opacity(0.14),
+            in: RoundedRectangle(cornerRadius: 7))
+      }.buttonStyle(.plain).help("Home")
+      Text(DemoModel.shared.projectName)
+        .font(.system(size: 13.5, weight: .semibold)).foregroundStyle(UI.text)
+        .lineLimit(1).truncationMode(.tail)
+        .fixedSize(horizontal: true, vertical: false)
+      if !compact {
         HStack(spacing: 4) {
           Image(systemName: "checkmark.circle.fill").font(.system(size: 8, weight: .bold))
             .foregroundStyle(UI.ok)
@@ -134,71 +241,111 @@ struct TopBar: View {
         }
         .padding(.horizontal, 6).padding(.vertical, 2)
         .background(UI.ok.opacity(0.12), in: Capsule())
-      }
-
-      // Standard file/tool icons — left-aligned next to the brand.
-      HStack(spacing: 8) {
-        Divider().frame(height: 16).overlay(UI.stroke)
-        projectMenu
-        Button {} label: {
-          Image(systemName: "square.and.arrow.down").font(.system(size: 12)).foregroundStyle(UI.text2)
-            .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
-        }.buttonStyle(.plain).help("Save (⌘S)")
-        Divider().frame(height: 16).overlay(UI.stroke)
-        toolIcon("arrow.uturn.backward")
-        toolIcon("arrow.uturn.forward")
-        Divider().frame(height: 16).overlay(UI.stroke)
-        Button { withAnimation(.easeInOut(duration: 0.15)) { theme.toggleLightDark() } } label: {
-          Image(systemName: theme.isDark ? "sun.max" : "moon")
-            .font(.system(size: 12)).foregroundStyle(UI.text2)
-            .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
-        }.buttonStyle(.plain).help("Toggle light / dark")
-        Button { openSettings() } label: {
-          Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(UI.text2)
-            .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
-        }.buttonStyle(.plain).help("Settings (⌘,)")
-      }
-
-        Spacer(minLength: 12)
-
-      // Global actions
-      HStack(spacing: 8) {
-        Button { showStatus.toggle() } label: {
-          HStack(spacing: 6) {
-            Circle().fill(UI.ok).frame(width: 7, height: 7)
-            Text("Live").font(.system(size: 11, weight: .medium)).foregroundStyle(UI.text2)
-            Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(UI.text3)
-          }
-          .padding(.horizontal, 10).padding(.vertical, 6)
-          .background(UI.panel, in: Capsule()).overlay(Capsule().stroke(UI.stroke, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .help("System status & outputs")
-        .popover(isPresented: $showStatus, arrowEdge: .bottom) { SystemStatusView() }
-        Button {} label: { Pill(icon: "play.fill", label: "Preview", active: true) }
-          .buttonStyle(.plain)
-        Divider().frame(height: 16).overlay(UI.stroke)
-        layoutMenu
-      }
+        .fixedSize()
       }
     }
-    .padding(.horizontal, 16)
-    .frame(height: 54)               // fixed so the header is identical on every workspace
-    .frame(maxWidth: .infinity)
-    .background(UI.panel.opacity(0.6))
+    .fixedSize(horizontal: false, vertical: true)
   }
 
-  private var pipelineTabs: some View {
+  private var fileIcons: some View {
+    HStack(spacing: 8) {
+      Divider().frame(height: 16).overlay(UI.stroke)
+      projectMenu
+      Button { ProjectStore.save() } label: {
+        Image(systemName: "square.and.arrow.down").font(.system(size: 12)).foregroundStyle(UI.text2)
+          .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
+      }.buttonStyle(.plain).help("Save (⌘S)")
+      Divider().frame(height: 16).overlay(UI.stroke)
+      toolIcon("arrow.uturn.backward")
+      toolIcon("arrow.uturn.forward")
+      Divider().frame(height: 16).overlay(UI.stroke)
+      Button { withAnimation(.easeInOut(duration: 0.15)) { theme.toggleLightDark() } } label: {
+        Image(systemName: theme.isDark ? "sun.max" : "moon")
+          .font(.system(size: 12)).foregroundStyle(UI.text2)
+          .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
+      }.buttonStyle(.plain).help("Toggle light / dark")
+      Button { openSettings() } label: {
+        Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(UI.text2)
+          .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
+      }.buttonStyle(.plain).help("Settings (⌘,)")
+    }
+    .fixedSize()
+  }
+
+  /// Everything from `fileIcons`, folded into one menu when space is tight.
+  private var overflowMenu: some View {
+    Menu {
+      Button("New Project", systemImage: "doc.badge.plus") { ProjectStore.newProject() }
+      Button("Open…", systemImage: "folder") { ProjectStore.open() }
+      Button("Save", systemImage: "square.and.arrow.down") { ProjectStore.save() }
+      Button("Import Model…", systemImage: "cube.transparent") { DemoModel.shared.importFiles() }
+      Divider()
+      Button("Undo", systemImage: "arrow.uturn.backward") {}
+      Button("Redo", systemImage: "arrow.uturn.forward") {}
+      Divider()
+      Button(theme.isDark ? "Light Appearance" : "Dark Appearance",
+        systemImage: theme.isDark ? "sun.max" : "moon") {
+        withAnimation(.easeInOut(duration: 0.15)) { theme.toggleLightDark() }
+      }
+      Button("Settings…", systemImage: "gearshape") { openSettings() }
+      Divider()
+      Button("Close Project", systemImage: "xmark.circle") {
+        ProjectStore.newProject()
+        StudioProject.shared.close()
+      }
+    } label: {
+      Image(systemName: "line.3.horizontal").font(.system(size: 13)).foregroundStyle(UI.text2)
+        .frame(width: 28, height: 24).background(UI.panel, in: RoundedRectangle(cornerRadius: 6))
+    }
+    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+    .help("File, edit, and settings")
+  }
+
+  private func globalActions(compact: Bool) -> some View {
+    HStack(spacing: 8) {
+      Button { showStatus.toggle() } label: {
+        HStack(spacing: 6) {
+          Circle().fill(UI.ok).frame(width: 7, height: 7)
+          if !compact {
+            Text("Live").font(.system(size: 11, weight: .medium)).foregroundStyle(UI.text2)
+            Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+              .foregroundStyle(UI.text3)
+          }
+        }
+        .padding(.horizontal, compact ? 8 : 10).padding(.vertical, 6)
+        .background(UI.panel, in: Capsule()).overlay(Capsule().stroke(UI.stroke, lineWidth: 1))
+      }
+      .buttonStyle(.plain).help("System status & outputs")
+      .popover(isPresented: $showStatus, arrowEdge: .bottom) { SystemStatusView() }
+
+      Button {} label: {
+        if compact {
+          Image(systemName: "play.fill").font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 24).background(UI.accent, in: Capsule())
+        } else {
+          Pill(icon: "play.fill", label: "Preview", active: true)
+        }
+      }.buttonStyle(.plain)
+
+      Divider().frame(height: 16).overlay(UI.stroke)
+      layoutMenu
+    }
+    .fixedSize()
+  }
+
+  private func pipelineTabs(compact: Bool) -> some View {
     HStack(spacing: 2) {
       ForEach(Workspace.pipeline) { stage in
         Button { withAnimation(.easeInOut(duration: 0.16)) { current = stage } } label: {
-          StageChip(stage: stage, active: current == stage)
+          StageChip(stage: stage, active: current == stage, compact: compact)
         }
         .buttonStyle(.plain)
       }
     }
     .padding(4).background(UI.panelHi, in: Capsule())
     .overlay(Capsule().stroke(UI.stroke, lineWidth: 1))
+    .fixedSize()
   }
 
   // Studio layout toggle — click cycles Floating → Docked → Canvas; the menu
@@ -229,12 +376,19 @@ struct TopBar: View {
   // importer; the rest are placeholders until persistence lands.
   private var projectMenu: some View {
     Menu {
-      Button("New Project", systemImage: "doc.badge.plus") {}
-      Button("Open…", systemImage: "folder") {}
+      Button("New Project", systemImage: "doc.badge.plus") { ProjectStore.newProject() }
+      Button("Open…", systemImage: "folder") { ProjectStore.open() }
       Divider()
-      Button("Save", systemImage: "square.and.arrow.down") {}
-      Button("Import Model…", systemImage: "square.and.arrow.down.on.square") {
+      Button("Save", systemImage: "square.and.arrow.down") { ProjectStore.save() }
+      Button("Save As…", systemImage: "square.and.arrow.down.on.square") { ProjectStore.saveAs() }
+      Divider()
+      Button("Import Model…", systemImage: "cube.transparent") {
         DemoModel.shared.importFiles()
+      }
+      Divider()
+      Button("Close Project", systemImage: "xmark.circle") {
+        ProjectStore.newProject()
+        StudioProject.shared.close()
       }
     } label: {
       Image(systemName: "doc").font(.system(size: 12)).foregroundStyle(UI.text2)
@@ -254,13 +408,15 @@ struct TopBar: View {
 struct StageChip: View {
   var stage: Workspace
   var active: Bool
+  var compact = false
   var body: some View {
     HStack(spacing: 6) {
       Image(systemName: stage.icon).font(.system(size: 12, weight: .medium))
-      Text(stage.rawValue).font(.system(size: 12.5, weight: .medium))
+      if !compact { Text(stage.rawValue).font(.system(size: 12.5, weight: .medium)) }
     }
     .foregroundStyle(active ? .white : UI.text2)
-    .padding(.horizontal, 13).padding(.vertical, 7)
+    .help(stage.rawValue)
+    .padding(.horizontal, compact ? 9 : 13).padding(.vertical, 7)
     .background(active ? UI.accent : .clear, in: Capsule())
     .contentShape(Capsule())
   }

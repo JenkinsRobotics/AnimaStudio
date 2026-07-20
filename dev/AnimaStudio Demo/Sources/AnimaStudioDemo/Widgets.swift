@@ -332,3 +332,38 @@ struct ChipPicker: View {
     }
   }
 }
+
+// Busy card for long operations (STEP import). Shows a spinner, what's being
+// worked on, and a determinate bar once the batch size is known.
+struct ProgressCard: View {
+  var title: String
+  var detail: String = ""
+  var progress: Double? = nil        // nil = indeterminate
+  var countText: String? = nil
+
+  var body: some View {
+    VStack(spacing: 12) {
+      ProgressView().controlSize(.large).progressViewStyle(.circular)
+      VStack(spacing: 4) {
+        Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(UI.text)
+        if !detail.isEmpty {
+          Text(detail).font(.system(size: 11)).foregroundStyle(UI.text3)
+            .lineLimit(1).truncationMode(.middle)
+        }
+      }
+      if let progress {
+        VStack(spacing: 5) {
+          ProgressBar(value: progress)
+          if let countText {
+            Text(countText).font(.system(size: 9.5, design: .monospaced)).foregroundStyle(UI.text3)
+          }
+        }
+      }
+    }
+    .padding(22)
+    .frame(width: 260)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(UI.stroke, lineWidth: 1))
+    .shadow(color: .black.opacity(0.28), radius: 26, y: 12)
+  }
+}
