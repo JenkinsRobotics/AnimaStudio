@@ -130,7 +130,9 @@
   categories. Animate exposes Transport, Keyframes, Curves, Tracks, and
   Reference independently, limiting its expanded row to seven tools; Standard
   and Compact collapse each family into one menu button instead of squeezing
-  every command into one oversized row. Sidebar
+  every command into one oversized row. Nodes likewise condenses its ten source
+  families into Canvas, Authoring, Logic, Data, AI + Voice, and Outputs while
+  retaining the complete node catalog. Sidebar
   tabs live in workspace-observable state, right presentation and camera state
   are app-wide, tool density/category is shared, and the Studio mode is global,
   so switching workspaces or view branches does not reset the shell. The

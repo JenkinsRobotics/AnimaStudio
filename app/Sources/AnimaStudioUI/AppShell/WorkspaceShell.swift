@@ -492,9 +492,33 @@ enum StudioWorkspaceToolCatalog {
   }
 
   static func categories(for workspace: StudioWorkspaceKind) -> [StudioToolCategory] {
-    groups(for: workspace).map { group in
+    if workspace == .nodes { return nodeCategories() }
+    return groups(for: workspace).map { group in
       StudioToolCategory(id: group.id, title: group.title, groups: [group])
     }
+  }
+
+  private static func nodeCategories() -> [StudioToolCategory] {
+    let nodeGroups = groups(for: .nodes)
+
+    func category(_ id: String, _ title: String, groups titles: [String]) -> StudioToolCategory {
+      StudioToolCategory(
+        id: id,
+        title: title,
+        groups: titles.compactMap { title in
+          nodeGroups.first { $0.title == title }
+        }
+      )
+    }
+
+    return [
+      category("nodes.canvas", "Canvas", groups: ["Graph"]),
+      category("nodes.authoring", "Authoring", groups: ["Flow", "Actions"]),
+      category("nodes.logic", "Logic", groups: ["Program Logic", "Conditions"]),
+      category("nodes.data", "Data", groups: ["I/O & Registers", "Background"]),
+      category("nodes.ai", "AI + Voice", groups: ["Inputs", "Voice & AI"]),
+      category("nodes.outputs", "Outputs", groups: ["Outputs"]),
+    ]
   }
 
   @MainActor

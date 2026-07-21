@@ -88,6 +88,33 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
     XCTAssertTrue(groups.dropFirst(3).flatMap(\.tools).allSatisfy { !$0.isImplemented })
   }
 
+  func testNodeExpandedRibbonUsesCondensedOperatorCategoriesWithoutLosingTools() {
+    let categories = StudioWorkspaceToolCatalog.categories(for: .nodes)
+    XCTAssertEqual(
+      categories.map(\.title),
+      ["Canvas", "Authoring", "Logic", "Data", "AI + Voice", "Outputs"]
+    )
+    XCTAssertEqual(
+      categories.map { $0.groups.map(\.title) },
+      [
+        ["Graph"],
+        ["Flow", "Actions"],
+        ["Program Logic", "Conditions"],
+        ["I/O & Registers", "Background"],
+        ["Inputs", "Voice & AI"],
+        ["Outputs"],
+      ]
+    )
+    XCTAssertEqual(
+      categories.flatMap(\.groups).flatMap(\.tools).map(\.title).sorted(),
+      WorkspaceRibbonCatalog.groups(for: .nodes).flatMap(\.tools).map(\.title).sorted()
+    )
+    XCTAssertLessThanOrEqual(
+      categories.map { $0.groups.flatMap(\.tools).count }.max() ?? 0,
+      12
+    )
+  }
+
   func testHardwareCatalogIncludesConnectionMappingCalibrationSafetyAndMonitoring() {
     XCTAssertEqual(
       WorkspaceRibbonCatalog.groups(for: .hardware).map(\.title),

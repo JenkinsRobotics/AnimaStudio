@@ -1888,3 +1888,11 @@ does the heavy implementation; Codex reviews it and plans what's next.
   every action. Strict touched lint, 319 XCTest tests, 22 bridge/integration
   tests, the native/root build, helper embedding, strict deep signing, and a
   clean root-app launch (PID 93863) pass.
+
+- **2026-07-20 — OUT: the Nodes tool bar is now condensed too.** Its ten
+  source families are retained but presented through six operator categories:
+  Canvas, Authoring, Logic, Data, AI + Voice, and Outputs. Expanded shows only
+  the selected bounded category; Standard/Compact retain their grouped menus.
+  A deterministic no-loss test covers every original node tool. Strict touched
+  lint, 320 XCTest tests, 22 bridge/integration tests, native/root build, helper
+  embedding, deep signing, and clean launch (PID 4025) pass.

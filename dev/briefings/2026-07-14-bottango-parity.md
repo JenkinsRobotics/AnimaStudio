@@ -3515,3 +3515,11 @@ change needed in the Handoff log instead of inventing commands.
   density coverage joins the suite; strict touched lint, 319 XCTest tests, 22
   bridge/integration tests, the native/root build, helper embedding, and strict
   deep signing pass. The rebuilt root app launched cleanly as PID 93863.
+- **2026-07-20 (Codex, condensed Nodes tool bar):** Consolidated the Nodes
+  workspace's ten source families into six readable top categories—Canvas,
+  Authoring, Logic, Data, AI + Voice, and Outputs—without removing any node
+  command. Expanded shows only the chosen bounded category, while Standard and
+  Compact keep one menu per source family. A deterministic test proves the
+  reorganized catalog preserves the complete tool-title multiset. Strict
+  touched lint, 320 XCTest tests, 22 bridge/integration tests, native/root
+  build, helper embedding, deep signing, and clean launch (PID 4025) pass.
