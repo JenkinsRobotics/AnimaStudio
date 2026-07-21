@@ -75,7 +75,31 @@ final class AnimaDocumentStoreTests: XCTestCase {
       )
     )
     XCTAssertTrue(FileManager.default.fileExists(atPath: url.appendingPathComponent("scenes").path))
+    for folder in ProjectAssetFolder.allCases {
+      XCTAssertTrue(
+        FileManager.default.fileExists(
+          atPath: url.appendingPathComponent(folder.relativeDirectoryPath).path
+        ),
+        "Missing typed project folder \(folder.relativeDirectoryPath)"
+      )
+    }
     XCTAssertFalse(url.pathExtension == "animastudio")
+  }
+
+  func testOpeningOlderProjectBackfillsTypedAssetFolders() throws {
+    let url = projectURL("LegacyFolders")
+    _ = try store.save(document(), to: url)
+    try FileManager.default.removeItem(at: url.appendingPathComponent("assets"))
+
+    _ = try store.load(from: url)
+
+    for folder in ProjectAssetFolder.allCases {
+      XCTAssertTrue(
+        FileManager.default.fileExists(
+          atPath: url.appendingPathComponent(folder.relativeDirectoryPath).path
+        )
+      )
+    }
   }
 
   func testCharacterIndexAndCanonicalEngineFileRoundTrip() throws {
@@ -219,6 +243,9 @@ final class AnimaDocumentStoreTests: XCTestCase {
         "characters/jp01/assets/head.usdz"
       )
     )
+    XCTAssertNoThrow(
+      try AnimaDocumentStore.validateProjectRelativePath("assets/models/head.step")
+    )
   }
 
   func testDuplicateCharacterAndSceneNamesAreRejected() {
@@ -240,7 +267,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
     }
   }
 
-  func testEmbeddedAssetLivesInsideActiveCharacterAssetsFolder() throws {
+  func testEmbeddedModelLivesInsideTypedProjectAssetsFolder() throws {
     let url = projectURL()
     var saved = try store.save(
       document(characters: [character]),
@@ -253,7 +280,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
       from: source,
       into: url,
       document: saved,
-      characterFolderName: "jp01",
+      folder: .models,
       kind: "model3D"
     )
     saved = try store.save(saved, to: url)
@@ -261,7 +288,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
     guard case .embedded(let path) = asset.storage else {
       return XCTFail("Expected embedded asset")
     }
-    XCTAssertEqual(path, "characters/jp01/assets/head.usdz")
+    XCTAssertEqual(path, "assets/models/head.usdz")
     guard case .resolved(let resolved) = try store.resolveAsset(asset, projectURL: url) else {
       return XCTFail("Expected resolved asset")
     }
@@ -278,7 +305,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
       from: first,
       into: url,
       document: document,
-      characterFolderName: "robot",
+      folder: .models,
       kind: "model3D"
     )
     let asset = try XCTUnwrap(document.assets.first)
@@ -311,7 +338,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
       from: source,
       into: url,
       document: saved,
-      characterFolderName: "jp01",
+      folder: .models,
       kind: "model3D"
     )
     try Data("second".utf8).write(to: source)
@@ -319,7 +346,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
       from: source,
       into: url,
       document: saved,
-      characterFolderName: "jp01",
+      folder: .models,
       kind: "model3D"
     )
 
@@ -329,18 +356,20 @@ final class AnimaDocumentStoreTests: XCTestCase {
     }
     XCTAssertEqual(
       Set(paths),
-      ["characters/jp01/assets/head.stl", "characters/jp01/assets/head-2.stl"]
+      ["assets/models/head.stl", "assets/models/head-2.stl"]
     )
     XCTAssertNoThrow(try store.save(saved, to: url))
   }
 
   func testCharacterEditorMetadataRoundTripsAppearanceAndTreeState() throws {
     let groupID = UUID(uuidString: "AD000000-0000-4000-8000-000000000001")!
+    let modelAssetID = UUID(uuidString: "AD000000-0000-4000-8000-000000000002")!
     let metadata = CharacterEditorMetadata(
       modelImports: [
         "assets/head.stl": ModelImportMetadata(
           unitName: "millimeters",
-          unitScaleToMeters: 0.001
+          unitScaleToMeters: 0.001,
+          assetID: modelAssetID
         )
       ],
       partAssetVersions: ["head": 3],
@@ -398,6 +427,7 @@ final class AnimaDocumentStoreTests: XCTestCase {
     XCTAssertEqual(decoded, metadata)
     XCTAssertEqual(decoded.formatVersion, "5")
     XCTAssertEqual(decoded.partAssetVersions["head"], 3)
+    XCTAssertEqual(decoded.modelImports["assets/head.stl"]?.assetID, modelAssetID)
     XCTAssertEqual(decoded.partAppearances["head"]?.proxyFilletRadiusMeters, 0.012)
   }
 

@@ -346,6 +346,85 @@ struct AnimaCoreClientTests {
   }
 
   @Test
+  func rigDocumentEditorRemovesMatesRelationsAndTheirDependentValues() throws {
+    let source: AnimaCoreJSONValue = .object([
+      "parts": .array([]),
+      "joints": .array([
+        .object([
+          "id": .string("Revolute 1"),
+          "name": .string("head_pan"),
+          "dofs": .array([.object(["path": .string("head_pan.rotation")])]),
+        ]),
+        .object(["name": .string("jaw")]),
+      ]),
+      "relations": .array([
+        .object([
+          "kind": .string("gear"),
+          "driver": .string("head_pan.rotation"),
+          "driven": .string("jaw.rotation"),
+        ]),
+        .object([
+          "kind": .string("linear"),
+          "driver": .string("slider.travel"),
+          "driven": .string("lift.travel"),
+        ]),
+      ]),
+      "outputs": .array([
+        .object(["dof_path": .string("head_pan.rotation")]),
+        .object(["dof_path": .string("jaw.rotation")]),
+      ]),
+      "clips": .array([
+        .object([
+          "keyframes": .array([
+            .object([
+              "values": .object([
+                "head_pan.rotation": .number(0.5),
+                "jaw.rotation": .number(0.2),
+              ])
+            ])
+          ])
+        ])
+      ]),
+    ])
+
+    let withoutMate = try AnimaCoreRigDocumentEditor.removingJoint(
+      identifiedBy: "Revolute 1",
+      from: source
+    )
+    guard case .object(let mateRoot) = withoutMate,
+      case .array(let joints) = mateRoot["joints"],
+      case .array(let outputs) = mateRoot["outputs"],
+      case .array(let relations) = mateRoot["relations"],
+      case .array(let clips) = mateRoot["clips"],
+      case .object(let clip) = clips.first,
+      case .array(let keyframes) = clip["keyframes"],
+      case .object(let keyframe) = keyframes.first,
+      case .object(let values) = keyframe["values"]
+    else {
+      Issue.record("Mate deletion must preserve the remaining full-fidelity DTO")
+      return
+    }
+    #expect(joints.count == 1)
+    #expect(outputs.count == 1)
+    #expect(relations.count == 1)
+    #expect(values == ["jaw.rotation": .number(0.2)])
+
+    let withoutRelation = try AnimaCoreRigDocumentEditor.removingRelation(
+      kind: .linear,
+      driver: "slider.travel",
+      driven: "lift.travel",
+      from: withoutMate
+    )
+    guard case .object(let relationRoot) = withoutRelation,
+      case .array(let remainingRelations) = relationRoot["relations"]
+    else {
+      Issue.record("Relation deletion must retain a relation array")
+      return
+    }
+    #expect(remainingRelations.isEmpty)
+  }
+
+  @Test
   func rigDocumentEditorBuildsEmptyRigidPartsCharacterDTO() {
     let document = AnimaCoreRigDocumentEditor.emptyCharacter(
       name: "walle",

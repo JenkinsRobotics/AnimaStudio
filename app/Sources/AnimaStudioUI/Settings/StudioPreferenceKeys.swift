@@ -4,6 +4,8 @@ enum StudioPreferenceKey {
   static let workspaceRootBookmark = "workspaceRootBookmark"
   static let defaultLayoutPreset = "defaultLayoutPreset"
   static let panelsOnOuterEdge = "panelsOnOuterEdge"
+  static let showsStatusBar = "showsStatusBar"
+  static let showsLayoutZones = "showsLayoutZones"
 
   static let viewportAppearance = "viewportAppearance"
   static let viewportNavigationProfile = "viewportNavigationProfile"

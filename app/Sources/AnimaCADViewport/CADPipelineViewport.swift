@@ -9,6 +9,7 @@ public struct CADPipelineViewport: View {
   public let theme: CADViewportTheme
   public let showsTelemetry: Bool
   public let isSelected: Bool
+  public let onSourceTriangleCountsChange: ([URL: Int]) -> Void
 
   @State private var document: CADGeometryDocument?
   @State private var camera = CADCameraState()
@@ -21,13 +22,15 @@ public struct CADPipelineViewport: View {
     backend: CADRenderBackend,
     theme: CADViewportTheme,
     showsTelemetry: Bool = false,
-    isSelected: Bool = false
+    isSelected: Bool = false,
+    onSourceTriangleCountsChange: @escaping ([URL: Int]) -> Void = { _ in }
   ) {
     self.sourceURLs = sourceURLs
     self.backend = backend
     self.theme = theme
     self.showsTelemetry = showsTelemetry
     self.isSelected = isSelected
+    self.onSourceTriangleCountsChange = onSourceTriangleCountsChange
   }
 
   public var body: some View {
@@ -134,6 +137,7 @@ public struct CADPipelineViewport: View {
   private func loadSources() async {
     document = nil
     errorMessage = nil
+    onSourceTriangleCountsChange([:])
     let urls = sourceURLs.filter { ["step", "stp"].contains($0.pathExtension.lowercased()) }
     guard !urls.isEmpty else {
       errorMessage = "The selected CAD backend needs at least one STEP or STP source."
@@ -143,6 +147,11 @@ public struct CADPipelineViewport: View {
       let imported = try await Task.detached(priority: .userInitiated) {
         try urls.map { try CADGeometryDocument.loadSTEP($0) }
       }.value
+      var counts: [URL: Int] = [:]
+      for (url, sourceDocument) in zip(urls, imported) {
+        counts[url.standardizedFileURL] = sourceDocument.triangleCount
+      }
+      onSourceTriangleCountsChange(counts)
       let merged = try CADGeometryDocument.merging(imported)
       document = merged
       camera.frame(bounds: merged.renderGeometry.bounds)

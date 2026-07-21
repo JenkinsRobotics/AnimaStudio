@@ -268,8 +268,14 @@ struct NodeWorkspaceView: View {
           .foregroundStyle(StudioPalette.muted)
         Spacer()
         Button("Jump to Start", systemImage: "backward.end.fill") {}
+          .disabled(true)
+          .help("Scene playback is unavailable until a scene document is open")
         Button("Play", systemImage: "play.fill") {}
+          .disabled(true)
+          .help("Scene playback is unavailable until a scene document is open")
         Button("Jump to End", systemImage: "forward.end.fill") {}
+          .disabled(true)
+          .help("Scene playback is unavailable until a scene document is open")
       }
       .labelStyle(.iconOnly)
       .buttonStyle(.borderless)

@@ -7,6 +7,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case nodes
   case referenceWidgets
   case designKit
+  case demoUIKit
   case navigator
   case inspector
   case timeline
@@ -31,6 +32,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .nodes: "Node Workspace"
     case .referenceWidgets: "Reference Widgets"
     case .designKit: "Live UI Kit"
+    case .demoUIKit: "Demo UI Kit"
     case .navigator: "Navigator Preview"
     case .inspector: "Inspector Preview"
     case .timeline: "Timeline Preview"
@@ -55,6 +57,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .nodes: "point.3.connected.trianglepath.dotted"
     case .referenceWidgets: "square.stack.3d.up"
     case .designKit: "paintbrush.pointed.fill"
+    case .demoUIKit: "shippingbox.and.arrow.backward"
     case .navigator: "sidebar.left"
     case .inspector: "sidebar.right"
     case .timeline: "rectangle.bottomthird.inset.filled"
@@ -83,6 +86,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .referenceWidgets:
       "Prototype incoming visual references before adopting them in production workspaces."
     case .designKit: "Edit the shared visual tokens and review every production UI family live."
+    case .demoUIKit:
+      "Review the additively imported Demo component vocabulary beside production UI."
     case .navigator: "Review the real Navigator docked at the left of the production viewport."
     case .inspector: "Review the real Inspector docked at the right of the production viewport."
     case .timeline: "Review the real Timeline docked below the production viewport."
@@ -104,6 +109,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .navigator, .inspector, .timeline, .workspace3D:
       true
     case .overview, .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit,
+      .demoUIKit,
       .buttons, .inputs, .menus, .panels, .mateEditor, .triadManipulator, .dialogs, .popovers,
       .tokens:
       false

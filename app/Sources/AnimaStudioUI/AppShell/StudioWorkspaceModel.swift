@@ -43,6 +43,11 @@ final class StudioWorkspaceModel {
       ($0, $0.descriptor.defaultPresentation)
     }
   )
+  var centerViews = Dictionary(
+    uniqueKeysWithValues: StudioWorkspaceKind.allCases.compactMap { workspace in
+      StudioCenterViewCatalog.defaultMode(for: workspace).map { (workspace, $0) }
+    }
+  )
   var navigatorPlacement: StudioPanelPlacement {
     get { StudioLayoutState.shared.navigatorPlacement }
     set { StudioLayoutState.shared.navigatorPlacement = newValue }
@@ -113,7 +118,9 @@ final class StudioWorkspaceModel {
   var enginePartModelSources: [PartID: PartModelSource] = [:]
   @ObservationIgnored private var configuredAssetDirectoryURL: URL?
   @ObservationIgnored private var configuredEditorMetadata: CharacterEditorMetadata?
+  @ObservationIgnored private var configuredProjectAssetURLs: [String: URL] = [:]
   @ObservationIgnored private var retainedProjectAccessURL: URL?
+  @ObservationIgnored private var retainedLinkedAssetAccessURLs: [URL] = []
   var engineParts: [AnimaCorePartSummary] = []
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
   var engineMates: [AnimaCoreJointSummary] = []
@@ -213,6 +220,25 @@ final class StudioWorkspaceModel {
 
   var activePresentation: WorkspacePresentation {
     workspacePresentations[activeWorkspace] ?? activeWorkspace.descriptor.defaultPresentation
+  }
+
+  var activeCenterView: StudioCenterViewMode? {
+    let available = StudioCenterViewCatalog.modes(for: activeWorkspace)
+    guard !available.isEmpty else { return nil }
+    let stored = centerViews[activeWorkspace]
+    return stored.flatMap { available.contains($0) ? $0 : nil } ?? available[0]
+  }
+
+  func selectCenterView(_ mode: StudioCenterViewMode) {
+    guard StudioCenterViewCatalog.modes(for: activeWorkspace).contains(mode) else { return }
+    centerViews[activeWorkspace] = mode
+    if activeWorkspace == .animate {
+      switch mode {
+      case .dopeSheet: timelineEditorMode = .dopeSheet
+      case .curves: timelineEditorMode = .graph
+      default: break
+      }
+    }
   }
 
   var detectedLayoutPreset: StudioLayoutPreset? {
@@ -569,11 +595,23 @@ final class StudioWorkspaceModel {
   func releaseProjectAssetAccess() {
     retainedProjectAccessURL?.stopAccessingSecurityScopedResource()
     retainedProjectAccessURL = nil
+    for url in retainedLinkedAssetAccessURLs {
+      url.stopAccessingSecurityScopedResource()
+    }
+    retainedLinkedAssetAccessURLs.removeAll()
+  }
+
+  func retainLinkedAssetAccess(_ urls: [URL]) {
+    for url in retainedLinkedAssetAccessURLs {
+      url.stopAccessingSecurityScopedResource()
+    }
+    retainedLinkedAssetAccessURLs = urls.filter { $0.startAccessingSecurityScopedResource() }
   }
 
   func configurePartModelSources(
     characterDirectoryURL: URL,
-    editorMetadata: CharacterEditorMetadata
+    editorMetadata: CharacterEditorMetadata,
+    resolvedProjectAssetURLs: [String: URL] = [:]
   ) {
     // Retain the asset context so every subsequent engine reload can rebuild
     // the render sources itself. Without this, any reload (suppress, mate
@@ -581,6 +619,7 @@ final class StudioWorkspaceModel {
     // back to primitive proxies instead of the imported meshes.
     configuredAssetDirectoryURL = characterDirectoryURL
     configuredEditorMetadata = editorMetadata
+    configuredProjectAssetURLs = resolvedProjectAssetURLs
     rebuildPartModelSources()
   }
 
@@ -597,11 +636,14 @@ final class StudioWorkspaceModel {
       uniqueKeysWithValues: engineParts.compactMap { part in
         guard !part.model.isEmpty, let partID = enginePartIDsByName[part.name] else { return nil }
         let metadata = editorMetadata.modelImports[part.model]
+        let fileURL =
+          configuredProjectAssetURLs[part.model]
+          ?? characterDirectoryURL.appendingPathComponent(part.model)
         return (
           partID,
           PartModelSource(
             partID: partID,
-            fileURL: characterDirectoryURL.appendingPathComponent(part.model),
+            fileURL: fileURL,
             modelNode: part.modelNode,
             unitScaleToMeters: metadata?.unitScaleToMeters ?? 1,
             assetVersion: max(editorMetadata.partAssetVersions[part.name] ?? 1, 1)
@@ -1294,7 +1336,16 @@ final class StudioWorkspaceModel {
 
   func toggleBottomEditor() {
     guard activeWorkspace == .animate || activeWorkspace == .show else { return }
-    updateActivePresentation { $0.showsBottomEditor.toggle() }
+    let next: StudioCenterViewMode
+    switch activeWorkspace {
+    case .animate:
+      next = activeCenterView == .threeD ? .dopeSheet : .threeD
+    case .show:
+      next = activeCenterView == .threeD ? .nodeGraph : .threeD
+    case .assets, .rig, .nodes, .hardware, .design:
+      return
+    }
+    selectCenterView(next)
   }
 
   func resetActivePresentation() {
@@ -1525,6 +1576,22 @@ final class StudioWorkspaceModel {
     }
   }
 
+  func deleteEngineMate(_ mate: AnimaCoreJointSummary) async {
+    guard let document = engineRigDocument else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.removingJoint(
+        identifiedBy: mate.selectionKey,
+        from: document
+      )
+      lockedMateIDs.remove(JointID(rawValue: mate.selectionKey))
+      selection.remove(.joint(JointID(rawValue: mate.selectionKey)))
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
   func toggleRelationSuppressed(_ relation: AnimaCoreRelationSummary) async {
     guard let document = engineRigDocument else { return }
     do {
@@ -1535,6 +1602,23 @@ final class StudioWorkspaceModel {
         suppressed: !relation.isSuppressed,
         in: document
       )
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  func deleteEngineRelation(_ relation: AnimaCoreRelationSummary) async {
+    guard let document = engineRigDocument else { return }
+    do {
+      engineRigDocument = try AnimaCoreRigDocumentEditor.removingRelation(
+        kind: relation.kind,
+        driver: relation.driver,
+        driven: relation.driven,
+        from: document
+      )
+      selection.remove(.relation(relation.id))
       documentEditRevision += 1
       try await reloadEditedEngineRig()
     } catch {

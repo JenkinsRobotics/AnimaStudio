@@ -1,4 +1,5 @@
 import AnimaCoreClient
+import AnimaDocument
 import AnimaEvaluation
 import AnimaModel
 import RealityKitViewport
@@ -6,11 +7,17 @@ import SwiftUI
 
 struct ProjectNavigatorView: View {
   @Bindable var workspace: StudioWorkspaceModel
+  let selectedTab: String?
   let importModel: () -> Void
+  let deleteParts: (Set<PartID>) -> Void
+  var savedAssemblies: [AssemblyDocumentSummary] = []
+  var saveAssembly: () -> Void = {}
+  var importAssembly: (AssemblyDocumentSummary) -> Void = { _ in }
   @State private var filterText = ""
   @State private var renameTarget: NavigatorRenameTarget?
   @State private var renameText = ""
   @State private var activeDragPayload: NavigatorDragPayload?
+  @State private var pendingDeletion: NavigatorDeletionTarget?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -30,6 +37,7 @@ struct ProjectNavigatorView: View {
       .scrollContentBackground(.hidden)
       .background(StudioPalette.panel)
       .accessibilityLabel(panelTitle)
+      .onDeleteCommand(perform: requestDeletionForSelection)
 
       Divider()
       panelFooter
@@ -50,6 +58,19 @@ struct ProjectNavigatorView: View {
     } message: {
       Text("Names are stored with the project-owned rig data.")
     }
+    .confirmationDialog(
+      deletionTitle,
+      isPresented: Binding(
+        get: { pendingDeletion != nil },
+        set: { if !$0 { pendingDeletion = nil } }
+      ),
+      titleVisibility: .visible
+    ) {
+      Button(deletionActionTitle, role: .destructive, action: commitDeletion)
+      Button("Cancel", role: .cancel) { pendingDeletion = nil }
+    } message: {
+      Text(deletionMessage)
+    }
   }
 
   @ViewBuilder
@@ -60,23 +81,84 @@ struct ProjectNavigatorView: View {
       assetSection
       sourceHierarchySection
     case .rig:
+      rigNavigatorContent
+    case .animate:
+      animationNavigatorContent
+    case .show:
+      showNavigatorContent
+    case .nodes:
+      nodesNavigatorContent
+    case .hardware:
+      hardwareNavigatorContent
+    case .design:
+      Text("Design uses its sandbox browser.")
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private var rigNavigatorContent: some View {
+    switch selectedTab {
+    case "Mates": mateSection
+    case "Relations": relationSection
+    default:
       projectSection
       semanticRigSection
-      jointSection
+      assemblyLibrarySection
       sourceHierarchySection
-    case .animate:
+    }
+  }
+
+  @ViewBuilder
+  private var animationNavigatorContent: some View {
+    switch selectedTab {
+    case "Components":
+      semanticRigSection
+      mateSection
+    case "Clips": animationSection
+    default:
       animationSection
       semanticRigSection
-      jointSection
-      sourceHierarchySection
-    case .show:
-      showSection
-      animationSection
-      mediaSection
-    case .nodes:
-      EmptyView()
-    case .hardware:
-      hardwareSection
+    }
+  }
+
+  @ViewBuilder
+  private var showNavigatorContent: some View {
+    switch selectedTab {
+    case "Media": mediaSection
+    case "Cues": cueSection
+    default: showSection
+    }
+  }
+
+  @ViewBuilder
+  private var nodesNavigatorContent: some View {
+    switch selectedTab {
+    case "Graph":
+      Section("Graph") {
+        Label(
+          "The center canvas owns graph selection",
+          systemImage: "point.3.connected.trianglepath.dotted"
+        )
+        .foregroundStyle(.secondary)
+      }
+    default:
+      Section("Node Library") {
+        Label(
+          "Choose node families from the Tool sidebar",
+          systemImage: "square.grid.3x3"
+        )
+        .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var hardwareNavigatorContent: some View {
+    switch selectedTab {
+    case "Outputs": outputSection
+    case "Safety": safetySection
+    default: driverSection
     }
   }
 
@@ -175,16 +257,49 @@ struct ProjectNavigatorView: View {
     }
   }
 
-  private var jointSection: some View {
+  private var assemblyLibrarySection: some View {
+    Section {
+      if savedAssemblies.isEmpty {
+        Label("No saved Assemblies", systemImage: "square.3.layers.3d")
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(savedAssemblies) { assembly in
+          Button {
+            importAssembly(assembly)
+          } label: {
+            PartTreeRow(
+              title: assembly.name,
+              role: .sourceAssembly,
+              detail: "\(assembly.nodeCount) nodes"
+            )
+          }
+          .buttonStyle(.plain)
+          .help("Import this reusable Assembly into the active Character")
+        }
+      }
+    } header: {
+      HStack {
+        Text("Rig Asset Library")
+        Spacer()
+        Button(action: saveAssembly) {
+          Image(systemName: "square.and.arrow.down")
+        }
+        .buttonStyle(.plain)
+        .help("Save selected Parts as a reusable Assembly")
+      }
+    }
+  }
+
+  private var mateSection: some View {
     Section("Mate Features") {
-      if mateTreeNodes.isEmpty {
+      if mateNodes.isEmpty {
         Label("No mates yet", systemImage: "rotate.3d")
           .foregroundStyle(.secondary)
       } else {
         TreeView(
-          nodes: mateTreeNodes,
+          nodes: mateNodes,
           filterText: filterText,
-          expandedIDs: mateExpandedIDs,
+          expandedIDs: expansionBinding(for: mateNodes),
           activeDragPayload: $activeDragPayload,
           revealRequest: mateRevealRequest,
           rowContent: navigatorTreeRow,
@@ -193,7 +308,32 @@ struct ProjectNavigatorView: View {
           canDrop: canDropInTree,
           onDrop: handleTreeDrop
         )
-        if TreeModel(roots: mateTreeNodes).filtered(by: TreeFilterQuery(filterText)).roots.isEmpty {
+        if TreeModel(roots: mateNodes).filtered(by: TreeFilterQuery(filterText)).roots.isEmpty {
+          noFilterResults
+        }
+      }
+    }
+  }
+
+  private var relationSection: some View {
+    Section("Relations") {
+      if relationNodes.isEmpty {
+        Label("No relations yet", systemImage: "arrow.triangle.branch")
+          .foregroundStyle(.secondary)
+      } else {
+        TreeView(
+          nodes: relationNodes,
+          filterText: filterText,
+          expandedIDs: expansionBinding(for: relationNodes),
+          activeDragPayload: $activeDragPayload,
+          revealRequest: mateRevealRequest,
+          rowContent: navigatorTreeRow,
+          dragPayload: \.payload,
+          dropBehavior: \.behavior,
+          canDrop: canDropInTree,
+          onDrop: handleTreeDrop
+        )
+        if TreeModel(roots: relationNodes).filtered(by: TreeFilterQuery(filterText)).roots.isEmpty {
           noFilterResults
         }
       }
@@ -219,6 +359,13 @@ struct ProjectNavigatorView: View {
     }
   }
 
+  private var cueSection: some View {
+    Section("Cues") {
+      Label("Create a scene before authoring cues", systemImage: "bolt.circle")
+        .foregroundStyle(.secondary)
+    }
+  }
+
   private var mediaSection: some View {
     Section("Media & Effects") {
       Label("No audio, screens, lights, or events", systemImage: "waveform.badge.plus")
@@ -226,16 +373,24 @@ struct ProjectNavigatorView: View {
     }
   }
 
-  private var hardwareSection: some View {
-    Group {
-      Section("Drivers") {
-        Label("No configured drivers", systemImage: "powerplug")
-          .foregroundStyle(.secondary)
-      }
-      Section("Actuator Mappings") {
-        Label("No output mappings", systemImage: "arrow.triangle.branch")
-          .foregroundStyle(.secondary)
-      }
+  private var driverSection: some View {
+    Section("Drivers") {
+      Label("No configured drivers", systemImage: "powerplug")
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var outputSection: some View {
+    Section("Actuator Mappings") {
+      Label("No output mappings", systemImage: "arrow.triangle.branch")
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var safetySection: some View {
+    Section("Safety") {
+      Label("Hardware output is safely offline", systemImage: "lock.shield")
+        .foregroundStyle(.secondary)
     }
   }
 
@@ -289,6 +444,8 @@ struct ProjectNavigatorView: View {
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
+    case .design:
+      EmptyView()
     }
   }
 
@@ -328,11 +485,13 @@ struct ProjectNavigatorView: View {
   }
 
   private var panelTitle: String {
-    switch workspace.activeWorkspace {
+    if let selectedTab, !selectedTab.isEmpty { return selectedTab }
+    return switch workspace.activeWorkspace {
     case .assets: "Assets"
     case .rig, .animate: "Components"
     case .show: "Show Contents"
     case .nodes: "Nodes"
+    case .design: "Design"
     case .hardware: "Hardware"
     }
   }
@@ -400,9 +559,9 @@ struct ProjectNavigatorView: View {
     return groups + ungrouped
   }
 
-  private var mateTreeNodes: [NavigatorTreeNode] {
-    if !workspace.engineMates.isEmpty || !workspace.engineRelations.isEmpty {
-      let mates = workspace.engineMates.map { mate in
+  private var mateNodes: [NavigatorTreeNode] {
+    if !workspace.engineMates.isEmpty {
+      return workspace.engineMates.map { mate in
         let id = JointID(rawValue: mate.selectionKey)
         let states = navigatorStates(
           locked: workspace.isMateLocked(id),
@@ -423,24 +582,6 @@ struct ProjectNavigatorView: View {
           behavior: nil
         )
       }
-      let relations = workspace.engineRelations.map { relation in
-        let states: [NavigatorRowState] = relation.isSuppressed ? [.suppressed] : []
-        return NavigatorTreeNode(
-          id: .relation(relation.id),
-          selectionValue: .relation(relation.id),
-          title: relationTypeLabel(for: relation),
-          role: .joint,
-          detail: relation.isReversed ? "Reversed" : "Coupled",
-          states: states,
-          children: [],
-          filterTokens: treeTokens(type: .mate, states: states),
-          isLocked: false,
-          acceptsChildren: false,
-          payload: nil,
-          behavior: nil
-        )
-      }
-      return mates + relations
     }
 
     return workspace.project.rig.joints.map { joint in
@@ -458,6 +599,26 @@ struct ProjectNavigatorView: View {
         acceptsChildren: false,
         payload: .mate(joint.id),
         behavior: .mate
+      )
+    }
+  }
+
+  private var relationNodes: [NavigatorTreeNode] {
+    workspace.engineRelations.map { relation in
+      let states: [NavigatorRowState] = relation.isSuppressed ? [.suppressed] : []
+      return NavigatorTreeNode(
+        id: .relation(relation.id),
+        selectionValue: .relation(relation.id),
+        title: relationTypeLabel(for: relation),
+        role: .joint,
+        detail: relation.isReversed ? "Reversed" : "Coupled",
+        states: states,
+        children: [],
+        filterTokens: treeTokens(type: .mate, states: states),
+        isLocked: false,
+        acceptsChildren: false,
+        payload: nil,
+        behavior: nil
       )
     }
   }
@@ -521,10 +682,6 @@ struct ProjectNavigatorView: View {
 
   private var instanceExpandedIDs: Binding<Set<NavigatorTreeNodeID>> {
     expansionBinding(for: instanceTreeNodes)
-  }
-
-  private var mateExpandedIDs: Binding<Set<NavigatorTreeNodeID>> {
-    expansionBinding(for: mateTreeNodes)
   }
 
   private func expansionBinding(
@@ -832,6 +989,12 @@ struct ProjectNavigatorView: View {
         Task { await workspace.togglePartGrounded(part.id) }
       }
     }
+
+    Divider()
+    Button("Delete", systemImage: "trash", role: .destructive) {
+      pendingDeletion = .parts(partDeletionIDs(clicked: part.id))
+    }
+    .disabled(partDeletionIDs(clicked: part.id).isEmpty)
   }
 
   @ViewBuilder
@@ -909,6 +1072,11 @@ struct ProjectNavigatorView: View {
     ) {
       workspace.toggleMateLock(JointID(rawValue: mate.selectionKey))
     }
+    Divider()
+    Button("Delete Mate", systemImage: "trash", role: .destructive) {
+      pendingDeletion = .mate(mate)
+    }
+    .disabled(workspace.isMateLocked(JointID(rawValue: mate.selectionKey)))
   }
 
   @ViewBuilder
@@ -921,6 +1089,10 @@ struct ProjectNavigatorView: View {
       systemImage: relation.isSuppressed ? "checkmark.circle" : "nosign"
     ) {
       Task { await workspace.toggleRelationSuppressed(relation) }
+    }
+    Divider()
+    Button("Delete Relation", systemImage: "trash", role: .destructive) {
+      pendingDeletion = .relation(relation)
     }
   }
 
@@ -972,10 +1144,88 @@ struct ProjectNavigatorView: View {
     keys.insert(NavigatorTreeNodeID.group(id).persistenceKey)
     workspace.setNavigatorExpandedNodeKeys(keys)
   }
+
+  private func partDeletionIDs(clicked partID: PartID) -> Set<PartID> {
+    let selected = Set(workspace.selectedComponentIDs)
+    let candidates = selected.contains(partID) ? selected : Set([partID])
+    guard candidates.allSatisfy({ !workspace.isComponentLocked($0) }) else { return [] }
+    return candidates
+  }
+
+  private func requestDeletionForSelection() {
+    let parts = Set(workspace.selectedComponentIDs)
+    if !parts.isEmpty, parts.allSatisfy({ !workspace.isComponentLocked($0) }) {
+      pendingDeletion = .parts(parts)
+      return
+    }
+    guard workspace.selection.count == 1, let selection = workspace.selection.first else { return }
+    switch selection {
+    case .joint(let id):
+      guard !workspace.isMateLocked(id),
+        let mate = workspace.engineMates.first(where: { $0.selectionKey == id.rawValue })
+      else { return }
+      pendingDeletion = .mate(mate)
+    case .relation(let id):
+      guard let relation = workspace.engineRelations.first(where: { $0.id == id }) else { return }
+      pendingDeletion = .relation(relation)
+    default:
+      break
+    }
+  }
+
+  private var deletionTitle: String {
+    switch pendingDeletion {
+    case .parts(let ids): ids.count == 1 ? "Delete Part?" : "Delete \(ids.count) Parts?"
+    case .mate: "Delete Mate?"
+    case .relation: "Delete Relation?"
+    case nil: "Delete Item?"
+    }
+  }
+
+  private var deletionActionTitle: String {
+    switch pendingDeletion {
+    case .parts(let ids): ids.count == 1 ? "Delete Part" : "Delete Parts"
+    case .mate: "Delete Mate"
+    case .relation: "Delete Relation"
+    case nil: "Delete"
+    }
+  }
+
+  private var deletionMessage: String {
+    switch pendingDeletion {
+    case .parts:
+      "The selected parts and dependent mate data will be removed from this character."
+    case .mate:
+      "The mate and any relation, output, or keyframe values that reference its DOFs will be removed."
+    case .relation:
+      "The selected relationship will be removed from the character."
+    case nil:
+      "This operation cannot be undone yet."
+    }
+  }
+
+  private func commitDeletion() {
+    guard let target = pendingDeletion else { return }
+    pendingDeletion = nil
+    switch target {
+    case .parts(let ids):
+      deleteParts(ids)
+    case .mate(let mate):
+      Task { await workspace.deleteEngineMate(mate) }
+    case .relation(let relation):
+      Task { await workspace.deleteEngineRelation(relation) }
+    }
+  }
 }
 
 private enum NavigatorRenameTarget {
   case component(PartID)
   case group(UUID)
   case mate(JointID)
+}
+
+private enum NavigatorDeletionTarget {
+  case parts(Set<PartID>)
+  case mate(AnimaCoreJointSummary)
+  case relation(AnimaCoreRelationSummary)
 }

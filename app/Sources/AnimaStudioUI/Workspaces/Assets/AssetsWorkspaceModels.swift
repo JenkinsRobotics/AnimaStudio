@@ -161,7 +161,6 @@ enum AssetBuilderPartSelection {
 
 struct AssetBuilderAutomaticReplacement: Equatable {
   let asset: DocumentAssetReference
-  let relativePath: String
   let modelReference: String
   let partNames: [String]
 }
@@ -171,6 +170,7 @@ enum AssetBuilderImportMatching {
     sourceFilename: String,
     character: ProjectCharacterReference,
     assets: [DocumentAssetReference],
+    modelImports: [String: ModelImportMetadata],
     parts: [AnimaCorePartSummary]
   ) -> AssetBuilderAutomaticReplacement? {
     let prefix = character.directoryPath + "/"
@@ -180,17 +180,20 @@ enum AssetBuilderImportMatching {
           sourceFilename,
           options: [.caseInsensitive, .diacriticInsensitive]
         ) == .orderedSame,
-        case .embedded(let relativePath) = asset.storage,
-        relativePath.hasPrefix(prefix)
+        case .embedded(let relativePath) = asset.storage
       else { continue }
-      let modelReference = String(relativePath.dropFirst(prefix.count))
+      let modelReference =
+        modelImports.first(where: { $0.value.assetID == asset.id.rawValue })?.key
+        ?? (relativePath.hasPrefix(prefix)
+          ? String(relativePath.dropFirst(prefix.count))
+          : nil)
+      guard let modelReference else { continue }
       let partNames = parts.compactMap { part in
         part.model == modelReference ? part.name : nil
       }
       guard !partNames.isEmpty else { continue }
       return AssetBuilderAutomaticReplacement(
         asset: asset,
-        relativePath: relativePath,
         modelReference: modelReference,
         partNames: partNames
       )

@@ -1,3 +1,4 @@
+import AnimaDocument
 import XCTest
 
 @testable import AnimaStudioUI
@@ -70,10 +71,22 @@ final class ModelImportUnitsTests: XCTestCase {
       ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/head.usdz")),
     ]
 
-    let plan = ModelImportStagingPlan(targetCharacterID: "atlas", requests: requests)
+    let plan = ModelImportStagingPlan(
+      targetCharacterID: "atlas",
+      requests: requests,
+      importMode: .copyIntoProject
+    )
 
     XCTAssertEqual(plan.targetCharacterID, "atlas")
     XCTAssertEqual(plan.requests.map(\.url.lastPathComponent), ["base.stl", "head.usdz"])
+    XCTAssertEqual(plan.importMode, .copyIntoProject)
+  }
+
+  func testImportStorageOffersOnlyNonDestructiveChoices() {
+    XCTAssertEqual(
+      AssetImportMode.allCases,
+      [.copyIntoProject, .referenceInPlace]
+    )
   }
 
   func testStagingExplainsHowFilesBecomeRigidParts() {

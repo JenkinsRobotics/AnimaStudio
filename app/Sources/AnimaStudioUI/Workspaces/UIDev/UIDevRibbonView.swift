@@ -132,7 +132,7 @@ struct UIDevRibbonView: View {
       StudioPalette.accent
     case .workspace3D: StudioPalette.semanticPart
     case .buttons, .inputs, .menus: StudioPalette.semanticPart
-    case .designKit, .mateEditor, .triadManipulator, .tokens: StudioPalette.joint
+    case .designKit, .demoUIKit, .mateEditor, .triadManipulator, .tokens: StudioPalette.joint
     }
   }
 }

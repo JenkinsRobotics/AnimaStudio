@@ -18,10 +18,12 @@
           thumbnailKind: .character
         ),
       ],
-      createProject: {},
+      createProject: { _ in },
       openProject: {},
       openRecentProject: { _ in },
-      removeRecentProject: { _ in }
+      removeRecentProject: { _ in },
+      refreshProjects: { [] },
+      toggleTheme: {}
     )
     .frame(width: 1_180, height: 760)
   }

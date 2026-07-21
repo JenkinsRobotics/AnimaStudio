@@ -179,7 +179,9 @@ public enum AnimaCoreRigDocumentEditor {
             guard case .object(var entry) = keyframe,
               case .object(var values) = entry["values"]
             else { return keyframe }
-            values = values.filter { !removedDOFPaths.contains($0.key) }
+            values = values.filter {
+              !referencesRemovedDOF(.string($0.key), removedDOFPaths: removedDOFPaths)
+            }
             guard !values.isEmpty else { return nil }
             entry["values"] = .object(values)
             return .object(entry)
@@ -270,6 +272,56 @@ public enum AnimaCoreRigDocumentEditor {
     return .object(root)
   }
 
+  /// Removes one mate and every relation, output, and keyframe value that
+  /// references one of its DOFs. AnimaCore still validates and serializes the
+  /// returned DTO before it can become a canonical character file.
+  public static func removingJoint(
+    identifiedBy identifier: String,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    var root = try rootObject(document)
+    var joints = try objectArray(root, key: "joints")
+    guard
+      let index = joints.firstIndex(where: {
+        stringValue($0["id"]) == identifier || stringValue($0["name"]) == identifier
+      })
+    else { throw AnimaCoreRigDocumentEditingError.unknownJoint(identifier) }
+
+    var removedDOFPaths = Set<String>()
+    collectDOFPaths(from: joints[index], into: &removedDOFPaths)
+    joints.remove(at: index)
+    root["joints"] = .array(joints.map(AnimaCoreJSONValue.object))
+    try removeReferences(to: removedDOFPaths, from: &root)
+    return .object(root)
+  }
+
+  /// Removes exactly one advanced relation. The positive magnitude/reverse
+  /// convention remains owned by AnimaCore; this only removes the matching
+  /// already-described entry.
+  public static func removingRelation(
+    kind: AnimaCoreRelationKind,
+    driver: String,
+    driven: String,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    var root = try rootObject(document)
+    var relations = try objectArray(root, key: "relations")
+    guard
+      let index = relations.firstIndex(where: {
+        stringValue($0["kind"]) == kind.rawValue
+          && stringValue($0["driver"]) == driver
+          && stringValue($0["driven"]) == driven
+      })
+    else {
+      throw AnimaCoreRigDocumentEditingError.unknownRelation(
+        "\(kind.rawValue):\(driver)->\(driven)"
+      )
+    }
+    relations.remove(at: index)
+    root["relations"] = .array(relations.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
   private static func rootObject(
     _ document: AnimaCoreJSONValue
   ) throws -> [String: AnimaCoreJSONValue] {
@@ -335,6 +387,47 @@ public enum AnimaCoreRigDocumentEditor {
     guard let path = stringValue(value) else { return false }
     return removedDOFPaths.contains(path)
       || removedDOFPaths.contains { path.hasPrefix("\($0).") }
+  }
+
+  private static func removeReferences(
+    to removedDOFPaths: Set<String>,
+    from root: inout [String: AnimaCoreJSONValue]
+  ) throws {
+    root["relations"] = .array(
+      try objectArray(root, key: "relations").compactMap { relation in
+        guard !referencesRemovedDOF(relation["driver"], removedDOFPaths: removedDOFPaths),
+          !referencesRemovedDOF(relation["driven"], removedDOFPaths: removedDOFPaths)
+        else { return nil }
+        return .object(relation)
+      }
+    )
+    root["outputs"] = .array(
+      try objectArray(root, key: "outputs").compactMap { output in
+        referencesRemovedDOF(output["dof_path"], removedDOFPaths: removedDOFPaths)
+          ? nil : .object(output)
+      }
+    )
+    root["clips"] = .array(
+      try objectArray(root, key: "clips").map { clip in
+        var editedClip = clip
+        if case .array(let keyframes) = clip["keyframes"] {
+          editedClip["keyframes"] = .array(
+            keyframes.compactMap { keyframe in
+              guard case .object(var entry) = keyframe,
+                case .object(var values) = entry["values"]
+              else { return keyframe }
+              values = values.filter {
+                !referencesRemovedDOF(.string($0.key), removedDOFPaths: removedDOFPaths)
+              }
+              guard !values.isEmpty else { return nil }
+              entry["values"] = .object(values)
+              return .object(entry)
+            }
+          )
+        }
+        return .object(editedClip)
+      }
+    )
   }
 
   private static func kinematicChain(

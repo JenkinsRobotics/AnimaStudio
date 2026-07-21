@@ -172,7 +172,7 @@ final class AssetsWorkspaceModelsTests: XCTestCase {
     let currentAsset = DocumentAssetReference(
       originalFilename: "Head.STL",
       kind: "model3D",
-      storage: .embedded(packageRelativePath: "characters/robot/assets/head.stl")
+      storage: .embedded(packageRelativePath: "assets/models/head.stl")
     )
     let payload = Data(
       """
@@ -189,6 +189,13 @@ final class AssetsWorkspaceModelsTests: XCTestCase {
         sourceFilename: "head.stl",
         character: character,
         assets: [staleAsset, currentAsset],
+        modelImports: [
+          "assets/head.stl": ModelImportMetadata(
+            unitName: "millimeters",
+            unitScaleToMeters: 0.001,
+            assetID: currentAsset.id.rawValue
+          )
+        ],
         parts: parts
       )
     )

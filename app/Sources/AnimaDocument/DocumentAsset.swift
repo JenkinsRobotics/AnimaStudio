@@ -1,12 +1,33 @@
 import AnimaModel
 import Foundation
 
+/// Typed, project-owned asset destinations. These names are part of the
+/// on-disk project layout and therefore stay stable across UI revisions.
+public enum ProjectAssetFolder: String, CaseIterable, Codable, Sendable {
+  case models
+  case assemblies
+  case audio
+  case video
+  case images
+  case scripts
+  case renders
+
+  public var relativeDirectoryPath: String { "assets/\(rawValue)" }
+}
+
+/// The only two non-destructive import choices offered by Studio.
+public enum AssetImportMode: String, CaseIterable, Codable, Sendable {
+  case copyIntoProject
+  case referenceInPlace
+}
+
 /// How an asset's payload is stored relative to the package —
 /// the SolidWorks-assembly property: a project either carries a copy of a
 /// reference file inside itself or links to an external file on disk.
 public enum DocumentAssetStorage: Equatable, Sendable {
   /// The payload was copied into the package. The path is package-relative
-  /// (always under `characters/<name>/assets/`).
+  /// and normally lives under a typed `assets/<kind>/` directory. Legacy
+  /// projects may still contain character-local embedded paths.
   case embedded(packageRelativePath: String)
   /// The payload lives outside the package. `externalPath` is the absolute
   /// path recorded at link time; `bookmarkData` is a macOS bookmark so the

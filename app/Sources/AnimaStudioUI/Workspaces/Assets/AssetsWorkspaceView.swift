@@ -36,6 +36,7 @@ struct AssetsWorkspaceView: View {
   @Environment(\.studioPanelSurfaceMode) private var panelSurfaceMode
   @Environment(\.studioWorkspaceOverlayInsets) private var overlayInsets
   var surface = AssetsWorkspaceSurface.center
+  var centerLayoutMode: AssetBuilderLayoutMode? = nil
   let projectName: String
   let projectRevision: Int
   let characters: [ProjectCharacterReference]
@@ -111,13 +112,17 @@ struct AssetsWorkspaceView: View {
       selectCharacter: selectCharacter,
       importModels: importModels,
       replaceModel: replaceModel,
-      deleteParts: deleteParts
+      deleteParts: deleteParts,
+      forcedLayoutMode: centerLayoutMode
     )
     .studioPanelSurface()
   }
 
   @ViewBuilder private var centerCollection: some View {
-    if StudioLayoutState.shared.detectedPreset == .docked {
+    if centerLayoutMode != nil {
+      content
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    } else if StudioLayoutState.shared.detectedPreset == .docked {
       content
         .environment(\.studioPanelSurfaceMode, .docked)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

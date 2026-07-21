@@ -6,6 +6,7 @@ public struct AnimaStudioRootView: View {
   @State private var designProfile: StudioDesignProfile
   @State private var recentProjects: [RecentProjectSummary]
   @State private var lifecycleErrorMessage: String?
+  @State private var startupWorkspace = StudioWorkspaceKind.assets
 
   public init() {
     let profile = StudioDesignPersistence.load()
@@ -22,7 +23,8 @@ public struct AnimaStudioRootView: View {
         StudioWorkspaceView(
           session: activeSession,
           designProfile: liveDesignProfile,
-          newProject: createProject,
+          startupWorkspace: startupWorkspace,
+          newProject: createProjectWithPanel,
           openProject: openProject,
           didPersistProject: recordRecent,
           closeProject: { projectSession = nil }
@@ -31,10 +33,12 @@ public struct AnimaStudioRootView: View {
       } else {
         StudioHomeView(
           recentProjects: recentProjects,
-          createProject: createProject,
+          createProject: createProjectFromHome,
           openProject: openProject,
           openRecentProject: openRecent,
-          removeRecentProject: removeRecent
+          removeRecentProject: removeRecent,
+          refreshProjects: refreshRecentProjects,
+          toggleTheme: toggleHomeTheme
         )
       }
     }
@@ -65,10 +69,22 @@ public struct AnimaStudioRootView: View {
     )
   }
 
-  private func createProject() {
+  private func createProjectWithPanel() {
     guard let url = ProjectLifecycle.chooseNewProjectURL() else { return }
     do {
       let session = try ProjectLifecycle.createProject(at: url)
+      startupWorkspace = .assets
+      projectSession = session
+      recordRecent(session)
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  private func createProjectFromHome(startingIn workspace: StudioWorkspaceKind) {
+    do {
+      let session = try ProjectLifecycle.createProjectInDefaultLocation()
+      startupWorkspace = workspace
       projectSession = session
       recordRecent(session)
     } catch {
@@ -80,6 +96,7 @@ public struct AnimaStudioRootView: View {
     guard let url = ProjectLifecycle.chooseProjectToOpen() else { return }
     do {
       let session = try ProjectLifecycle.openProject(at: url)
+      startupWorkspace = .assets
       projectSession = session
       recordRecent(session)
     } catch {
@@ -90,6 +107,7 @@ public struct AnimaStudioRootView: View {
   private func openRecent(_ recent: RecentProjectSummary) {
     do {
       let session = try ProjectLifecycle.openRecent(recent)
+      startupWorkspace = .assets
       projectSession = session
       recordRecent(session)
     } catch {
@@ -109,6 +127,22 @@ public struct AnimaStudioRootView: View {
       .project(session),
       in: recentProjects
     )
+  }
+
+  @discardableResult
+  private func refreshRecentProjects() -> [RecentProjectSummary] {
+    let stored = RecentProjectsPersistence.load()
+    let merged = RecentProjectsPersistence.mergedWithDiscoveredProjects(
+      stored,
+      in: ProjectLifecycle.defaultProjectsDirectory()
+    )
+    RecentProjectsPersistence.save(merged)
+    recentProjects = merged
+    return merged
+  }
+
+  private func toggleHomeTheme() {
+    liveDesignProfile.wrappedValue = designProfile == .highContrast ? .standard : .highContrast
   }
 
   private var liveDesignProfile: Binding<StudioDesignProfile> {

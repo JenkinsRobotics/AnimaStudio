@@ -21,7 +21,8 @@ final class WorkspaceChromeTests: XCTestCase {
       WorkspaceSelectorMetrics.idealWidth
     )
     XCTAssertLessThan(WorkspaceSelectorMetrics.menuWidth, WorkspaceSelectorMetrics.minimumWidth)
-    XCTAssertLessThanOrEqual(WorkspaceSelectorMetrics.maximumWidth, 440)
+    XCTAssertLessThanOrEqual(WorkspaceSelectorMetrics.maximumWidth, 560)
+    XCTAssertGreaterThanOrEqual(WorkspaceSelectorMetrics.maximumWidth, 500)
   }
 
   func testStudioModesUseOperatorFacingNamesAndCycleInOrder() {
@@ -35,10 +36,10 @@ final class WorkspaceChromeTests: XCTestCase {
 
   func testDocumentBarUsesStableResponsiveDensities() {
     XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_800), .expanded)
-    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_420), .expanded)
-    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_419), .compact)
-    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_180), .compact)
-    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_179), .minimal)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_320), .expanded)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_319), .compact)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_060), .compact)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_059), .minimal)
 
     XCTAssertEqual(
       StudioDocumentBarDensity.expanded.selectorWidth,
@@ -51,6 +52,32 @@ final class WorkspaceChromeTests: XCTestCase {
     XCTAssertEqual(
       StudioDocumentBarDensity.minimal.selectorWidth,
       WorkspaceSelectorMetrics.minimumWidth
+    )
+  }
+
+  func testHeaderRegionsCollapseAtTheDemoBreakpointsIndependently() {
+    XCTAssertEqual(
+      StudioHeaderPresentation.resolve(width: 1_320),
+      StudioHeaderPresentation(
+        collapsesFileCommands: false,
+        usesCompactTabs: false,
+        usesCompactRuntimeControls: false
+      )
+    )
+    XCTAssertEqual(
+      StudioHeaderPresentation.resolve(width: 1_319),
+      StudioHeaderPresentation(
+        collapsesFileCommands: true,
+        usesCompactTabs: false,
+        usesCompactRuntimeControls: false
+      )
+    )
+    XCTAssertTrue(StudioHeaderPresentation.resolve(width: 1_059).usesCompactTabs)
+    XCTAssertFalse(
+      StudioHeaderPresentation.resolve(width: 880).usesCompactRuntimeControls
+    )
+    XCTAssertTrue(
+      StudioHeaderPresentation.resolve(width: 879).usesCompactRuntimeControls
     )
   }
 

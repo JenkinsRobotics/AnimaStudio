@@ -80,6 +80,8 @@ struct InspectorView: View {
       }
     case .nodes:
       EmptyView()
+    case .design:
+      EmptyView()
     }
   }
 
@@ -184,7 +186,7 @@ struct InspectorView: View {
         .disabled(true)
         .help("Scene documents are not wired yet")
         .padding(12)
-    case .assets, .rig, .nodes, .hardware:
+    case .assets, .rig, .nodes, .hardware, .design:
       EmptyView()
     }
   }
@@ -597,6 +599,7 @@ struct InspectorView: View {
     case .animate: "Animation Inspector"
     case .show: "Show Inspector"
     case .nodes: "Node Inspector"
+    case .design: "Design Inspector"
     case .hardware: "Hardware Status"
     }
   }

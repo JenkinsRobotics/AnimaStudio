@@ -8,6 +8,7 @@ final class UIDevCatalogTests: XCTestCase {
       UIDevSection.allCases,
       [
         .overview, .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit,
+        .demoUIKit,
         .navigator, .inspector, .timeline, .workspace3D, .buttons, .inputs, .menus, .panels,
         .mateEditor, .triadManipulator, .dialogs, .popovers, .tokens,
       ]
@@ -29,6 +30,7 @@ final class UIDevCatalogTests: XCTestCase {
     XCTAssertFalse(UIDevSection.nodes.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.referenceWidgets.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.designKit.isEmbeddedWorkspacePreview)
+    XCTAssertFalse(UIDevSection.demoUIKit.isEmbeddedWorkspacePreview)
     XCTAssertFalse(UIDevSection.panels.isEmbeddedWorkspacePreview)
   }
 

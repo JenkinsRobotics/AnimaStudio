@@ -5,6 +5,13 @@ import XCTest
 @testable import AnimaStudioUI
 
 final class RecentProjectsTests: XCTestCase {
+  func testHomeArchetypesRouteToTheirHonestWorkspaces() {
+    XCTAssertEqual(StudioStartArchetype.hardwareCharacter.destination, .assets)
+    XCTAssertEqual(StudioStartArchetype.digitalCharacter.destination, .assets)
+    XCTAssertTrue(StudioStartArchetype.digitalCharacter.isPreview)
+    XCTAssertEqual(StudioStartArchetype.showControl.destination, .show)
+  }
+
   func testSummaryNormalizesRevisionAndProvidesStableLabel() {
     let summary = RecentProjectSummary(
       displayName: "  Robot Head  ",
@@ -165,6 +172,85 @@ final class RecentProjectsTests: XCTestCase {
     let storedData = try XCTUnwrap(defaults.data(forKey: RecentProjectsPersistence.storageKey))
     let stored = try JSONDecoder().decode([RecentProjectSummary].self, from: storedData)
     XCTAssertEqual(stored.map(\.id), [existing.id])
+  }
+
+  func testDiskDiscoveryUnionsProjectsAndPrefersNewerRecentMetadata() throws {
+    let rootURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("AnimaStudio-DiscoveryTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+    addTeardownBlock { try? FileManager.default.removeItem(at: rootURL) }
+
+    let store = AnimaDocumentStore(
+      bookmarkStyle: .plain,
+      now: { Date(timeIntervalSince1970: 100) }
+    )
+    let projectURL = rootURL.appendingPathComponent("Walker", isDirectory: true)
+    let saved = try store.save(ProjectLifecycle.makeEmptyDocument(name: "Walker"), to: projectURL)
+    let explicitRecent = RecentProjectSummary(
+      id: saved.projectID,
+      displayName: "Walker · Recent",
+      lastOpenedAt: Date(timeIntervalSince1970: 300),
+      revisionNumber: 9,
+      projectPath: projectURL.path
+    )
+
+    let merged = RecentProjectsPersistence.mergedWithDiscoveredProjects(
+      [explicitRecent],
+      in: rootURL,
+      documentStore: store
+    )
+
+    XCTAssertEqual(merged.count, 1)
+    XCTAssertEqual(merged.first?.displayName, "Walker · Recent")
+    XCTAssertEqual(merged.first?.revisionNumber, 9)
+  }
+
+  func testDiskDiscoveryFindsValidProjectNotAlreadyInRecents() throws {
+    let rootURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("AnimaStudio-DiscoveryTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+    addTeardownBlock { try? FileManager.default.removeItem(at: rootURL) }
+
+    let store = AnimaDocumentStore(bookmarkStyle: .plain)
+    let projectURL = rootURL.appendingPathComponent("Stage", isDirectory: true)
+    let saved = try store.save(ProjectLifecycle.makeEmptyDocument(name: "Stage"), to: projectURL)
+
+    let merged = RecentProjectsPersistence.mergedWithDiscoveredProjects(
+      [],
+      in: rootURL,
+      documentStore: store
+    )
+
+    XCTAssertEqual(merged.map(\.id), [saved.projectID])
+    XCTAssertEqual(merged.first?.displayName, "Stage")
+    XCTAssertEqual(
+      merged.first?.projectPath.map {
+        URL(fileURLWithPath: $0).resolvingSymlinksInPath().standardizedFileURL.path
+      },
+      projectURL.resolvingSymlinksInPath().standardizedFileURL.path
+    )
+  }
+
+  func testDefaultProjectDestinationUsesNextAvailableName() throws {
+    let rootURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("AnimaStudio-NewProjectTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: rootURL.appendingPathComponent("Untitled Project", isDirectory: true),
+      withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+      at: rootURL.appendingPathComponent("Untitled Project 2", isDirectory: true),
+      withIntermediateDirectories: true
+    )
+    addTeardownBlock { try? FileManager.default.removeItem(at: rootURL) }
+
+    let destination = ProjectLifecycle.availableProjectURL(
+      named: "Untitled Project",
+      in: rootURL
+    )
+
+    XCTAssertEqual(destination.lastPathComponent, "Untitled Project 3")
   }
 
   private func isolatedDefaults() -> UserDefaults {

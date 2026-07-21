@@ -8,8 +8,8 @@ enum StudioDocumentBarDensity: Equatable, Sendable {
   case minimal
 
   static func resolve(width: CGFloat) -> Self {
-    if width >= WorkspaceSelectorMetrics.compactWidth { return .expanded }
-    if width >= 1_180 { return .compact }
+    if width >= StudioHeaderPresentation.fileCollapseWidth { return .expanded }
+    if width >= StudioHeaderPresentation.compactTabsWidth { return .compact }
     return .minimal
   }
 
@@ -19,6 +19,27 @@ enum StudioDocumentBarDensity: Equatable, Sendable {
     case .compact: WorkspaceSelectorMetrics.idealWidth
     case .minimal: WorkspaceSelectorMetrics.minimumWidth
     }
+  }
+}
+
+/// The demo's independently collapsing header regions. Keeping these as
+/// separate flags matters: file commands collapse before workspace labels,
+/// while runtime controls remain labelled until the narrowest breakpoint.
+struct StudioHeaderPresentation: Equatable, Sendable {
+  static let fileCollapseWidth: CGFloat = 1_320
+  static let compactTabsWidth: CGFloat = 1_060
+  static let compactRuntimeWidth: CGFloat = 880
+
+  var collapsesFileCommands: Bool
+  var usesCompactTabs: Bool
+  var usesCompactRuntimeControls: Bool
+
+  static func resolve(width: CGFloat) -> Self {
+    Self(
+      collapsesFileCommands: width < fileCollapseWidth,
+      usesCompactTabs: width < compactTabsWidth,
+      usesCompactRuntimeControls: width < compactRuntimeWidth
+    )
   }
 }
 
@@ -55,6 +76,7 @@ struct StudioDocumentBar: View {
 
   var body: some View {
     GeometryReader { proxy in
+      let presentation = StudioHeaderPresentation.resolve(width: proxy.size.width)
       let density = StudioDocumentBarDensity.resolve(width: proxy.size.width)
       let contentWidth = max(0, proxy.size.width - 28)
       let sideWidth = max(0, (contentWidth - density.selectorWidth - 24) / 2)
@@ -62,17 +84,20 @@ struct StudioDocumentBar: View {
         WorkspaceStageTabs(
           workspace: workspace,
           isUIDevWorkspace: $isUIDevWorkspace,
-          compact: density != .expanded
+          compact: presentation.usesCompactTabs
         )
         .frame(width: density.selectorWidth)
 
         HStack(spacing: 0) {
-          leadingControls(density: density)
-            .frame(width: sideWidth, alignment: .leading)
+          leadingControls(
+            density: density,
+            collapsesFileCommands: presentation.collapsesFileCommands
+          )
+          .frame(width: sideWidth, alignment: .leading)
 
           Spacer(minLength: 0)
 
-          trailingControls(density: density)
+          trailingControls(compactRuntime: presentation.usesCompactRuntimeControls)
             .frame(width: sideWidth, alignment: .trailing)
         }
         .labelStyle(.iconOnly)
@@ -90,31 +115,30 @@ struct StudioDocumentBar: View {
     }
   }
 
-  private func leadingControls(density: StudioDocumentBarDensity) -> some View {
+  private func leadingControls(
+    density: StudioDocumentBarDensity,
+    collapsesFileCommands: Bool
+  ) -> some View {
     HStack(spacing: 7) {
-      projectIdentity(density: density)
+      projectIdentity(density: density, showsSaveStatus: !collapsesFileCommands)
 
       Divider().frame(height: 18)
 
-      switch density {
-      case .expanded:
+      if collapsesFileCommands {
+        compactApplicationMenu
+      } else {
         settingsButton
         projectCommandMenu
         saveButton
         historyButtons
-      case .compact:
-        settingsButton
-        projectCommandMenu
-      case .minimal:
-        compactApplicationMenu
       }
     }
   }
 
-  private func trailingControls(density: StudioDocumentBarDensity) -> some View {
+  private func trailingControls(compactRuntime: Bool) -> some View {
     HStack(spacing: 7) {
-      engineStatus(compact: density == .minimal)
-      playbackButton(showsLabel: density == .expanded)
+      engineStatus(compact: compactRuntime)
+      playbackButton(showsLabel: !compactRuntime)
 
       Divider().frame(height: 18)
 
@@ -131,7 +155,10 @@ struct StudioDocumentBar: View {
     .fixedSize(horizontal: true, vertical: false)
   }
 
-  private func projectIdentity(density: StudioDocumentBarDensity) -> some View {
+  private func projectIdentity(
+    density: StudioDocumentBarDensity,
+    showsSaveStatus: Bool
+  ) -> some View {
     HStack(spacing: 8) {
       Button(action: closeProject) {
         Image(systemName: "house.fill")
@@ -152,17 +179,19 @@ struct StudioDocumentBar: View {
         )
         .layoutPriority(1)
         .accessibilityLabel("Project name")
-      Text(isSaving ? "SAVING" : (isDirty ? "UNSAVED" : "SAVED"))
-        .font(.system(size: 8.5, weight: .bold))
-        .tracking(0.7)
-        .foregroundStyle(isDirty ? StudioPalette.hardware : StudioPalette.semanticPart)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(
-          (isDirty ? StudioPalette.hardware : StudioPalette.semanticPart).opacity(0.12),
-          in: Capsule()
-        )
-        .fixedSize(horizontal: true, vertical: false)
+      if showsSaveStatus {
+        Text(isSaving ? "SAVING" : (isDirty ? "UNSAVED" : "SAVED"))
+          .font(.system(size: 8.5, weight: .bold))
+          .tracking(0.7)
+          .foregroundStyle(isDirty ? StudioPalette.hardware : StudioPalette.semanticPart)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(
+            (isDirty ? StudioPalette.hardware : StudioPalette.semanticPart).opacity(0.12),
+            in: Capsule()
+          )
+          .fixedSize(horizontal: true, vertical: false)
+      }
     }
     .fixedSize(horizontal: true, vertical: false)
   }
@@ -283,6 +312,90 @@ struct StudioDocumentBar: View {
     case .failed: Color.red
     case .unavailable: Color.secondary
     }
+  }
+}
+
+/// Home deliberately has different chrome from an open project: product
+/// identity and project-entry actions only. Workspace tabs, engine state, and
+/// preview controls would imply an active document, so they are absent here.
+struct StudioHomeDocumentBar: View {
+  @Environment(\.openSettings) private var openSettings
+  let createProject: () -> Void
+  let openProject: () -> Void
+  let toggleTheme: () -> Void
+
+  var body: some View {
+    HStack(spacing: 12) {
+      Image(systemName: "hexagon.fill")
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(StudioPalette.accent)
+        .frame(width: 28, height: 24)
+        .background(StudioPalette.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Anima Studio")
+          .font(.system(size: 14, weight: .semibold))
+        Text("Animate digital characters and physical robots.")
+          .font(.system(size: 10))
+          .foregroundStyle(StudioPalette.muted)
+          .lineLimit(1)
+      }
+
+      Spacer(minLength: 8)
+
+      HStack(spacing: 7) {
+        homeAction(
+          "New Character — starts a Studio project",
+          systemImage: "person.crop.square.badge.plus",
+          action: createProject
+        )
+        homeAction(
+          "Import Model — open a project first",
+          systemImage: "square.and.arrow.down",
+          isEnabled: false,
+          action: {}
+        )
+        homeAction("Open Project", systemImage: "folder", action: openProject)
+        homeAction(
+          "Save — no project is open",
+          systemImage: "square.and.arrow.up",
+          isEnabled: false,
+          action: {}
+        )
+        Divider().frame(height: 16)
+        homeAction("Toggle interface contrast", systemImage: "circle.lefthalf.filled") {
+          toggleTheme()
+        }
+        homeAction("Settings", systemImage: "gearshape") { openSettings() }
+      }
+      .fixedSize()
+    }
+    .padding(.horizontal, 14)
+    .frame(height: StudioMetrics.documentBarHeight)
+    .background(StudioWindowControlArea())
+    .background(StudioPalette.documentChrome)
+    .overlay(alignment: .bottom) {
+      Rectangle().fill(StudioPalette.border).frame(height: 1)
+    }
+  }
+
+  private func homeAction(
+    _ title: String,
+    systemImage: String,
+    isEnabled: Bool = true,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Image(systemName: systemImage)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(StudioPalette.muted)
+        .frame(width: 28, height: 24)
+        .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 6))
+    }
+    .buttonStyle(.plain)
+    .disabled(!isEnabled)
+    .opacity(isEnabled ? 1 : 0.38)
+    .help(title)
   }
 }
 
@@ -657,47 +770,88 @@ struct WorkspacePanelHeader: View {
 }
 
 struct StudioStatusBar: View {
-  @Bindable var workspace: StudioWorkspaceModel
-  let isUIDevWorkspace: Bool
+  let workspaceTitle: String
+  let selectedPartName: String?
+  let selectedPartTriangleCount: Int?
+  let rendererName: String
+  let themeName: String
+  let kernelVersion: String
+
+  init(
+    workspace: StudioWorkspaceModel,
+    isUIDevWorkspace: Bool,
+    selectedPartName: String? = nil,
+    selectedPartTriangleCount: Int? = nil,
+    rendererName: String = "RealityKit",
+    themeName: String = "Midnight",
+    kernelVersion: String = "—"
+  ) {
+    workspaceTitle =
+      isUIDevWorkspace ? UIDevWorkspaceDescriptor.title : workspace.activeWorkspace.descriptor.title
+    self.selectedPartName = selectedPartName
+    self.selectedPartTriangleCount = selectedPartTriangleCount
+    self.rendererName = rendererName
+    self.themeName = themeName
+    self.kernelVersion = kernelVersion
+  }
+
+  init(
+    workspaceTitle: String,
+    selectedPartName: String? = nil,
+    selectedPartTriangleCount: Int? = nil,
+    rendererName: String = "RealityKit",
+    themeName: String = "Midnight",
+    kernelVersion: String = "—"
+  ) {
+    self.workspaceTitle = workspaceTitle
+    self.selectedPartName = selectedPartName
+    self.selectedPartTriangleCount = selectedPartTriangleCount
+    self.rendererName = rendererName
+    self.themeName = themeName
+    self.kernelVersion = kernelVersion
+  }
 
   var body: some View {
     HStack(spacing: 12) {
       HStack(spacing: 5) {
-        Image(systemName: "hexagon.fill")
-          .foregroundStyle(StudioPalette.hardware)
+        Circle()
+          .fill(StudioPalette.accent)
+          .frame(width: 6, height: 6)
         Text("Anima Studio")
           .fontWeight(.semibold)
       }
-      Rectangle().fill(StudioPalette.border).frame(width: 1, height: 13)
-      Label(activeTitle, systemImage: activeSystemImage)
-      Text(workspace.animaCoreStatusLabel)
-      Spacer()
-      if let time = workspace.engineEvaluationTimeSeconds {
-        Label(
-          "\(time.formatted(.number.precision(.fractionLength(3)))) s",
-          systemImage: "waveform.path.ecg"
-        )
+      separator
+      Text(workspaceTitle)
+      if let selectedPartName {
+        separator
+        Label(selectionLabel(selectedPartName), systemImage: "cube")
+          .lineLimit(1)
       }
-      Text("Local macOS")
-      Text("⌘1–7 Workspaces")
+      Spacer()
+      Label(rendererName, systemImage: "cpu")
+        .lineLimit(1)
+      separator
+      Text(themeName).lineLimit(1)
+      separator
+      Text("OCCT \(kernelVersion)").lineLimit(1)
     }
     .font(.system(size: 9))
-    .foregroundStyle(StudioPalette.muted.opacity(0.78))
+    .foregroundStyle(StudioPalette.muted)
     .padding(.horizontal, 12)
-    .frame(height: 25)
-    .background(StudioPalette.documentChrome)
+    .frame(height: 24)
+    .background(StudioPalette.panel.opacity(0.60))
     .overlay(alignment: .top) {
       Rectangle().fill(StudioPalette.border).frame(height: 1)
     }
   }
 
-  private var activeTitle: String {
-    isUIDevWorkspace ? UIDevWorkspaceDescriptor.title : workspace.activeWorkspace.descriptor.title
+  private var separator: some View {
+    Rectangle().fill(StudioPalette.border).frame(width: 1, height: 12)
   }
 
-  private var activeSystemImage: String {
-    isUIDevWorkspace
-      ? UIDevWorkspaceDescriptor.systemImage : workspace.activeWorkspace.descriptor.systemImage
+  private func selectionLabel(_ name: String) -> String {
+    guard let selectedPartTriangleCount else { return name }
+    return "\(name) · \(selectedPartTriangleCount.formatted()) tris"
   }
 }
 

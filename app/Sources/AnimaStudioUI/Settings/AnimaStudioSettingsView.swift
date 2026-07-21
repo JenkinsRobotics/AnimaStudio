@@ -17,6 +17,7 @@ public struct AnimaStudioSettingsView: View {
   @AppStorage(StudioPreferenceKey.workspaceRootPath) private var workspaceRootPath = ""
   @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
     StudioLayoutPreset.floating.rawValue
+  @AppStorage(StudioPreferenceKey.showsStatusBar) private var showsStatusBar = true
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var appearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile) private var profileRawValue =
@@ -176,6 +177,22 @@ public struct AnimaStudioSettingsView: View {
           )
           .toggleStyle(.switch)
           Text("Keeps the panel margin while moving the icon rail inboard.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+          Toggle("Show workspace status bar", isOn: $showsStatusBar)
+            .toggleStyle(.switch)
+          Text("Shows engine timing, workspace identity, and local runtime status at the bottom.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+          Toggle(
+            "Dev: show layout zones",
+            isOn: Binding(
+              get: { StudioLayoutState.shared.showsLayoutZones },
+              set: { StudioLayoutState.shared.showsLayoutZones = $0 }
+            )
+          )
+          .toggleStyle(.switch)
+          Text("Draws the live content-safe zone and the four workspace edges over the canvas.")
             .font(.caption)
             .foregroundStyle(StudioPalette.muted)
         }

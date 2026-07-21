@@ -283,9 +283,23 @@ public struct CharacterTreeGroupMetadata: Codable, Equatable, Sendable {
 public struct ModelImportMetadata: Codable, Equatable, Sendable {
   public var unitName: String
   public var unitScaleToMeters: Double
+  /// Stable link to the project manifest's asset table. Older editor files do
+  /// not carry it and continue resolving their character-local model path.
+  public var assetID: UUID?
 
-  public init(unitName: String, unitScaleToMeters: Double) {
+  public init(
+    unitName: String,
+    unitScaleToMeters: Double,
+    assetID: UUID? = nil
+  ) {
     self.unitName = unitName
     self.unitScaleToMeters = unitScaleToMeters
+    self.assetID = assetID
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case unitName
+    case unitScaleToMeters
+    case assetID = "asset_id"
   }
 }

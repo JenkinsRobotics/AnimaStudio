@@ -23,6 +23,7 @@ struct AssetBuilderContentView: View {
   let importModels: () -> Void
   let replaceModel: () -> Void
   let deleteParts: (Set<PartID>) -> Void
+  var forcedLayoutMode: AssetBuilderLayoutMode? = nil
 
   @State private var searchText = ""
   @State private var layoutMode = AssetBuilderLayoutMode.defaultMode
@@ -107,17 +108,19 @@ struct AssetBuilderContentView: View {
         .overlay { RoundedRectangle(cornerRadius: 7).stroke(StudioPalette.border) }
       }
 
-      Picker("Collection view", selection: $layoutMode) {
-        ForEach(AssetBuilderLayoutMode.allCases) { mode in
-          Label(mode.title, systemImage: mode.systemImage)
-            .labelStyle(.iconOnly)
-            .tag(mode)
+      if forcedLayoutMode == nil {
+        Picker("Collection view", selection: $layoutMode) {
+          ForEach(AssetBuilderLayoutMode.allCases) { mode in
+            Label(mode.title, systemImage: mode.systemImage)
+              .labelStyle(.iconOnly)
+              .tag(mode)
+          }
         }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 72)
+        .help("Switch between table and grid views")
       }
-      .labelsHidden()
-      .pickerStyle(.segmented)
-      .frame(width: 72)
-      .help("Switch between table and grid views")
 
       if case .characterCollection(_, let collection) = selection,
         collection == .parts || collection == .sourceAssets
@@ -326,7 +329,7 @@ struct AssetBuilderContentView: View {
     @ViewBuilder row: @escaping (Item) -> Row,
     @ViewBuilder card: @escaping (Item) -> Card
   ) -> some View {
-    switch layoutMode {
+    switch forcedLayoutMode ?? layoutMode {
     case .table:
       VStack(spacing: 0) {
         header()

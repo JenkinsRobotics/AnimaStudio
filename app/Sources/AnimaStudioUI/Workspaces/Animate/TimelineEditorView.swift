@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TimelineEditorView: View {
   @Bindable var workspace: StudioWorkspaceModel
+  var showsModeBar = true
 
   private let trackHeaderWidth: CGFloat = 220
   private let rulerHeight: CGFloat = 30
@@ -16,8 +17,10 @@ struct TimelineEditorView: View {
     VStack(spacing: 0) {
       transport
       Divider()
-      editorModeBar
-      Divider()
+      if showsModeBar {
+        editorModeBar
+        Divider()
+      }
       editorContent
     }
     .background(Color.black.opacity(0.92))

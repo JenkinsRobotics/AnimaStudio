@@ -6,24 +6,108 @@ import XCTest
 final class WorkspaceShellTests: XCTestCase {
   func testStructuredCentersCanConsumeTemporaryOverlayInsets() {
     let hidden = StudioWorkspaceOverlayInsets()
-    let revealed = StudioWorkspaceOverlayInsets(top: 92, leading: 320, trailing: 350)
+    let revealed = StudioWorkspaceOverlayInsets(
+      top: 92,
+      leading: 320,
+      bottom: 76,
+      trailing: 350
+    )
 
     XCTAssertEqual(hidden, StudioWorkspaceOverlayInsets())
     XCTAssertGreaterThan(revealed.top, hidden.top)
     XCTAssertGreaterThan(revealed.leading, hidden.leading)
+    XCTAssertGreaterThan(revealed.bottom, hidden.bottom)
     XCTAssertGreaterThan(revealed.trailing, hidden.trailing)
+  }
+
+  func testCenterViewCatalogMatchesTheFiveProductionWorkspaces() {
+    XCTAssertEqual(StudioCenterViewCatalog.modes(for: .assets), [.threeD, .gallery, .table])
+    XCTAssertEqual(StudioCenterViewCatalog.modes(for: .rig), [.threeD, .table, .exploded])
+    XCTAssertEqual(
+      StudioCenterViewCatalog.modes(for: .animate),
+      [.threeD, .dopeSheet, .curves]
+    )
+    XCTAssertEqual(StudioCenterViewCatalog.modes(for: .show), [.nodeGraph, .table, .threeD])
+    XCTAssertEqual(
+      StudioCenterViewCatalog.modes(for: .hardware),
+      [.servoTimeline, .table, .threeD]
+    )
+    XCTAssertTrue(StudioCenterViewCatalog.modes(for: .nodes).isEmpty)
+    XCTAssertTrue(StudioCenterViewCatalog.modes(for: .design).isEmpty)
+  }
+
+  func testVisibleZoneTracksAllFourChromeEdges() {
+    let floating = StudioVisibleZoneLayout.insets(
+      preset: .floating,
+      toolInset: 98,
+      hasCenterSwitcher: true,
+      leftStackOpen: true,
+      rightStackOpen: false
+    )
+
+    XCTAssertEqual(floating.top, 98)
+    XCTAssertEqual(floating.leading, StudioSidebarSizing.workspacePanelWidth + 68)
+    XCTAssertEqual(floating.trailing, StudioVisibleZoneLayout.sideRailInset)
+    XCTAssertEqual(floating.bottom, StudioVisibleZoneLayout.bottomSwitcherInset)
+
+    let docked = StudioVisibleZoneLayout.insets(
+      preset: .docked,
+      toolInset: 98,
+      hasCenterSwitcher: true,
+      leftStackOpen: true,
+      rightStackOpen: true
+    )
+    XCTAssertEqual(docked.leading, StudioVisibleZoneLayout.dockedInset)
+    XCTAssertEqual(docked.trailing, StudioVisibleZoneLayout.dockedInset)
+  }
+
+  func testCanvasZoneOnlyReservesRevealedEdges() {
+    let hidden = StudioVisibleZoneLayout.insets(
+      preset: .canvas,
+      toolInset: 88,
+      hasCenterSwitcher: true,
+      leftStackOpen: true,
+      rightStackOpen: true,
+      revealedTop: false,
+      revealedLeading: false,
+      revealedTrailing: false
+    )
+    XCTAssertEqual(hidden.top, 0)
+    XCTAssertEqual(hidden.leading, 0)
+    XCTAssertEqual(hidden.trailing, 0)
+    XCTAssertEqual(hidden.bottom, StudioVisibleZoneLayout.bottomSwitcherInset)
+  }
+
+  func testTornOffPanelFootprintPushesTheSafeContentBoundary() {
+    let insets = StudioVisibleZoneLayout.insets(
+      preset: .floating,
+      toolInset: 88,
+      hasCenterSwitcher: true,
+      leftStackOpen: false,
+      rightStackOpen: false,
+      canvasWidth: 1_200,
+      floatingPanels: [
+        StudioFloatingPanelFootprint(side: .leading, minimumX: 220, maximumX: 452),
+        StudioFloatingPanelFootprint(side: .trailing, minimumX: 870, maximumX: 1_070),
+      ]
+    )
+    XCTAssertEqual(insets.leading, 462)
+    XCTAssertEqual(insets.trailing, 340)
   }
 
   private func resetShellState() {
     StudioLayoutState.shared.apply(.floating)
     StudioToolState.shared.disarm()
     StudioToolState.shared.staysArmed = false
-    StudioToolSettings.shared.density = .standard
+    StudioToolState.shared.actionHandler = nil
+    StudioToolSettings.shared.density = StudioToolSettings.defaultDensity
     StudioToolSettings.shared.activeCategoryByWorkspace.removeAll()
+    StudioToolSettings.shared.openCompactGroupByWorkspace.removeAll()
     StudioViewSidebarState.shared.selectedTab = .view
     StudioViewSidebarState.shared.isOpen = false
     StudioViewSidebarState.shared.navigationMode = .select
     StudioLayoutState.shared.panelsOnOuterEdge = false
+    StudioLayoutState.shared.showsLayoutZones = false
   }
 
   func testLayoutModeIsGlobalAndCyclesAcrossAllThreePresets() {
@@ -112,7 +196,7 @@ final class WorkspaceShellTests: XCTestCase {
         categories: StudioWorkspaceToolCatalog.categories(for: .assets)
       )
     )
-    XCTAssertFalse(
+    XCTAssertTrue(
       StudioToolCategoryPresentation.usesTabs(
         groups: StudioWorkspaceToolCatalog.groups(for: .show),
         categories: StudioWorkspaceToolCatalog.categories(for: .show)
@@ -130,6 +214,58 @@ final class WorkspaceShellTests: XCTestCase {
         categories: StudioWorkspaceToolCatalog.categories(for: .nodes)
       )
     )
+  }
+
+  func testExpandedIsTheDefaultToolDensity() {
+    XCTAssertEqual(StudioToolSettings.defaultDensity, .expanded)
+    XCTAssertFalse(StudioToolDensity.expanded.usesVisualCategoryPalette)
+    XCTAssertFalse(StudioToolDensity.standard.usesVisualCategoryPalette)
+    XCTAssertTrue(StudioToolDensity.compact.usesVisualCategoryPalette)
+    XCTAssertFalse(StudioToolBarSizing.fillsAvailableWidth(.expanded))
+    XCTAssertFalse(StudioToolBarSizing.fillsAvailableWidth(.standard))
+    XCTAssertFalse(StudioToolBarSizing.fillsAvailableWidth(.compact))
+    XCTAssertGreaterThan(
+      StudioToolBarSizing.height(for: .expanded),
+      StudioToolBarSizing.height(for: .standard)
+    )
+    XCTAssertGreaterThan(
+      StudioToolBarSizing.height(for: .standard),
+      StudioToolBarSizing.height(for: .compact)
+    )
+  }
+
+  func testCharacterStandardToolbarShowsPrimaryToolsAndMovesTheRestToOverflow() {
+    let groups = StudioWorkspaceToolCatalog.groups(for: .assets)
+    let primaryByGroup = Dictionary(
+      uniqueKeysWithValues: groups.map { group in
+        (group.title, StudioStandardToolPresentation.primaryTools(in: group).map(\.title))
+      }
+    )
+
+    XCTAssertEqual(primaryByGroup["Import"], ["Character", "3D Model"])
+    XCTAssertEqual(primaryByGroup["Manage"], ["Replace", "Reveal"])
+    XCTAssertEqual(primaryByGroup["Prepare"], ["Units", "Validate"])
+    XCTAssertEqual(groups.first { $0.title == "Import" }?.categoryIcon, "square.and.arrow.down")
+    XCTAssertEqual(
+      groups.first { $0.title == "Import" }?.overflowTools.first?.title,
+      "Audio"
+    )
+  }
+
+  func testCompactCategoryPaletteKeepsOneOpenGroupPerWorkspace() {
+    defer { resetShellState() }
+    let settings = StudioToolSettings.shared
+
+    settings.toggleCompactGroup("Import", for: .assets)
+    XCTAssertTrue(settings.isCompactGroupOpen("Import", for: .assets))
+    XCTAssertFalse(settings.isCompactGroupOpen("Manage", for: .assets))
+
+    settings.toggleCompactGroup("Manage", for: .assets)
+    XCTAssertFalse(settings.isCompactGroupOpen("Import", for: .assets))
+    XCTAssertTrue(settings.isCompactGroupOpen("Manage", for: .assets))
+
+    settings.closeCompactGroup(for: .assets)
+    XCTAssertFalse(settings.isCompactGroupOpen("Manage", for: .assets))
   }
 
   func testViewportDisplayProjectionUsesThePersistedRenderStyleAsTruth() {
@@ -249,6 +385,8 @@ final class WorkspaceShellTests: XCTestCase {
   }
 
   func testDockedSidebarsUseFixedPanelWidthsAroundTheCenterColumn() {
+    XCTAssertEqual(StudioSidebarSizing.workspacePanelWidth, 232)
+    XCTAssertEqual(StudioSidebarSizing.viewPanelWidth, 200)
     XCTAssertEqual(
       StudioSidebarSizing.dockedWidth(side: .leading, panelsAreOpen: true),
       StudioSidebarSizing.railWidth + StudioSidebarSizing.workspacePanelWidth + 1
@@ -299,6 +437,31 @@ final class WorkspaceShellTests: XCTestCase {
 
     StudioToolState.shared.staysArmed = false
     StudioToolState.shared.committed()
+    XCTAssertFalse(StudioToolState.shared.isArmed)
+  }
+
+  func testImmediateToolUsesTheOnAppearHandlerAndNeverArms() {
+    defer {
+      StudioToolState.shared.actionHandler = nil
+      resetShellState()
+    }
+    var performed: WorkspaceRibbonAction?
+    StudioToolState.shared.actionHandler = { tool in
+      guard case .command(let action) = tool.behavior else { return false }
+      performed = action
+      return true
+    }
+    let tool = StudioToolDescriptor(
+      id: "test.import",
+      title: "Import",
+      systemImage: "square.and.arrow.down",
+      help: "Import immediately",
+      behavior: .command(.importModel)
+    )
+
+    StudioToolState.shared.activate(tool)
+
+    XCTAssertEqual(performed?.rawValue, WorkspaceRibbonAction.importModel.rawValue)
     XCTAssertFalse(StudioToolState.shared.isArmed)
   }
 }

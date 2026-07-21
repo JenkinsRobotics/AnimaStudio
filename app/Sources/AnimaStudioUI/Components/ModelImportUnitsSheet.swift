@@ -56,28 +56,33 @@ struct ModelImportRequest: Identifiable, Equatable, Sendable {
 struct ModelImportStagingPlan: Equatable, Sendable {
   let targetCharacterID: String
   let requests: [ModelImportRequest]
+  let importMode: AssetImportMode
 }
 
 struct ModelImportUnitsSheet: View {
   let urls: [URL]
   let characters: [ProjectCharacterReference]
+  let canCopyIntoProject: Bool
   let isReplacingPart: Bool
   let cancel: () -> Void
   let importModels: (ModelImportStagingPlan) -> Void
 
   @State private var requests: [ModelImportRequest]
   @State private var targetCharacterID: String
+  @State private var importMode: AssetImportMode
 
   init(
     urls: [URL],
     characters: [ProjectCharacterReference],
     initialTargetCharacterID: String?,
+    canCopyIntoProject: Bool = true,
     isReplacingPart: Bool = false,
     cancel: @escaping () -> Void,
     importModels: @escaping (ModelImportStagingPlan) -> Void
   ) {
     self.urls = urls
     self.characters = characters
+    self.canCopyIntoProject = canCopyIntoProject
     self.isReplacingPart = isReplacingPart
     self.cancel = cancel
     self.importModels = importModels
@@ -89,6 +94,7 @@ struct ModelImportUnitsSheet: View {
         ? initialTargetCharacterID ?? ""
         : characters.first?.id ?? ""
     )
+    _importMode = State(initialValue: canCopyIntoProject ? .copyIntoProject : .referenceInPlace)
   }
 
   var body: some View {
@@ -109,6 +115,8 @@ struct ModelImportUnitsSheet: View {
       workflowStrip
 
       destinationSection
+
+      storageSection
 
       ScrollView {
         VStack(spacing: 8) {
@@ -161,7 +169,8 @@ struct ModelImportUnitsSheet: View {
           importModels(
             ModelImportStagingPlan(
               targetCharacterID: targetCharacterID,
-              requests: requests
+              requests: requests,
+              importMode: canCopyIntoProject ? importMode : .referenceInPlace
             )
           )
         }
@@ -172,6 +181,48 @@ struct ModelImportUnitsSheet: View {
     }
     .padding(24)
     .frame(width: 620)
+  }
+
+  private var storageSection: some View {
+    VStack(alignment: .leading, spacing: 9) {
+      Text("FILE STORAGE")
+        .font(.caption2.weight(.bold))
+        .tracking(0.8)
+        .foregroundStyle(StudioPalette.muted)
+      Picker("File storage", selection: $importMode) {
+        Text("Copy into Project").tag(AssetImportMode.copyIntoProject)
+        Text("Reference in Place").tag(AssetImportMode.referenceInPlace)
+      }
+      .pickerStyle(.segmented)
+      .disabled(!canCopyIntoProject)
+
+      Label(storageExplanation, systemImage: storageIcon)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(12)
+    .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 9))
+    .overlay(RoundedRectangle(cornerRadius: 9).stroke(StudioPalette.border))
+  }
+
+  private var storageExplanation: String {
+    guard canCopyIntoProject else {
+      return
+        "No project is open, so Studio must reference the original file. Create or open a project to make a portable copy."
+    }
+    switch importMode {
+    case .copyIntoProject:
+      return
+        "Recommended. Studio copies the source into assets/models/ for a portable Pack-and-Go project. The original stays untouched."
+    case .referenceInPlace:
+      return
+        "Studio bookmarks the original file. This saves disk space, but the project will need relinking if the source moves."
+    }
+  }
+
+  private var storageIcon: String {
+    importMode == .copyIntoProject ? "doc.on.doc" : "link"
   }
 
   private var workflowStrip: some View {
@@ -223,14 +274,14 @@ struct ModelImportUnitsSheet: View {
         .labelsHidden()
         .disabled(isReplacingPart)
         Spacer()
-        Label("Copy into Character", systemImage: "doc.on.doc")
+        Label("Project asset", systemImage: "folder.badge.gearshape")
           .font(.caption.monospaced())
           .foregroundStyle(.secondary)
       }
       Text(
         isReplacingPart
-          ? "A copied replacement stays assigned to the selected Part. The source file remains untouched."
-          : "Portable copies go into this Character's assets/ folder. The source files remain in their original location."
+          ? "The replacement stays assigned to the selected Part and retains its stable asset identity."
+          : "The model becomes a Part of this Character; its file storage is selected below."
       )
       .font(.caption)
       .foregroundStyle(.secondary)

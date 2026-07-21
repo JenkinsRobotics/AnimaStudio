@@ -164,6 +164,29 @@ struct TreeModel<Node: TreeNode>: Equatable {
     return true
   }
 
+  /// Removes an editable selection as one transaction.
+  ///
+  /// A locked row anywhere in the requested selection rejects the whole
+  /// operation so a bulk delete never produces a surprising partial result.
+  /// Descendants of an already-selected ancestor are returned only once as
+  /// part of that ancestor's subtree.
+  @discardableResult
+  mutating func removeAll(ids: Set<Node.ID>) -> [Node] {
+    guard !ids.isEmpty,
+      ids.allSatisfy({ id in node(id: id).map { !$0.isLocked } == true })
+    else { return [] }
+
+    let rootSelection = ids.filter { id in
+      ancestorIDs(of: id).allSatisfy { !ids.contains($0) }
+    }
+    var removed: [Node] = []
+    for id in flattened(expandedIDs: Set(roots.map(\.id)), forceExpanded: true).map(\.id)
+    where rootSelection.contains(id) {
+      if let node = remove(id: id) { removed.append(node) }
+    }
+    return removed
+  }
+
   private mutating func remove(id: Node.ID) -> Node? {
     if let index = roots.firstIndex(where: { $0.id == id }) {
       return roots.remove(at: index)

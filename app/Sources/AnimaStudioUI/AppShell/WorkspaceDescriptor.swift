@@ -7,11 +7,12 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
   case show
   case nodes
   case hardware
+  case design
 
   var id: Self { self }
 
   static let centeredNavigation: [Self] = [
-    .assets, .rig, .animate, .show, .hardware, .nodes,
+    .assets, .rig, .animate, .show, .hardware, .nodes, .design,
   ]
 
   var descriptor: StudioWorkspaceDescriptor {
@@ -52,7 +53,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
         defaultPresentation: WorkspacePresentation(
           showsNavigator: true,
           showsInspector: true,
-          showsBottomEditor: true
+          showsBottomEditor: false
         )
       )
     case .show:
@@ -65,7 +66,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
         defaultPresentation: WorkspacePresentation(
           showsNavigator: true,
           showsInspector: true,
-          showsBottomEditor: true
+          showsBottomEditor: false
         )
       )
     case .nodes:
@@ -94,6 +95,19 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
           showsBottomEditor: false
         )
       )
+    case .design:
+      StudioWorkspaceDescriptor(
+        id: self,
+        title: "Design",
+        systemImage: "pencil.and.ruler",
+        purpose: "Sandbox future in-app CAD tools and part properties",
+        viewportLabel: "DESIGN SANDBOX",
+        defaultPresentation: WorkspacePresentation(
+          showsNavigator: true,
+          showsInspector: true,
+          showsBottomEditor: false
+        )
+      )
     }
   }
 
@@ -105,6 +119,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
     case .show: 4
     case .nodes: 5
     case .hardware: 6
+    case .design: 7
     }
   }
 }

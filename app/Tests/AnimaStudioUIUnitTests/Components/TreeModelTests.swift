@@ -87,6 +87,28 @@ final class TreeModelTests: XCTestCase {
       ["root", "nested", "target"]
     )
   }
+
+  func testBulkRemovalIsOrderedAtomicAndDoesNotDoubleRemoveDescendants() {
+    var model = TreeModel(roots: [
+      TestTreeNode(
+        id: "folder",
+        children: [TestTreeNode(id: "nested")],
+        acceptsChildren: true
+      ),
+      TestTreeNode(id: "sibling"),
+    ])
+
+    let removed = model.removeAll(ids: ["folder", "nested", "sibling"])
+    XCTAssertEqual(removed.map(\.id), ["folder", "sibling"])
+    XCTAssertTrue(model.roots.isEmpty)
+
+    model = TreeModel(roots: [
+      TestTreeNode(id: "editable"),
+      TestTreeNode(id: "locked", isLocked: true),
+    ])
+    XCTAssertTrue(model.removeAll(ids: ["editable", "locked"]).isEmpty)
+    XCTAssertEqual(model.roots.map(\.id), ["editable", "locked"])
+  }
 }
 
 private struct TestTreeNode: TreeNode {

@@ -57,6 +57,8 @@ struct UIDevWorkspaceView: View {
         selectSurface: { selectedSection = $0 },
         showAgentPanel: showAgentPanel
       )
+    } else if selectedSection == .demoUIKit {
+      DemoUIKitGalleryView()
     } else if selectedSection.isEmbeddedWorkspacePreview {
       UIDevEmbeddedWorkspacePreview(surface: selectedSection) {
         selectedSection = .overview
@@ -107,7 +109,8 @@ struct UIDevWorkspaceView: View {
   @ViewBuilder
   private var sectionContent: some View {
     switch selectedSection {
-    case .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit: EmptyView()
+    case .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit, .demoUIKit:
+      EmptyView()
     case .navigator, .inspector, .timeline, .workspace3D: EmptyView()
     case .overview: overviewGallery
     case .buttons: buttonGallery

@@ -135,7 +135,11 @@ public enum RealityKitModelLoader {
         geometries: importedMeshes.map(\.topologyGeometry)
       )
     }
-    return LoadedRealityKitModel(entity: selectedRoot, topology: topology)
+    return LoadedRealityKitModel(
+      entity: selectedRoot,
+      topology: topology,
+      triangleCount: topologyTriangleCount
+    )
   }
 
   private static func makeEntity(from meshes: [ImportedMesh], name: String) throws -> Entity {
@@ -264,10 +268,12 @@ public enum RealityKitModelLoader {
 public struct LoadedRealityKitModel {
   public let entity: Entity
   public let topology: ImportedMeshTopology?
+  public let triangleCount: Int
 
-  public init(entity: Entity, topology: ImportedMeshTopology?) {
+  public init(entity: Entity, topology: ImportedMeshTopology?, triangleCount: Int) {
     self.entity = entity
     self.topology = topology
+    self.triangleCount = max(triangleCount, 0)
   }
 }
 

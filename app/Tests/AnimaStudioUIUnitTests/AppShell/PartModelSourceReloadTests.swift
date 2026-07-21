@@ -53,4 +53,35 @@ final class PartModelSourceReloadTests: XCTestCase {
       "reload dropped imported meshes back to proxies"
     )
   }
+
+  func testProjectAssetOverrideWinsOverCharacterLocalFallback() async throws {
+    let repoRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repoRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repoRoot
+      )
+    )
+    defer { Task { await client.shutdown() } }
+    let characterURL = repoRoot.appendingPathComponent("examples/pan_tilt_head.character.anima")
+    let text = try String(contentsOf: characterURL, encoding: .utf8)
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    try await workspace.loadSerializedCharacter(text: text)
+    let part = try XCTUnwrap(workspace.engineParts.first(where: { !$0.model.isEmpty }))
+    let partID = try XCTUnwrap(workspace.partID(forEngineName: part.name))
+    let projectAssetURL = URL(fileURLWithPath: "/tmp/Project/assets/models/source.step")
+
+    workspace.configurePartModelSources(
+      characterDirectoryURL: URL(fileURLWithPath: "/tmp/Project/characters/robot"),
+      editorMetadata: CharacterEditorMetadata(),
+      resolvedProjectAssetURLs: [part.model: projectAssetURL]
+    )
+
+    XCTAssertEqual(workspace.enginePartModelSources[partID]?.fileURL, projectAssetURL)
+  }
 }

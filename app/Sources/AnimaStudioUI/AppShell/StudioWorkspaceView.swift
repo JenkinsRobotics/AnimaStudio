@@ -27,6 +27,7 @@ struct StudioWorkspaceView: View {
   @State private var isSwitchingCharacter = false
   @State private var characterEditorMetadata = CharacterEditorMetadata()
   @State private var characterLibraryEntries: [CharacterLibraryEntry] = []
+  @State private var savedAssemblies: [AssemblyDocumentSummary] = []
   @State private var activeImportedModelReference: String?
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
@@ -38,10 +39,13 @@ struct StudioWorkspaceView: View {
   @State private var isSavingProject = false
   @State private var didLoadIndexedCharacter = false
   @State private var armIKSolveTask: Task<Void, Never>?
+  @State private var partTriangleCounts: [PartID: Int] = [:]
+  @State private var cadSourceTriangleCounts: [String: Int] = [:]
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
     StudioLayoutPreset.floating.rawValue
+  @AppStorage(StudioPreferenceKey.showsStatusBar) private var showsStatusBar = true
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile)
   private var viewportNavigationProfileRawValue =
     PreviewNavigationProfile.default.rawValue
@@ -103,6 +107,7 @@ struct StudioWorkspaceView: View {
   init(
     session: Binding<StudioProjectSession>,
     designProfile: Binding<StudioDesignProfile> = .constant(.standard),
+    startupWorkspace: StudioWorkspaceKind = .assets,
     newProject: @escaping () -> Void = {},
     openProject: @escaping () -> Void = {},
     didPersistProject: @escaping (StudioProjectSession) -> Void = { _ in },
@@ -111,7 +116,10 @@ struct StudioWorkspaceView: View {
     _session = session
     _designProfile = designProfile
     _workspace = State(
-      initialValue: StudioWorkspaceModel(project: session.wrappedValue.document.project)
+      initialValue: StudioWorkspaceModel(
+        project: session.wrappedValue.document.project,
+        startupWorkspace: startupWorkspace
+      )
     )
     self.newProject = newProject
     self.openProject = openProject
@@ -154,10 +162,17 @@ struct StudioWorkspaceView: View {
 
       workspaceShell
 
-      StudioStatusBar(
-        workspace: workspace,
-        isUIDevWorkspace: isUIDevWorkspace
-      )
+      if showsStatusBar {
+        StudioStatusBar(
+          workspace: workspace,
+          isUIDevWorkspace: isUIDevWorkspace,
+          selectedPartName: selectedPartStatusName,
+          selectedPartTriangleCount: selectedPartTriangleCount,
+          rendererName: activeRendererName,
+          themeName: activeThemeName,
+          kernelVersion: CADGeometryKernel.version
+        )
+      }
     }
     .overlay(alignment: .bottom) {
       if showsWorkspaceGuide {
@@ -197,6 +212,7 @@ struct StudioWorkspaceView: View {
           urls: pendingModelImportURLs,
           characters: session.document.characters,
           initialTargetCharacterID: session.document.activeCharacter?.id,
+          canCopyIntoProject: hasPersistedProjectForImport,
           isReplacingPart: replacesSelectedPartOnNextImport,
           cancel: {
             pendingModelImportURLs.removeAll()
@@ -259,6 +275,7 @@ struct StudioWorkspaceView: View {
       if AssetBuilderFeatureAvailability.showsLibraries {
         refreshCharacterLibrary()
       }
+      refreshSavedAssemblies()
     }
     .onChange(of: workspace.detectedLayoutPreset) { _, preset in
       if let preset {
@@ -290,6 +307,13 @@ struct StudioWorkspaceView: View {
     }
   }
 
+  private var hasPersistedProjectForImport: Bool {
+    guard let projectURL = try? session.resolvedProjectURL() else { return false }
+    return FileManager.default.fileExists(
+      atPath: projectURL.appendingPathComponent(AnimaDocumentStore.manifestFilename).path
+    )
+  }
+
   /// Coalesces high-frequency gizmo updates before they enter the sequential
   /// bridge actor. The target moves immediately; AnimaCore still owns every
   /// solved arm pose.
@@ -311,6 +335,8 @@ struct StudioWorkspaceView: View {
       workspaceKind: workspace.activeWorkspace,
       toolGroups: workspaceToolGroups,
       toolCategories: workspaceToolCategories,
+      centerModes: centerViewModes,
+      centerSelection: centerViewSelection,
       leftTabs: StudioWorkspaceSidebarCatalog.tabs(for: workspace.activeWorkspace),
       leftPanels: workspace.activeWorkspaceSidebarPanels,
       didToggleLeftPanel: { tab in
@@ -320,10 +346,7 @@ struct StudioWorkspaceView: View {
       },
       performCommand: performWorkspaceRibbonAction,
       center: {
-        VStack(spacing: 0) {
-          workspaceCanvas
-          bottomEditor
-        }
+        workspaceCanvas
       },
       left: { tab in
         workspaceSidebarContent(tab: tab)
@@ -349,6 +372,19 @@ struct StudioWorkspaceView: View {
     )
   }
 
+  private var centerViewModes: [StudioCenterViewMode] {
+    guard !isUIDevWorkspace else { return [] }
+    return StudioCenterViewCatalog.modes(for: workspace.activeWorkspace)
+  }
+
+  private var centerViewSelection: Binding<StudioCenterViewMode>? {
+    guard let fallback = workspace.activeCenterView else { return nil }
+    return Binding(
+      get: { workspace.activeCenterView ?? fallback },
+      set: { workspace.selectCenterView($0) }
+    )
+  }
+
   private var workspaceToolGroups: [StudioToolGroup] {
     guard !isUIDevWorkspace, workspace.activeWorkspace != .rig else { return [] }
     return StudioWorkspaceToolCatalog.groups(for: workspace.activeWorkspace)
@@ -367,14 +403,26 @@ struct StudioWorkspaceView: View {
     if isUIDevWorkspace {
       ProjectNavigatorView(
         workspace: workspace,
-        importModel: presentModelImportPanel
+        selectedTab: tab,
+        importModel: presentModelImportPanel,
+        deleteParts: { ids in Task { await deleteParts(ids) } },
+        savedAssemblies: savedAssemblies,
+        saveAssembly: saveAssembly,
+        importAssembly: { summary in Task { await importAssembly(summary) } }
       )
     } else if workspace.activeWorkspace == .assets {
       assetsWorkspaceView(surface: .workspaceSidebar)
+    } else if workspace.activeWorkspace == .design {
+      StudioDesignSandboxBrowser(tab: tab)
     } else {
       ProjectNavigatorView(
         workspace: workspace,
-        importModel: presentModelImportPanel
+        selectedTab: tab,
+        importModel: presentModelImportPanel,
+        deleteParts: { ids in Task { await deleteParts(ids) } },
+        savedAssemblies: savedAssemblies,
+        saveAssembly: saveAssembly,
+        importAssembly: { summary in Task { await importAssembly(summary) } }
       )
     }
   }
@@ -385,6 +433,8 @@ struct StudioWorkspaceView: View {
       StudioAgentPanelView { showsUIDevAgentPanel = false }
     } else if workspace.activeWorkspace == .assets {
       assetsWorkspaceView(surface: .viewInspector)
+    } else if workspace.activeWorkspace == .design {
+      StudioDesignPartPropertiesPanel()
     } else {
       InspectorView(
         workspace: workspace,
@@ -444,26 +494,10 @@ struct StudioWorkspaceView: View {
         workspace.beginRelationDraft(relation)
         toolState.committed()
       }
-    }
-  }
-
-  @ViewBuilder
-  private var bottomEditor: some View {
-    if !isUIDevWorkspace && workspace.activePresentation.showsBottomEditor {
-      switch workspace.activeWorkspace {
-      case .animate:
-        TimelineWorkspaceSurface {
-          TimelineEditorView(workspace: workspace)
-            .frame(minHeight: 260, idealHeight: 340, maxHeight: 440)
-        }
-      case .show:
-        TimelineWorkspaceSurface {
-          ShowTimelineView(workspace: workspace)
-            .frame(minHeight: 210, idealHeight: 250, maxHeight: 320)
-        }
-      case .assets, .rig, .nodes, .hardware:
-        EmptyView()
-      }
+    case .designPlaceholder:
+      // The Design sandbox consumes the click location directly so the
+      // placeholder lands where the operator clicked.
+      break
     }
   }
 
@@ -493,21 +527,102 @@ struct StudioWorkspaceView: View {
   }
 
   private var authoringWorkspaceCanvas: some View {
-    Group {
-      if workspace.activeWorkspace == .assets {
-        assetsWorkspaceView(surface: .center)
-      } else {
-        viewportCenterContent
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .clipped()
+    workspaceCenterRepresentation
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .clipped()
   }
 
-  private func assetsWorkspaceView(surface: AssetsWorkspaceSurface) -> some View {
+  @ViewBuilder
+  private var workspaceCenterRepresentation: some View {
+    switch workspace.activeWorkspace {
+    case .assets:
+      switch workspace.activeCenterView ?? .threeD {
+      case .threeD:
+        viewport
+      case .gallery:
+        StudioContentSafeCenter {
+          assetsWorkspaceView(surface: .center, centerLayoutMode: .grid)
+        }
+      case .table:
+        StudioContentSafeCenter {
+          assetsWorkspaceView(surface: .center, centerLayoutMode: .table)
+        }
+      case .exploded, .dopeSheet, .curves, .nodeGraph, .servoTimeline:
+        viewport
+      }
+
+    case .rig:
+      switch workspace.activeCenterView ?? .threeD {
+      case .threeD:
+        viewport
+      case .table:
+        StudioContentSafeCenter {
+          StudioRigTableCenterView(parts: workspace.engineParts, mates: workspace.engineMates)
+        }
+      case .exploded:
+        StudioContentSafeCenter {
+          StudioRigExplodedCenterView(parts: workspace.engineParts)
+        }
+      case .gallery, .dopeSheet, .curves, .nodeGraph, .servoTimeline:
+        viewport
+      }
+
+    case .animate:
+      switch workspace.activeCenterView ?? .threeD {
+      case .threeD:
+        viewport
+      case .dopeSheet, .curves:
+        StudioContentSafeCenter {
+          TimelineEditorView(workspace: workspace, showsModeBar: false)
+        }
+      case .gallery, .table, .exploded, .nodeGraph, .servoTimeline:
+        viewport
+      }
+
+    case .show:
+      switch workspace.activeCenterView ?? .nodeGraph {
+      case .nodeGraph:
+        StudioContentSafeCenter { NodeWorkspaceView() }
+      case .table:
+        StudioContentSafeCenter {
+          StudioShowTableCenterView(
+            scenes: session.document.scenes,
+            clips: workspace.project.clips
+          )
+        }
+      case .threeD:
+        viewport
+      case .gallery, .exploded, .dopeSheet, .curves, .servoTimeline:
+        viewport
+      }
+
+    case .hardware:
+      switch workspace.activeCenterView ?? .servoTimeline {
+      case .servoTimeline:
+        StudioContentSafeCenter { StudioServoTimelineCenterView(workspace: workspace) }
+      case .table:
+        StudioContentSafeCenter { HardwareWorkspaceView() }
+      case .threeD:
+        viewport
+      case .gallery, .exploded, .dopeSheet, .curves, .nodeGraph:
+        viewport
+      }
+
+    case .nodes:
+      NodeWorkspaceView()
+    case .design:
+      StudioDesignSandboxCanvas()
+    }
+  }
+
+  private func assetsWorkspaceView(
+    surface: AssetsWorkspaceSurface,
+    centerLayoutMode: AssetBuilderLayoutMode? = nil
+  ) -> some View {
     AssetsWorkspaceView(
       workspace: workspace,
       surface: surface,
+      centerLayoutMode: centerLayoutMode,
       projectName: session.document.displayName,
       projectRevision: session.document.metadata.revision,
       characters: session.document.characters,
@@ -540,17 +655,6 @@ struct StudioWorkspaceView: View {
     )
   }
 
-  @ViewBuilder
-  private var viewportCenterContent: some View {
-    if workspace.activeWorkspace == .nodes {
-      NodeWorkspaceView()
-    } else if workspace.activeWorkspace == .hardware {
-      HardwareWorkspaceView()
-    } else {
-      viewport
-    }
-  }
-
   private var showsFloatingNavigator: Bool {
     StudioLayoutState.shared.detectedPreset == .floating
       && workspace.isActiveWorkspaceSidebarOpen
@@ -570,7 +674,14 @@ struct StudioWorkspaceView: View {
             backend: cadRenderBackend,
             theme: cadViewportTheme,
             showsTelemetry: cadShowsTelemetry,
-            isSelected: workspace.selectionCount > 0
+            isSelected: workspace.selectionCount > 0,
+            onSourceTriangleCountsChange: { counts in
+              cadSourceTriangleCounts = Dictionary(
+                uniqueKeysWithValues: counts.map {
+                  ($0.key.standardizedFileURL.path, $0.value)
+                }
+              )
+            }
           )
         } else {
           RobotPreviewView(
@@ -665,7 +776,8 @@ struct StudioWorkspaceView: View {
             },
             onBackgroundClick: { _ in commitArmedTool() },
             onFrameAll: workspace.showHomeView,
-            onBoxSelectPartIDs: workspace.selectParts
+            onBoxSelectPartIDs: workspace.selectParts,
+            onPartTriangleCountsChange: { partTriangleCounts = $0 }
           )
         }
       }
@@ -736,6 +848,38 @@ struct StudioWorkspaceView: View {
 
   private var cadRenderBackend: CADRenderBackend {
     CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .realityKit
+  }
+
+  private var selectedPartStatusName: String? {
+    guard let selectedPartID = workspace.selectedPartID else { return nil }
+    return workspace.project.rig.parts.first { $0.id == selectedPartID }?.displayName
+  }
+
+  private var selectedPartTriangleCount: Int? {
+    guard let selectedPartID = workspace.selectedPartID else { return nil }
+    if usesDedicatedCADPipeline,
+      let source = workspace.enginePartModelSources[selectedPartID]
+    {
+      return cadSourceTriangleCounts[source.fileURL.standardizedFileURL.path]
+    }
+    return partTriangleCounts[selectedPartID]
+  }
+
+  private var activeRendererName: String {
+    if usesDedicatedCADPipeline || !stepModelURLs.isEmpty {
+      return cadRenderBackend.title
+    }
+    return "RealityKit"
+  }
+
+  private var activeThemeName: String {
+    if usesDedicatedCADPipeline { return cadViewportTheme.name }
+    return switch workspace.viewportBackground.mode {
+    case .preset: workspace.viewportBackground.preset.title
+    case .transparent: "Transparent"
+    case .solid: "Custom Solid"
+    case .gradient: "Custom Gradient"
+    }
   }
 
   private var stepModelURLs: [URL] {
@@ -861,7 +1005,7 @@ struct StudioWorkspaceView: View {
 
   private var hasInspectorContent: Bool {
     return switch workspace.activeWorkspace {
-    case .assets, .animate, .show, .hardware:
+    case .assets, .animate, .show, .hardware, .design:
       true
     case .nodes:
       false
@@ -1160,13 +1304,7 @@ struct StudioWorkspaceView: View {
       } else {
         characterEditorMetadata = CharacterEditorMetadata()
       }
-      workspace.configurePartModelSources(
-        characterDirectoryURL: projectURL.appendingPathComponent(
-          character.directoryPath,
-          isDirectory: true
-        ),
-        editorMetadata: characterEditorMetadata
-      )
+      configurePartModelSources(projectURL: projectURL, character: character)
       workspace.applyCharacterEditorMetadata(characterEditorMetadata)
       workspace.project.name = session.document.displayName
       var updated = session
@@ -1181,6 +1319,40 @@ struct StudioWorkspaceView: View {
       lifecycleErrorMessage = error.localizedDescription
       return false
     }
+  }
+
+  /// Resolves project-level Pack-and-Go files and bookmarked external files
+  /// into renderer URLs while leaving AnimaCore's model field as a safe,
+  /// character-relative logical token.
+  @MainActor
+  private func configurePartModelSources(
+    projectURL: URL,
+    character: ProjectCharacterReference,
+    metadata: CharacterEditorMetadata? = nil,
+    document: AnimaStudioDocument? = nil
+  ) {
+    let metadata = metadata ?? characterEditorMetadata
+    let document = document ?? session.document
+    var resolvedURLs: [String: URL] = [:]
+    for (modelReference, importMetadata) in metadata.modelImports {
+      guard let assetID = importMetadata.assetID,
+        let asset = document.assets.first(where: { $0.id.rawValue == assetID }),
+        case .resolved(let url) = try? ProjectLifecycle.store.resolveAsset(
+          asset,
+          projectURL: projectURL
+        )
+      else { continue }
+      resolvedURLs[modelReference] = url
+    }
+    workspace.retainLinkedAssetAccess(Array(resolvedURLs.values))
+    workspace.configurePartModelSources(
+      characterDirectoryURL: projectURL.appendingPathComponent(
+        character.directoryPath,
+        isDirectory: true
+      ),
+      editorMetadata: metadata,
+      resolvedProjectAssetURLs: resolvedURLs
+    )
   }
 
   @MainActor
@@ -1271,6 +1443,7 @@ struct StudioWorkspaceView: View {
       updated.isDirty = false
       session = updated
       didPersistProject(updated)
+      refreshSavedAssemblies()
     } catch {
       lifecycleErrorMessage = error.localizedDescription
     }
@@ -1323,6 +1496,107 @@ struct StudioWorkspaceView: View {
   private func refreshCharacterLibrary() {
     let root = characterLibraryRootURL
     characterLibraryEntries = (try? CharacterLibraryStore().list(in: root)) ?? []
+  }
+
+  @MainActor
+  private func refreshSavedAssemblies() {
+    guard let projectURL = try? session.resolvedProjectURL() else {
+      savedAssemblies = []
+      return
+    }
+    savedAssemblies = (try? AssemblyDocumentStore().list(in: projectURL)) ?? []
+  }
+
+  @MainActor
+  private func saveAssembly() {
+    let selectedIDs = workspace.selectedComponentIDs
+    let partIDs = selectedIDs.isEmpty ? workspace.project.rig.parts.map(\.id) : selectedIDs
+    let parts = partIDs.compactMap(workspace.enginePart(for:))
+    guard !parts.isEmpty else {
+      lifecycleErrorMessage = "Select at least one Part before saving an Assembly."
+      return
+    }
+
+    let alert = NSAlert()
+    alert.messageText = "Save Reusable Assembly"
+    alert.informativeText =
+      "The selected Parts will be stored in this project's assets/assemblies folder."
+    let nameField = NSTextField(
+      string: "\(session.document.activeCharacter?.displayName ?? "Character") Assembly"
+    )
+    nameField.placeholderString = "Assembly name"
+    nameField.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
+    alert.accessoryView = nameField
+    alert.addButton(withTitle: "Save Assembly")
+    alert.addButton(withTitle: "Cancel")
+    guard alert.runModal() == .alertFirstButtonReturn else { return }
+    let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty else { return }
+
+    do {
+      let projectURL = try session.resolvedProjectURL()
+      let document = AnimaAssemblyDocument(
+        name: name,
+        nodes: parts.map { part in
+          AssemblyNodeReference(
+            name: part.name,
+            kind: .part,
+            partName: part.name,
+            modelReference: part.model.isEmpty ? nil : part.model,
+            modelNode: part.modelNode
+          )
+        }
+      )
+      _ = try AssemblyDocumentStore().save(document, in: projectURL)
+      refreshSavedAssemblies()
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func importAssembly(_ summary: AssemblyDocumentSummary) async {
+    do {
+      let document = try AssemblyDocumentStore().load(from: summary.url)
+      var importedIDs: Set<PartID> = []
+      for node in flattenedAssemblyNodes(document.nodes) where node.kind == .part {
+        if let partName = node.partName,
+          let existingID = workspace.partID(forEngineName: partName)
+        {
+          importedIDs.insert(existingID)
+          continue
+        }
+        guard let modelReference = node.modelReference else { continue }
+        let partName = try await workspace.authorImportedModel(
+          modelReference: modelReference,
+          modelNode: node.modelNode,
+          suggestedPartName: node.name
+        )
+        if let partID = workspace.partID(forEngineName: partName) {
+          importedIDs.insert(partID)
+        }
+      }
+      guard !importedIDs.isEmpty else {
+        throw AnimaDocumentError.writeFailed(
+          path: summary.url.path,
+          detail: "None of this Assembly's Part references are available in the active Character."
+        )
+      }
+      workspace.selectParts(ids: importedIDs)
+      _ = workspace.createComponentGroup(named: document.name)
+      var updated = session
+      updated.isDirty = true
+      session = updated
+      _ = await saveProject()
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  private func flattenedAssemblyNodes(
+    _ nodes: [AssemblyNodeReference]
+  ) -> [AssemblyNodeReference] {
+    nodes.flatMap { [$0] + flattenedAssemblyNodes($0.children) }
   }
 
   private var characterLibraryRootURL: URL {
@@ -1495,6 +1769,7 @@ struct StudioWorkspaceView: View {
       let succeeded = await importModel(
         from: request.url,
         sourceUnit: request.unit,
+        importMode: plan.importMode,
         replacingSelectedPart: replacesSelectedPart && index == 0
       )
       guard succeeded else {
@@ -1520,6 +1795,7 @@ struct StudioWorkspaceView: View {
   private func importModel(
     from sourceURL: URL,
     sourceUnit: ModelImportUnit,
+    importMode: AssetImportMode,
     replacingSelectedPart: Bool = false
   ) async -> Bool {
     guard let character = session.document.activeCharacter else {
@@ -1544,11 +1820,12 @@ struct StudioWorkspaceView: View {
         if accessedProject { projectURL.stopAccessingSecurityScopedResource() }
         if accessedSource { sourceURL.stopAccessingSecurityScopedResource() }
       }
-      if !replacingSelectedPart,
+      if importMode == .copyIntoProject, !replacingSelectedPart,
         let replacement = AssetBuilderImportMatching.automaticReplacement(
           sourceFilename: sourceURL.lastPathComponent,
           character: character,
           assets: updated.document.assets,
+          modelImports: characterEditorMetadata.modelImports,
           parts: workspace.engineParts
         )
       {
@@ -1559,7 +1836,8 @@ struct StudioWorkspaceView: View {
         )
         characterEditorMetadata.modelImports[replacement.modelReference] = ModelImportMetadata(
           unitName: sourceUnit.rawValue,
-          unitScaleToMeters: sourceUnit.scaleToMeters
+          unitScaleToMeters: sourceUnit.scaleToMeters,
+          assetID: replacement.asset.id.rawValue
         )
         var versionedPartNames = Set<String>()
         for partName in replacement.partNames {
@@ -1570,15 +1848,18 @@ struct StudioWorkspaceView: View {
           )
         }
         activeImportedModelReference = replacement.modelReference
-        workspace.importedModelURL = projectURL.appendingPathComponent(replacement.relativePath)
+        if case .resolved(let resolvedURL) = try ProjectLifecycle.store.resolveAsset(
+          replacement.asset,
+          projectURL: projectURL
+        ) {
+          workspace.importedModelURL = resolvedURL
+        }
         workspace.importedModelHierarchy = importedHierarchy
         workspace.retainProjectAssetAccess(projectURL)
-        workspace.configurePartModelSources(
-          characterDirectoryURL: projectURL.appendingPathComponent(
-            character.directoryPath,
-            isDirectory: true
-          ),
-          editorMetadata: characterEditorMetadata
+        configurePartModelSources(
+          projectURL: projectURL,
+          character: character,
+          document: updated.document
         )
         workspace.selectParts(
           ids: Set(replacement.partNames.compactMap(workspace.partID(forEngineName:)))
@@ -1587,27 +1868,37 @@ struct StudioWorkspaceView: View {
         session = updated
         return true
       }
-      updated.document = try ProjectLifecycle.store.embedAsset(
-        from: sourceURL,
-        into: projectURL,
-        document: updated.document,
-        characterFolderName: character.folderName,
-        kind: "model3D"
-      )
-      if let asset = updated.document.assets.last,
-        case .embedded(let relativePath) = asset.storage
-      {
+      switch importMode {
+      case .copyIntoProject:
+        updated.document = try ProjectLifecycle.store.embedAsset(
+          from: sourceURL,
+          into: projectURL,
+          document: updated.document,
+          folder: .models,
+          kind: "model3D"
+        )
+      case .referenceInPlace:
+        updated.document = try ProjectLifecycle.store.linkAsset(
+          at: sourceURL,
+          into: updated.document,
+          kind: "model3D"
+        )
+      }
+      if let asset = updated.document.assets.last {
         let partNamesBeforeImport = Set(workspace.engineParts.map(\.name))
         var versionedPartNames = Set<String>()
-        let prefix = character.directoryPath + "/"
-        guard relativePath.hasPrefix(prefix) else {
-          throw AnimaDocumentError.pathTraversal(path: relativePath)
+        let storedFilename: String
+        switch asset.storage {
+        case .embedded(let relativePath):
+          storedFilename = URL(fileURLWithPath: relativePath).lastPathComponent
+        case .linked:
+          storedFilename = asset.originalFilename
         }
-        let modelReference = String(relativePath.dropFirst(prefix.count))
-        let copiedURL = projectURL.appendingPathComponent(relativePath)
+        let modelReference = "assets/\(storedFilename)"
         characterEditorMetadata.modelImports[modelReference] = ModelImportMetadata(
           unitName: sourceUnit.rawValue,
-          unitScaleToMeters: sourceUnit.scaleToMeters
+          unitScaleToMeters: sourceUnit.scaleToMeters,
+          assetID: asset.id.rawValue
         )
         let primaryPartName = try await workspace.authorImportedModel(
           modelReference: modelReference,
@@ -1639,15 +1930,18 @@ struct StudioWorkspaceView: View {
           }
         }
         activeImportedModelReference = modelReference
-        workspace.importedModelURL = copiedURL
+        if case .resolved(let resolvedURL) = try ProjectLifecycle.store.resolveAsset(
+          asset,
+          projectURL: projectURL
+        ) {
+          workspace.importedModelURL = resolvedURL
+        }
         workspace.importedModelHierarchy = importedHierarchy
         workspace.retainProjectAssetAccess(projectURL)
-        workspace.configurePartModelSources(
-          characterDirectoryURL: projectURL.appendingPathComponent(
-            character.directoryPath,
-            isDirectory: true
-          ),
-          editorMetadata: characterEditorMetadata
+        configurePartModelSources(
+          projectURL: projectURL,
+          character: character,
+          document: updated.document
         )
       }
       workspace.project.name = updated.document.displayName
@@ -1705,28 +1999,34 @@ struct StudioWorkspaceView: View {
       }
       let remainingModelReferences = Set(workspace.engineParts.map(\.model).filter { !$0.isEmpty })
       let orphanedModelReferences = removedModelReferences.subtracting(remainingModelReferences)
+      let orphanedAssetIDs = Set(
+        orphanedModelReferences.compactMap { characterEditorMetadata.modelImports[$0]?.assetID }
+      )
       for reference in orphanedModelReferences {
         characterEditorMetadata.modelImports.removeValue(forKey: reference)
       }
       workspace.applyCharacterEditorMetadata(characterEditorMetadata)
 
       var updated = session
-      let prefix = character.directoryPath + "/"
-      let orphanedRelativePaths = Set(orphanedModelReferences.map { prefix + $0 })
+      let orphanedRelativePaths = Set(
+        updated.document.assets.compactMap { asset -> String? in
+          guard orphanedAssetIDs.contains(asset.id.rawValue),
+            case .embedded(let path) = asset.storage
+          else { return nil }
+          return path
+        }
+      )
       updated.document.assets.removeAll { asset in
-        guard case .embedded(let path) = asset.storage else { return false }
-        return orphanedRelativePaths.contains(path)
+        orphanedAssetIDs.contains(asset.id.rawValue)
       }
       updated.isDirty = true
       session = updated
       let projectURL = try updated.resolvedProjectURL()
       workspace.retainProjectAssetAccess(projectURL)
-      workspace.configurePartModelSources(
-        characterDirectoryURL: projectURL.appendingPathComponent(
-          character.directoryPath,
-          isDirectory: true
-        ),
-        editorMetadata: characterEditorMetadata
+      configurePartModelSources(
+        projectURL: projectURL,
+        character: character,
+        document: updated.document
       )
       guard await saveProject() else { return }
       let accessedProject = projectURL.startAccessingSecurityScopedResource()
@@ -1785,12 +2085,10 @@ struct StudioWorkspaceView: View {
       characterEditorMetadata = emptyEditorMetadata
       activeImportedModelReference = nil
       workspace.retainProjectAssetAccess(projectURL)
-      workspace.configurePartModelSources(
-        characterDirectoryURL: projectURL.appendingPathComponent(
-          reference.directoryPath,
-          isDirectory: true
-        ),
-        editorMetadata: emptyEditorMetadata
+      configurePartModelSources(
+        projectURL: projectURL,
+        character: reference,
+        metadata: emptyEditorMetadata
       )
       updated.projectURL = projectURL
       updated.bookmarkData = ProjectLifecycle.bookmark(for: projectURL)
@@ -1841,13 +2139,7 @@ struct StudioWorkspaceView: View {
       workspace.importedModelURL = importedURL
       let projectURL = try session.resolvedProjectURL()
       workspace.retainProjectAssetAccess(projectURL)
-      workspace.configurePartModelSources(
-        characterDirectoryURL: projectURL.appendingPathComponent(
-          character.directoryPath,
-          isDirectory: true
-        ),
-        editorMetadata: characterEditorMetadata
-      )
+      configurePartModelSources(projectURL: projectURL, character: character)
       workspace.project.name = session.document.displayName
       var updated = session
       updated.isDirty = true

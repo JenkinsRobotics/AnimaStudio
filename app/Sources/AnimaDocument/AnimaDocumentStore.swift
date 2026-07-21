@@ -29,6 +29,8 @@ public struct AnimaDocumentStore: Sendable {
   public static let manifestFilename = "project.json"
   public static let charactersDirectoryName = "characters"
   public static let scenesDirectoryName = "scenes"
+  public static let assetsDirectoryName = "assets"
+  public static let assetFolders = ProjectAssetFolder.allCases
 
   let bookmarkStyle: BookmarkStyle
   let now: @Sendable () -> Date
@@ -146,6 +148,7 @@ public struct AnimaDocumentStore: Sendable {
         at: staging.appendingPathComponent(Self.scenesDirectoryName, isDirectory: true),
         withIntermediateDirectories: true
       )
+      try Self.ensureProjectDirectories(at: staging, fileManager: fileManager)
       for character in updated.characters {
         let directory = staging.appendingPathComponent(
           character.directoryPath,
@@ -191,6 +194,11 @@ public struct AnimaDocumentStore: Sendable {
     guard fileManager.fileExists(atPath: manifestURL.path) else {
       throw AnimaDocumentError.packageNotFound(path: projectURL.path)
     }
+
+    // Opening is also the migration point for the folder-only project
+    // skeleton. Older format-v2 projects remain valid; missing typed asset
+    // directories are backfilled without rewriting project.json.
+    try Self.ensureProjectDirectories(at: projectURL, fileManager: fileManager)
 
     let data: Data
     do {
@@ -243,30 +251,29 @@ public struct AnimaDocumentStore: Sendable {
     return document
   }
 
+  /// Copies an operator-owned source into the project's typed Pack-and-Go
+  /// asset store. The source is never moved or modified.
   public func embedAsset(
     from sourceURL: URL,
     into projectURL: URL,
     document: AnimaStudioDocument,
-    characterFolderName: String,
+    folder: ProjectAssetFolder,
     kind: String
   ) throws -> AnimaStudioDocument {
     let fileManager = FileManager.default
     guard fileManager.fileExists(atPath: sourceURL.path) else {
       throw AnimaDocumentError.missingAsset(path: sourceURL.path)
     }
-    guard document.characters.contains(where: { $0.folderName == characterFolderName }) else {
-      throw AnimaDocumentError.unknownCharacter(name: characterFolderName)
-    }
     let requestedFilename = sourceURL.lastPathComponent
     try Self.validate(filename: requestedFilename)
     let filename = Self.availableAssetFilename(
       requestedFilename,
-      characterFolderName: characterFolderName,
+      folder: folder,
       document: document,
       projectURL: projectURL
     )
     let id = AssetID()
-    let relativePath = "characters/\(characterFolderName)/assets/\(filename)"
+    let relativePath = "\(folder.relativeDirectoryPath)/\(filename)"
     let destination = projectURL.appendingPathComponent(relativePath)
     do {
       try fileManager.createDirectory(
@@ -330,14 +337,14 @@ public struct AnimaDocumentStore: Sendable {
 
   private static func availableAssetFilename(
     _ requestedFilename: String,
-    characterFolderName: String,
+    folder: ProjectAssetFolder,
     document: AnimaStudioDocument,
     projectURL: URL
   ) -> String {
     let requestedURL = URL(fileURLWithPath: requestedFilename)
     let stem = requestedURL.deletingPathExtension().lastPathComponent
     let pathExtension = requestedURL.pathExtension
-    let prefix = "characters/\(characterFolderName)/assets/"
+    let prefix = "\(folder.relativeDirectoryPath)/"
     let occupied = Set(
       document.assets.compactMap { asset -> String? in
         guard case .embedded(let path) = asset.storage, path.hasPrefix(prefix) else { return nil }
@@ -459,11 +466,12 @@ public struct AnimaDocumentStore: Sendable {
         }
         try validateProjectRelativePath(relativePath)
         let parts = relativePath.split(separator: "/")
-        guard
-          parts.count >= 4,
-          parts[0] == "characters",
-          parts[2] == "assets"
-        else {
+        let isLegacyCharacterAsset =
+          parts.count >= 4 && parts[0] == "characters" && parts[2] == "assets"
+        let isTypedProjectAsset =
+          parts.count >= 3 && parts[0] == "assets"
+          && ProjectAssetFolder(rawValue: String(parts[1])) != nil
+        guard isLegacyCharacterAsset || isTypedProjectAsset else {
           throw AnimaDocumentError.pathTraversal(path: relativePath)
         }
       }
@@ -515,6 +523,7 @@ public struct AnimaDocumentStore: Sendable {
     guard
       !components.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }),
       components.first == "characters" || components.first == "scenes"
+        || components.first == "assets"
     else {
       throw AnimaDocumentError.pathTraversal(path: path)
     }
@@ -548,6 +557,34 @@ public struct AnimaDocumentStore: Sendable {
 
   static func wholeSecond(_ date: Date) -> Date {
     Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down))
+  }
+
+  /// Creates the complete plain-folder skeleton and is safe to call for every
+  /// create/open/save. This is intentionally independent of project.json's
+  /// format version: adding a typed directory does not migrate engine data.
+  public static func ensureProjectDirectories(
+    at projectURL: URL,
+    fileManager: FileManager = .default
+  ) throws {
+    do {
+      for directory in [charactersDirectoryName, scenesDirectoryName, assetsDirectoryName] {
+        try fileManager.createDirectory(
+          at: projectURL.appendingPathComponent(directory, isDirectory: true),
+          withIntermediateDirectories: true
+        )
+      }
+      for folder in assetFolders {
+        try fileManager.createDirectory(
+          at: projectURL.appendingPathComponent(folder.relativeDirectoryPath, isDirectory: true),
+          withIntermediateDirectories: true
+        )
+      }
+    } catch {
+      throw AnimaDocumentError.writeFailed(
+        path: projectURL.path,
+        detail: "Could not prepare project folders: \(error.localizedDescription)"
+      )
+    }
   }
 
   static func describe(decodingError error: any Error) -> String {

@@ -5,23 +5,6 @@ import SwiftUI
 
 // MARK: - Shared shell state
 
-struct StudioWorkspaceOverlayInsets: Equatable, Sendable {
-  var top: CGFloat = 0
-  var leading: CGFloat = 0
-  var trailing: CGFloat = 0
-}
-
-private struct StudioWorkspaceOverlayInsetsKey: EnvironmentKey {
-  static let defaultValue = StudioWorkspaceOverlayInsets()
-}
-
-extension EnvironmentValues {
-  var studioWorkspaceOverlayInsets: StudioWorkspaceOverlayInsets {
-    get { self[StudioWorkspaceOverlayInsetsKey.self] }
-    set { self[StudioWorkspaceOverlayInsetsKey.self] = newValue }
-  }
-}
-
 enum StudioToolDensity: String, CaseIterable, Identifiable, Sendable {
   case compact = "Compact"
   case standard = "Standard"
@@ -42,12 +25,35 @@ enum StudioToolDensity: String, CaseIterable, Identifiable, Sendable {
   }
 
   var usesGroupedMenus: Bool { self != .expanded }
+  var usesVisualCategoryPalette: Bool { self == .compact }
+}
+
+enum StudioToolBarSizing {
+  static func height(for density: StudioToolDensity) -> CGFloat {
+    switch density {
+    case .compact: StudioMetrics.compactRibbonHeight
+    case .standard: 64
+    case .expanded: StudioMetrics.rigCreationRibbonHeight
+    }
+  }
+
+  static func fillsAvailableWidth(_ density: StudioToolDensity) -> Bool {
+    false
+  }
+}
+
+enum StudioStandardToolPresentation {
+  static func primaryTools(in group: StudioToolGroup) -> [StudioToolDescriptor] {
+    group.primaryTools
+  }
 }
 
 enum StudioSidebarSizing {
   static let railWidth: CGFloat = 44
-  static let workspacePanelWidth: CGFloat = StudioMetrics.navigatorWidth
-  static let viewPanelWidth: CGFloat = StudioMetrics.inspectorWidth
+  /// Match the accepted demo shell. These are intentionally fixed so a
+  /// docked browser or inspector cannot greedily consume the center canvas.
+  static let workspacePanelWidth: CGFloat = 232
+  static let viewPanelWidth: CGFloat = 200
 
   static func dockedWidth(side: StudioSidebarSide, panelsAreOpen: Bool) -> CGFloat {
     railWidth
@@ -66,9 +72,11 @@ enum StudioSidebarSide: String, Sendable {
 @Observable
 final class StudioToolSettings {
   static let shared = StudioToolSettings()
+  static let defaultDensity = StudioToolDensity.expanded
 
-  var density = StudioToolDensity.standard
+  var density = defaultDensity
   var activeCategoryByWorkspace: [StudioWorkspaceKind: String] = [:]
+  var openCompactGroupByWorkspace: [StudioWorkspaceKind: String] = [:]
 
   func activeCategory(for workspace: StudioWorkspaceKind, fallback: String) -> String {
     activeCategoryByWorkspace[workspace] ?? fallback
@@ -77,12 +85,26 @@ final class StudioToolSettings {
   func setActiveCategory(_ category: String, for workspace: StudioWorkspaceKind) {
     activeCategoryByWorkspace[workspace] = category
   }
+
+  func isCompactGroupOpen(_ groupID: String, for workspace: StudioWorkspaceKind) -> Bool {
+    openCompactGroupByWorkspace[workspace] == groupID
+  }
+
+  func toggleCompactGroup(_ groupID: String, for workspace: StudioWorkspaceKind) {
+    openCompactGroupByWorkspace[workspace] =
+      isCompactGroupOpen(groupID, for: workspace) ? nil : groupID
+  }
+
+  func closeCompactGroup(for workspace: StudioWorkspaceKind) {
+    openCompactGroupByWorkspace[workspace] = nil
+  }
 }
 
 enum StudioToolPayload: Sendable {
   case addPart(RigPrimitiveKind)
   case createRevoluteMate
   case createRelation(kindID: String)
+  case designPlaceholder(toolID: String)
 }
 
 enum StudioToolBehavior: Sendable {
@@ -97,12 +119,35 @@ struct StudioToolDescriptor: Identifiable, Sendable {
   let systemImage: String
   let help: String
   let behavior: StudioToolBehavior
+  /// Standard density keeps primary tools inline and moves the rest into the
+  /// group's overflow popover. This is catalog data, not a view heuristic.
+  var primary = true
 }
 
 struct StudioToolGroup: Identifiable, Sendable {
   let id: String
   let title: String
   let tools: [StudioToolDescriptor]
+  private let explicitCategoryIcon: String?
+
+  init(
+    id: String,
+    title: String,
+    tools: [StudioToolDescriptor],
+    categoryIcon: String? = nil
+  ) {
+    self.id = id
+    self.title = title
+    self.tools = tools
+    self.explicitCategoryIcon = categoryIcon
+  }
+
+  var categoryIcon: String {
+    explicitCategoryIcon ?? tools.first?.systemImage ?? "square.grid.2x2"
+  }
+
+  var primaryTools: [StudioToolDescriptor] { tools.filter(\.primary) }
+  var overflowTools: [StudioToolDescriptor] { tools.filter { !$0.primary } }
 }
 
 struct StudioToolCategory: Identifiable, Sendable {
@@ -134,12 +179,23 @@ final class StudioToolState {
 
   var armedTool: StudioToolDescriptor?
   var staysArmed = false
+  /// Installed by the active workspace from `.onAppear`. Returning true marks
+  /// an immediate command as handled so it never enters the armed-tool state.
+  var actionHandler: ((StudioToolDescriptor) -> Bool)?
 
   var isArmed: Bool { armedTool != nil }
 
   var prompt: String {
     guard let armedTool else { return "" }
-    return "\(armedTool.title) — click in the workspace to apply. Esc to cancel."
+    return "\(armedTool.title) — click in the viewport. Esc to cancel."
+  }
+
+  func activate(_ tool: StudioToolDescriptor) {
+    if actionHandler?(tool) == true {
+      disarm()
+      return
+    }
+    arm(tool)
   }
 
   func arm(_ tool: StudioToolDescriptor) {
@@ -475,6 +531,11 @@ enum StudioWorkspaceSidebarCatalog {
         tab("Devices", "cable.connector"), tab("Outputs", "slider.horizontal.3"),
         tab("Safety", "exclamationmark.shield"),
       ]
+    case .design:
+      [
+        tab("Documents", "doc.on.doc"), tab("Features", "list.bullet.rectangle"),
+        tab("Bodies", "cube"), tab("Mates", "link"),
+      ]
     }
   }
 
@@ -489,24 +550,41 @@ enum StudioWorkspaceSidebarCatalog {
 
 enum StudioWorkspaceToolCatalog {
   static func groups(for workspace: StudioWorkspaceKind) -> [StudioToolGroup] {
-    WorkspaceRibbonCatalog.groups(for: workspace).map { group in
+    let production = WorkspaceRibbonCatalog.groups(for: workspace).map { group in
       StudioToolGroup(
         id: group.id,
         title: group.title,
-        tools: group.tools.map { tool in
+        tools: group.tools.enumerated().map { index, tool in
           StudioToolDescriptor(
             id: "\(workspace.rawValue).\(group.id).\(tool.id)",
             title: tool.title,
             systemImage: tool.systemImage,
             help: tool.help,
-            behavior: tool.action.map(StudioToolBehavior.command) ?? .unavailable
+            behavior: tool.action.map(StudioToolBehavior.command) ?? .unavailable,
+            primary: primaryToolTitles(for: group.title).contains(tool.title)
+              || (primaryToolTitles(for: group.title).isEmpty && index < 2)
           )
-        }
+        },
+        categoryIcon: group.systemImage
       )
+    }
+    return DemoWorkspaceToolCatalog.merge(
+      production: production,
+      incoming: DemoWorkspaceToolCatalog.groups(for: workspace)
+    )
+  }
+
+  private static func primaryToolTitles(for groupTitle: String) -> Set<String> {
+    switch groupTitle {
+    case "Import": ["Character", "3D Model"]
+    case "Manage": ["Replace", "Reveal"]
+    case "Prepare": ["Units", "Validate"]
+    default: []
     }
   }
 
   static func categories(for workspace: StudioWorkspaceKind) -> [StudioToolCategory] {
+    if workspace == .design { return DemoWorkspaceToolCatalog.designCategories }
     if workspace == .nodes { return nodeCategories() }
     return groups(for: workspace).map { group in
       StudioToolCategory(id: group.id, title: group.title, groups: [group])
@@ -567,7 +645,7 @@ enum StudioWorkspaceToolCatalog {
         behavior: .arm(.createRelation(kindID: relation.kind.rawValue))
       )
     }
-    return [
+    let production = [
       StudioToolCategory(
         id: "Build", title: "Build",
         groups: [StudioToolGroup(id: "Structures", title: "Create", tools: partTools)]
@@ -597,6 +675,35 @@ enum StudioWorkspaceToolCatalog {
         ]
       ),
     ]
+
+    // Rig is category-driven, so the Demo catalog must be folded into the
+    // live categories rather than only appearing in the flat catalog. Keep
+    // production behaviors for collisions and append only the missing demo
+    // concepts as an additional group in their matching category.
+    let incomingByCategory = Dictionary(
+      uniqueKeysWithValues: DemoWorkspaceToolCatalog.groups(for: .rig).map { group in
+        let categoryTitle = group.title == "Structure" ? "Build" : group.title
+        return (categoryTitle, group)
+      }
+    )
+
+    return production.map { category in
+      guard let incoming = incomingByCategory[category.title] else { return category }
+      let existingTitles = Set(category.groups.flatMap(\.tools).map(\.title))
+      let additions = incoming.tools.filter { !existingTitles.contains($0.title) }
+      guard !additions.isEmpty else { return category }
+      let additiveGroup = StudioToolGroup(
+        id: "\(incoming.id).additive",
+        title: incoming.title,
+        tools: additions,
+        categoryIcon: incoming.categoryIcon
+      )
+      return StudioToolCategory(
+        id: category.id,
+        title: category.title,
+        groups: category.groups + [additiveGroup]
+      )
+    }
   }
 }
 
@@ -643,7 +750,8 @@ enum WorkspaceRibbonActionDispatcher {
     switch action {
     case .toggleLoop: workspace.loopsPreviewPlayback
     case .toggleGrid: workspace.showsPreviewGrid
-    case .toggleBottomEditor: workspace.activePresentation.showsBottomEditor
+    case .toggleBottomEditor:
+      workspace.activeCenterView != .threeD
     default: false
     }
   }
@@ -669,7 +777,7 @@ struct SidebarChrome: ViewModifier {
           RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .stroke(StudioPalette.border, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.24), radius: 16, y: 7)
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 6)
     }
   }
 }
@@ -697,7 +805,7 @@ private struct StudioStackRail: View {
           }
         } label: {
           Image(systemName: tab.systemImage)
-            .font(.system(size: 14, weight: .medium))
+            .font(.system(size: 15, weight: .medium))
             .foregroundStyle(active ? Color.white : StudioPalette.muted)
             .frame(width: 34, height: 34)
             .background(
@@ -722,7 +830,6 @@ struct StudioToolSidebar: View {
   var groups: [StudioToolGroup]
   var categories: [StudioToolCategory]
   let docked: Bool
-  let performCommand: (WorkspaceRibbonAction) -> Void
 
   private var settings: StudioToolSettings { .shared }
   private var state: StudioToolState { .shared }
@@ -753,10 +860,17 @@ struct StudioToolSidebar: View {
       }
       toolRow
     }
-    .padding(.horizontal, 7)
-    .padding(.vertical, 5)
-    .sidebarChrome(docked: docked, cornerRadius: 14)
-    .frame(maxWidth: docked ? .infinity : nil, alignment: .leading)
+    .padding(.horizontal, density == .expanded ? 18 : 7)
+    .padding(.vertical, density == .expanded ? 8 : 5)
+    .frame(
+      maxWidth: docked || StudioToolBarSizing.fillsAvailableWidth(density) ? .infinity : nil,
+      alignment: .leading
+    )
+    .frame(height: StudioToolBarSizing.height(for: density))
+    .sidebarChrome(
+      docked: docked,
+      cornerRadius: StudioToolBarSizing.height(for: density) / 2
+    )
   }
 
   private var categoryStrip: some View {
@@ -786,26 +900,38 @@ struct StudioToolSidebar: View {
     .padding(.bottom, 2)
   }
 
+  @ViewBuilder
   private var toolRow: some View {
-    ScrollView(.horizontal) {
-      HStack(alignment: .top, spacing: density == .expanded ? 13 : 2) {
-        ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
-          if density.usesGroupedMenus {
-            groupedMenu(group)
-          } else {
-            if index > 0 {
-              Divider()
-                .frame(height: 46)
-                .padding(.horizontal, 2)
-            }
-            expandedGroup(group)
-          }
-        }
-        densityMenu
+    if density == .expanded {
+      ScrollView(.horizontal) {
+        toolGroupRow
       }
+      .scrollIndicators(.hidden)
+      .frame(maxWidth: .infinity, alignment: .leading)
+    } else {
+      toolGroupRow
+        .fixedSize(horizontal: true, vertical: true)
     }
-    .scrollIndicators(.hidden)
-    .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private var toolGroupRow: some View {
+    HStack(alignment: .top, spacing: density == .expanded ? 13 : 2) {
+      ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
+        if index > 0, density != .compact {
+          Divider()
+            .frame(height: density == .expanded ? 58 : 48)
+            .padding(.horizontal, density == .expanded ? 2 : 5)
+        }
+        if density.usesVisualCategoryPalette {
+          compactCategoryButton(group)
+        } else if density.usesGroupedMenus {
+          standardGroup(group)
+        } else {
+          expandedGroup(group)
+        }
+      }
+      densityMenu
+    }
   }
 
   private func expandedGroup(_ group: StudioToolGroup) -> some View {
@@ -818,39 +944,152 @@ struct StudioToolSidebar: View {
     }
   }
 
-  private func groupedMenu(_ group: StudioToolGroup) -> some View {
-    let compact = density == .compact
-    let active = group.tools.contains { $0.id == state.armedTool?.id }
-    return Menu {
-      ForEach(group.tools) { tool in
-        Button {
-          activate(tool)
-        } label: {
-          Label(tool.title, systemImage: tool.systemImage)
-        }
-        .disabled(!isEnabled(tool))
+  private func standardGroup(_ group: StudioToolGroup) -> some View {
+    return HStack(spacing: 3) {
+      ForEach(group.primaryTools) { tool in
+        standardToolButton(tool)
       }
-    } label: {
-      VStack(spacing: 3) {
-        Image(systemName: group.tools.first?.systemImage ?? "square.grid.2x2")
-          .font(.system(size: compact ? 14 : 16, weight: .medium))
-        if !compact {
-          Text(group.title)
-            .font(.system(size: 9.5, weight: .medium))
-            .lineLimit(1)
+      if !group.overflowTools.isEmpty {
+        Menu {
+          ForEach(group.overflowTools) { tool in
+            Button {
+              activate(tool)
+            } label: {
+              Label(tool.title, systemImage: tool.systemImage)
+            }
+            .disabled(!isEnabled(tool))
+          }
+        } label: {
+          Image(systemName: "chevron.down")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(StudioPalette.muted)
+            .frame(width: 26, height: 48)
+            .contentShape(Rectangle())
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .help("More \(group.title.lowercased()) tools")
+      }
+    }
+  }
+
+  private func standardToolButton(_ tool: StudioToolDescriptor) -> some View {
+    let active = state.armedTool?.id == tool.id
+    let enabled = isEnabled(tool)
+    return Button {
+      activate(tool)
+    } label: {
+      VStack(spacing: 4) {
+        Image(systemName: tool.systemImage)
+          .font(.system(size: 19, weight: .medium))
+          .frame(height: 22)
+        Text(tool.title)
+          .font(.system(size: 11, weight: .medium))
+          .lineLimit(1)
       }
       .foregroundStyle(active ? Color.white : StudioPalette.muted)
-      .frame(width: compact ? 34 : 62, height: compact ? 34 : 48)
+      .frame(width: 66, height: 50)
       .background(
         active ? StudioPalette.accent : Color.clear,
-        in: RoundedRectangle(cornerRadius: 8)
+        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
       )
       .contentShape(Rectangle())
     }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.hidden)
-    .help("\(group.title) tools")
+    .buttonStyle(.plain)
+    .disabled(!enabled)
+    .opacity(enabled ? 1 : 0.35)
+    .help(tool.help)
+  }
+
+  private func compactCategoryButton(_ group: StudioToolGroup) -> some View {
+    let open = settings.isCompactGroupOpen(group.id, for: workspaceKind)
+    let active = group.tools.contains { $0.id == state.armedTool?.id }
+    return Button {
+      settings.toggleCompactGroup(group.id, for: workspaceKind)
+    } label: {
+      Image(systemName: group.categoryIcon)
+        .font(.system(size: 16, weight: .medium))
+        .foregroundStyle(open || active ? Color.white : StudioPalette.accent)
+        .frame(width: 36, height: 36)
+        .background(
+          open || active ? StudioPalette.accent : Color.clear,
+          in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .help(group.title)
+    .popover(
+      isPresented: Binding(
+        get: { settings.isCompactGroupOpen(group.id, for: workspaceKind) },
+        set: { presented in
+          if !presented { settings.closeCompactGroup(for: workspaceKind) }
+        }
+      ),
+      arrowEdge: .top
+    ) {
+      compactToolPalette(group)
+    }
+  }
+
+  private func compactToolPalette(_ group: StudioToolGroup) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      HStack {
+        Text(group.title.uppercased())
+          .font(.system(size: 9.5, weight: .semibold))
+          .tracking(0.6)
+          .foregroundStyle(StudioPalette.muted)
+        Spacer()
+        Image(systemName: group.categoryIcon)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(StudioPalette.accent)
+      }
+      .padding(.horizontal, 10)
+      .padding(.top, 8)
+      .padding(.bottom, 2)
+
+      ForEach(group.tools) { tool in
+        compactPaletteToolButton(tool)
+      }
+    }
+    .padding(6)
+    .frame(width: 210)
+  }
+
+  private func compactPaletteToolButton(_ tool: StudioToolDescriptor) -> some View {
+    let active = state.armedTool?.id == tool.id
+    let enabled = isEnabled(tool)
+    return Button {
+      settings.closeCompactGroup(for: workspaceKind)
+      activate(tool)
+    } label: {
+      HStack(spacing: 10) {
+        Image(systemName: tool.systemImage)
+          .font(.system(size: 13, weight: .medium))
+          .frame(width: 20)
+        Text(tool.title)
+          .font(.system(size: 12.5))
+          .lineLimit(1)
+        Spacer(minLength: 12)
+        if active {
+          Image(systemName: "checkmark")
+            .font(.system(size: 10, weight: .bold))
+        }
+      }
+      .foregroundStyle(active ? StudioPalette.accent : Color.white.opacity(0.88))
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        active ? StudioPalette.accent.opacity(0.10) : Color.clear,
+        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+      )
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(!enabled)
+    .opacity(enabled ? 1 : 0.35)
+    .help(tool.help)
   }
 
   private func toolButton(_ tool: StudioToolDescriptor) -> some View {
@@ -910,15 +1149,7 @@ struct StudioToolSidebar: View {
   }
 
   private func activate(_ tool: StudioToolDescriptor) {
-    switch tool.behavior {
-    case .arm:
-      state.arm(tool)
-    case .command(let action):
-      state.disarm()
-      performCommand(action)
-    case .unavailable:
-      break
-    }
+    state.activate(tool)
   }
 }
 
@@ -1135,10 +1366,57 @@ private enum StudioShellEdge: Hashable {
   case trailing
 }
 
+private struct StudioVisibleZoneOverlay: View {
+  let insets: StudioVisibleZoneInsets
+
+  var body: some View {
+    GeometryReader { geometry in
+      let rect = CGRect(
+        x: insets.leading,
+        y: insets.top,
+        width: max(geometry.size.width - insets.leading - insets.trailing, 0),
+        height: max(geometry.size.height - insets.top - insets.bottom, 0)
+      )
+      ZStack(alignment: .topLeading) {
+        Path { path in path.addRect(rect) }
+          .stroke(
+            StudioPalette.sourceModel.opacity(0.86),
+            style: StrokeStyle(lineWidth: 1, dash: [6, 5])
+          )
+
+        zoneLabel("VISIBLE ZONE")
+          .offset(x: rect.minX + 8, y: rect.minY + 8)
+        zoneLabel("TOP · TOOLS")
+          .position(x: rect.midX, y: max(rect.minY - 10, 10))
+        zoneLabel("BOTTOM · CENTER VIEW")
+          .position(x: rect.midX, y: min(rect.maxY + 10, geometry.size.height - 10))
+        zoneLabel("LEFT · WORKSPACE")
+          .rotationEffect(.degrees(-90))
+          .position(x: max(rect.minX - 10, 10), y: rect.midY)
+        zoneLabel("RIGHT · VIEW")
+          .rotationEffect(.degrees(90))
+          .position(x: min(rect.maxX + 10, geometry.size.width - 10), y: rect.midY)
+      }
+    }
+  }
+
+  private func zoneLabel(_ text: String) -> some View {
+    Text(text)
+      .font(.system(size: 8, weight: .bold, design: .monospaced))
+      .tracking(0.6)
+      .foregroundStyle(StudioPalette.sourceModel)
+      .padding(.horizontal, 4)
+      .padding(.vertical, 2)
+      .background(StudioPalette.canvas.opacity(0.88), in: RoundedRectangle(cornerRadius: 3))
+  }
+}
+
 struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
   let workspaceKind: StudioWorkspaceKind
   var toolGroups: [StudioToolGroup]
   var toolCategories: [StudioToolCategory]
+  var centerModes: [StudioCenterViewMode]
+  let centerSelection: Binding<StudioCenterViewMode>?
   let leftTabs: [StudioWorkspaceSidebarTab]
   let leftPanels: StudioPanelStackState
   var didToggleLeftPanel: (String) -> Void = { _ in }
@@ -1157,13 +1435,25 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
 
   private var isDocked: Bool { layout.detectedPreset == .docked }
   private var isCanvas: Bool { layout.detectedPreset == .canvas }
+  private var resolvedToolDensity: StudioToolDensity {
+    StudioToolDensity.resolved(
+      preference: StudioToolSettings.shared.density,
+      docked: isDocked
+    )
+  }
+  private var toolOverlayInset: CGFloat {
+    StudioToolBarSizing.height(for: resolvedToolDensity) + 24
+  }
 
   var body: some View {
-    Group {
-      if isDocked { dockedBody } else { floatingBody }
-    }
-    .overlay {
-      GeometryReader { geometry in
+    GeometryReader { geometry in
+      let insets = visibleZoneInsets(canvasSize: geometry.size)
+      Group {
+        if isDocked { dockedBody } else { floatingBody }
+      }
+      .environment(\.studioVisibleZoneInsets, insets)
+      .animation(.spring(response: 0.24, dampingFraction: 0.9), value: insets)
+      .overlay {
         ZStack(alignment: .topLeading) {
           floatingPanels(
             state: leftPanels,
@@ -1177,8 +1467,24 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
           )
         }
       }
+      .overlay(alignment: .bottom) {
+        if !centerModes.isEmpty, centerSelection != nil {
+          centerSwitcher
+            .padding(.bottom, 14)
+        }
+      }
+      .overlay {
+        if layout.showsLayoutZones {
+          StudioVisibleZoneOverlay(insets: insets)
+            .allowsHitTesting(false)
+        }
+      }
     }
     .animation(.spring(response: 0.28, dampingFraction: 0.88), value: layout.detectedPreset)
+    // Immediate tools are routed through the active workspace when this
+    // scaffold becomes live. Installing here avoids the lost-event bug caused
+    // by observing an armed tool after a child view already changed it.
+    .onAppear(perform: installToolActionHandler)
   }
 
   private var dockedBody: some View {
@@ -1197,49 +1503,104 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
 
   private var floatingBody: some View {
     center
-      .environment(\.studioWorkspaceOverlayInsets, centerOverlayInsets)
-      .animation(.spring(response: 0.24, dampingFraction: 0.9), value: centerOverlayInsets)
       .overlay(alignment: .top) {
-        reveal(edge: .top) { toolSidebar(docked: false).padding(.top, 12) }
+        reveal(edge: .top) { toolSidebar(docked: false).padding(.top, 14) }
       }
       .overlay(alignment: .top) {
         if tools.isArmed {
-          StudioToolPromptBar().padding(.top, 78)
+          StudioToolPromptBar().padding(.top, toolOverlayInset + 8)
         }
       }
       .overlay(alignment: .leading) {
         reveal(edge: .leading) {
           workspaceSidebar(docked: false)
-            .padding(.leading, 12)
+            .padding(.leading, 14)
             .frame(maxHeight: .infinity, alignment: .center)
         }
       }
       .overlay(alignment: .trailing) {
         reveal(edge: .trailing) {
           viewSidebar(docked: false)
-            .padding(.trailing, 12)
+            .padding(.trailing, 14)
             .frame(maxHeight: .infinity, alignment: .center)
         }
       }
   }
 
-  private var centerOverlayInsets: StudioWorkspaceOverlayInsets {
-    if isCanvas {
-      return StudioWorkspaceOverlayInsets(
-        top: revealedEdges.contains(.top) ? StudioMetrics.rigCreationRibbonHeight + 24 : 0,
-        leading: revealedEdges.contains(.leading)
-          ? (leftPanels.stacked.isEmpty ? 58 : StudioMetrics.navigatorWidth + 76)
-          : 0,
-        trailing: revealedEdges.contains(.trailing)
-          ? (viewPanels.stacked.isEmpty ? 58 : StudioMetrics.inspectorWidth + 76)
-          : 0
-      )
-    }
-    return StudioWorkspaceOverlayInsets(
-      top: StudioMetrics.rigCreationRibbonHeight + 24,
-      leading: leftPanels.stacked.isEmpty ? 58 : StudioMetrics.navigatorWidth + 76,
-      trailing: viewPanels.stacked.isEmpty ? 58 : StudioMetrics.inspectorWidth + 76
+  private func visibleZoneInsets(canvasSize: CGSize) -> StudioVisibleZoneInsets {
+    StudioVisibleZoneLayout.insets(
+      preset: layout.detectedPreset ?? .floating,
+      toolInset: toolOverlayInset,
+      hasCenterSwitcher: !centerModes.isEmpty,
+      leftStackOpen: !leftPanels.stacked.isEmpty,
+      rightStackOpen: !viewPanels.stacked.isEmpty,
+      revealedTop: revealedEdges.contains(.top),
+      revealedLeading: revealedEdges.contains(.leading),
+      revealedTrailing: revealedEdges.contains(.trailing),
+      canvasWidth: canvasSize.width,
+      floatingPanels: floatingPanelFootprints(canvasSize: canvasSize)
     )
+  }
+
+  private func floatingPanelFootprints(canvasSize: CGSize) -> [StudioFloatingPanelFootprint] {
+    guard !isDocked else { return [] }
+    return [leftPanels, viewPanels].flatMap { state in
+      let panelWidth =
+        state.side == .leading
+        ? StudioSidebarSizing.workspacePanelWidth
+        : StudioSidebarSizing.viewPanelWidth
+      let base = StudioFloatingPanelGeometry.base(
+        side: state.side,
+        canvasSize: canvasSize,
+        panelWidth: panelWidth
+      )
+      return state.floating.map { id in
+        let offset = StudioFloatingPanelGeometry.clamp(
+          state.floatingOffset[id] ?? .zero,
+          side: state.side,
+          canvasSize: canvasSize,
+          panelWidth: panelWidth
+        )
+        let minimumX = base.width + offset.width
+        return StudioFloatingPanelFootprint(
+          side: state.side,
+          minimumX: minimumX,
+          maximumX: minimumX + panelWidth
+        )
+      }
+    }
+  }
+
+  @ViewBuilder private var centerSwitcher: some View {
+    if let centerSelection {
+      HStack(spacing: 4) {
+        ForEach(centerModes) { mode in
+          Button {
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
+              centerSelection.wrappedValue = mode
+            }
+          } label: {
+            Label(mode.title, systemImage: mode.systemImage)
+              .font(.system(size: 11, weight: .semibold))
+              .labelStyle(.titleAndIcon)
+              .padding(.horizontal, 10)
+              .frame(height: 30)
+              .foregroundStyle(centerSelection.wrappedValue == mode ? .white : StudioPalette.muted)
+              .background(
+                centerSelection.wrappedValue == mode ? StudioPalette.accent : Color.clear,
+                in: Capsule()
+              )
+          }
+          .buttonStyle(.plain)
+          .help("Show \(mode.title) in the center")
+          .accessibilityAddTraits(centerSelection.wrappedValue == mode ? .isSelected : [])
+        }
+      }
+      .padding(5)
+      .background(.regularMaterial, in: Capsule())
+      .overlay(Capsule().stroke(StudioPalette.border, lineWidth: 1))
+      .shadow(color: .black.opacity(0.28), radius: 14, y: 5)
+    }
   }
 
   private func toolSidebar(docked: Bool) -> some View {
@@ -1247,9 +1608,16 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
       workspaceKind: workspaceKind,
       groups: toolGroups,
       categories: toolCategories,
-      docked: docked,
-      performCommand: performCommand
+      docked: docked
     )
+  }
+
+  private func installToolActionHandler() {
+    tools.actionHandler = { tool in
+      guard case .command(let command) = tool.behavior else { return false }
+      performCommand(command)
+      return true
+    }
   }
 
   private func workspaceSidebar(docked: Bool) -> some View {

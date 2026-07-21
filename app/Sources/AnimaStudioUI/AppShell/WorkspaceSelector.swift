@@ -2,8 +2,8 @@ import SwiftUI
 
 enum WorkspaceSelectorMetrics {
   static let minimumWidth: CGFloat = 300
-  static let idealWidth: CGFloat = 350
-  static let maximumWidth: CGFloat = 430
+  static let idealWidth: CGFloat = 480
+  static let maximumWidth: CGFloat = 540
   static let menuWidth: CGFloat = 280
   static let compactWidth: CGFloat = 1_420
   static let chipHeight: CGFloat = 30
@@ -88,10 +88,9 @@ struct WorkspaceStageTabs: View {
     action: @escaping () -> Void
   ) -> some View {
     let isHovered = hoveredID == id
-    // Keep the header quiet and spatially stable: the selected stage names
-    // the current workspace while every other destination remains a familiar
-    // icon with a tooltip and keyboard shortcut.
-    let showsLabel = isActive
+    // Match the accepted demo: the full pipeline is readable until the header
+    // reaches its compact-tabs breakpoint, where every stage becomes an icon.
+    let showsLabel = !compact
 
     return Button(action: action) {
       HStack(spacing: 6) {

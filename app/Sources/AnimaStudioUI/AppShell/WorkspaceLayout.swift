@@ -1,5 +1,161 @@
 import Foundation
 import Observation
+import SwiftUI
+
+/// The center representation shown inside a workspace. These modes change
+/// how the same project data is presented; they never create a second model.
+enum StudioCenterViewMode: String, CaseIterable, Identifiable, Sendable {
+  case threeD
+  case gallery
+  case table
+  case exploded
+  case dopeSheet
+  case curves
+  case nodeGraph
+  case servoTimeline
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .threeD: "3D"
+    case .gallery: "Gallery"
+    case .table: "Table"
+    case .exploded: "Exploded"
+    case .dopeSheet: "Dope Sheet"
+    case .curves: "Curves"
+    case .nodeGraph: "Node Graph"
+    case .servoTimeline: "Servo Timeline"
+    }
+  }
+
+  var systemImage: String {
+    switch self {
+    case .threeD: "cube"
+    case .gallery: "square.grid.2x2"
+    case .table: "list.bullet.rectangle"
+    case .exploded: "square.3.layers.3d"
+    case .dopeSheet: "diamond.fill"
+    case .curves: "point.3.filled.connected.trianglepath.dotted"
+    case .nodeGraph: "point.3.connected.trianglepath.dotted"
+    case .servoTimeline: "slider.horizontal.3"
+    }
+  }
+}
+
+enum StudioCenterViewCatalog {
+  static func modes(for workspace: StudioWorkspaceKind) -> [StudioCenterViewMode] {
+    switch workspace {
+    case .assets: [.threeD, .gallery, .table]
+    case .rig: [.threeD, .table, .exploded]
+    case .animate: [.threeD, .dopeSheet, .curves]
+    case .show: [.nodeGraph, .table, .threeD]
+    case .hardware: [.servoTimeline, .table, .threeD]
+    case .nodes, .design: []
+    }
+  }
+
+  static func defaultMode(for workspace: StudioWorkspaceKind) -> StudioCenterViewMode? {
+    modes(for: workspace).first
+  }
+}
+
+/// The rectangular area guaranteed not to sit behind live shell chrome.
+/// Spatial canvases intentionally ignore this value; structured content reads
+/// it from the environment and pads itself into the visible zone.
+struct StudioVisibleZoneInsets: Equatable, Sendable {
+  var top: CGFloat = 0
+  var leading: CGFloat = 0
+  var bottom: CGFloat = 0
+  var trailing: CGFloat = 0
+
+  var edgeInsets: EdgeInsets {
+    EdgeInsets(top: top, leading: leading, bottom: bottom, trailing: trailing)
+  }
+}
+
+/// Compatibility name for structured views built before the visible-zone
+/// system gained a bottom edge.
+typealias StudioWorkspaceOverlayInsets = StudioVisibleZoneInsets
+
+private struct StudioVisibleZoneInsetsKey: EnvironmentKey {
+  static let defaultValue = StudioVisibleZoneInsets()
+}
+
+extension EnvironmentValues {
+  var studioVisibleZoneInsets: StudioVisibleZoneInsets {
+    get { self[StudioVisibleZoneInsetsKey.self] }
+    set { self[StudioVisibleZoneInsetsKey.self] = newValue }
+  }
+
+  var studioWorkspaceOverlayInsets: StudioWorkspaceOverlayInsets {
+    get { studioVisibleZoneInsets }
+    set { studioVisibleZoneInsets = newValue }
+  }
+}
+
+struct StudioFloatingPanelFootprint: Equatable, Sendable {
+  let side: StudioSidebarSide
+  let minimumX: CGFloat
+  let maximumX: CGFloat
+}
+
+enum StudioVisibleZoneLayout {
+  static let sideRailInset: CGFloat = 58
+  static let bottomSwitcherInset: CGFloat = 76
+  static let dockedInset: CGFloat = 10
+  static let floatingPanelGap: CGFloat = 10
+
+  static func insets(
+    preset: StudioLayoutPreset,
+    toolInset: CGFloat,
+    hasCenterSwitcher: Bool,
+    leftStackOpen: Bool,
+    rightStackOpen: Bool,
+    revealedTop: Bool = true,
+    revealedLeading: Bool = true,
+    revealedTrailing: Bool = true,
+    canvasWidth: CGFloat = 0,
+    floatingPanels: [StudioFloatingPanelFootprint] = []
+  ) -> StudioVisibleZoneInsets {
+    if preset == .docked {
+      return StudioVisibleZoneInsets(
+        top: dockedInset,
+        leading: dockedInset,
+        bottom: hasCenterSwitcher ? bottomSwitcherInset : dockedInset,
+        trailing: dockedInset
+      )
+    }
+
+    let topVisible = preset == .floating || revealedTop
+    let leadingVisible = preset == .floating || revealedLeading
+    let trailingVisible = preset == .floating || revealedTrailing
+    var result = StudioVisibleZoneInsets(
+      top: topVisible ? toolInset : 0,
+      leading: leadingVisible
+        ? (leftStackOpen ? StudioSidebarSizing.workspacePanelWidth + 68 : sideRailInset)
+        : 0,
+      bottom: hasCenterSwitcher ? bottomSwitcherInset : 0,
+      trailing: trailingVisible
+        ? (rightStackOpen ? StudioSidebarSizing.viewPanelWidth + 68 : sideRailInset)
+        : 0
+    )
+
+    guard canvasWidth > 0 else { return result }
+    for panel in floatingPanels {
+      switch panel.side {
+      case .leading:
+        result.leading = max(result.leading, panel.maximumX + floatingPanelGap)
+      case .trailing:
+        result.trailing = max(
+          result.trailing,
+          canvasWidth - panel.minimumX + floatingPanelGap
+        )
+      }
+    }
+    return result
+  }
+}
 
 /// One presentation contract for every in-window workspace region.
 ///
@@ -114,10 +270,15 @@ final class StudioLayoutState {
   var panelsOnOuterEdge: Bool {
     didSet { defaults.set(panelsOnOuterEdge, forKey: StudioPreferenceKey.panelsOnOuterEdge) }
   }
+  /// Development-only visualization for the shell's content-safe rectangle.
+  var showsLayoutZones: Bool {
+    didSet { defaults.set(showsLayoutZones, forKey: StudioPreferenceKey.showsLayoutZones) }
+  }
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     self.panelsOnOuterEdge = defaults.bool(forKey: StudioPreferenceKey.panelsOnOuterEdge)
+    self.showsLayoutZones = defaults.bool(forKey: StudioPreferenceKey.showsLayoutZones)
   }
 
   var detectedPreset: StudioLayoutPreset? {

@@ -80,6 +80,7 @@ public struct RobotPreviewView: View {
   private let onBackgroundClick: (CGPoint) -> Void
   private let onFrameAll: () -> Void
   private let onBoxSelectPartIDs: (Set<PartID>) -> Void
+  private let onPartTriangleCountsChange: ([PartID: Int]) -> Void
 
   public init(
     rig: CharacterRig = CharacterRig(joints: []),
@@ -133,7 +134,8 @@ public struct RobotPreviewView: View {
     onContextMenuRequest: @escaping (CGPoint, ViewportPointerTarget) -> Void = { _, _ in },
     onBackgroundClick: @escaping (CGPoint) -> Void = { _ in },
     onFrameAll: @escaping () -> Void = {},
-    onBoxSelectPartIDs: @escaping (Set<PartID>) -> Void = { _ in }
+    onBoxSelectPartIDs: @escaping (Set<PartID>) -> Void = { _ in },
+    onPartTriangleCountsChange: @escaping ([PartID: Int]) -> Void = { _ in }
   ) {
     self.rig = rig
     self.engineResolvedPartPoses = engineResolvedPartPoses
@@ -187,11 +189,12 @@ public struct RobotPreviewView: View {
     self.onBackgroundClick = onBackgroundClick
     self.onFrameAll = onFrameAll
     self.onBoxSelectPartIDs = onBoxSelectPartIDs
+    self.onPartTriangleCountsChange = onPartTriangleCountsChange
   }
 
   public var body: some View {
     RealityView { content in
-      let root = await Self.makeScene(
+      let scene = await Self.makeScene(
         rig: rig,
         appearance: appearance,
         renderStyle: renderStyle,
@@ -209,8 +212,11 @@ public struct RobotPreviewView: View {
       )
       content.renderingEffects.antialiasing =
         renderQuality == .high ? .multisample4X : .none
-      content.add(root)
-      content.cameraTarget = root.findEntity(named: "previewCameraTarget")
+      content.add(scene.root)
+      content.cameraTarget = scene.root.findEntity(named: "previewCameraTarget")
+      Task { @MainActor in
+        onPartTriangleCountsChange(scene.triangleCounts)
+      }
 
       if partModelSources.isEmpty, let modelURL,
         let importedModel = try? await Entity(contentsOf: modelURL)
@@ -223,7 +229,7 @@ public struct RobotPreviewView: View {
           edgeDisplay: edgeDisplay,
           to: importedModel
         )
-        let environmentLight = root.findEntity(
+        let environmentLight = scene.root.findEntity(
           named: ViewportLightingFactory.environmentLightName
         )
         ViewportLightingFactory.applyEnvironmentReceiver(
@@ -231,7 +237,7 @@ public struct RobotPreviewView: View {
           to: importedModel
         )
         Self.applyShadowParticipation(showsShadows, to: importedModel)
-        root.addChild(importedModel)
+        scene.root.addChild(importedModel)
       }
     } update: { content in
       guard let root = content.entities.first else {
@@ -697,6 +703,11 @@ public struct RobotPreviewView: View {
       "\(modelURL?.absoluteString ?? "none")|\(partModelSources.values.map { "\($0.partID.rawValue):\($0.fileURL.path):\($0.modelNode ?? ""):\($0.unitScaleToMeters):v\($0.assetVersion)" }.sorted().joined(separator: ","))|\(appearance.rawValue)|\(renderStyle.rawValue)|\(edgeDisplay.rawValue)|\(lightingPreset.rawValue)|\(materialFinish.rawValue)|\(reflectionMode.rawValue)|\(lightingIntensity)|\(environmentPreset.rawValue)|\(environmentRotationDegrees)|\(showsShadows)|\(partIDs)|\(jointIDs)|\(proxyFillets)"
   }
 
+  private struct SceneBuildResult {
+    let root: Entity
+    let triangleCounts: [PartID: Int]
+  }
+
   private static func makeScene(
     rig: CharacterRig,
     appearance: PreviewAppearance,
@@ -712,7 +723,7 @@ public struct RobotPreviewView: View {
     environmentRotationDegrees: Float,
     sectionPlane: ViewportSectionPlane,
     showsShadows: Bool
-  ) async -> Entity {
+  ) async -> SceneBuildResult {
     let root = Entity()
     root.name = "animaPreviewRoot"
 
@@ -725,6 +736,7 @@ public struct RobotPreviewView: View {
 
     root.addChild(makeGrid(appearance: appearance))
 
+    var triangleCounts: [PartID: Int] = [:]
     for part in rig.parts {
       var loadedModel: LoadedRealityKitModel?
       if let source = partModelSources[part.id] {
@@ -745,6 +757,7 @@ public struct RobotPreviewView: View {
         }
       }
       if let loaded = loadedModel {
+        triangleCounts[part.id] = loaded.triangleCount
         characterRoot.addChild(
           await makeImportedPart(
             part,
@@ -814,7 +827,7 @@ public struct RobotPreviewView: View {
 
     ViewportSectionFactory.apply(sectionPlane, to: characterRoot)
 
-    return root
+    return SceneBuildResult(root: root, triangleCounts: triangleCounts)
   }
 
   private static func makePart(

@@ -1,3 +1,4 @@
+import AnimaDocument
 import Foundation
 
 enum RecentProjectThumbnailKind: String, Codable, CaseIterable, Sendable {
@@ -155,6 +156,55 @@ enum RecentProjectsPersistence {
   ) {
     guard let data = try? JSONEncoder().encode(normalized(projects)) else { return }
     defaults.set(data, forKey: storageKey)
+  }
+
+  /// Reconciles the explicit recent-project store with projects that are
+  /// physically present in the selected Studio workspace root. A project can
+  /// therefore return to Home after the preferences store is reset without
+  /// requiring a second Open operation.
+  static func mergedWithDiscoveredProjects(
+    _ stored: [RecentProjectSummary],
+    in workspaceRootURL: URL,
+    fileManager: FileManager = .default,
+    documentStore: AnimaDocumentStore = AnimaDocumentStore()
+  ) -> [RecentProjectSummary] {
+    let accessed = workspaceRootURL.startAccessingSecurityScopedResource()
+    defer { if accessed { workspaceRootURL.stopAccessingSecurityScopedResource() } }
+
+    let properties: Set<URLResourceKey> = [
+      .isDirectoryKey, .contentModificationDateKey,
+    ]
+    let children =
+      (try? fileManager.contentsOfDirectory(
+        at: workspaceRootURL,
+        includingPropertiesForKeys: Array(properties),
+        options: [.skipsHiddenFiles]
+      )) ?? []
+    let discovered = children.compactMap { projectURL -> RecentProjectSummary? in
+      let values = try? projectURL.resourceValues(forKeys: properties)
+      guard values?.isDirectory == true,
+        fileManager.fileExists(
+          atPath: projectURL.appendingPathComponent(AnimaDocumentStore.manifestFilename).path
+        ),
+        let document = try? documentStore.load(from: projectURL)
+      else { return nil }
+
+      return RecentProjectSummary(
+        id: document.projectID,
+        displayName: document.displayName,
+        lastOpenedAt: document.metadata.modifiedDate
+          ?? values?.contentModificationDate
+          ?? .distantPast,
+        revisionNumber: document.metadata.revision,
+        milestoneName: document.metadata.milestoneName,
+        thumbnailKind: document.scenes.isEmpty ? .character : .show,
+        projectPath: projectURL.path,
+        bookmarkData: ProjectLifecycle.bookmark(for: projectURL)
+      )
+    }
+
+    return normalized(stored + discovered)
+      .filter { $0.resolvedProjectURL(fileManager: fileManager) != nil }
   }
 
   private static func normalized(_ projects: [RecentProjectSummary]) -> [RecentProjectSummary] {

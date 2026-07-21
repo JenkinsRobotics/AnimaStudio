@@ -58,8 +58,13 @@ struct UIDevEmbeddedWorkspacePreview: View {
 
       HStack(alignment: .top, spacing: 16) {
         if surface == .navigator {
-          ProjectNavigatorView(workspace: workspace, importModel: {})
-            .frame(width: StudioMetrics.navigatorWidth)
+          ProjectNavigatorView(
+            workspace: workspace,
+            selectedTab: nil,
+            importModel: {},
+            deleteParts: { _ in }
+          )
+          .frame(width: StudioMetrics.navigatorWidth)
         }
 
         Spacer(minLength: 320)

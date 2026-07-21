@@ -7,11 +7,12 @@ final class WorkspacePresentationTests: XCTestCase {
   func testBuiltInWorkspaceOrderAndNamesAreStable() {
     XCTAssertEqual(
       StudioWorkspaceKind.allCases.map(\.descriptor.title),
-      ["Character", "Rig", "Animate", "Show", "Nodes", "Hardware"]
+      ["Character", "Rig", "Animate", "Show", "Nodes", "Hardware", "Design"]
     )
     XCTAssertEqual(StudioWorkspaceKind.rig.shortcutNumber, 2)
     XCTAssertEqual(StudioWorkspaceKind.nodes.shortcutNumber, 5)
     XCTAssertEqual(StudioWorkspaceKind.hardware.shortcutNumber, 6)
+    XCTAssertEqual(StudioWorkspaceKind.design.shortcutNumber, 7)
   }
 
   func testEachWorkspaceRestoresItsOwnPresentation() {
@@ -58,16 +59,27 @@ final class WorkspacePresentationTests: XCTestCase {
     XCTAssertFalse(model.isPlaying)
   }
 
-  func testBottomEditorOnlyChangesInTimelineWorkspaces() {
+  func testTimelineRibbonTogglesFullHeightCenterRepresentations() {
     let model = StudioWorkspaceModel()
     XCTAssertFalse(model.activePresentation.showsBottomEditor)
     model.toggleBottomEditor()
-    XCTAssertFalse(model.activePresentation.showsBottomEditor)
+    XCTAssertEqual(model.activeCenterView, .threeD)
 
     model.switchWorkspace(to: .animate)
-    XCTAssertTrue(model.activePresentation.showsBottomEditor)
+    XCTAssertEqual(model.activeCenterView, .threeD)
     model.toggleBottomEditor()
-    XCTAssertFalse(model.activePresentation.showsBottomEditor)
+    XCTAssertEqual(model.activeCenterView, .dopeSheet)
+    model.toggleBottomEditor()
+    XCTAssertEqual(model.activeCenterView, .threeD)
+
+    model.switchWorkspace(to: .show)
+    XCTAssertEqual(model.activeCenterView, .nodeGraph)
+    model.selectCenterView(.table)
+    model.switchWorkspace(to: .animate)
+    model.selectCenterView(.curves)
+    XCTAssertEqual(model.timelineEditorMode, .graph)
+    model.switchWorkspace(to: .show)
+    XCTAssertEqual(model.activeCenterView, .table)
   }
 
   func testInspectableSelectionRevealsTheRightInspector() throws {

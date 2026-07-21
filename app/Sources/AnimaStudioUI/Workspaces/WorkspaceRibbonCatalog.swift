@@ -50,6 +50,7 @@ enum WorkspaceRibbonCatalog {
     case .show: showGroups
     case .nodes: nodeGroups
     case .hardware: hardwareGroups
+    case .design: []
     }
   }
 
@@ -58,7 +59,7 @@ enum WorkspaceRibbonCatalog {
       "Import", "square.and.arrow.down", .assets,
       [
         tool(
-          "Anima Character", "figure.stand.line.dotted.figure.stand",
+          "Character", "figure.stand.line.dotted.figure.stand",
           "Load and validate a canonical .character.anima file through AnimaCore.",
           .importAnimaCharacter),
         tool(

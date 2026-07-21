@@ -178,6 +178,37 @@ enum ProjectLifecycle {
     )
   }
 
+  /// Creates a project immediately in the configured workspace root. Home uses
+  /// this path so its primary action behaves like a project launcher rather
+  /// than presenting a redundant Save panel.
+  static func createProjectInDefaultLocation(
+    suggestedName: String = "Untitled Project"
+  ) throws -> StudioProjectSession {
+    let rootURL = try ensureDefaultProjectsDirectory()
+    let accessed = rootURL.startAccessingSecurityScopedResource()
+    defer { if accessed { rootURL.stopAccessingSecurityScopedResource() } }
+    let destination = availableProjectURL(named: suggestedName, in: rootURL)
+    return try createProject(at: destination)
+  }
+
+  static func availableProjectURL(
+    named suggestedName: String,
+    in rootURL: URL,
+    fileManager: FileManager = .default
+  ) -> URL {
+    let trimmed = suggestedName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let safeName = (trimmed.isEmpty ? "Untitled Project" : trimmed)
+      .replacingOccurrences(of: "/", with: "-")
+      .replacingOccurrences(of: ":", with: "-")
+    var suffix = 1
+    var candidate = rootURL.appendingPathComponent(safeName, isDirectory: true)
+    while fileManager.fileExists(atPath: candidate.path) {
+      suffix += 1
+      candidate = rootURL.appendingPathComponent("\(safeName) \(suffix)", isDirectory: true)
+    }
+    return candidate
+  }
+
   static func openProject(at url: URL) throws -> StudioProjectSession {
     let accessed = url.startAccessingSecurityScopedResource()
     defer { if accessed { url.stopAccessingSecurityScopedResource() } }
