@@ -59,11 +59,9 @@ struct WorkspaceStageTabs: View {
     .background(StudioPalette.panelInset, in: Capsule())
     .overlay(Capsule().stroke(StudioPalette.border, lineWidth: 1))
     .shadow(color: .black.opacity(0.10), radius: 4, y: 1)
-    .frame(
-      minWidth: WorkspaceSelectorMetrics.minimumWidth,
-      idealWidth: WorkspaceSelectorMetrics.idealWidth,
-      maxWidth: WorkspaceSelectorMetrics.maximumWidth
-    )
+    // Size to content — never clamp the strip, or labeled chips truncate to
+    // "Ch…". The compact breakpoint (icon-only) is the only width control.
+    .fixedSize()
     .animation(.spring(response: 0.30, dampingFraction: 0.86), value: activeID)
   }
 

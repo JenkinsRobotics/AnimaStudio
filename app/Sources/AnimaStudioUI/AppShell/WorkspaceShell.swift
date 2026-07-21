@@ -986,8 +986,9 @@ struct StudioToolSidebar: View {
         Text(tool.title)
           .font(.system(size: 11, weight: .medium))
           .lineLimit(1)
+          .foregroundStyle(active ? Color.white : Color.white.opacity(0.62))
       }
-      .foregroundStyle(active ? Color.white : StudioPalette.muted)
+      .foregroundStyle(active ? Color.white : Color.white.opacity(0.9))
       .frame(width: 66, height: 50)
       .background(
         active ? StudioPalette.accent : Color.clear,
@@ -1104,9 +1105,10 @@ struct StudioToolSidebar: View {
           .font(.system(size: compact ? 14 : 16, weight: .medium))
         if !compact {
           Text(tool.title).font(.system(size: 9.5, weight: .medium)).lineLimit(1)
+            .foregroundStyle(active ? Color.white : Color.white.opacity(0.62))
         }
       }
-      .foregroundStyle(active ? Color.white : StudioPalette.muted)
+      .foregroundStyle(active ? Color.white : Color.white.opacity(0.9))
       .frame(width: compact ? 34 : 56, height: compact ? 34 : 48)
       .background(
         active ? StudioPalette.accent : Color.clear,
@@ -1121,8 +1123,10 @@ struct StudioToolSidebar: View {
   }
 
   private func isEnabled(_ tool: StudioToolDescriptor) -> Bool {
-    if case .unavailable = tool.behavior { return false }
-    return true
+    // Tools always render bright and clickable, like the demo. A tool with no
+    // wired action simply no-ops on tap (activate → arm guards on `.arm`); we
+    // never grey the ribbon out.
+    true
   }
 
   private var densityMenu: some View {
@@ -1227,39 +1231,44 @@ private struct StudioPanelSidebar<Content: View>: View {
   }
 
   private var floatingLayout: some View {
-    ZStack(alignment: state.side == .leading ? .leading : .trailing) {
-      rail
-        .frame(maxHeight: .infinity, alignment: .center)
-        .padding(
-          panelsOnOuterEdge && !state.stacked.isEmpty ? edgePadding : [],
-          panelWidth + 10
-        )
-        // The stack reveals from beneath this fixed rail. Keeping the rail on
-        // the upper layer makes its icons continuously readable and clickable
-        // during both the opening and closing animation on either side.
-        .zIndex(StudioSidebarMotion.railLayer)
-      if !state.stacked.isEmpty {
-        stackColumn(docked: false)
+    GeometryReader { geo in
+      // Floating panels get a bounded height so their List/content self-contains
+      // and never overlaps (docked panels are bounded by their in-flow column).
+      let panelMax = min(560, max(220, geo.size.height - 120))
+      ZStack(alignment: state.side == .leading ? .leading : .trailing) {
+        rail
           .frame(maxHeight: .infinity, alignment: .center)
           .padding(
-            panelsOnOuterEdge ? [] : edgePadding,
-            StudioSidebarSizing.railWidth + 10
+            panelsOnOuterEdge && !state.stacked.isEmpty ? edgePadding : [],
+            panelWidth + 10
           )
-          .transition(StudioSidebarMotion.panelTransition(for: state.side))
-          .zIndex(StudioSidebarMotion.stackLayer)
+          // The stack reveals from beneath this fixed rail. Keeping the rail on
+          // the upper layer makes its icons continuously readable and clickable
+          // during both the opening and closing animation on either side.
+          .zIndex(StudioSidebarMotion.railLayer)
+        if !state.stacked.isEmpty {
+          stackColumn(docked: false, maxContentHeight: panelMax)
+            .frame(maxHeight: .infinity, alignment: .center)
+            .padding(
+              panelsOnOuterEdge ? [] : edgePadding,
+              StudioSidebarSizing.railWidth + 10
+            )
+            .transition(StudioSidebarMotion.panelTransition(for: state.side))
+            .zIndex(StudioSidebarMotion.stackLayer)
+        }
       }
     }
     .frame(maxHeight: .infinity)
   }
 
-  private func stackColumn(docked: Bool) -> some View {
+  private func stackColumn(docked: Bool, maxContentHeight: CGFloat? = nil) -> some View {
     let cards = VStack(spacing: docked ? 0 : 10) {
       ForEach(Array(state.stacked.enumerated()), id: \.element) { index, id in
         if !docked, state.draggingID != nil, !state.willFloat, state.dropIndex == index {
           dropIndicator
         }
         if docked, index > 0 { Divider().overlay(StudioPalette.border) }
-        panelCard(id, docked: docked)
+        panelCard(id, docked: docked, maxContentHeight: maxContentHeight)
       }
       if !docked, state.draggingID != nil, !state.willFloat,
         state.dropIndex == state.stacked.count
@@ -1288,10 +1297,11 @@ private struct StudioPanelSidebar<Content: View>: View {
       .transition(.opacity)
   }
 
-  private func panelCard(_ id: String, docked: Bool) -> some View {
+  private func panelCard(_ id: String, docked: Bool, maxContentHeight: CGFloat? = nil) -> some View {
     let lifted = state.draggingID == id
     return content(id)
       .frame(width: panelWidth)
+      .frame(maxHeight: docked ? nil : maxContentHeight, alignment: .top)
       .environment(\.studioPanelSurfaceMode, docked ? .docked : .floating)
       .background {
         GeometryReader { geometry in

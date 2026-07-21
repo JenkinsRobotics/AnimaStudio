@@ -78,30 +78,30 @@ struct StudioDocumentBar: View {
     GeometryReader { proxy in
       let presentation = StudioHeaderPresentation.resolve(width: proxy.size.width)
       let density = StudioDocumentBarDensity.resolve(width: proxy.size.width)
-      let contentWidth = max(0, proxy.size.width - 28)
-      let sideWidth = max(0, (contentWidth - density.selectorWidth - 24) / 2)
+      // Side clusters hug their edges at natural width; the stage tabs are an
+      // overlay so they center on the WINDOW (never on leftover space), and the
+      // tab strip sizes to content so labels never truncate.
       ZStack {
-        WorkspaceStageTabs(
-          workspace: workspace,
-          isUIDevWorkspace: $isUIDevWorkspace,
-          compact: presentation.usesCompactTabs
-        )
-        .frame(width: density.selectorWidth)
-
         HStack(spacing: 0) {
           leadingControls(
             density: density,
             collapsesFileCommands: presentation.collapsesFileCommands
           )
-          .frame(width: sideWidth, alignment: .leading)
+          .fixedSize()
 
-          Spacer(minLength: 0)
+          Spacer(minLength: 12)
 
           trailingControls(compactRuntime: presentation.usesCompactRuntimeControls)
-            .frame(width: sideWidth, alignment: .trailing)
+            .fixedSize()
         }
         .labelStyle(.iconOnly)
         .buttonStyle(StudioChromeIconButtonStyle())
+
+        WorkspaceStageTabs(
+          workspace: workspace,
+          isUIDevWorkspace: $isUIDevWorkspace,
+          compact: presentation.usesCompactTabs
+        )
       }
       .padding(.horizontal, 14)
     }
