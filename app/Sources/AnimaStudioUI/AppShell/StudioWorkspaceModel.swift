@@ -43,6 +43,32 @@ final class StudioWorkspaceModel {
       ($0, $0.descriptor.defaultPresentation)
     }
   )
+  var navigatorPlacement: StudioPanelPlacement {
+    get { StudioLayoutState.shared.navigatorPlacement }
+    set { StudioLayoutState.shared.navigatorPlacement = newValue }
+  }
+  var inspectorPlacement: StudioPanelPlacement {
+    get { StudioLayoutState.shared.inspectorPlacement }
+    set { StudioLayoutState.shared.inspectorPlacement = newValue }
+  }
+  var ribbonPlacement: StudioPanelPlacement {
+    get { StudioLayoutState.shared.ribbonPlacement }
+    set { StudioLayoutState.shared.ribbonPlacement = newValue }
+  }
+  var floatingRibbonEdge: StudioFloatingRibbonEdge {
+    get { StudioLayoutState.shared.floatingRibbonEdge }
+    set { StudioLayoutState.shared.floatingRibbonEdge = newValue }
+  }
+  var workspaceSidebarSelections = Dictionary(
+    uniqueKeysWithValues: StudioWorkspaceKind.allCases.map {
+      ($0, StudioWorkspaceSidebarCatalog.defaultSelection(for: $0))
+    }
+  )
+  var workspaceSidebarOpen = Dictionary(
+    uniqueKeysWithValues: StudioWorkspaceKind.allCases.map { ($0, true) }
+  )
+  var assetBuilderSelection = AssetBuilderSelection.characters
+  var hasInitializedAssetBuilderSelection = false
   var project = AnimaProject(
     name: "Untitled Character",
     rig: CharacterRig(joints: []),
@@ -183,6 +209,10 @@ final class StudioWorkspaceModel {
 
   var activePresentation: WorkspacePresentation {
     workspacePresentations[activeWorkspace] ?? activeWorkspace.descriptor.defaultPresentation
+  }
+
+  var detectedLayoutPreset: StudioLayoutPreset? {
+    StudioLayoutState.shared.detectedPreset
   }
 
   var selectedModelPath: ModelEntityPath? {
@@ -1267,6 +1297,37 @@ final class StudioWorkspaceModel {
     workspacePresentations[activeWorkspace] = activeWorkspace.descriptor.defaultPresentation
   }
 
+  func applyLayoutPreset(_ preset: StudioLayoutPreset) {
+    StudioLayoutState.shared.apply(preset)
+  }
+
+  func cycleLayoutPreset() {
+    StudioLayoutState.shared.cyclePreset()
+  }
+
+  var activeWorkspaceSidebarSelection: String {
+    get {
+      workspaceSidebarSelections[activeWorkspace]
+        ?? StudioWorkspaceSidebarCatalog.defaultSelection(for: activeWorkspace)
+    }
+    set { workspaceSidebarSelections[activeWorkspace] = newValue }
+  }
+
+  var isActiveWorkspaceSidebarOpen: Bool {
+    get { workspaceSidebarOpen[activeWorkspace] ?? true }
+    set { workspaceSidebarOpen[activeWorkspace] = newValue }
+  }
+
+  func setNavigatorPlacement(_ placement: StudioPanelPlacement) {
+    navigatorPlacement = placement
+    updateActivePresentation { $0.showsNavigator = placement != .hidden }
+  }
+
+  func setInspectorPlacement(_ placement: StudioPanelPlacement) {
+    inspectorPlacement = placement
+    updateActivePresentation { $0.showsInspector = placement != .hidden }
+  }
+
   func toggleRigConnectors() {
     rigGuideVisibility.showsConnectors.toggle()
   }
@@ -2141,6 +2202,9 @@ final class StudioWorkspaceModel {
       }
     }
     guard hasInspectableSelection, !activePresentation.showsInspector else { return }
+    if inspectorPlacement == .hidden {
+      inspectorPlacement = .floating
+    }
     updateActivePresentation { $0.showsInspector = true }
   }
 

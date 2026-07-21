@@ -27,6 +27,9 @@ public struct ProjectCharacterReference: Equatable, Identifiable, Sendable {
   public var displayName: String
   public var characterFilename: String
   public var editorFilename: String
+  public var sourceKind: ProjectCharacterSourceKind
+  public var libraryCharacterID: UUID?
+  public var libraryRevision: Int?
 
   public var id: String { folderName }
   public var directoryPath: String { "characters/\(folderName)" }
@@ -38,12 +41,25 @@ public struct ProjectCharacterReference: Equatable, Identifiable, Sendable {
     folderName: String,
     displayName: String,
     characterFilename: String? = nil,
-    editorFilename: String? = nil
+    editorFilename: String? = nil,
+    sourceKind: ProjectCharacterSourceKind = .projectLocal,
+    libraryCharacterID: UUID? = nil,
+    libraryRevision: Int? = nil
   ) {
     self.folderName = folderName
     self.displayName = displayName
     self.characterFilename = characterFilename ?? "\(folderName).character.anima"
     self.editorFilename = editorFilename ?? "\(folderName).editor.json"
+    self.sourceKind = sourceKind
+    self.libraryCharacterID = libraryCharacterID
+    self.libraryRevision = libraryRevision
+  }
+
+  public var sourceLabel: String {
+    switch sourceKind {
+    case .projectLocal: "Project local"
+    case .librarySnapshot: "Library snapshot"
+    }
   }
 }
 

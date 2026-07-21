@@ -96,6 +96,28 @@ final class AnimaDocumentStoreTests: XCTestCase {
     )
   }
 
+  func testCharacterLibrarySnapshotProvenanceRoundTripsInManifest() throws {
+    let libraryID = UUID()
+    let snapshot = ProjectCharacterReference(
+      folderName: "jp01",
+      displayName: "JP-01",
+      sourceKind: .librarySnapshot,
+      libraryCharacterID: libraryID,
+      libraryRevision: 7
+    )
+    let url = projectURL()
+    _ = try store.save(
+      document(characters: [snapshot]),
+      to: url,
+      fileWrites: [canonicalWrite(snapshot)]
+    )
+
+    let loaded = try store.load(from: url)
+    XCTAssertEqual(loaded.characters.first?.sourceKind, .librarySnapshot)
+    XCTAssertEqual(loaded.characters.first?.libraryCharacterID, libraryID)
+    XCTAssertEqual(loaded.characters.first?.libraryRevision, 7)
+  }
+
   func testManifestDoesNotPersistSwiftRigOrClips() throws {
     let url = projectURL()
     try store.save(document(characters: [character]), to: url, fileWrites: [canonicalWrite()])

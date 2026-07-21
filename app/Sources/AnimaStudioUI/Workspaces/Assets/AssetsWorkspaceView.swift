@@ -2,14 +2,44 @@ import AnimaDocument
 import AnimaModel
 import SwiftUI
 
-/// Asset Builder follows the same durable three-column workspace grammar as Rig:
-/// navigation on the left, the active collection in the center, and task tools /
-/// selected-item context on the right.
+/// Character uses a collection document in the center, project navigation at
+/// left, and import/selection context at right. Unlike a spatial viewport, its
+/// center becomes a bounded card in Floating and Canvas modes so overlay
+/// sidebars never obscure table content.
+enum AssetsWorkspaceSurface {
+  case center
+  case workspaceSidebar
+  case viewInspector
+}
+
+enum AssetsWorkspacePanelSizing {
+  static let floatingMinimumHeight: CGFloat = 300
+  static let floatingMaximumHeight: CGFloat = 520
+
+  static func collectionHeight(itemCount: Int) -> CGFloat {
+    let visibleRows = min(max(itemCount, 0), 6)
+    let bodyHeight = visibleRows == 0 ? 190 : CGFloat(visibleRows) * 54 + 24
+    return min(floatingMaximumHeight, max(floatingMinimumHeight, 96 + bodyHeight))
+  }
+
+  static func browserHeight(characterCount: Int, hasActiveCharacter: Bool) -> CGFloat {
+    let rootRows = 2
+    let characterRows = max(characterCount, 0)
+    let activeCollectionRows = hasActiveCharacter ? AssetBuilderCollection.allCases.count : 0
+    let treeHeight = CGFloat(rootRows + characterRows + activeCollectionRows) * 30
+    return min(floatingMaximumHeight, max(floatingMinimumHeight, 146 + treeHeight))
+  }
+}
+
 struct AssetsWorkspaceView: View {
   @Bindable var workspace: StudioWorkspaceModel
+  @Environment(\.studioPanelSurfaceMode) private var panelSurfaceMode
+  @Environment(\.studioWorkspaceOverlayInsets) private var overlayInsets
+  var surface = AssetsWorkspaceSurface.center
   let projectName: String
   let projectRevision: Int
   let characters: [ProjectCharacterReference]
+  let characterLibrary: [CharacterLibraryEntry]
   let projectScenes: [ProjectSceneReference]
   let projectAssets: [DocumentAssetReference]
   let partAssetVersions: [String: Int]
@@ -18,73 +48,155 @@ struct AssetsWorkspaceView: View {
   let importErrorMessage: String?
   let isSwitchingCharacter: Bool
   let newCharacter: () -> Void
+  let publishActiveCharacter: () -> Void
+  let addLibraryCharacter: (CharacterLibraryEntry) -> Void
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
   let replaceModel: () -> Void
   let deleteParts: (Set<PartID>) -> Void
   let dropModels: ([URL]) -> Void
 
-  @State private var selection = AssetBuilderSelection.characters
-
   var body: some View {
-    HStack(alignment: .top, spacing: 0) {
-      AssetBuilderSidebar(
-        projectName: projectName,
-        revision: projectRevision,
-        characters: characters,
-        activeCharacterID: activeCharacterID,
-        counts: collectionCounts,
-        isSwitchingCharacter: isSwitchingCharacter,
-        selection: $selection,
-        newCharacter: newCharacter,
-        selectCharacter: selectCharacter
-      )
-      .frame(width: 260)
-
-      Divider()
-
-      AssetBuilderContentView(
-        selection: selection,
-        characters: characters,
-        activeCharacterID: activeCharacterID,
-        parts: partRows,
-        assets: activeCharacterAssets,
-        animations: workspace.project.clips,
-        assemblies: assemblyItems,
-        renders: renderItems,
-        scripts: scriptItems,
-        isSwitchingCharacter: isSwitchingCharacter,
-        selectedPartIDs: selectedPartIDsBinding,
-        newCharacter: newCharacter,
-        selectCharacter: selectCharacter,
-        importModels: importModels,
-        replaceModel: replaceModel,
-        deleteParts: deleteParts
-      )
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-      Divider()
-
-      AssetBuilderInspector(
-        activeCharacter: activeCharacter,
-        selectedPart: selectedPart,
-        selectedPartIDs: selectedPartIDs,
-        workspace: workspace,
-        importProgress: importProgress,
-        importErrorMessage: importErrorMessage,
-        importModels: importModels,
-        dropModels: dropModels
-      )
-      .frame(width: 350)
+    Group {
+      switch surface {
+      case .center:
+        centerCollection
+      case .workspaceSidebar:
+        sidebarSurface
+      case .viewInspector:
+        inspector
+      }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(StudioPalette.canvas)
     .onAppear {
-      selection = .initial(activeCharacterID: activeCharacterID)
+      guard surface == .center, !workspace.hasInitializedAssetBuilderSelection else {
+        return
+      }
+      workspace.assetBuilderSelection = .initial(activeCharacterID: activeCharacterID)
+      workspace.hasInitializedAssetBuilderSelection = true
     }
     .onChange(of: activeCharacterID) { _, newValue in
-      selection = .initial(activeCharacterID: newValue)
+      workspace.assetBuilderSelection = .initial(activeCharacterID: newValue)
+      workspace.hasInitializedAssetBuilderSelection = true
     }
+  }
+
+  private var content: some View {
+    AssetBuilderContentView(
+      selection: workspace.assetBuilderSelection,
+      characters: characters,
+      characterLibrary: characterLibrary,
+      activeCharacterID: activeCharacterID,
+      parts: partRows,
+      assets: activeCharacterAssets,
+      animations: workspace.project.clips,
+      assemblies: assemblyItems,
+      renders: renderItems,
+      scripts: scriptItems,
+      isSwitchingCharacter: isSwitchingCharacter,
+      selectedPartIDs: selectedPartIDsBinding,
+      newCharacter: newCharacter,
+      publishActiveCharacter: publishActiveCharacter,
+      addLibraryCharacter: addLibraryCharacter,
+      selectCharacter: selectCharacter,
+      importModels: importModels,
+      replaceModel: replaceModel,
+      deleteParts: deleteParts
+    )
+    .studioPanelSurface()
+  }
+
+  @ViewBuilder private var centerCollection: some View {
+    if StudioLayoutState.shared.detectedPreset == .docked {
+      content
+        .environment(\.studioPanelSurfaceMode, .docked)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    } else {
+      content
+        .environment(\.studioPanelSurfaceMode, .floating)
+        .frame(maxWidth: .infinity)
+        .frame(height: floatingCollectionHeight, alignment: .top)
+        .padding(.top, floatingTopClearance)
+        .padding(.bottom, 18)
+        .padding(.leading, floatingLeadingClearance)
+        .padding(.trailing, floatingTrailingClearance)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+  }
+
+  private var floatingLeadingClearance: CGFloat {
+    max(18, overlayInsets.leading)
+  }
+
+  private var floatingTopClearance: CGFloat {
+    max(18, overlayInsets.top)
+  }
+
+  private var floatingTrailingClearance: CGFloat {
+    max(18, overlayInsets.trailing)
+  }
+
+  private var sidebar: some View {
+    AssetBuilderSidebar(
+      projectName: projectName,
+      revision: projectRevision,
+      characters: characters,
+      characterLibraryCount: characterLibrary.count,
+      activeCharacterID: activeCharacterID,
+      counts: collectionCounts,
+      isSwitchingCharacter: isSwitchingCharacter,
+      selection: Binding(
+        get: { workspace.assetBuilderSelection },
+        set: { workspace.assetBuilderSelection = $0 }
+      ),
+      newCharacter: newCharacter,
+      selectCharacter: selectCharacter
+    )
+    .studioPanelSurface()
+  }
+
+  @ViewBuilder private var sidebarSurface: some View {
+    if panelSurfaceMode == .docked {
+      sidebar.frame(maxHeight: .infinity, alignment: .top)
+    } else {
+      sidebar.frame(
+        height: AssetsWorkspacePanelSizing.browserHeight(
+          characterCount: characters.count,
+          hasActiveCharacter: activeCharacterID != nil
+        ),
+        alignment: .top
+      )
+    }
+  }
+
+  private var floatingCollectionHeight: CGFloat {
+    AssetsWorkspacePanelSizing.collectionHeight(itemCount: activeCollectionItemCount)
+  }
+
+  private var activeCollectionItemCount: Int {
+    switch workspace.assetBuilderSelection {
+    case .characters:
+      characters.count
+    case .characterLibrary:
+      characterLibrary.count
+    case .characterCollection(_, let collection):
+      collectionCounts[collection] ?? 0
+    case .partsLibrary:
+      0
+    }
+  }
+
+  private var inspector: some View {
+    AssetBuilderInspector(
+      activeCharacter: activeCharacter,
+      selectedPart: selectedPart,
+      selectedPartIDs: selectedPartIDs,
+      workspace: workspace,
+      importProgress: importProgress,
+      importErrorMessage: importErrorMessage,
+      importModels: importModels,
+      dropModels: dropModels
+    )
+    .studioPanelSurface()
   }
 
   private var partRows: [AssetBuilderPartRow] {
@@ -200,6 +312,7 @@ struct AssetsWorkspaceView: View {
       ProjectCharacterReference(folderName: "walle", displayName: "WALL-E"),
       ProjectCharacterReference(folderName: "greeter", displayName: "Greeter Robot"),
     ],
+    characterLibrary: [],
     projectScenes: [],
     projectAssets: [],
     partAssetVersions: [:],
@@ -208,6 +321,8 @@ struct AssetsWorkspaceView: View {
     importErrorMessage: nil,
     isSwitchingCharacter: false,
     newCharacter: {},
+    publishActiveCharacter: {},
+    addLibraryCharacter: { _ in },
     selectCharacter: { _ in },
     importModels: {},
     replaceModel: {},

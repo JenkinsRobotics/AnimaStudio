@@ -5,6 +5,7 @@ struct AssetBuilderSidebar: View {
   let projectName: String
   let revision: Int
   let characters: [ProjectCharacterReference]
+  let characterLibraryCount: Int
   let activeCharacterID: String?
   let counts: [AssetBuilderCollection: Int]
   let isSwitchingCharacter: Bool
@@ -86,6 +87,7 @@ struct AssetBuilderSidebar: View {
   private var nodes: [AssetBuilderTreeNode] {
     AssetBuilderTreeAdapter.nodes(
       characters: characters,
+      characterLibraryCount: characterLibraryCount,
       activeCharacterID: activeCharacterID,
       counts: counts
     )
@@ -154,6 +156,7 @@ struct AssetBuilderSidebar: View {
       return StudioPalette.sourceModel
     }
     if case .library = node.id { return StudioPalette.sourceModel }
+    if case .characterLibrary = node.id { return StudioPalette.sourceModel }
     return .secondary
   }
 }

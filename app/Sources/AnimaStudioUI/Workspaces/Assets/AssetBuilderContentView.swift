@@ -6,6 +6,7 @@ import SwiftUI
 struct AssetBuilderContentView: View {
   let selection: AssetBuilderSelection
   let characters: [ProjectCharacterReference]
+  let characterLibrary: [CharacterLibraryEntry]
   let activeCharacterID: String?
   let parts: [AssetBuilderPartRow]
   let assets: [DocumentAssetReference]
@@ -16,6 +17,8 @@ struct AssetBuilderContentView: View {
   let isSwitchingCharacter: Bool
   @Binding var selectedPartIDs: Set<PartID>
   let newCharacter: () -> Void
+  let publishActiveCharacter: () -> Void
+  let addLibraryCharacter: (CharacterLibraryEntry) -> Void
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
   let replaceModel: () -> Void
@@ -35,7 +38,7 @@ struct AssetBuilderContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(StudioPalette.canvas)
+    .background(StudioPalette.panel)
     .onChange(of: selection) { _, _ in
       searchText = ""
       selectionAnchorID = nil
@@ -143,6 +146,16 @@ struct AssetBuilderContentView: View {
           .help("Delete the selected parts from this character")
         }
       }
+      if selection == .characters, activeCharacterID != nil {
+        Button(action: publishActiveCharacter) {
+          Label(
+            activeCharacter?.sourceKind == .librarySnapshot ? "Update Library" : "Publish",
+            systemImage: "person.crop.square.badge.plus"
+          )
+        }
+        .buttonStyle(.bordered)
+        .help("Publish the active project Character as a reusable library source")
+      }
     }
     .padding(.horizontal, 18)
     .frame(height: 62)
@@ -153,6 +166,8 @@ struct AssetBuilderContentView: View {
     switch selection {
     case .characters:
       charactersView
+    case .characterLibrary:
+      characterLibraryView
     case .characterCollection(_, let collection):
       switch collection {
       case .parts: partsView
@@ -178,6 +193,8 @@ struct AssetBuilderContentView: View {
         "CHARACTER",
         columns: [
           AssetBuilderTableColumn(title: "TYPE", width: 190),
+          AssetBuilderTableColumn(title: "SOURCE", width: 130),
+          AssetBuilderTableColumn(title: "REV", width: 54),
           AssetBuilderTableColumn(title: "STATUS", width: 120),
         ]
       )
@@ -185,6 +202,28 @@ struct AssetBuilderContentView: View {
       characterTableRow(character)
     } card: { character in
       characterCard(character)
+    }
+  }
+
+  private var characterLibraryView: some View {
+    collectionSurface(
+      items: filteredLibraryEntries,
+      emptyTitle: characterLibrary.isEmpty ? "No library Characters yet" : "No matches",
+      emptyDetail: "Publish a project Character to reuse it in other projects.",
+      systemImage: "person.2.crop.square.stack"
+    ) {
+      tableHeader(
+        "CHARACTER",
+        columns: [
+          AssetBuilderTableColumn(title: "REVISION", width: 90),
+          AssetBuilderTableColumn(title: "MODIFIED", width: 150),
+          AssetBuilderTableColumn(title: "ACTION", width: 92),
+        ]
+      )
+    } row: { entry in
+      characterLibraryTableRow(entry)
+    } card: { entry in
+      characterLibraryCard(entry)
     }
   }
 
@@ -371,6 +410,18 @@ struct AssetBuilderContentView: View {
           .foregroundStyle(.secondary)
           .frame(width: 190, alignment: .leading)
 
+        Text(character.sourceLabel)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .frame(width: 130, alignment: .leading)
+
+        Text(character.libraryRevision.map { "V\($0)" } ?? "—")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(
+            character.sourceKind == .librarySnapshot ? StudioPalette.sourceModel : .secondary
+          )
+          .frame(width: 54, alignment: .leading)
+
         if isSwitchingCharacter && character.id == activeCharacterID {
           ProgressView().controlSize(.small)
             .frame(width: 120, alignment: .leading)
@@ -391,6 +442,30 @@ struct AssetBuilderContentView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+  }
+
+  private func characterLibraryTableRow(_ entry: CharacterLibraryEntry) -> some View {
+    HStack(spacing: 12) {
+      HStack(spacing: 10) {
+        collectionIcon("person.crop.square")
+        Text(entry.displayName).font(.callout.weight(.medium)).lineLimit(1)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      Text("V\(entry.revision)")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(StudioPalette.sourceModel)
+        .frame(width: 90, alignment: .leading)
+      Text(entry.modifiedDate.formatted(date: .abbreviated, time: .shortened))
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(width: 150, alignment: .leading)
+      Button("Add") { addLibraryCharacter(entry) }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+        .frame(width: 92, alignment: .leading)
+    }
+    .padding(.horizontal, 16)
+    .frame(height: 54)
   }
 
   private func partTableRow(_ part: AssetBuilderPartRow) -> some View {
@@ -598,10 +673,14 @@ struct AssetBuilderContentView: View {
           .frame(width: 54, height: 54)
         VStack(alignment: .leading, spacing: 4) {
           Text(character.displayName).font(.headline).lineLimit(1)
-          Text(character.id == activeCharacterID ? "ACTIVE · 3D ASSEMBLY" : "3D ASSEMBLY")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(
-              character.id == activeCharacterID ? StudioPalette.sourceModel : .secondary)
+          Text(
+            character.id == activeCharacterID
+              ? "ACTIVE · \(character.sourceLabel.uppercased())"
+              : character.sourceLabel.uppercased()
+          )
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(
+            character.id == activeCharacterID ? StudioPalette.sourceModel : .secondary)
         }
         Spacer()
         if isSwitchingCharacter && character.id == activeCharacterID {
@@ -621,6 +700,31 @@ struct AssetBuilderContentView: View {
       }
     }
     .buttonStyle(.plain)
+  }
+
+  private func characterLibraryCard(_ entry: CharacterLibraryEntry) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        collectionIcon("person.crop.square")
+        Spacer()
+        Text("V\(entry.revision)")
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(StudioPalette.sourceModel)
+      }
+      Text(entry.displayName).font(.headline).lineLimit(1)
+      Text(
+        "Reusable Character · \(entry.modifiedDate.formatted(date: .abbreviated, time: .omitted))"
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      Button("Add to Project") { addLibraryCharacter(entry) }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, minHeight: 142, alignment: .leading)
+    .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 11))
+    .overlay { RoundedRectangle(cornerRadius: 11).stroke(StudioPalette.border) }
   }
 
   private func partThumbnail(_ part: AssetBuilderPartRow) -> some View {
@@ -649,6 +753,19 @@ struct AssetBuilderContentView: View {
     return characters.filter {
       $0.displayName.lowercased().contains(needle) || $0.id.lowercased().contains(needle)
     }
+  }
+
+  private var filteredLibraryEntries: [CharacterLibraryEntry] {
+    let needle = normalizedSearchText
+    guard !needle.isEmpty else { return characterLibrary }
+    return characterLibrary.filter {
+      $0.displayName.lowercased().contains(needle)
+        || $0.folderName.lowercased().contains(needle)
+    }
+  }
+
+  private var activeCharacter: ProjectCharacterReference? {
+    characters.first { $0.id == activeCharacterID }
   }
 
   private var sourceAssetItems: [AssetBuilderListItem] {
@@ -704,7 +821,8 @@ struct AssetBuilderContentView: View {
 
   private var kicker: String {
     switch selection {
-    case .characters: "PROJECT CONTENT"
+    case .characters: "PROJECT SNAPSHOTS"
+    case .characterLibrary: "REUSABLE SOURCES"
     case .characterCollection: "ACTIVE CHARACTER"
     case .partsLibrary: "SHARED LIBRARY"
     }
@@ -712,7 +830,8 @@ struct AssetBuilderContentView: View {
 
   private var title: String {
     switch selection {
-    case .characters: "Characters"
+    case .characters: "Project Characters"
+    case .characterLibrary: "Character Library"
     case .characterCollection(_, let collection): collection.title
     case .partsLibrary(let category): category?.title ?? "Parts Library"
     }

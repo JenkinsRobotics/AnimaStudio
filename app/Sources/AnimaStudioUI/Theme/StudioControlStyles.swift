@@ -107,6 +107,33 @@ struct StudioIconButtonStyle: ButtonStyle {
   }
 }
 
+/// Quiet, compact chrome control used by the single application header.
+struct StudioChromeIconButtonStyle: ButtonStyle {
+  var isSelected = false
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(.system(size: 11, weight: .semibold))
+      .foregroundStyle(isSelected ? StudioPalette.accent : StudioPalette.muted)
+      .frame(width: 28, height: 24)
+      .background(
+        isSelected
+          ? StudioPalette.accent.opacity(0.14)
+          : (configuration.isPressed ? Color.white.opacity(0.07) : StudioPalette.panelInset),
+        in: RoundedRectangle(cornerRadius: 6)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: 6)
+          .stroke(
+            isSelected ? StudioPalette.accent.opacity(0.40) : StudioPalette.border,
+            lineWidth: 1
+          )
+      }
+      .scaleEffect(configuration.isPressed ? 0.94 : 1)
+      .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
+  }
+}
+
 struct StudioSectionHeader: View {
   let title: String
   let detail: String
@@ -150,23 +177,23 @@ struct StudioPanelHeader<Trailing: View>: View {
   }
 
   var body: some View {
-    HStack(spacing: 9) {
+    HStack(spacing: 7) {
       Image(systemName: systemImage)
         .foregroundStyle(StudioPalette.accent)
       VStack(alignment: .leading, spacing: 1) {
         Text(title.uppercased())
-          .font(.caption.weight(.bold))
-          .tracking(0.8)
+          .font(.system(size: 10.5, weight: .semibold))
+          .tracking(0.6)
         Text(detail)
-          .font(.caption2)
+          .font(.system(size: 8.5, weight: .medium))
           .foregroundStyle(StudioPalette.muted)
       }
       Spacer(minLength: 8)
       trailing()
     }
-    .padding(.horizontal, 14)
-    .frame(height: 52)
-    .background(StudioPalette.chrome)
+    .padding(.horizontal, StudioMetrics.panelPadding)
+    .frame(height: detail.isEmpty ? 42 : 50)
+    .background(StudioPalette.panelInset.opacity(0.52))
   }
 }
 

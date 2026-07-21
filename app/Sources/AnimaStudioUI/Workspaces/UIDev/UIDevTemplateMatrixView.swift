@@ -1,3 +1,4 @@
+import AnimaDocument
 import SwiftUI
 
 enum UIDevTemplateCategory: String, CaseIterable, Identifiable, Sendable {
@@ -72,6 +73,9 @@ enum UIDevTemplateCategory: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
+  case productionChrome
+  case workspaceLayouts
+  case floatingRibbon
   case recentProjects
   case layeredIconList
   case notificationPopup
@@ -79,6 +83,7 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case compactTabPanel
   case documentTabStrip
   case materialEditor
+  case visualizationPanel
   case navigator
   case workspace3D
   case agent
@@ -103,6 +108,7 @@ enum UIDevTemplateID: String, CaseIterable, Identifiable, Sendable {
   case viewportControls
   case emptyState
   case progressAndStatus
+  case modelImportStaging
 
   var id: Self { self }
 }
@@ -124,6 +130,14 @@ struct UIDevTemplateDescriptor: Identifiable, Equatable, Sendable {
 
 enum UIDevTemplateMatrixCatalog {
   static let templates: [UIDevTemplateDescriptor] = [
+    descriptor(
+      .productionChrome, "Production App Chrome",
+      "Project identity, centered workspace stages, status, layout, and help.",
+      .windowsAndWorkspaces, 1_180, 150, 190, "rectangle.topthird.inset.filled"),
+    descriptor(
+      .workspaceLayouts, "Workspace Layout Modes",
+      "The same browser and inspector shown docked, floating, and canvas-hidden.",
+      .windowsAndWorkspaces, 1_080, 440, 390, "macwindow.on.rectangle"),
     descriptor(
       .recentProjects, "Recent Projects", "Start-screen project history and revisions.",
       .windowsAndWorkspaces, 440, 250, 230, "clock.arrow.circlepath"),
@@ -160,6 +174,10 @@ enum UIDevTemplateMatrixCatalog {
       .materialEditor, "Material Editor", "Preview, surface color, channels, and assignment.",
       .inspectors, 410, 620, 520, "circle.hexagongrid.fill"),
     descriptor(
+      .visualizationPanel, "Visualization Browser",
+      "The production material and environment trigger, library, and assignment states.",
+      .inspectors, 420, 720, 620, "circle.lefthalf.filled"),
+    descriptor(
       .mateEditor, "Mate Editor", "Shared eight-kind mate configuration panel.",
       .inspectors, 350, 540, 390, "link.badge.plus"),
 
@@ -178,6 +196,10 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .floatingTool, "Detached Tool", "The one intentional floating utility pattern.",
       .panelsAndTools, 360, 420, 360, "macwindow.badge.plus"),
+    descriptor(
+      .floatingRibbon, "Floating Tool Ribbon",
+      "Compact workspace groups that reveal the production tool catalog on demand.",
+      .panelsAndTools, 620, 120, 180, "rectangle.tophalf.inset.filled"),
 
     descriptor(
       .alert, "Information Alert", "Short, blocking information with one safe exit.",
@@ -194,6 +216,10 @@ enum UIDevTemplateMatrixCatalog {
     descriptor(
       .notificationPopup, "Notification Popup", "Dismissible announcement with supporting rows.",
       .dialogsAndPopovers, 340, 430, 430, "bell.badge"),
+    descriptor(
+      .modelImportStaging, "Character Part Import",
+      "Destination character, source files, units, and assembly workflow confirmation.",
+      .dialogsAndPopovers, 620, 690, 530, "shippingbox.and.arrow.backward"),
 
     descriptor(
       .actionButtons, "Action Buttons", "Primary, secondary, quiet, destructive, and states.",
@@ -390,11 +416,33 @@ struct UIDevTemplateMatrixView: View {
   @ViewBuilder
   private func specimen(for id: UIDevTemplateID) -> some View {
     switch id {
+    case .productionChrome:
+      UIDevProductionChromeSpecimen()
+    case .workspaceLayouts:
+      UIDevWorkspaceLayoutSpecimen()
+    case .floatingRibbon:
+      UIDevFloatingRibbonSpecimen()
     case .recentProjects: recentProjectsTemplate
     case .layeredIconList:
       UIDevReferenceWidgetSpecimen(kind: .layeredIconList)
     case .notificationPopup:
       UIDevReferenceWidgetSpecimen(kind: .notificationPopup)
+    case .modelImportStaging:
+      scaledLab(designSize: CGSize(width: 620, height: 690)) {
+        ModelImportUnitsSheet(
+          urls: [
+            URL(fileURLWithPath: "/tmp/base.stl"),
+            URL(fileURLWithPath: "/tmp/head.usdz"),
+          ],
+          characters: [
+            ProjectCharacterReference(folderName: "atlas", displayName: "Atlas"),
+            ProjectCharacterReference(folderName: "greeter", displayName: "Greeter"),
+          ],
+          initialTargetCharacterID: "atlas",
+          cancel: {},
+          importModels: { _ in }
+        )
+      }
     case .layoutStyleControls:
       scaledLab(designSize: CGSize(width: 980, height: 620)) {
         UIDevReferenceWidgetSpecimen(kind: .layoutStyleControls)
@@ -405,6 +453,8 @@ struct UIDevTemplateMatrixView: View {
       UIDevReferenceWidgetSpecimen(kind: .documentTabStrip)
     case .materialEditor:
       UIDevReferenceWidgetSpecimen(kind: .materialEditor)
+    case .visualizationPanel:
+      UIDevVisualizationPanelSpecimen()
     case .navigator: navigatorTemplate
     case .workspace3D: workspaceTemplate
     case .agent: agentTemplate

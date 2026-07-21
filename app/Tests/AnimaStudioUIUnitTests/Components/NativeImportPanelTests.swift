@@ -14,6 +14,8 @@ final class NativeImportPanelTests: XCTestCase {
       configuration.allowedContentTypes.count,
       ModelImportFormatSupport.supportedFileExtensions.count
     )
+    XCTAssertTrue(configuration.message.contains(ModelImportFormatSupport.operatorLabel))
+    XCTAssertTrue(configuration.message.contains("destination character"))
     XCTAssertTrue(configuration.allowsMultipleSelection)
     XCTAssertEqual(configuration.prompt, "Import")
   }

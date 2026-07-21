@@ -26,6 +26,7 @@ public struct ViewportColor: Equatable, Sendable {
 
 public enum ViewportBackgroundMode: String, CaseIterable, Identifiable, Sendable {
   case preset
+  case transparent
   case solid
   case gradient
 
@@ -57,6 +58,8 @@ public struct ViewportBackgroundSettings: Equatable, Sendable {
     switch mode {
     case .preset:
       preset.backgroundColor
+    case .transparent:
+      Color.clear
     case .solid:
       primary.color
     case .gradient:

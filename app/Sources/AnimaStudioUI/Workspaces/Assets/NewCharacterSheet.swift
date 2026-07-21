@@ -24,9 +24,11 @@ struct NewCharacterSheet: View {
         VStack(alignment: .leading, spacing: 3) {
           Text("New Character")
             .font(.title3.weight(.semibold))
-          Text("Characters are independent of the project name.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          Text(
+            "Creates a project-local Character. Publish it to the Character Library to reuse it."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
         }
       }
 

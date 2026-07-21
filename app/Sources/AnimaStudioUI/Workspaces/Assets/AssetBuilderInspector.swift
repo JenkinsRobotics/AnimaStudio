@@ -14,8 +14,17 @@ struct AssetBuilderInspector: View {
   let dropModels: ([URL]) -> Void
 
   @State private var isDropTargeted = false
+  @Environment(\.studioPanelSurfaceMode) private var panelSurfaceMode
 
   var body: some View {
+    inspectorContent
+      .frame(
+        minHeight: panelSurfaceMode == .floating ? 500 : nil,
+        maxHeight: panelSurfaceMode == .docked ? .infinity : 560
+      )
+  }
+
+  private var inspectorContent: some View {
     VStack(spacing: 0) {
       importPanel
         .frame(minHeight: 248, idealHeight: 286)

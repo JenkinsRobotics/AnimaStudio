@@ -12,6 +12,8 @@ public struct AnimaStudioSettingsView: View {
   @AppStorage(StudioPreferenceKey.settingsSelectedTab) private var selectedTabRawValue =
     StudioSettingsTab.workspace.rawValue
   @AppStorage(StudioPreferenceKey.workspaceRootPath) private var workspaceRootPath = ""
+  @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
+    StudioLayoutPreset.studio.rawValue
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var appearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile) private var profileRawValue =
@@ -128,6 +130,26 @@ public struct AnimaStudioSettingsView: View {
         }
         .studioCardSurface()
 
+        VStack(alignment: .leading, spacing: 12) {
+          StudioSectionHeader(
+            title: "Interface Layout",
+            detail: "Choose how new workspace sessions present browsers, inspectors, and tools.",
+            systemImage: "macwindow.on.rectangle"
+          )
+          Picker("Default Studio mode", selection: defaultLayoutPresetBinding) {
+            ForEach(StudioLayoutPreset.allCases) { preset in
+              Label(preset.title, systemImage: preset.systemImage).tag(preset)
+            }
+          }
+          .pickerStyle(.segmented)
+          Text(
+            "Floating keeps spatial canvases full-size. Docked reserves space for structured work. Canvas hides panels until the pointer reaches an edge."
+          )
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+
         VStack(alignment: .leading, spacing: 8) {
           Label("Plain project folders", systemImage: "checkmark.seal.fill")
             .foregroundStyle(StudioPalette.hardware)
@@ -223,6 +245,13 @@ public struct AnimaStudioSettingsView: View {
     Binding(
       get: { StudioSettingsTab(rawValue: selectedTabRawValue) ?? .workspace },
       set: { selectedTabRawValue = $0.rawValue }
+    )
+  }
+
+  private var defaultLayoutPresetBinding: Binding<StudioLayoutPreset> {
+    Binding(
+      get: { StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .studio },
+      set: { defaultLayoutPresetRawValue = $0.rawValue }
     )
   }
 

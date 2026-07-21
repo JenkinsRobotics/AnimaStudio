@@ -24,10 +24,12 @@ struct StudioWorkspaceView: View {
   @State private var characterImportErrorMessage: String?
   @State private var isSwitchingCharacter = false
   @State private var characterEditorMetadata = CharacterEditorMetadata()
+  @State private var characterLibraryEntries: [CharacterLibraryEntry] = []
   @State private var activeImportedModelReference: String?
   @State private var isUIDevWorkspace = false
   @State private var uiDevSection = UIDevSection.templateMatrix
   @State private var showsUIDevAgentPanel = false
+  @State private var showsWorkspaceGuide = false
   @State private var viewportPointerTarget = ViewportPointerTarget.canvas
   @State private var viewportContextMenuRequest: ViewportContextMenuRequest?
   @State private var lifecycleErrorMessage: String?
@@ -36,6 +38,8 @@ struct StudioWorkspaceView: View {
   @State private var armIKSolveTask: Task<Void, Never>?
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
+  @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
+    StudioLayoutPreset.studio.rawValue
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile)
   private var viewportNavigationProfileRawValue =
     PreviewNavigationProfile.default.rawValue
@@ -121,33 +125,46 @@ struct StudioWorkspaceView: View {
     VStack(spacing: 0) {
       StudioDocumentBar(
         workspace: workspace,
+        isUIDevWorkspace: $isUIDevWorkspace,
+        showsWorkspaceGuide: $showsWorkspaceGuide,
         isSaving: isSavingProject,
+        isDirty: session.isDirty,
         newProject: newProject,
         openProject: openProject,
         saveProject: { Task { await saveProject() } },
         saveProjectAs: { Task { await saveProjectAs() } },
         closeProject: closeProject
       )
-      Divider()
-      WorkspaceToolBar(
+
+      workspaceShell
+
+      StudioStatusBar(
         workspace: workspace,
-        viewportAppearance: viewportAppearanceBinding,
-        isUIDevWorkspace: $isUIDevWorkspace,
-        uiDevSection: $uiDevSection,
-        importModel: presentModelImportPanel,
-        importAnimaCharacter: presentAnimaCharacterImportPanel,
-        toggleAgentPanel: { showsUIDevAgentPanel.toggle() }
+        isUIDevWorkspace: isUIDevWorkspace
       )
-      Divider()
-
-      workspaceCanvas
-
-      bottomEditor
+    }
+    .overlay(alignment: .bottom) {
+      if showsWorkspaceGuide {
+        WorkspaceGuideCard(
+          workspace: workspace,
+          isUIDevWorkspace: $isUIDevWorkspace,
+          dismiss: { showsWorkspaceGuide = false }
+        )
+        .frame(maxWidth: 760)
+        .padding(.horizontal, 20)
+        .padding(.bottom, workspace.floatingRibbonEdge == .bottom ? 102 : 34)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .zIndex(50)
+      }
     }
     .background(StudioPalette.canvas)
     .preferredColorScheme(.dark)
+    .animation(.spring(response: 0.30, dampingFraction: 0.90), value: workspace.ribbonPlacement)
+    .animation(.spring(response: 0.30, dampingFraction: 0.90), value: showsWorkspaceGuide)
     .onExitCommand {
-      if workspace.matePlacement != nil {
+      if StudioToolState.shared.isArmed {
+        StudioToolState.shared.disarm()
+      } else if workspace.matePlacement != nil {
         workspace.cancelMatePlacement()
       } else {
         workspace.clearSelection()
@@ -162,13 +179,16 @@ struct StudioWorkspaceView: View {
       if !pendingModelImportURLs.isEmpty {
         ModelImportUnitsSheet(
           urls: pendingModelImportURLs,
+          characters: session.document.characters,
+          initialTargetCharacterID: session.document.activeCharacter?.id,
+          isReplacingPart: replacesSelectedPartOnNextImport,
           cancel: {
             pendingModelImportURLs.removeAll()
             replacesSelectedPartOnNextImport = false
           },
-          importModels: { requests in
+          importModels: { plan in
             pendingModelImportURLs.removeAll()
-            Task { await importModels(requests) }
+            Task { await importModels(plan) }
           }
         )
       }
@@ -215,8 +235,17 @@ struct StudioWorkspaceView: View {
       Text(lifecycleErrorMessage ?? "Unknown project error")
     }
     .task {
+      workspace.applyLayoutPreset(
+        StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .studio
+      )
       await workspace.connectToAnimaCore()
       await loadIndexedCharacterIfNeeded()
+      refreshCharacterLibrary()
+    }
+    .onChange(of: workspace.detectedLayoutPreset) { _, preset in
+      if let preset {
+        defaultLayoutPresetRawValue = preset.rawValue
+      }
     }
     .task(id: workspace.isPlaying) {
       guard workspace.isPlaying else { return }
@@ -256,18 +285,166 @@ struct StudioWorkspaceView: View {
     }
   }
 
+  /// Every authored workspace enters through this one frame. The center owns
+  /// the document surface; the left sidebar only changes the working set, and
+  /// the right sidebar only changes presentation or inspects the selection.
+  private var workspaceShell: some View {
+    StudioWorkspaceScaffold(
+      workspaceKind: workspace.activeWorkspace,
+      toolGroups: workspaceToolGroups,
+      toolCategories: workspaceToolCategories,
+      leftTabs: StudioWorkspaceSidebarCatalog.tabs(for: workspace.activeWorkspace),
+      leftSelection: Binding(
+        get: { workspace.activeWorkspaceSidebarSelection },
+        set: { selectWorkspaceSidebarTab($0) }
+      ),
+      leftOpen: Binding(
+        get: { workspace.isActiveWorkspaceSidebarOpen },
+        set: { workspace.isActiveWorkspaceSidebarOpen = $0 }
+      ),
+      performCommand: performWorkspaceRibbonAction,
+      center: {
+        VStack(spacing: 0) {
+          workspaceCanvas
+          bottomEditor
+        }
+      },
+      left: { tab in
+        workspaceSidebarContent(tab: tab)
+      },
+      right: { tab in
+        StudioViewSidebarPanel(tab: tab) {
+          workspaceInspectorContent
+        }
+      }
+    )
+  }
+
+  private var workspaceToolGroups: [StudioToolGroup] {
+    guard !isUIDevWorkspace, workspace.activeWorkspace != .rig else { return [] }
+    return StudioWorkspaceToolCatalog.groups(for: workspace.activeWorkspace)
+  }
+
+  private var workspaceToolCategories: [StudioToolCategory] {
+    guard !isUIDevWorkspace, workspace.activeWorkspace == .rig else { return [] }
+    return StudioWorkspaceToolCatalog.rigCategories(workspace: workspace)
+  }
+
+  @ViewBuilder
+  private func workspaceSidebarContent(tab: String) -> some View {
+    if isUIDevWorkspace {
+      ProjectNavigatorView(
+        workspace: workspace,
+        importModel: presentModelImportPanel
+      )
+    } else if workspace.activeWorkspace == .assets {
+      assetsWorkspaceView(surface: .workspaceSidebar)
+    } else {
+      ProjectNavigatorView(
+        workspace: workspace,
+        importModel: presentModelImportPanel
+      )
+    }
+  }
+
+  @ViewBuilder
+  private var workspaceInspectorContent: some View {
+    if isUIDevWorkspace {
+      StudioAgentPanelView { showsUIDevAgentPanel = false }
+    } else if workspace.activeWorkspace == .assets {
+      assetsWorkspaceView(surface: .viewInspector)
+    } else {
+      InspectorView(
+        workspace: workspace,
+        mapModelNode: { node in
+          Task { await createRigidPart(from: node) }
+        }
+      )
+    }
+  }
+
+  private func selectWorkspaceSidebarTab(_ tab: String) {
+    workspace.activeWorkspaceSidebarSelection = tab
+    guard workspace.activeWorkspace == .assets else { return }
+    switch tab {
+    case "Characters":
+      workspace.assetBuilderSelection = .characters
+    case "Library":
+      workspace.assetBuilderSelection = .characterLibrary
+    case "Collections":
+      if let characterID = session.document.activeCharacter?.id {
+        workspace.assetBuilderSelection = .characterCollection(
+          characterID: characterID,
+          collection: .parts
+        )
+      }
+    default:
+      break
+    }
+  }
+
+  private func performWorkspaceRibbonAction(_ action: WorkspaceRibbonAction) {
+    switch action {
+    case .importAnimaCharacter: presentAnimaCharacterImportPanel()
+    case .importModel: presentModelImportPanel()
+    case .stopPlayback: workspace.stopPlayback()
+    case .togglePlayback: workspace.togglePlayback()
+    case .toggleLoop: workspace.loopsPreviewPlayback.toggle()
+    case .previousKeyframe: workspace.seekAdjacentKeyframe(forward: false)
+    case .nextKeyframe: workspace.seekAdjacentKeyframe(forward: true)
+    case .frameSelection: workspace.frameSelection()
+    case .toggleGrid: workspace.showsPreviewGrid.toggle()
+    case .toggleBottomEditor: workspace.toggleBottomEditor()
+    }
+  }
+
+  /// Applies the currently armed model tool. Camera navigation always disarms
+  /// this state before it can reach the center surface.
+  private func commitArmedTool() {
+    let toolState = StudioToolState.shared
+    guard let tool = toolState.armedTool,
+      case .arm(let command) = tool.behavior
+    else { return }
+
+    if command.hasPrefix("rig.part."),
+      let kind = RigPrimitiveKind(rawValue: String(command.dropFirst("rig.part.".count)))
+    {
+      workspace.addPart(kind: kind)
+      toolState.committed()
+      return
+    }
+
+    if command == "rig.mate.revolute" {
+      workspace.beginRevoluteMatePlacement()
+      toolState.committed()
+      return
+    }
+
+    if command.hasPrefix("rig.relation.") {
+      let rawKind = String(command.dropFirst("rig.relation.".count))
+      if let relation = workspace.engineRelationTypes.first(where: {
+        $0.kind.rawValue == rawKind
+      }) {
+        workspace.beginRelationDraft(relation)
+        toolState.committed()
+      }
+    }
+  }
+
   @ViewBuilder
   private var bottomEditor: some View {
     if !isUIDevWorkspace && workspace.activePresentation.showsBottomEditor {
       switch workspace.activeWorkspace {
       case .animate:
-        Divider()
-        TimelineEditorView(workspace: workspace)
-          .frame(minHeight: 260, idealHeight: 340, maxHeight: 440)
+        TimelineWorkspaceSurface {
+          TimelineEditorView(workspace: workspace)
+            .frame(minHeight: 260, idealHeight: 340, maxHeight: 440)
+        }
       case .show:
-        Divider()
-        ShowTimelineView(workspace: workspace)
-          .frame(minHeight: 210, idealHeight: 250, maxHeight: 320)
+        TimelineWorkspaceSurface {
+          ShowTimelineView(workspace: workspace)
+            .frame(minHeight: 210, idealHeight: 250, maxHeight: 320)
+        }
       case .assets, .rig, .nodes, .hardware:
         EmptyView()
       }
@@ -302,72 +479,70 @@ struct StudioWorkspaceView: View {
   private var authoringWorkspaceCanvas: some View {
     Group {
       if workspace.activeWorkspace == .assets {
-        AssetsWorkspaceView(
-          workspace: workspace,
-          projectName: session.document.displayName,
-          projectRevision: session.document.metadata.revision,
-          characters: session.document.characters,
-          projectScenes: session.document.scenes,
-          projectAssets: session.document.assets,
-          partAssetVersions: characterEditorMetadata.partAssetVersions,
-          activeCharacterID: session.document.activeCharacter?.id,
-          importProgress: characterImportProgress,
-          importErrorMessage: characterImportErrorMessage,
-          isSwitchingCharacter: isSwitchingCharacter,
-          newCharacter: { showsNewCharacterSheet = true },
-          selectCharacter: { character in
-            Task { await selectCharacter(character) }
-          },
-          importModels: presentModelImportPanel,
-          replaceModel: {
-            presentModelImportPanel(replacingSelectedPart: true)
-          },
-          deleteParts: { ids in
-            Task { await deleteParts(ids) }
-          },
-          dropModels: beginModelImport
-        )
+        assetsWorkspaceView(surface: .center)
       } else {
-        viewportWorkspaceCanvas
+        viewportCenterContent
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .clipped()
   }
 
-  private var viewportWorkspaceCanvas: some View {
-    ZStack {
-      if workspace.activeWorkspace == .nodes {
-        NodeWorkspaceView()
-      } else if workspace.activeWorkspace == .hardware {
-        HardwareWorkspaceView()
-      } else {
-        viewport
-      }
+  private func assetsWorkspaceView(surface: AssetsWorkspaceSurface) -> some View {
+    AssetsWorkspaceView(
+      workspace: workspace,
+      surface: surface,
+      projectName: session.document.displayName,
+      projectRevision: session.document.metadata.revision,
+      characters: session.document.characters,
+      characterLibrary: characterLibraryEntries,
+      projectScenes: session.document.scenes,
+      projectAssets: session.document.assets,
+      partAssetVersions: characterEditorMetadata.partAssetVersions,
+      activeCharacterID: session.document.activeCharacter?.id,
+      importProgress: characterImportProgress,
+      importErrorMessage: characterImportErrorMessage,
+      isSwitchingCharacter: isSwitchingCharacter,
+      newCharacter: { showsNewCharacterSheet = true },
+      publishActiveCharacter: {
+        Task { await publishActiveCharacterToLibrary() }
+      },
+      addLibraryCharacter: { entry in
+        Task { await addLibraryCharacterToProject(entry) }
+      },
+      selectCharacter: { character in
+        Task { await selectCharacter(character) }
+      },
+      importModels: presentModelImportPanel,
+      replaceModel: {
+        presentModelImportPanel(replacingSelectedPart: true)
+      },
+      deleteParts: { ids in
+        Task { await deleteParts(ids) }
+      },
+      dropModels: beginModelImport
+    )
+  }
 
-      HStack(alignment: .top, spacing: 16) {
-        if workspace.activePresentation.showsNavigator {
-          ProjectNavigatorView(
-            workspace: workspace,
-            importModel: presentModelImportPanel
-          )
-          .frame(width: StudioMetrics.navigatorWidth)
-        }
-
-        Spacer(minLength: 320)
-
-        if showsInspector {
-          InspectorView(
-            workspace: workspace,
-            mapModelNode: { node in
-              Task { await createRigidPart(from: node) }
-            }
-          )
-          .frame(width: StudioMetrics.inspectorWidth)
-        }
-      }
-      .padding(16)
+  @ViewBuilder
+  private var viewportCenterContent: some View {
+    if workspace.activeWorkspace == .nodes {
+      NodeWorkspaceView()
+    } else if workspace.activeWorkspace == .hardware {
+      HardwareWorkspaceView()
+    } else {
+      viewport
     }
+  }
+
+  private var showsFloatingNavigator: Bool {
+    StudioLayoutState.shared.detectedPreset == .studio
+      && workspace.isActiveWorkspaceSidebarOpen
+  }
+
+  private var showsFloatingInspector: Bool {
+    StudioLayoutState.shared.detectedPreset == .studio
+      && StudioViewSidebarState.shared.isOpen
   }
 
   private var viewport: some View {
@@ -377,7 +552,7 @@ struct StudioWorkspaceView: View {
         engineResolvedPartPoses: workspace.engineResolvedPartPoses,
         partModelSources: workspace.enginePartModelSources,
         modelURL: workspace.importedModelURL,
-        showsGrid: workspace.showsPreviewGrid,
+        showsGrid: shellShowsGrid,
         projection: workspace.cameraProjection,
         viewpoint: workspace.cameraViewpoint,
         cameraCommandRevision: workspace.cameraCommandRevision,
@@ -406,18 +581,18 @@ struct StudioWorkspaceView: View {
         rigGuideVisibility: workspace.activeWorkspace == .rig
           ? workspace.rigGuideVisibility : .hidden,
         appearance: workspace.viewportBackground.palette,
-        renderStyle: viewportRenderStyle,
-        edgeDisplay: viewportEdgeDisplay,
+        renderStyle: shellRenderStyle,
+        edgeDisplay: shellEdgeDisplay,
         lightingPreset: viewportLightingPreset,
         materialFinish: viewportMaterialFinish,
         reflectionMode: viewportReflectionMode,
-        lightingIntensity: Float(viewportLightingIntensity),
+        lightingIntensity: shellLightingIntensity,
         environmentPreset: viewportEnvironmentPreset,
         environmentRotationDegrees: Float(viewportEnvironmentRotationDegrees),
         renderQuality: viewportRenderQuality,
         backgroundSettings: workspace.viewportBackground,
         sectionPlane: workspace.viewportSectionPlane,
-        showsShadows: viewportShowsShadows,
+        showsShadows: shellShowsShadows,
         fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
         onSelectModelPath: { path in
           viewportContextMenuRequest = nil
@@ -462,6 +637,7 @@ struct StudioWorkspaceView: View {
             pointerTarget: target
           )
         },
+        onBackgroundClick: { _ in commitArmedTool() },
         onFrameAll: workspace.showHomeView,
         onBoxSelectPartIDs: workspace.selectParts
       )
@@ -469,6 +645,7 @@ struct StudioWorkspaceView: View {
 
       viewportTitle
       cameraHUD
+      visualizationControl
 
       if let engineEvaluationTimeSeconds = workspace.engineEvaluationTimeSeconds {
         engineFrameBadge(timeSeconds: engineEvaluationTimeSeconds)
@@ -484,6 +661,7 @@ struct StudioWorkspaceView: View {
 
       if workspace.activeWorkspace == .rig && workspace.isRigEmpty {
         EmptyRigWorkspaceView(showCreationTools: workspace.showCreationTools)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
       }
 
       if workspace.activeWorkspace == .rig {
@@ -495,10 +673,10 @@ struct StudioWorkspaceView: View {
         }
         .padding(
           .leading,
-          workspace.activePresentation.showsNavigator
+          showsFloatingNavigator
             ? StudioMetrics.navigatorWidth + 32 : 18
         )
-        .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 18)
+        .padding(.trailing, showsFloatingInspector ? StudioMetrics.inspectorWidth + 32 : 18)
         .padding(.bottom, 16)
       }
 
@@ -585,13 +763,32 @@ struct StudioWorkspaceView: View {
           openSettings()
         }
       )
-      .padding(.trailing, showsInspector ? StudioMetrics.inspectorWidth + 32 : 16)
+      .padding(.trailing, showsFloatingInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
     .padding(.top, 10)
   }
 
+  private var visualizationControl: some View {
+    ViewportVisualizationControl(
+      workspace: workspace,
+      lightingIntensity: $viewportLightingIntensity,
+      environmentPreset: viewportEnvironmentPresetBinding,
+      environmentRotationDegrees: $viewportEnvironmentRotationDegrees
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    .padding(
+      .leading,
+      showsFloatingNavigator ? StudioMetrics.navigatorWidth + 30 : 16
+    )
+    .padding(.bottom, 16)
+  }
+
   private var showsInspector: Bool {
     guard workspace.activePresentation.showsInspector else { return false }
+    return hasInspectorContent
+  }
+
+  private var hasInspectorContent: Bool {
     return switch workspace.activeWorkspace {
     case .assets, .animate, .show, .hardware:
       true
@@ -742,6 +939,30 @@ struct StudioWorkspaceView: View {
 
   private var viewportRenderStyle: ViewportRenderStyle {
     ViewportRenderStyle(rawValue: viewportRenderStyleRawValue) ?? .shaded
+  }
+
+  private var shellRenderStyle: ViewportRenderStyle {
+    switch StudioViewSidebarState.shared.displayMode {
+    case .wireframe: .wireframe
+    case .hiddenLine: .shadedWithEdges
+    case .shaded: viewportRenderStyle
+    }
+  }
+
+  private var shellEdgeDisplay: ViewportEdgeDisplay {
+    StudioViewSidebarState.shared.showsEdges ? viewportEdgeDisplay : .hidden
+  }
+
+  private var shellShowsGrid: Bool {
+    workspace.showsPreviewGrid && StudioViewSidebarState.shared.showsGrid
+  }
+
+  private var shellShowsShadows: Bool {
+    viewportShowsShadows && StudioViewSidebarState.shared.showsGroundShadow
+  }
+
+  private var shellLightingIntensity: Float {
+    Float(viewportLightingIntensity * StudioViewSidebarState.shared.lightingIntensity)
   }
 
   private var viewportRenderStyleBinding: Binding<ViewportRenderStyle> {
@@ -898,9 +1119,13 @@ struct StudioWorkspaceView: View {
   @MainActor
   private func registerLoadedCharacter(markDirty: Bool) {
     guard workspace.animaCoreErrorMessage == nil,
-      let character = workspace.currentCharacterReference
+      let engineReference = workspace.currentCharacterReference
     else { return }
     var updated = session
+    let character = preservingIndexedCharacterMetadata(
+      for: engineReference,
+      in: updated.document
+    )
     let projectName = updated.document.displayName
     if let index = updated.document.characters.firstIndex(where: {
       $0.folderName == character.folderName
@@ -989,9 +1214,10 @@ struct StudioWorkspaceView: View {
     updating document: inout AnimaStudioDocument
   ) async throws -> [ProjectFileWrite] {
     guard workspace.hasSerializableCharacter else { return [] }
-    guard let character = workspace.currentCharacterReference else {
+    guard let engineReference = workspace.currentCharacterReference else {
       throw ProjectLifecycleError.noCharacterLoaded
     }
+    let character = preservingIndexedCharacterMetadata(for: engineReference, in: document)
     if let index = document.characters.firstIndex(where: {
       $0.folderName == character.folderName
     }) {
@@ -1013,6 +1239,106 @@ struct StudioWorkspaceView: View {
     ]
   }
 
+  private func preservingIndexedCharacterMetadata(
+    for engineReference: ProjectCharacterReference,
+    in document: AnimaStudioDocument
+  ) -> ProjectCharacterReference {
+    guard
+      var indexed = document.characters.first(where: {
+        $0.folderName == engineReference.folderName
+      })
+    else { return engineReference }
+    indexed.displayName = engineReference.displayName
+    return indexed
+  }
+
+  @MainActor
+  private func refreshCharacterLibrary() {
+    let root = characterLibraryRootURL
+    characterLibraryEntries = (try? CharacterLibraryStore().list(in: root)) ?? []
+  }
+
+  private var characterLibraryRootURL: URL {
+    WorkspaceLocationPreference().workspaceRootURL.appendingPathComponent(
+      CharacterLibraryStore.directoryName,
+      isDirectory: true
+    )
+  }
+
+  @MainActor
+  private func publishActiveCharacterToLibrary() async {
+    guard await saveProject(), let activeCharacter = session.document.activeCharacter else {
+      return
+    }
+    do {
+      let workspaceRoot = try WorkspaceLocationPreference().ensureWorkspaceRootExists()
+      let libraryRoot = workspaceRoot.appendingPathComponent(
+        CharacterLibraryStore.directoryName,
+        isDirectory: true
+      )
+      let projectURL = try session.resolvedProjectURL()
+      let accessedProject = projectURL.startAccessingSecurityScopedResource()
+      let accessedLibrary = libraryRoot.startAccessingSecurityScopedResource()
+      defer {
+        if accessedProject { projectURL.stopAccessingSecurityScopedResource() }
+        if accessedLibrary { libraryRoot.stopAccessingSecurityScopedResource() }
+      }
+      let publication = try CharacterLibraryStore().publish(
+        activeCharacter,
+        from: projectURL,
+        to: libraryRoot
+      )
+      var updated = session
+      guard
+        let index = updated.document.characters.firstIndex(where: {
+          $0.id == activeCharacter.id
+        })
+      else { return }
+      updated.document.characters[index] = publication.projectReference
+      updated.document = try ProjectLifecycle.store.save(updated.document, to: projectURL)
+      updated.bookmarkData = ProjectLifecycle.bookmark(for: projectURL)
+      updated.isDirty = false
+      session = updated
+      characterLibraryEntries = try CharacterLibraryStore().list(in: libraryRoot)
+      didPersistProject(updated)
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func addLibraryCharacterToProject(_ entry: CharacterLibraryEntry) async {
+    if session.isDirty, !(await saveProject()) { return }
+    do {
+      let projectURL = try session.resolvedProjectURL()
+      let libraryRoot = characterLibraryRootURL
+      let accessedProject = projectURL.startAccessingSecurityScopedResource()
+      let accessedLibrary = libraryRoot.startAccessingSecurityScopedResource()
+      defer {
+        if accessedProject { projectURL.stopAccessingSecurityScopedResource() }
+        if accessedLibrary { libraryRoot.stopAccessingSecurityScopedResource() }
+      }
+      let reference = try CharacterLibraryStore().install(
+        entry,
+        from: libraryRoot,
+        into: projectURL,
+        existingCharacters: session.document.characters
+      )
+      var updated = session
+      updated.document.characters.append(reference)
+      updated.document.editorState.activeCharacterFolderName = reference.folderName
+      updated.document = try ProjectLifecycle.store.save(updated.document, to: projectURL)
+      updated.bookmarkData = ProjectLifecycle.bookmark(for: projectURL)
+      updated.isDirty = false
+      session = updated
+      didPersistProject(updated)
+      _ = await loadCharacter(reference, markDirty: false)
+      showsCharacterLoadingStage = workspace.engineParts.isEmpty
+    } catch {
+      lifecycleErrorMessage = error.localizedDescription
+    }
+  }
+
   @MainActor
   private func presentModelImportPanel() {
     presentModelImportPanel(replacingSelectedPart: false)
@@ -1020,6 +1346,10 @@ struct StudioWorkspaceView: View {
 
   @MainActor
   private func presentModelImportPanel(replacingSelectedPart: Bool) {
+    guard session.document.activeCharacter != nil else {
+      presentModelImportError("Create or select a 3D character before importing model parts.")
+      return
+    }
     replacesSelectedPartOnNextImport = replacingSelectedPart
     guard
       let urls = NativeImportPanel.chooseFiles(configuration: .models),
@@ -1068,13 +1398,25 @@ struct StudioWorkspaceView: View {
   }
 
   @MainActor
-  private func importModels(_ requests: [ModelImportRequest]) async {
+  private func importModels(_ plan: ModelImportStagingPlan) async {
+    let requests = plan.requests
     guard !requests.isEmpty else { return }
     let replacesSelectedPart = replacesSelectedPartOnNextImport
     replacesSelectedPartOnNextImport = false
-    guard session.document.activeCharacter != nil else {
-      presentModelImportError("Create a 3D character before importing model parts.")
+    guard
+      let targetCharacter = session.document.characters.first(where: {
+        $0.id == plan.targetCharacterID
+      })
+    else {
+      presentModelImportError("The selected destination character is no longer in this project.")
       return
+    }
+    if targetCharacter.id != session.document.activeCharacter?.id {
+      await selectCharacter(targetCharacter)
+      guard session.document.activeCharacter?.id == targetCharacter.id else {
+        presentModelImportError("The destination character could not be opened for import.")
+        return
+      }
     }
     characterImportErrorMessage = nil
     for (index, request) in requests.enumerated() {
@@ -1103,7 +1445,7 @@ struct StudioWorkspaceView: View {
     characterImportProgress = nil
     guard saved else { return }
     showsCharacterLoadingStage = false
-    workspace.activeWorkspace = .rig
+    workspace.activeWorkspace = .assets
   }
 
   @MainActor

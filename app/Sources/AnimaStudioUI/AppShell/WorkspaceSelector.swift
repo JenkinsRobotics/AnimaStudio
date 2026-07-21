@@ -1,206 +1,134 @@
 import SwiftUI
 
 enum WorkspaceSelectorMetrics {
-  static let minimumWidth: CGFloat = 228
-  static let idealWidth: CGFloat = 242
-  static let maximumWidth: CGFloat = 260
+  static let minimumWidth: CGFloat = 300
+  static let idealWidth: CGFloat = 350
+  static let maximumWidth: CGFloat = 430
   static let menuWidth: CGFloat = 280
+  static let compactWidth: CGFloat = 1_420
+  static let chipHeight: CGFloat = 30
+  static let compactChipHeight: CGFloat = 28
 }
 
-struct WorkspaceRibbonSelector: View {
+/// The production app's single workspace navigator.
+///
+/// It replaces the old left-hand workspace dropdown with the accepted
+/// CodexUI centered stage strip. The authoring path stays readable as a flow;
+/// Nodes and UI Dev remain adjacent utilities rather than a second navigator.
+struct WorkspaceStageTabs: View {
   @Bindable var workspace: StudioWorkspaceModel
   @Binding var isUIDevWorkspace: Bool
+  let compact: Bool
 
-  @State private var showsWorkspaceMenu = false
+  @Namespace private var activeTab
+  @State private var hoveredID: String?
 
   var body: some View {
-    Button {
-      showsWorkspaceMenu.toggle()
-    } label: {
-      HStack(spacing: 11) {
-        Image(systemName: activeSystemImage)
-          .font(.title2.weight(.medium))
-          .foregroundStyle(StudioPalette.accent)
-          .frame(width: 38, height: 38)
-          .background(StudioPalette.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
-
-        VStack(alignment: .leading, spacing: 3) {
-          Text(activeTitle.uppercased())
-            .font(.callout.weight(.bold))
-            .lineLimit(1)
-          Text(activePurpose)
-            .font(.system(size: 9.5))
-            .foregroundStyle(StudioPalette.muted)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
+    HStack(spacing: 2) {
+      ForEach(StudioWorkspaceKind.centeredNavigation) { kind in
+        if kind == .nodes {
+          divider
         }
-
-        Spacer(minLength: 6)
-
-        Image(systemName: showsWorkspaceMenu ? "chevron.up" : "chevron.down")
-          .font(.caption.weight(.bold))
-          .foregroundStyle(showsWorkspaceMenu ? StudioPalette.accent : StudioPalette.muted)
-      }
-      .padding(.horizontal, 11)
-      .frame(height: 72)
-      .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 13))
-      .overlay {
-        RoundedRectangle(cornerRadius: 13)
-          .stroke(
-            showsWorkspaceMenu ? StudioPalette.accent : StudioPalette.border,
-            lineWidth: showsWorkspaceMenu ? 1.5 : 1
-          )
-      }
-      .contentShape(RoundedRectangle(cornerRadius: 13))
-    }
-    .buttonStyle(.plain)
-    .frame(
-      minWidth: WorkspaceSelectorMetrics.minimumWidth,
-      idealWidth: WorkspaceSelectorMetrics.idealWidth,
-      maxWidth: WorkspaceSelectorMetrics.maximumWidth,
-      maxHeight: .infinity
-    )
-    .padding(.horizontal, 7)
-    .popover(
-      isPresented: $showsWorkspaceMenu,
-      attachmentAnchor: .rect(.bounds),
-      arrowEdge: .top
-    ) {
-      WorkspaceSelectorMenu(
-        workspace: workspace,
-        isUIDevWorkspace: $isUIDevWorkspace,
-        dismiss: { showsWorkspaceMenu = false }
-      )
-      .frame(width: WorkspaceSelectorMetrics.menuWidth)
-      .padding(8)
-      .background(StudioPalette.chrome)
-      .presentationBackground(StudioPalette.chrome)
-      .preferredColorScheme(.dark)
-    }
-    .accessibilityLabel("Workspace: \(activeTitle)")
-    .accessibilityHint(
-      "Open the task-focused workspace menu. Command 1 through 7 switches directly."
-    )
-    .help("Switch task-focused workspace (⌘1–7)")
-  }
-
-  private var activeTitle: String {
-    isUIDevWorkspace ? UIDevWorkspaceDescriptor.title : workspace.activeWorkspace.descriptor.title
-  }
-
-  private var activeSystemImage: String {
-    isUIDevWorkspace
-      ? UIDevWorkspaceDescriptor.systemImage : workspace.activeWorkspace.descriptor.systemImage
-  }
-
-  private var activePurpose: String {
-    isUIDevWorkspace
-      ? UIDevWorkspaceDescriptor.purpose : workspace.activeWorkspace.descriptor.purpose
-  }
-}
-
-private struct WorkspaceSelectorMenu: View {
-  @Bindable var workspace: StudioWorkspaceModel
-  @Binding var isUIDevWorkspace: Bool
-  let dismiss: () -> Void
-
-  var body: some View {
-    VStack(spacing: 6) {
-      ForEach(StudioWorkspaceKind.allCases) { kind in
-        workspaceButton(
+        workspaceTab(
+          id: kind.rawValue,
           title: kind.descriptor.title,
           purpose: kind.descriptor.purpose,
           systemImage: kind.descriptor.systemImage,
           shortcutNumber: kind.shortcutNumber,
-          isSelected: !isUIDevWorkspace && workspace.activeWorkspace == kind
+          isActive: !isUIDevWorkspace && workspace.activeWorkspace == kind
         ) {
           isUIDevWorkspace = false
           workspace.switchWorkspace(to: kind)
-          dismiss()
         }
-        .keyboardShortcut(
-          KeyEquivalent(Character(String(kind.shortcutNumber))),
-          modifiers: .command
-        )
       }
 
-      Divider()
-        .padding(.horizontal, 6)
+      divider
 
-      workspaceButton(
+      workspaceTab(
+        id: "ui-dev",
         title: UIDevWorkspaceDescriptor.title,
         purpose: UIDevWorkspaceDescriptor.purpose,
         systemImage: UIDevWorkspaceDescriptor.systemImage,
         shortcutNumber: UIDevWorkspaceDescriptor.shortcutNumber,
-        isSelected: isUIDevWorkspace
+        isActive: isUIDevWorkspace
       ) {
         isUIDevWorkspace = true
-        dismiss()
       }
-      .keyboardShortcut("7", modifiers: .command)
     }
-    .padding(5)
-    .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 14))
-    .overlay {
-      RoundedRectangle(cornerRadius: 14)
-        .stroke(StudioPalette.border, lineWidth: 1)
-    }
+    .padding(4)
+    .background(StudioPalette.panelInset, in: Capsule())
+    .overlay(Capsule().stroke(StudioPalette.border, lineWidth: 1))
+    .shadow(color: .black.opacity(0.10), radius: 4, y: 1)
+    .frame(
+      minWidth: WorkspaceSelectorMetrics.minimumWidth,
+      idealWidth: WorkspaceSelectorMetrics.idealWidth,
+      maxWidth: WorkspaceSelectorMetrics.maximumWidth
+    )
+    .animation(.spring(response: 0.30, dampingFraction: 0.86), value: activeID)
   }
 
-  private func workspaceButton(
+  private var divider: some View {
+    Rectangle()
+      .fill(StudioPalette.border)
+      .frame(width: 1, height: 21)
+      .padding(.horizontal, 3)
+  }
+
+  private var activeID: String {
+    isUIDevWorkspace ? "ui-dev" : workspace.activeWorkspace.rawValue
+  }
+
+  private func workspaceTab(
+    id: String,
     title: String,
     purpose: String,
     systemImage: String,
     shortcutNumber: Int,
-    isSelected: Bool,
+    isActive: Bool,
     action: @escaping () -> Void
   ) -> some View {
-    Button(action: action) {
-      HStack(spacing: 11) {
+    let isHovered = hoveredID == id
+    // Keep the header quiet and spatially stable: the selected stage names
+    // the current workspace while every other destination remains a familiar
+    // icon with a tooltip and keyboard shortcut.
+    let showsLabel = isActive
+
+    return Button(action: action) {
+      HStack(spacing: 6) {
         Image(systemName: systemImage)
-          .font(.title3.weight(.medium))
-          .foregroundStyle(isSelected ? .white : StudioPalette.accent)
-          .frame(width: 34, height: 34)
-          .background(
-            isSelected ? Color.white.opacity(0.14) : StudioPalette.panelInset,
-            in: RoundedRectangle(cornerRadius: 8)
-          )
-
-        VStack(alignment: .leading, spacing: 2) {
-          Text(title.uppercased())
-            .font(.callout.weight(.semibold))
-            .lineLimit(1)
-          Text(purpose)
-            .font(.caption2)
-            .foregroundStyle(isSelected ? Color.white.opacity(0.76) : StudioPalette.muted)
+          .font(.system(size: compact ? 11 : 12, weight: .semibold))
+        if showsLabel {
+          Text(title)
+            .font(.system(size: compact ? 10.5 : 12, weight: .semibold))
             .lineLimit(1)
         }
-
-        Spacer(minLength: 6)
-
-        if isSelected {
-          Image(systemName: "checkmark.circle.fill")
-            .foregroundStyle(.white)
-        }
-        Text("⌘\(shortcutNumber)")
-          .font(.system(.caption2, design: .monospaced))
-          .foregroundStyle(isSelected ? Color.white.opacity(0.72) : StudioPalette.muted)
       }
-      .padding(.horizontal, 9)
-      .frame(height: 54)
-      .background(
-        isSelected ? StudioPalette.accent : Color.clear,
-        in: RoundedRectangle(cornerRadius: 11)
+      .foregroundStyle(isActive ? Color.white : StudioPalette.muted)
+      .padding(.horizontal, compact ? (showsLabel ? 10 : 8) : 13)
+      .frame(
+        height: compact
+          ? WorkspaceSelectorMetrics.compactChipHeight
+          : WorkspaceSelectorMetrics.chipHeight
       )
-      .overlay {
-        RoundedRectangle(cornerRadius: 11)
-          .stroke(isSelected ? StudioPalette.accent : StudioPalette.border, lineWidth: 1)
+      .background {
+        if isActive {
+          Capsule()
+            .fill(StudioPalette.accent)
+            .matchedGeometryEffect(id: "active-workspace", in: activeTab)
+        } else if isHovered {
+          Capsule().fill(Color.white.opacity(0.07))
+        }
       }
-      .contentShape(RoundedRectangle(cornerRadius: 11))
+      .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(title), Command \(shortcutNumber)")
-    .accessibilityValue(isSelected ? "Selected" : "")
-    .help(purpose)
+    .onHover { hoveredID = $0 ? id : nil }
+    .keyboardShortcut(
+      KeyEquivalent(Character(String(shortcutNumber))),
+      modifiers: .command
+    )
+    .help("\(title) — \(purpose) (⌘\(shortcutNumber))")
+    .accessibilityLabel("\(title) workspace")
+    .accessibilityAddTraits(isActive ? .isSelected : [])
   }
 }

@@ -77,6 +77,7 @@ public struct RobotPreviewView: View {
   private let onCameraStateChange: (PreviewCameraState) -> Void
   private let onPointerTargetChange: (ViewportPointerTarget) -> Void
   private let onContextMenuRequest: (CGPoint, ViewportPointerTarget) -> Void
+  private let onBackgroundClick: (CGPoint) -> Void
   private let onFrameAll: () -> Void
   private let onBoxSelectPartIDs: (Set<PartID>) -> Void
 
@@ -130,6 +131,7 @@ public struct RobotPreviewView: View {
     onCameraStateChange: @escaping (PreviewCameraState) -> Void = { _ in },
     onPointerTargetChange: @escaping (ViewportPointerTarget) -> Void = { _ in },
     onContextMenuRequest: @escaping (CGPoint, ViewportPointerTarget) -> Void = { _, _ in },
+    onBackgroundClick: @escaping (CGPoint) -> Void = { _ in },
     onFrameAll: @escaping () -> Void = {},
     onBoxSelectPartIDs: @escaping (Set<PartID>) -> Void = { _ in }
   ) {
@@ -182,6 +184,7 @@ public struct RobotPreviewView: View {
     self.onCameraStateChange = onCameraStateChange
     self.onPointerTargetChange = onPointerTargetChange
     self.onContextMenuRequest = onContextMenuRequest
+    self.onBackgroundClick = onBackgroundClick
     self.onFrameAll = onFrameAll
     self.onBoxSelectPartIDs = onBoxSelectPartIDs
   }
@@ -518,6 +521,7 @@ public struct RobotPreviewView: View {
         let pendingRevision = entityTapRevision
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) {
           guard pendingRevision == entityTapRevision, !isPlacementActive else { return }
+          onBackgroundClick(location)
           standingFeature = nil
           pointerTarget = .canvas
           reportPointerTarget(.canvas)

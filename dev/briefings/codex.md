@@ -1674,3 +1674,166 @@ does the heavy implementation; Codex reviews it and plans what's next.
   metrics, command buttons, project status, and the icon-only floating ribbon
   were refined once and therefore changed in every workspace plus UI Kit.
   Twelve tests, lint, release/deep sign, live PID 25144, and diff check pass.
+
+- **2026-07-19 — OUT: the approved CodexUI system is now production UI.** The
+  real `app/` retains its AnimaCore bridge, project lifecycle, import, viewport,
+  selection, and timeline behavior while adopting the shared palette, compact
+  project-first header, centered seven-workspace tabs, Docked/Floating/Canvas
+  layouts, top/bottom floating ribbon, edge restoration, footer, and floating
+  walkthrough. UI Dev uses the real production components and catalogs 34
+  specimens. The root app rebuilt with the bundled helper, passed deep signing,
+  and launched; 284 Swift tests plus 22 bridge/integration tests, recursive
+  lint, native Xcode build, and diff check pass. The superseded prototype is
+  retained under `dev/archive/CodexUI/`; renderer integration is deliberately
+  deferred to the next Codex Bench phase.
+
+- **2026-07-19 — OUT: Assets now participates in the production layout
+  system.** The old fixed three-column branch was a real migration gap. Assets'
+  character tree and import/preview inspector now float as themed cards,
+  dock as full-height columns, and edge-reveal in Canvas; its table/grid center
+  reserves unobstructed space for floating panels. The focused 12-test suite,
+  root rebuild/sign, launch, and diff check pass. The complete archive parity
+  audit remains active.
+
+- **2026-07-19 — OUT: part import now targets a Character explicitly.** The
+  production staging sheet shows the Assets → rigid Parts → mates → animation
+  path, allows any indexed Character as the destination, explains each file's
+  Part-creation behavior, confirms unit conversion, and documents identity at
+  the Character origin as the initial frame. The app saves and switches safely
+  before importing, then stays in Assets so the operator can review and
+  organize Parts before Rig. Replacement remains scoped to the active
+  Character. UI Dev coverage is 35 specimens. Recursive lint, 287 XCTest
+  tests, 22 bridge/integration tests, native/root build, helper embedding,
+  deep signing, launch, and diff check pass. World transforms remain scene
+  concerns; this packet added no Swift-side rig semantics.
+
+- **2026-07-20 — OUT: the empty-Rig card is centered in the workspace.** Its
+  full-size overlay now centers the card within the usable viewport while the
+  viewport title and camera HUD retain their intentional top alignment.
+  Focused Rig tests (6), recursive lint, root build/helper embedding/deep sign,
+  launch, and diff check pass.
+
+- **2026-07-20 — OUT: production now uses the compact centered stage header
+  and explicit Studio modes.** Only the selected workspace carries text in the
+  absolutely centered capsule; inactive destinations remain stable icons with
+  tooltips/shortcuts. Project commands remain left and runtime/mode/help remain
+  right. The layout authority now says Floating, Docked, Canvas, or Custom and
+  continues to coordinate browser, inspector, and ribbon placement, with the
+  same default available in Settings. Recursive lint, 288 XCTest tests, 22
+  bridge/integration tests, native/root build, helper embedding/deep sign,
+  launch, and diff check pass.
+
+- **2026-07-20 — OUT: production no longer draws a second native title band
+  above the custom header.** The main scene now uses a hidden transparent
+  title bar, matching the demo: traffic lights remain native while the window
+  background and Studio header read as one continuous surface. Format/diff
+  checks, native/root build, helper embedding/deep sign, and launch pass; the
+  preceding full suite remains 288 XCTest + 22 bridge tests.
+
+- **2026-07-20 — OUT: Characters are now reusable sources with durable project
+  snapshots.** `AnimaDocument` owns a user-level Character Library package and
+  stable UUID/simple-revision metadata. Assets distinguishes Project Characters
+  from the Character Library, can publish/update the active Character, and can
+  add a complete pinned copy to a Project without a live external dependency;
+  name collisions generate safe project-local copies. `project.json` keeps
+  additive provenance fields while old v2 manifests remain project-local by
+  default, and save paths preserve that provenance instead of rebuilding it
+  from engine identity. World-to-Character scene placement and hardware-profile
+  bindings remain engine contract follow-ups in Claude's IN mailbox. Lint,
+  292 XCTest tests, 22 bridge/integration tests, native/root builds, helper
+  embedding, deep signing, live launch, and diff check pass.
+
+- **2026-07-20 — OUT: the Shapr3D-style Visualization browser is production
+  UI.** A compact color-wheel button now sits at the lower-left of the real 3D
+  workspace. Its shared popover switches between Material and Environment:
+  Material searches and applies Plastic/Metal/Glass PBR presets, reuses
+  materials already present in the Character, and requires a selected Part;
+  Environment edits the same background/lighting/rotation/section bindings as
+  the existing Display menu. Assignments use `PreviewPartAppearance`, so they
+  persist through the existing character `editor.json` path and never enter
+  AnimaCore rig semantics. UI Dev renders the same trigger and material browser
+  as template 36. Changed files: `ViewportVisualizationPanel.swift`,
+  `StudioWorkspaceView.swift`, `UIDevVisualizationPanelSpecimen.swift`, the UI
+  Dev matrix/tests, focused visualization tests, and STATUS. Touched-file lint,
+  294 XCTest tests plus 22 bridge/integration tests, native Xcode build, root
+  rebuild/helper embed/deep sign, clean single-process launch (PID 24094), and
+  diff check pass.
+
+- **2026-07-20 — OUT: Visualization now has the requested visual Environment
+  browser.** The Environment tab presents live Default, Transparent, Colored
+  Mood, Gradient Mood, and Black and White Stage cards with code-native sphere
+  previews. Selecting a card updates the real viewport background plus studio
+  environment, intensity, and rotation; Transparent is a new persisted clear
+  background mode. Detailed background/color/lighting/section controls remain
+  one click away. UI Dev uses the same switchable production component. Touched
+  lint, 296 XCTest tests + 22 bridge/integration tests, native Xcode build, root
+  rebuild/helper embed/deep sign, and launch pass.
+
+- **2026-07-20 — OUT: the first workspace is now labeled Character.** Only the
+  operator-facing descriptor changed; the internal `.assets` identity remains
+  stable for compatibility. Its purpose and viewport label now describe
+  Character building rather than a generic asset bin.
+
+- **2026-07-20 — OUT: the production document header is responsive at compact
+  widths.** Expanded, compact, and minimal densities protect the centered
+  Character/Rig/Animate/Show/Hardware/Nodes navigator and prevent vertical or
+  overlapping controls. Project identity flexes, SAVED/UNSAVED stays one line,
+  and lower-priority commands progressively collapse into document/overflow
+  menus while retaining their actions. Touched lint, 297 XCTest tests + 22
+  bridge/integration tests, native/root build, helper embedding/deep signing,
+  clean relaunch (PID 85747), and diff check pass.
+
+- **2026-07-20 — OUT: the project identity is now content-sized and directly
+  navigable.** The leading cube is replaced by an always-visible Home button
+  that returns to the project browser, so the separate Home control and its
+  minimal-width duplicate are gone. The editable project name measures its
+  rendered macOS text width and grows only with its content, capped for long
+  names at each header density; the identity no longer reserves a fixed minimum
+  block. Eight focused header tests, touched-file strict lint, native/root
+  build, helper embedding, deep signing, clean relaunch (PID 99224), and diff
+  check pass.
+
+- **2026-07-20 — OUT: the demo's three-sidebar standard is now the production
+  shell.** Every workspace is rendered by one `StudioWorkspaceScaffold`: model
+  tools above a full-bleed center, workspace/content navigation at left, and
+  view/environment/appearance/inspection at right. Floating, Docked, and Canvas
+  are one app-global state; the same sidebar content receives either pill or
+  flat chrome. Docked forces Expanded tools, Canvas uses stable edge-hover
+  reveal, both rails share the active-tab collapse rule, and shared tool/camera
+  state prevents object and camera modes from being armed together. Tool
+  prompts support repeat, background commit, and Escape/cancel. Character's
+  existing three-column UI now supplies scaffold regions instead of owning a
+  separate shell, and its selection does not reset on mode changes. Added six
+  state/interaction tests. Recursive lint, 304 XCTest tests + 22 live bridge/
+  integration tests, native Xcode/root builds, helper embedding, deep signing,
+  and live app/bridge launch pass.
+
+- **2026-07-20 — OUT: the Character collection is now a protected structured
+  document in every Studio mode.** Floating presents its table/grid as a
+  rounded content-sized center window and reserves safe space for the top,
+  left, and right floating widgets. Canvas uses the broad center until an edge
+  widget reveals, then smoothly reflows the collection inside that widget's
+  boundary; Docked remains full-height. Full-bleed 3D and node canvases ignore
+  this opt-in structured-content inset. Floating Character browser and
+  import/preview widgets now size to their content instead of spanning the
+  entire height. Recursive lint, 308 XCTest tests + 22 live bridge/integration
+  tests, native/root builds, helper embedding, deep signing, clean launch (PID
+  51868), and diff check pass.
+
+- **2026-07-20 — OUT: Animate and Show timelines now obey the structured-center
+  boundary.** Docked timelines remain full-width and in-flow. Floating and
+  Canvas timelines are rounded center/bottom windows that start broad, then
+  smoothly move inside left/right safe insets whenever a sidebar is open or a
+  Canvas edge widget reveals. This adjustment is isolated to the timeline, so
+  the 3D viewport above it remains full-bleed; the top tool ribbon also does not
+  waste timeline width. Recursive lint, 311 XCTest tests + 22 bridge/integration
+  tests, native/root builds, helper embedding, deep signing, and clean launch
+  (PID 74679) pass.
+
+- **2026-07-20 — OUT: shell-alignment phase A removed the dead ribbon renderer.**
+  `WorkspaceToolBar`, `WorkspaceRibbonControls`,
+  `WorkspaceRibbonPresentation`, its compact/contextual helpers,
+  `StudioCanvasSide`, and `WorkspaceRibbonCatalogView` are gone. The live
+  `WorkspaceRibbonCatalog` data layer remains and feeds the production shared
+  Tool sidebar. Three tests that only pinned the retired presentation enum were
+  removed; 308 XCTest tests plus 22 bridge/integration tests pass.

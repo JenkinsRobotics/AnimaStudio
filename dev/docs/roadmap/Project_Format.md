@@ -10,6 +10,12 @@
 
 ```
 ~/Documents/AnimaStudio/
+  Character Library/              <- reusable Character sources (app-owned index)
+    <stable-library-uuid>/
+      character-library.json      <- source identity + simple revision
+      jp01.character.anima        <- canonical engine Character
+      jp01.editor.json
+      assets/
   MyRobot/                        ← the project folder (plain folder, browsable)
     project.json                  ← manifest (app-owned): name, revision, dates,
     │                               milestone, character/scene index, window/editor state
@@ -33,6 +39,32 @@ Extensible: `project.json` indexes what's present, so future kinds
 single-file **`.animastudio` bundle is an Export form only** — "Export
 Project" zips the folder into one shareable/double-clickable item;
 day-to-day projects stay open folders.
+
+## Ownership model: Library Character -> Project snapshot -> Scene instance
+
+A **Character is reusable and conceptually independent of a Project**. Studio's
+user-level `Character Library/` stores those reusable sources. A Project does
+not keep a live external link to a library package: **Add to Project copies the
+complete Character folder into `characters/` as a pinned snapshot**. That
+snapshot records the source library UUID and revision in `project.json`, so the
+operator can see exactly which source revision a show uses and explicitly
+publish/update when desired. Editing a Library Character never silently changes
+an existing show.
+
+The ownership boundary is:
+
+- **Character:** rigid Parts, mates/relations, DOF and limits, reusable clips,
+  logical outputs, model/media assets intrinsic to that Character.
+- **Project:** pinned Character snapshots, scenes/shows, project media and
+  cues, world-space Character instances, and deployment selections.
+- **Hardware profile / deployment:** device identities, physical channels,
+  calibration, safety limits, and the binding from Character logical outputs
+  to hardware. Hardware addresses do not belong in reusable Character rigs.
+
+Character authoring uses `Character -> Part` coordinates. Scene authoring adds
+the separate `World -> Character` instance transform. A Project may therefore
+place the same Character multiple times without changing any Part-local rig
+data.
 
 ## Where the logic lives (engine vs app)
 
@@ -60,7 +92,10 @@ identities — a "MyRobot" project can contain characters "jp01",
 the project name is unique within `~/Documents/AnimaStudio/`. Renaming
 a project never touches character names, and vice versa. `project.json`
 indexes the characters (and scenes) by their folder names + display
-names.
+names. Each indexed Character also has `source_kind` (`project_local` or
+`library_snapshot`) and, for snapshots, `library_character_id` plus
+`library_revision`. These app-owned provenance fields do not enter the
+canonical `.character.anima` file.
 
 ## The rule: canonical files vs editor metadata are separate
 
@@ -101,6 +136,14 @@ character is portable.
   `<character>.editor.json` and converts positions to metres for rendering.
   STEP is not advertised as natively loadable: selecting `.step`/`.stp`
   presents conversion guidance to export STL or USD from the source CAD tool.
+- **Publish to Character Library** -> save the active Project Character first,
+  then copy its complete self-contained directory to its stable library UUID.
+  First publish creates revision 1; each later publish increments the simple
+  library revision.
+- **Add from Character Library** -> copy the selected library package into
+  `characters/`, preserve its canonical and editor files, record the source
+  UUID/revision, and generate a safe project-local display/folder name if the
+  Project already contains a Character with that name.
 - **Save** → for each dirty character/scene, the app hands its rig/scene
   to the engine to **serialize** into canonical text (the engine owns
   `.anima` *writing*, so the format has one author), writes the file,

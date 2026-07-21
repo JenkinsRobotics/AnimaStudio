@@ -10,15 +10,19 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
 
   var id: Self { self }
 
+  static let centeredNavigation: [Self] = [
+    .assets, .rig, .animate, .show, .hardware, .nodes,
+  ]
+
   var descriptor: StudioWorkspaceDescriptor {
     switch self {
     case .assets:
       StudioWorkspaceDescriptor(
         id: self,
-        title: "Assets",
+        title: "Character",
         systemImage: "square.and.arrow.down",
-        purpose: "Import and organize source media",
-        viewportLabel: "ASSET PREVIEW",
+        purpose: "Build characters and organize their source media",
+        viewportLabel: "CHARACTER PREVIEW",
         defaultPresentation: WorkspacePresentation(
           showsNavigator: true,
           showsInspector: true,

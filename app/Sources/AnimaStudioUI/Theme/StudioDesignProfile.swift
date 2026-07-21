@@ -67,40 +67,44 @@ struct StudioDesignProfile: Codable, Equatable, Sendable {
   var agentWidth: Double
 
   static let standard = Self(
-    canvas: .init(red: 0.105, green: 0.105, blue: 0.125),
-    documentChrome: .init(red: 0.115, green: 0.115, blue: 0.135),
-    chrome: .init(red: 0.15, green: 0.15, blue: 0.18),
-    ribbonChrome: .init(red: 0.18, green: 0.185, blue: 0.21),
-    panel: .init(red: 0.22, green: 0.23, blue: 0.26),
-    panelInset: .init(red: 0.16, green: 0.17, blue: 0.19),
-    field: .init(red: 0.12, green: 0.13, blue: 0.15),
-    accent: .init(red: 0.12, green: 0.58, blue: 0.90),
-    sourceModel: .init(red: 0.25, green: 0.62, blue: 0.96),
-    semanticPart: .init(red: 0.23, green: 0.76, blue: 0.68),
-    joint: .init(red: 0.72, green: 0.45, blue: 0.96),
-    hardware: .init(red: 0.96, green: 0.58, blue: 0.24),
-    mutedOpacity: 0.62,
-    borderOpacity: 0.10,
-    documentBarHeight: 34,
-    compactRibbonHeight: 53,
-    fullRibbonHeight: 112,
-    panelHeaderHeight: 38,
-    panelCornerRadius: 16,
-    panelPadding: 14,
-    fieldHeight: 30,
+    // Shared with the accepted CodexUI/AnimaStudio Demo visual language.
+    // Keeping the production palette here means every real workspace inherits
+    // the same canvas, chrome, panel, and control hierarchy automatically.
+    canvas: .init(red: 14 / 255, green: 16 / 255, blue: 19 / 255),
+    documentChrome: .init(red: 23 / 255, green: 26 / 255, blue: 32 / 255),
+    chrome: .init(red: 23 / 255, green: 26 / 255, blue: 32 / 255),
+    ribbonChrome: .init(red: 23 / 255, green: 26 / 255, blue: 32 / 255),
+    panel: .init(red: 23 / 255, green: 26 / 255, blue: 32 / 255),
+    panelInset: .init(red: 30 / 255, green: 34 / 255, blue: 42 / 255),
+    field: .init(red: 15 / 255, green: 18 / 255, blue: 22 / 255),
+    accent: .init(red: 76 / 255, green: 157 / 255, blue: 1),
+    sourceModel: .init(red: 76 / 255, green: 157 / 255, blue: 1),
+    semanticPart: .init(red: 54 / 255, green: 214 / 255, blue: 195 / 255),
+    joint: .init(red: 139 / 255, green: 135 / 255, blue: 1),
+    hardware: .init(red: 255 / 255, green: 138 / 255, blue: 61 / 255),
+    mutedOpacity: 0.64,
+    borderOpacity: 0.07,
+    documentBarHeight: 54,
+    compactRibbonHeight: 48,
+    fullRibbonHeight: 88,
+    panelHeaderHeight: 42,
+    panelCornerRadius: 10,
+    panelPadding: 12,
+    fieldHeight: 29,
     controlCornerRadius: 7,
-    navigatorWidth: 290,
-    inspectorWidth: 320,
+    navigatorWidth: 246,
+    inspectorWidth: 286,
     agentWidth: 360
   )
 
   static let compact: Self = {
     var profile = standard
-    profile.compactRibbonHeight = 47
-    profile.fullRibbonHeight = 102
-    profile.panelHeaderHeight = 34
-    profile.panelCornerRadius = 12
-    profile.panelPadding = 10
+    profile.documentBarHeight = 48
+    profile.compactRibbonHeight = 44
+    profile.fullRibbonHeight = 78
+    profile.panelHeaderHeight = 38
+    profile.panelCornerRadius = 8
+    profile.panelPadding = 9
     profile.fieldHeight = 27
     profile.controlCornerRadius = 6
     profile.navigatorWidth = 260
@@ -111,13 +115,14 @@ struct StudioDesignProfile: Codable, Equatable, Sendable {
 
   static let highContrast: Self = {
     var profile = standard
-    profile.canvas = .init(red: 0.055, green: 0.06, blue: 0.075)
-    profile.chrome = .init(red: 0.105, green: 0.115, blue: 0.14)
-    profile.ribbonChrome = .init(red: 0.14, green: 0.15, blue: 0.18)
-    profile.panel = .init(red: 0.18, green: 0.195, blue: 0.23)
-    profile.panelInset = .init(red: 0.09, green: 0.10, blue: 0.125)
-    profile.field = .init(red: 0.045, green: 0.05, blue: 0.065)
-    profile.accent = .init(red: 0.10, green: 0.68, blue: 1)
+    profile.canvas = .init(red: 6 / 255, green: 9 / 255, blue: 15 / 255)
+    profile.documentChrome = .init(red: 13 / 255, green: 18 / 255, blue: 27 / 255)
+    profile.chrome = .init(red: 13 / 255, green: 18 / 255, blue: 27 / 255)
+    profile.ribbonChrome = .init(red: 13 / 255, green: 18 / 255, blue: 27 / 255)
+    profile.panel = .init(red: 21 / 255, green: 28 / 255, blue: 40 / 255)
+    profile.panelInset = .init(red: 28 / 255, green: 38 / 255, blue: 54 / 255)
+    profile.field = .init(red: 8 / 255, green: 12 / 255, blue: 19 / 255)
+    profile.accent = .init(red: 76 / 255, green: 157 / 255, blue: 1)
     profile.mutedOpacity = 0.78
     profile.borderOpacity = 0.24
     return profile
@@ -139,9 +144,9 @@ struct StudioDesignProfile: Codable, Equatable, Sendable {
     profile.hardware = hardware.clamped()
     profile.mutedOpacity = mutedOpacity.clamped(to: 0.35...1)
     profile.borderOpacity = borderOpacity.clamped(to: 0.04...0.50)
-    profile.documentBarHeight = documentBarHeight.clamped(to: 30...48)
+    profile.documentBarHeight = documentBarHeight.clamped(to: 30...64)
     profile.compactRibbonHeight = compactRibbonHeight.clamped(to: 44...72)
-    profile.fullRibbonHeight = fullRibbonHeight.clamped(to: 92...150)
+    profile.fullRibbonHeight = fullRibbonHeight.clamped(to: 72...150)
     profile.panelHeaderHeight = panelHeaderHeight.clamped(to: 32...56)
     profile.panelCornerRadius = panelCornerRadius.clamped(to: 0...28)
     profile.panelPadding = panelPadding.clamped(to: 8...24)
@@ -179,7 +184,8 @@ enum StudioDesignPreset: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum StudioDesignPersistence {
-  static let defaultsKey = "studioDesignProfile.v1"
+  // v2 adopts the shared CodexUI/AnimaStudio Demo palette and compact chrome.
+  static let defaultsKey = "studioDesignProfile.v2"
 
   static func load(from defaults: UserDefaults = .standard) -> StudioDesignProfile {
     guard let data = defaults.data(forKey: defaultsKey),

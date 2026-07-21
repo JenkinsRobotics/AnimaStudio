@@ -230,13 +230,15 @@ final class AssetsWorkspaceModelsTests: XCTestCase {
     let character = ProjectCharacterReference(folderName: "robot", displayName: "Robot")
     let nodes = AssetBuilderTreeAdapter.nodes(
       characters: [character],
+      characterLibraryCount: 2,
       activeCharacterID: character.id,
       counts: [.parts: 7]
     )
     let model = TreeModel(roots: nodes)
 
-    XCTAssertEqual(nodes.map(\.id), [.characters, .library])
+    XCTAssertEqual(nodes.map(\.id), [.characters, .characterLibrary, .library])
     XCTAssertEqual(model.node(id: .characters)?.detail, "1")
+    XCTAssertEqual(model.node(id: .characterLibrary)?.detail, "2")
     XCTAssertEqual(model.node(id: .collection("robot", .parts))?.detail, "7")
     XCTAssertEqual(
       model.ancestorIDs(of: .collection("robot", .parts)),

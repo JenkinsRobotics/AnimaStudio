@@ -2,6 +2,7 @@ enum StudioPreferenceKey {
   static let settingsSelectedTab = "settingsSelectedTab"
   static let workspaceRootPath = "workspaceRootPath"
   static let workspaceRootBookmark = "workspaceRootBookmark"
+  static let defaultLayoutPreset = "defaultLayoutPreset"
 
   static let viewportAppearance = "viewportAppearance"
   static let viewportNavigationProfile = "viewportNavigationProfile"

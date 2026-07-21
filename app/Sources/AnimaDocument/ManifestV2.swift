@@ -38,12 +38,18 @@ struct ManifestV2: Codable {
     var displayName: String
     var characterFilename: String
     var editorFilename: String
+    var sourceKind: String?
+    var libraryCharacterID: UUID?
+    var libraryRevision: Int?
 
     enum CodingKeys: String, CodingKey {
       case folderName = "folder_name"
       case displayName = "display_name"
       case characterFilename = "character_file"
       case editorFilename = "editor_file"
+      case sourceKind = "source_kind"
+      case libraryCharacterID = "library_character_id"
+      case libraryRevision = "library_revision"
     }
   }
 
@@ -160,6 +166,9 @@ extension ManifestV2.ManifestCharacter {
     self.displayName = reference.displayName
     self.characterFilename = reference.characterFilename
     self.editorFilename = reference.editorFilename
+    self.sourceKind = reference.sourceKind.rawValue
+    self.libraryCharacterID = reference.libraryCharacterID
+    self.libraryRevision = reference.libraryRevision
   }
 
   var reference: ProjectCharacterReference {
@@ -167,7 +176,10 @@ extension ManifestV2.ManifestCharacter {
       folderName: folderName,
       displayName: displayName,
       characterFilename: characterFilename,
-      editorFilename: editorFilename
+      editorFilename: editorFilename,
+      sourceKind: ProjectCharacterSourceKind(rawValue: sourceKind ?? "") ?? .projectLocal,
+      libraryCharacterID: libraryCharacterID,
+      libraryRevision: libraryRevision
     )
   }
 }

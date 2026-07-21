@@ -3,53 +3,8 @@ import XCTest
 @testable import AnimaStudioUI
 
 final class WorkspaceChromeTests: XCTestCase {
-  func testRigUsesCreationRibbonWhenToolsAreExpanded() {
-    XCTAssertEqual(
-      WorkspaceRibbonPresentation.resolve(
-        workspace: .rig,
-        showsRigCreationTools: true
-      ),
-      .rigCreation
-    )
-  }
-
-  func testCollapsedRigAndOtherWorkspacesUseCompactRibbon() {
-    XCTAssertEqual(
-      WorkspaceRibbonPresentation.resolve(
-        workspace: .rig,
-        showsRigCreationTools: false
-      ),
-      .compactRig
-    )
-
-    for workspace in StudioWorkspaceKind.allCases where workspace != .rig {
-      XCTAssertEqual(
-        WorkspaceRibbonPresentation.resolve(
-          workspace: workspace,
-          showsRigCreationTools: true
-        ),
-        .workspaceTools
-      )
-    }
-  }
-
-  func testExpandedWorkspaceRibbonsUseTheFullHeight() {
-    XCTAssertEqual(
-      WorkspaceRibbonPresentation.rigCreation.height,
-      StudioMetrics.rigCreationRibbonHeight
-    )
-    XCTAssertEqual(
-      WorkspaceRibbonPresentation.workspaceTools.height,
-      StudioMetrics.rigCreationRibbonHeight
-    )
-    XCTAssertEqual(
-      WorkspaceRibbonPresentation.compactRig.height,
-      StudioMetrics.compactRibbonHeight
-    )
-  }
-
-  func testWorkspaceSelectorKeepsAReadableMinimumWidth() {
-    XCTAssertGreaterThanOrEqual(WorkspaceSelectorMetrics.minimumWidth, 220)
+  func testCenteredWorkspaceNavigatorKeepsAReadableWidth() {
+    XCTAssertGreaterThanOrEqual(WorkspaceSelectorMetrics.minimumWidth, 280)
     XCTAssertGreaterThanOrEqual(
       WorkspaceSelectorMetrics.idealWidth,
       WorkspaceSelectorMetrics.minimumWidth
@@ -58,9 +13,76 @@ final class WorkspaceChromeTests: XCTestCase {
       WorkspaceSelectorMetrics.maximumWidth,
       WorkspaceSelectorMetrics.idealWidth
     )
-    XCTAssertGreaterThanOrEqual(
-      WorkspaceSelectorMetrics.menuWidth,
+    XCTAssertLessThan(WorkspaceSelectorMetrics.menuWidth, WorkspaceSelectorMetrics.minimumWidth)
+    XCTAssertLessThanOrEqual(WorkspaceSelectorMetrics.maximumWidth, 440)
+  }
+
+  func testStudioModesUseOperatorFacingNamesAndCycleInOrder() {
+    XCTAssertEqual(StudioLayoutPreset.studio.title, "Floating")
+    XCTAssertEqual(StudioLayoutPreset.docked.title, "Docked")
+    XCTAssertEqual(StudioLayoutPreset.canvas.title, "Canvas")
+    XCTAssertEqual(StudioLayoutPreset.studio.next, .docked)
+    XCTAssertEqual(StudioLayoutPreset.docked.next, .canvas)
+    XCTAssertEqual(StudioLayoutPreset.canvas.next, .studio)
+  }
+
+  func testDocumentBarUsesStableResponsiveDensities() {
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_800), .expanded)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_420), .expanded)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_419), .compact)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_180), .compact)
+    XCTAssertEqual(StudioDocumentBarDensity.resolve(width: 1_179), .minimal)
+
+    XCTAssertEqual(
+      StudioDocumentBarDensity.expanded.selectorWidth,
+      WorkspaceSelectorMetrics.maximumWidth
+    )
+    XCTAssertEqual(
+      StudioDocumentBarDensity.compact.selectorWidth,
+      WorkspaceSelectorMetrics.idealWidth
+    )
+    XCTAssertEqual(
+      StudioDocumentBarDensity.minimal.selectorWidth,
       WorkspaceSelectorMetrics.minimumWidth
     )
+  }
+
+  func testProjectIdentityNameWidthFollowsContentAndStaysBounded() {
+    let shortNameWidth = StudioProjectIdentityMetrics.projectNameWidth(
+      for: "Test",
+      density: .expanded
+    )
+    let mediumNameWidth = StudioProjectIdentityMetrics.projectNameWidth(
+      for: "Atlas Animatronic",
+      density: .expanded
+    )
+    let longNameWidth = StudioProjectIdentityMetrics.projectNameWidth(
+      for: String(repeating: "Character", count: 30),
+      density: .expanded
+    )
+
+    XCTAssertLessThan(shortNameWidth, mediumNameWidth)
+    XCTAssertLessThan(mediumNameWidth, longNameWidth)
+    XCTAssertEqual(longNameWidth, 170)
+  }
+
+  @MainActor
+  func testLayoutPresetsConfigurePanelsAndRibbonTogether() {
+    let workspace = StudioWorkspaceModel(resolvesDefaultAnimaCoreClient: false)
+
+    workspace.applyLayoutPreset(.docked)
+    XCTAssertEqual(workspace.navigatorPlacement, .docked)
+    XCTAssertEqual(workspace.inspectorPlacement, .docked)
+    XCTAssertEqual(workspace.ribbonPlacement, .docked)
+
+    workspace.applyLayoutPreset(.studio)
+    XCTAssertEqual(workspace.navigatorPlacement, .floating)
+    XCTAssertEqual(workspace.inspectorPlacement, .floating)
+    XCTAssertEqual(workspace.ribbonPlacement, .floating)
+
+    workspace.applyLayoutPreset(.canvas)
+    XCTAssertEqual(workspace.navigatorPlacement, .hidden)
+    XCTAssertEqual(workspace.inspectorPlacement, .hidden)
+    XCTAssertEqual(workspace.ribbonPlacement, .floating)
   }
 }

@@ -222,6 +222,7 @@ enum AssetLibraryCategory: String, CaseIterable, Hashable, Identifiable, Sendabl
 
 enum AssetBuilderSelection: Hashable, Sendable {
   case characters
+  case characterLibrary
   case characterCollection(characterID: String, collection: AssetBuilderCollection)
   case partsLibrary(AssetLibraryCategory?)
 
@@ -238,6 +239,7 @@ enum AssetBuilderSelection: Hashable, Sendable {
 
 enum AssetBuilderTreeNodeID: Hashable, Sendable {
   case characters
+  case characterLibrary
   case character(String)
   case collection(String, AssetBuilderCollection)
   case library
@@ -263,6 +265,7 @@ struct AssetBuilderTreeNode: TreeNode {
 enum AssetBuilderTreeAdapter {
   static func nodes(
     characters: [ProjectCharacterReference],
+    characterLibraryCount: Int,
     activeCharacterID: String?,
     counts: [AssetBuilderCollection: Int]
   ) -> [AssetBuilderTreeNode] {
@@ -290,10 +293,19 @@ enum AssetBuilderTreeAdapter {
     let charactersRoot = AssetBuilderTreeNode(
       id: .characters,
       selectionValue: .characters,
-      title: "Characters",
+      title: "Project Characters",
       systemImage: "person.2",
       detail: String(characters.count),
       children: characterNodes,
+      filterTokens: []
+    )
+    let characterLibrary = AssetBuilderTreeNode(
+      id: .characterLibrary,
+      selectionValue: .characterLibrary,
+      title: "Character Library",
+      systemImage: "person.2.crop.square.stack",
+      detail: String(characterLibraryCount),
+      children: [],
       filterTokens: []
     )
     let library = AssetBuilderTreeNode(
@@ -315,7 +327,7 @@ enum AssetBuilderTreeAdapter {
       },
       filterTokens: []
     )
-    return [charactersRoot, library]
+    return [charactersRoot, characterLibrary, library]
   }
 }
 

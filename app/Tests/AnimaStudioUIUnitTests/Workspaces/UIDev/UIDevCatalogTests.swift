@@ -49,7 +49,7 @@ final class UIDevCatalogTests: XCTestCase {
   func testTemplateMatrixCoversEveryCategoryWithStableUniqueTemplates() {
     let templates = UIDevTemplateMatrixCatalog.templates
 
-    XCTAssertEqual(templates.count, 31)
+    XCTAssertEqual(templates.count, 36)
     XCTAssertEqual(Set(templates.map(\.id)).count, templates.count)
     XCTAssertEqual(Set(templates.map(\.id)), Set(UIDevTemplateID.allCases))
     XCTAssertTrue(templates.allSatisfy { !$0.title.isEmpty && !$0.detail.isEmpty })
@@ -58,6 +58,15 @@ final class UIDevCatalogTests: XCTestCase {
     for category in UIDevTemplateCategory.allCases {
       XCTAssertFalse(UIDevTemplateMatrixCatalog.templates(in: category).isEmpty)
     }
+  }
+
+  func testProductionShellComponentsAreRepresentedInTheUIKit() {
+    let matrixIDs = Set(UIDevTemplateMatrixCatalog.templates.map(\.id))
+    XCTAssertTrue(matrixIDs.contains(.productionChrome))
+    XCTAssertTrue(matrixIDs.contains(.workspaceLayouts))
+    XCTAssertTrue(matrixIDs.contains(.floatingRibbon))
+    XCTAssertTrue(matrixIDs.contains(.modelImportStaging))
+    XCTAssertTrue(matrixIDs.contains(.visualizationPanel))
   }
 
   func testVariantBoardPreservesMultipleStableVariantsPerFamily() {

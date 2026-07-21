@@ -11,7 +11,7 @@ struct NativeImportPanelConfiguration: Equatable {
   static let models = NativeImportPanelConfiguration(
     title: "Import 3D Models",
     message:
-      "Choose (ModelImportFormatSupport.operatorLabel) files to add to the active character.",
+      "Choose \(ModelImportFormatSupport.operatorLabel) files. You will confirm the destination character before loading.",
     prompt: "Import",
     allowedFileExtensions: ModelImportFormatSupport.supportedFileExtensions,
     allowsMultipleSelection: true

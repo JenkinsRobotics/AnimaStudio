@@ -1,5 +1,21 @@
 import SwiftUI
 
+enum StudioPanelSurfaceMode {
+  case docked
+  case floating
+}
+
+private struct StudioPanelSurfaceModeKey: EnvironmentKey {
+  static let defaultValue = StudioPanelSurfaceMode.floating
+}
+
+extension EnvironmentValues {
+  var studioPanelSurfaceMode: StudioPanelSurfaceMode {
+    get { self[StudioPanelSurfaceModeKey.self] }
+    set { self[StudioPanelSurfaceModeKey.self] = newValue }
+  }
+}
+
 enum StudioPalette {
   private static var profile: StudioDesignProfile { StudioDesignRuntime.shared.profile }
 
@@ -38,13 +54,24 @@ enum StudioMetrics {
 
 extension View {
   func studioPanelSurface() -> some View {
-    background(StudioPalette.panel)
-      .clipShape(RoundedRectangle(cornerRadius: StudioMetrics.panelCornerRadius))
+    modifier(StudioPanelSurfaceModifier())
+  }
+}
+
+private struct StudioPanelSurfaceModifier: ViewModifier {
+  @Environment(\.studioPanelSurfaceMode) private var mode
+
+  func body(content: Content) -> some View {
+    let floating = mode == .floating
+    let radius = floating ? StudioMetrics.panelCornerRadius : 0
+    content
+      .background(StudioPalette.panel)
+      .clipShape(RoundedRectangle(cornerRadius: radius))
       .overlay {
-        RoundedRectangle(cornerRadius: StudioMetrics.panelCornerRadius)
+        RoundedRectangle(cornerRadius: radius)
           .stroke(StudioPalette.border, lineWidth: 1)
       }
-      .shadow(color: .black.opacity(0.35), radius: 12, y: 5)
+      .shadow(color: .black.opacity(floating ? 0.30 : 0), radius: 14, y: 6)
   }
 }
 

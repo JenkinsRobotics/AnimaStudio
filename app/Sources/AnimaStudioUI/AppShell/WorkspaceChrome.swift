@@ -1,9 +1,52 @@
+import AppKit
 import RealityKitViewport
 import SwiftUI
 
+enum StudioDocumentBarDensity: Equatable, Sendable {
+  case expanded
+  case compact
+  case minimal
+
+  static func resolve(width: CGFloat) -> Self {
+    if width >= WorkspaceSelectorMetrics.compactWidth { return .expanded }
+    if width >= 1_180 { return .compact }
+    return .minimal
+  }
+
+  var selectorWidth: CGFloat {
+    switch self {
+    case .expanded: WorkspaceSelectorMetrics.maximumWidth
+    case .compact: WorkspaceSelectorMetrics.idealWidth
+    case .minimal: WorkspaceSelectorMetrics.minimumWidth
+    }
+  }
+}
+
+enum StudioProjectIdentityMetrics {
+  static func projectNameWidth(
+    for projectName: String,
+    density: StudioDocumentBarDensity
+  ) -> CGFloat {
+    let displayName = projectName.isEmpty ? "Project name" : projectName
+    let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+    let measuredWidth = (displayName as NSString).size(withAttributes: [.font: font]).width
+    let maximumWidth: CGFloat =
+      switch density {
+      case .expanded: 170
+      case .compact: 118
+      case .minimal: 90
+      }
+    return min(max(ceil(measuredWidth) + 8, 30), maximumWidth)
+  }
+}
+
 struct StudioDocumentBar: View {
+  @Environment(\.openSettings) private var openSettings
   @Bindable var workspace: StudioWorkspaceModel
+  @Binding var isUIDevWorkspace: Bool
+  @Binding var showsWorkspaceGuide: Bool
   let isSaving: Bool
+  let isDirty: Bool
   let newProject: () -> Void
   let openProject: () -> Void
   let saveProject: () -> Void
@@ -11,94 +54,223 @@ struct StudioDocumentBar: View {
   let closeProject: () -> Void
 
   var body: some View {
-    ZStack {
-      HStack(spacing: 5) {
-        Button(action: closeProject) {
-          Image(systemName: "house.fill")
+    GeometryReader { proxy in
+      let density = StudioDocumentBarDensity.resolve(width: proxy.size.width)
+      let contentWidth = max(0, proxy.size.width - 28)
+      let sideWidth = max(0, (contentWidth - density.selectorWidth - 24) / 2)
+      ZStack {
+        WorkspaceStageTabs(
+          workspace: workspace,
+          isUIDevWorkspace: $isUIDevWorkspace,
+          compact: density != .expanded
+        )
+        .frame(width: density.selectorWidth)
+
+        HStack(spacing: 0) {
+          leadingControls(density: density)
+            .frame(width: sideWidth, alignment: .leading)
+
+          Spacer(minLength: 0)
+
+          trailingControls(density: density)
+            .frame(width: sideWidth, alignment: .trailing)
         }
-        .help("Return to Anima Studio home")
-
-        Button("Projects", systemImage: "square.grid.2x2", action: closeProject)
-          .help("Open the project browser")
-
-        Menu {
-          Button("New Project", systemImage: "doc.badge.plus", action: newProject)
-          Button("Open Project…", systemImage: "folder", action: openProject)
-          Divider()
-          Button("Save", systemImage: "square.and.arrow.down", action: saveProject)
-          Button("Save As…", systemImage: "doc.on.doc", action: saveProjectAs)
-        } label: {
-          Image(systemName: "doc")
-        }
-        .menuIndicator(.visible)
-        .help("Project file commands")
-
-        Divider()
-          .frame(height: 18)
-
-        Button("Save", systemImage: "square.and.arrow.down", action: saveProject)
-          .disabled(isSaving)
-          .help("Save project through AnimaCore")
-        Button("Undo", systemImage: "arrow.uturn.backward") {}
-          .disabled(true)
-          .help("Undo history arrives with durable projects")
-        Button("Redo", systemImage: "arrow.uturn.forward") {}
-          .disabled(true)
-          .help("Redo history arrives with durable projects")
-
-        Spacer()
+        .labelStyle(.iconOnly)
+        .buttonStyle(StudioChromeIconButtonStyle())
       }
-      .labelStyle(.iconOnly)
-      .buttonStyle(.borderless)
-
-      HStack(spacing: 7) {
-        Image(systemName: "cube.fill")
-          .font(.caption)
-          .foregroundStyle(StudioPalette.hardware)
-        TextField("Project name", text: $workspace.project.name)
-          .textFieldStyle(.plain)
-          .font(.callout.weight(.medium))
-          .multilineTextAlignment(.center)
-          .frame(width: 250)
-          .accessibilityLabel("Project name")
-      }
-
-      HStack(spacing: 9) {
-        Spacer()
-
-        Circle()
-          .fill(animaCoreStatusColor)
-          .frame(width: 7, height: 7)
-        Text(workspace.animaCoreStatusLabel)
-          .font(.caption)
-          .foregroundStyle(StudioPalette.muted)
-
-        Divider()
-          .frame(height: 18)
-
-        Circle()
-          .fill(Color.secondary)
-          .frame(width: 7, height: 7)
-        Text("No Driver")
-          .font(.caption)
-          .foregroundStyle(StudioPalette.muted)
-
-        Divider()
-          .frame(height: 18)
-
-        Text("MASTER LIVE")
-          .font(.system(size: 9, weight: .semibold))
-        Toggle("", isOn: .constant(false))
-          .labelsHidden()
-          .toggleStyle(.switch)
-          .controlSize(.mini)
-          .disabled(true)
-          .help("Hardware output is unavailable")
-      }
+      .padding(.horizontal, 14)
     }
-    .padding(.horizontal, 10)
     .frame(height: StudioMetrics.documentBarHeight)
     .background(StudioPalette.documentChrome)
+    .overlay(alignment: .bottom) {
+      Rectangle().fill(StudioPalette.border).frame(height: 1)
+    }
+  }
+
+  private func leadingControls(density: StudioDocumentBarDensity) -> some View {
+    HStack(spacing: 7) {
+      projectIdentity(density: density)
+
+      Divider().frame(height: 18)
+
+      switch density {
+      case .expanded:
+        settingsButton
+        projectCommandMenu
+        saveButton
+        historyButtons
+      case .compact:
+        settingsButton
+        projectCommandMenu
+      case .minimal:
+        compactApplicationMenu
+      }
+    }
+  }
+
+  private func trailingControls(density: StudioDocumentBarDensity) -> some View {
+    HStack(spacing: 7) {
+      engineStatus(compact: density == .minimal)
+      playbackButton(showsLabel: density == .expanded)
+
+      Divider().frame(height: 18)
+
+      WorkspaceLayoutMenu(workspace: workspace)
+
+      Button {
+        showsWorkspaceGuide.toggle()
+      } label: {
+        Image(systemName: "questionmark.circle")
+      }
+      .foregroundStyle(showsWorkspaceGuide ? StudioPalette.accent : StudioPalette.muted)
+      .help("Workspace walkthrough")
+    }
+    .fixedSize(horizontal: true, vertical: false)
+  }
+
+  private func projectIdentity(density: StudioDocumentBarDensity) -> some View {
+    HStack(spacing: 8) {
+      Button(action: closeProject) {
+        Image(systemName: "house.fill")
+      }
+      .foregroundStyle(StudioPalette.hardware)
+      .help("Return to Anima Studio home")
+      .accessibilityLabel("Project Home")
+
+      TextField("Project name", text: $workspace.project.name)
+        .textFieldStyle(.plain)
+        .font(.system(size: 13, weight: .semibold))
+        .lineLimit(1)
+        .frame(
+          width: StudioProjectIdentityMetrics.projectNameWidth(
+            for: workspace.project.name,
+            density: density
+          )
+        )
+        .layoutPriority(1)
+        .accessibilityLabel("Project name")
+      Text(isSaving ? "SAVING" : (isDirty ? "UNSAVED" : "SAVED"))
+        .font(.system(size: 8.5, weight: .bold))
+        .tracking(0.7)
+        .foregroundStyle(isDirty ? StudioPalette.hardware : StudioPalette.semanticPart)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+          (isDirty ? StudioPalette.hardware : StudioPalette.semanticPart).opacity(0.12),
+          in: Capsule()
+        )
+        .fixedSize(horizontal: true, vertical: false)
+    }
+    .fixedSize(horizontal: true, vertical: false)
+  }
+
+  private var settingsButton: some View {
+    Button {
+      openSettings()
+    } label: {
+      Image(systemName: "gearshape")
+    }
+    .help("Anima Studio Settings")
+  }
+
+  private var projectCommandMenu: some View {
+    Menu {
+      projectCommands
+    } label: {
+      Image(systemName: "doc")
+    }
+    .menuIndicator(.hidden)
+    .help("Project file commands")
+  }
+
+  private var compactApplicationMenu: some View {
+    Menu {
+      Button("Settings…", systemImage: "gearshape") { openSettings() }
+      Divider()
+      projectCommands
+    } label: {
+      Image(systemName: "ellipsis.circle")
+    }
+    .menuIndicator(.hidden)
+    .help("App and project commands")
+  }
+
+  @ViewBuilder private var projectCommands: some View {
+    Button("New Project", systemImage: "doc.badge.plus", action: newProject)
+    Button("Open Project…", systemImage: "folder", action: openProject)
+    Divider()
+    Button("Save", systemImage: "square.and.arrow.down", action: saveProject)
+      .disabled(isSaving)
+    Button("Save As…", systemImage: "doc.on.doc", action: saveProjectAs)
+  }
+
+  private var saveButton: some View {
+    Button("Save", systemImage: "square.and.arrow.down", action: saveProject)
+      .disabled(isSaving)
+      .help("Save project through AnimaCore")
+  }
+
+  private var historyButtons: some View {
+    Group {
+      Button("Undo", systemImage: "arrow.uturn.backward") {}
+        .disabled(true)
+        .help("Undo history arrives with durable projects")
+      Button("Redo", systemImage: "arrow.uturn.forward") {}
+        .disabled(true)
+        .help("Redo history arrives with durable projects")
+    }
+  }
+
+  private func playbackButton(showsLabel: Bool) -> some View {
+    Button {
+      workspace.togglePlayback()
+    } label: {
+      HStack(spacing: 5) {
+        Image(systemName: workspace.isPlaying ? "pause.fill" : "play.fill")
+          .font(.system(size: 8, weight: .bold))
+        if showsLabel {
+          Text(workspace.isPlaying ? "Pause" : "Preview")
+            .font(.system(size: 10.5, weight: .semibold))
+        }
+      }
+      .foregroundStyle(workspace.isPlaying ? Color.white : StudioPalette.muted)
+      .padding(.horizontal, showsLabel ? 10 : 8)
+      .frame(height: 24)
+      .background(
+        workspace.isPlaying ? StudioPalette.accent : StudioPalette.panelInset,
+        in: Capsule()
+      )
+      .overlay(
+        Capsule().stroke(workspace.isPlaying ? StudioPalette.accent : StudioPalette.border))
+    }
+    .buttonStyle(.plain)
+    .fixedSize()
+    .help(workspace.isPlaying ? "Pause preview" : "Start preview")
+  }
+
+  private func engineStatus(compact: Bool) -> some View {
+    HStack(spacing: 5) {
+      Circle().fill(animaCoreStatusColor).frame(width: 7, height: 7)
+      if compact {
+        Image(systemName: "bolt.horizontal.fill")
+          .font(.system(size: 9, weight: .semibold))
+      } else {
+        Text(workspace.animaCoreStatusLabel)
+          .font(.system(size: 10.5, weight: .semibold))
+          .lineLimit(1)
+        Image(systemName: "chevron.down")
+          .font(.system(size: 7, weight: .bold))
+      }
+    }
+    .foregroundStyle(StudioPalette.muted)
+    .padding(.horizontal, 9)
+    .frame(height: 24)
+    .background(StudioPalette.panelInset, in: Capsule())
+    .overlay(Capsule().stroke(animaCoreStatusColor.opacity(0.38)))
+    .fixedSize()
+    .accessibilityLabel("AnimaCore status")
+    .accessibilityValue(workspace.animaCoreStatusLabel)
+    .help("AnimaCore status")
   }
 
   private var animaCoreStatusColor: Color {
@@ -111,203 +283,333 @@ struct StudioDocumentBar: View {
   }
 }
 
-struct WorkspaceRibbonControls: View {
+struct WorkspaceLayoutMenu: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @Binding var viewportAppearance: PreviewAppearance
-  let isCompact: Bool
 
   var body: some View {
-    Group {
-      if isCompact {
-        HStack(spacing: 4) {
-          settingsMenu
-          workspaceLayoutMenu
-        }
-      } else {
-        VStack(spacing: 7) {
-          settingsMenu
-          workspaceLayoutMenu
-        }
-      }
-    }
-    .frame(width: isCompact ? 72 : 42)
-  }
-
-  private var settingsMenu: some View {
     Menu {
-      Section("Viewport Appearance") {
-        ForEach(PreviewAppearance.allCases) { appearance in
+      Section("Studio modes") {
+        ForEach(StudioLayoutPreset.allCases) { preset in
           Button {
-            viewportAppearance = appearance
+            workspace.applyLayoutPreset(preset)
           } label: {
             Label(
-              appearance.title,
-              systemImage: viewportAppearance == appearance
-                ? "checkmark.circle.fill" : appearance.systemImage
+              preset.title,
+              systemImage: workspace.detectedLayoutPreset == preset
+                ? "checkmark" : preset.systemImage
             )
           }
         }
       }
+
       Divider()
-      Section("About") {
-        Text("Anima Studio 0.1.0")
-        Text("Kinematic preview · Open source")
+      Button("Reset Studio Layout") {
+        workspace.applyLayoutPreset(.studio)
       }
     } label: {
-      Image(systemName: "gearshape")
-        .frame(width: 28, height: 28)
-    }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.hidden)
-    .help("Studio settings and viewport appearance")
-  }
-
-  private var workspaceLayoutMenu: some View {
-    Menu {
-      Button {
-        workspace.toggleNavigator()
-      } label: {
-        Label(
-          "Navigator",
-          systemImage: workspace.activePresentation.showsNavigator ? "checkmark" : "sidebar.left"
-        )
-      }
-      Button {
-        workspace.toggleInspector()
-      } label: {
-        Label(
-          "Inspector",
-          systemImage: workspace.activePresentation.showsInspector ? "checkmark" : "sidebar.right"
-        )
-      }
-      if workspace.activeWorkspace == .animate || workspace.activeWorkspace == .show {
-        Button {
-          workspace.toggleBottomEditor()
-        } label: {
-          Label(
-            "Bottom Editor",
-            systemImage: workspace.activePresentation.showsBottomEditor
-              ? "checkmark" : "rectangle.bottomthird.inset.filled"
-          )
+      Image(systemName: currentIcon)
+        .font(.system(size: 11, weight: .bold))
+        .foregroundStyle(Color.white)
+        .frame(width: 28, height: 24)
+        .background(currentColor, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+          RoundedRectangle(cornerRadius: 6)
+            .stroke(currentColor.opacity(0.85), lineWidth: 1)
         }
-      }
-      Divider()
-      Button("Reset \(workspace.activeWorkspace.descriptor.title) Layout") {
-        workspace.resetActivePresentation()
-      }
-    } label: {
-      Image(systemName: "rectangle.3.group")
-        .frame(width: 28, height: 28)
+    } primaryAction: {
+      workspace.cycleLayoutPreset()
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
-    .help("Show, hide, or reset workspace panels")
-  }
-}
-
-enum WorkspaceRibbonPresentation: Equatable {
-  case compactRig
-  case rigCreation
-  case workspaceTools
-
-  static func resolve(
-    workspace: StudioWorkspaceKind,
-    showsRigCreationTools: Bool
-  ) -> Self {
-    guard workspace == .rig else { return .workspaceTools }
-    return showsRigCreationTools ? .rigCreation : .compactRig
+    .fixedSize()
+    .accessibilityLabel("Studio mode: \(currentTitle)")
+    .help("Studio mode: \(currentTitle) · click to cycle")
   }
 
-  var height: CGFloat {
-    switch self {
-    case .compactRig: StudioMetrics.compactRibbonHeight
-    case .rigCreation, .workspaceTools: StudioMetrics.rigCreationRibbonHeight
+  private var currentIcon: String {
+    workspace.detectedLayoutPreset?.systemImage ?? "square.grid.2x2"
+  }
+
+  private var currentTitle: String {
+    workspace.detectedLayoutPreset?.title ?? "Custom"
+  }
+
+  private var currentColor: Color {
+    switch workspace.detectedLayoutPreset {
+    case .studio: StudioPalette.semanticPart
+    case .docked: StudioPalette.joint
+    case .canvas: StudioPalette.hardware
+    case nil: StudioPalette.accent
     }
   }
+
 }
 
-struct WorkspaceToolBar: View {
+/// Compact, in-window presentation of the same workspace tool catalog used by
+/// the docked ribbon. It keeps the canvas full-bleed and reveals full tool
+/// groups only when the operator asks for them.
+struct WorkspaceFloatingToolBar: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @Binding var viewportAppearance: PreviewAppearance
   @Binding var isUIDevWorkspace: Bool
   @Binding var uiDevSection: UIDevSection
   let importModel: () -> Void
   let importAnimaCharacter: () -> Void
   let toggleAgentPanel: () -> Void
 
+  @State private var selectedGroupID: String?
+  @State private var hoveredGroupID: String?
+
   var body: some View {
-    let presentation =
-      isUIDevWorkspace
-      ? WorkspaceRibbonPresentation.workspaceTools
-      : WorkspaceRibbonPresentation.resolve(
-        workspace: workspace.activeWorkspace,
-        showsRigCreationTools: workspace.showsCreationPalette
+    HStack(spacing: 2) {
+      ForEach(groups) { group in
+        groupButton(group)
+      }
+
+      Rectangle()
+        .fill(StudioPalette.border)
+        .frame(width: 1, height: 28)
+        .padding(.horizontal, 3)
+
+      Menu {
+        Button("Dock Tool Ribbon", systemImage: "rectangle.tophalf.inset.filled") {
+          workspace.ribbonPlacement = .docked
+        }
+        Button("Float at Top", systemImage: "rectangle.tophalf.inset.filled") {
+          workspace.floatingRibbonEdge = .top
+        }
+        Button("Float at Bottom", systemImage: "rectangle.bottomhalf.inset.filled") {
+          workspace.floatingRibbonEdge = .bottom
+        }
+        Divider()
+        Button("Hide Tool Ribbon", systemImage: "eye.slash") {
+          workspace.ribbonPlacement = .hidden
+        }
+      } label: {
+        Image(
+          systemName: workspace.floatingRibbonEdge == .top
+            ? "rectangle.tophalf.inset.filled" : "rectangle.bottomhalf.inset.filled"
+        )
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(StudioPalette.muted)
+        .frame(width: 28, height: 28)
+        .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 7))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(StudioPalette.border))
+      }
+      .menuStyle(.borderlessButton)
+      .menuIndicator(.hidden)
+      .fixedSize()
+      .help("Tool ribbon placement")
+    }
+    .padding(6)
+    .background(.regularMaterial, in: Capsule())
+    .overlay(Capsule().stroke(StudioPalette.border, lineWidth: 1))
+    .shadow(
+      color: .black.opacity(0.22),
+      radius: 18,
+      y: workspace.floatingRibbonEdge == .top ? 8 : -8
+    )
+  }
+
+  private var groups: [WorkspaceFloatingGroup] {
+    if isUIDevWorkspace {
+      return [
+        WorkspaceFloatingGroup(id: "ui-library", title: "Library", systemImage: "square.grid.3x3"),
+        WorkspaceFloatingGroup(id: "ui-panels", title: "Panels", systemImage: "sidebar.right"),
+        WorkspaceFloatingGroup(id: "ui-agent", title: "Agent", systemImage: "sparkles"),
+      ]
+    }
+    if workspace.activeWorkspace == .rig {
+      return [
+        WorkspaceFloatingGroup(id: "rig-structure", title: "Structure", systemImage: "cube"),
+        WorkspaceFloatingGroup(id: "rig-mates", title: "Mates", systemImage: "rotate.3d"),
+        WorkspaceFloatingGroup(id: "rig-relations", title: "Relations", systemImage: "link"),
+      ]
+    }
+    return WorkspaceRibbonCatalog.groups(for: workspace.activeWorkspace).map {
+      WorkspaceFloatingGroup(
+        id: $0.id,
+        title: $0.title,
+        systemImage: $0.systemImage,
+        descriptor: $0
       )
-    HStack(spacing: 0) {
-      WorkspaceRibbonSelector(
+    }
+  }
+
+  private func groupButton(_ group: WorkspaceFloatingGroup) -> some View {
+    let isSelected = selectedGroupID == group.id
+    let isHovered = hoveredGroupID == group.id
+    return Button {
+      selectedGroupID = isSelected ? nil : group.id
+    } label: {
+      Image(systemName: group.systemImage)
+        .font(.system(size: 16, weight: .medium))
+        .foregroundStyle(isSelected ? Color.white : tint(for: group))
+        .frame(width: 36, height: 36)
+        .background(
+          isSelected
+            ? tint(for: group)
+            : (isHovered ? tint(for: group).opacity(0.12) : Color.clear),
+          in: RoundedRectangle(cornerRadius: 9)
+        )
+    }
+    .buttonStyle(.plain)
+    .onHover { hoveredGroupID = $0 ? group.id : nil }
+    .popover(
+      isPresented: Binding(
+        get: { selectedGroupID == group.id },
+        set: { if !$0 { selectedGroupID = nil } }
+      ),
+      arrowEdge: workspace.floatingRibbonEdge == .top ? .top : .bottom
+    ) {
+      groupPopover(group)
+    }
+    .help(group.title)
+  }
+
+  @ViewBuilder
+  private func groupPopover(_ group: WorkspaceFloatingGroup) -> some View {
+    if isUIDevWorkspace {
+      VStack(alignment: .leading, spacing: 10) {
+        StudioSectionHeader(
+          title: group.title,
+          detail: "UI Dev uses the same production component library.",
+          systemImage: group.systemImage
+        )
+        Button("Open UI Kit") {
+          uiDevSection = .templateMatrix
+          selectedGroupID = nil
+        }
+        .buttonStyle(StudioButtonStyle(expandsHorizontally: false))
+        if group.id == "ui-agent" {
+          Button("Open Agent Panel", action: toggleAgentPanel)
+            .buttonStyle(StudioButtonStyle(role: .secondary, expandsHorizontally: false))
+        }
+      }
+      .padding(12)
+      .frame(width: 310)
+    } else if workspace.activeWorkspace == .rig {
+      CreationPaletteView(workspace: workspace)
+        .frame(width: 1_000, height: StudioMetrics.rigCreationRibbonHeight)
+    } else if let descriptor = group.descriptor {
+      WorkspaceFloatingGroupPopover(
         workspace: workspace,
-        isUIDevWorkspace: $isUIDevWorkspace
+        group: descriptor,
+        importModel: importModel,
+        importAnimaCharacter: importAnimaCharacter
       )
+    }
+  }
 
-      Divider()
-        .padding(.vertical, 10)
+  private func tint(for group: WorkspaceFloatingGroup) -> Color {
+    guard let descriptor = group.descriptor else {
+      if group.id.contains("mate") { return StudioPalette.joint }
+      if group.id.contains("relation") { return StudioPalette.hardware }
+      return StudioPalette.semanticPart
+    }
+    return switch descriptor.role {
+    case .accent: StudioPalette.accent
+    case .assets: StudioPalette.sourceModel
+    case .components: StudioPalette.semanticPart
+    case .mates: StudioPalette.joint
+    case .hardware: StudioPalette.hardware
+    case .planned: StudioPalette.muted
+    }
+  }
+}
 
-      Group {
-        if isUIDevWorkspace {
-          UIDevRibbonView(
-            selectedSection: $uiDevSection,
-            toggleAgentPanel: toggleAgentPanel
-          )
-        } else {
-          switch presentation {
-          case .compactRig:
-            compactRibbon
-          case .rigCreation:
-            CreationPaletteView(workspace: workspace)
-          case .workspaceTools:
-            WorkspaceRibbonCatalogView(
-              workspace: workspace,
-              importModel: importModel,
-              importAnimaCharacter: importAnimaCharacter
-            )
+private struct WorkspaceFloatingGroup: Identifiable {
+  let id: String
+  let title: String
+  let systemImage: String
+  var descriptor: WorkspaceRibbonGroupDescriptor?
+}
+
+private struct WorkspaceFloatingGroupPopover: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  let group: WorkspaceRibbonGroupDescriptor
+  let importModel: () -> Void
+  let importAnimaCharacter: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      StudioSectionHeader(
+        title: group.title,
+        detail: "\(group.tools.count) workspace tools",
+        systemImage: group.systemImage
+      )
+      LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 7)], spacing: 7) {
+        ForEach(group.tools) { tool in
+          CreationToolButton(
+            title: displayTitle(tool),
+            systemImage: displayImage(tool),
+            tint: tint,
+            isEnabled: isEnabled(tool),
+            isSelected: isSelected(tool),
+            help: tool.help
+          ) {
+            perform(tool.action)
           }
         }
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-      Divider()
-        .padding(.vertical, 10)
-
-      if isUIDevWorkspace {
-        UIDevRibbonTrailingControls(selectedSection: $uiDevSection)
-      } else {
-        WorkspaceRibbonControls(
-          workspace: workspace,
-          viewportAppearance: $viewportAppearance,
-          isCompact: presentation == .compactRig
-        )
-      }
     }
-    .frame(height: presentation.height)
-    .background(StudioPalette.ribbonChrome)
+    .padding(12)
+    .frame(width: min(CGFloat(group.tools.count) * 82 + 32, 430))
   }
 
-  private var compactRibbon: some View {
-    HStack(spacing: 12) {
-      WorkspaceContextualTools(workspace: workspace, importModel: importModel)
-
-      Spacer(minLength: 12)
-
-      if workspace.isLoadingModelHierarchy {
-        ProgressView()
-          .controlSize(.small)
-        Text("Reading model…")
-          .font(.caption)
-          .foregroundStyle(StudioPalette.muted)
-      }
+  private var tint: Color {
+    switch group.role {
+    case .accent: StudioPalette.accent
+    case .assets: StudioPalette.sourceModel
+    case .components: StudioPalette.semanticPart
+    case .mates: StudioPalette.joint
+    case .hardware: StudioPalette.hardware
+    case .planned: StudioPalette.muted
     }
-    .buttonStyle(.borderless)
-    .padding(.horizontal, 12)
+  }
+
+  private func displayTitle(_ tool: WorkspaceRibbonToolDescriptor) -> String {
+    tool.action == .togglePlayback && workspace.isPlaying ? "Pause" : tool.title
+  }
+
+  private func displayImage(_ tool: WorkspaceRibbonToolDescriptor) -> String {
+    tool.action == .togglePlayback && workspace.isPlaying ? "pause.fill" : tool.systemImage
+  }
+
+  private func isEnabled(_ tool: WorkspaceRibbonToolDescriptor) -> Bool {
+    guard let action = tool.action else { return false }
+    return switch action {
+    case .importAnimaCharacter: workspace.animaCoreState != .connecting
+    case .importModel: !workspace.isLoadingModelHierarchy
+    case .frameSelection: workspace.canFrameSelection
+    case .stopPlayback, .togglePlayback, .toggleLoop, .previousKeyframe, .nextKeyframe,
+      .toggleGrid, .toggleBottomEditor:
+      true
+    }
+  }
+
+  private func isSelected(_ tool: WorkspaceRibbonToolDescriptor) -> Bool {
+    switch tool.action {
+    case .toggleLoop: workspace.loopsPreviewPlayback
+    case .toggleGrid: workspace.showsPreviewGrid
+    case .toggleBottomEditor: workspace.activePresentation.showsBottomEditor
+    default: false
+    }
+  }
+
+  private func perform(_ action: WorkspaceRibbonAction?) {
+    guard let action else { return }
+    switch action {
+    case .importAnimaCharacter: importAnimaCharacter()
+    case .importModel: importModel()
+    case .stopPlayback: workspace.stopPlayback()
+    case .togglePlayback: workspace.togglePlayback()
+    case .toggleLoop: workspace.loopsPreviewPlayback.toggle()
+    case .previousKeyframe: workspace.seekAdjacentKeyframe(forward: false)
+    case .nextKeyframe: workspace.seekAdjacentKeyframe(forward: true)
+    case .frameSelection: workspace.frameSelection()
+    case .toggleGrid: workspace.showsPreviewGrid.toggle()
+    case .toggleBottomEditor: workspace.toggleBottomEditor()
+    }
   }
 }
 
@@ -334,170 +636,20 @@ private struct UIDevRibbonTrailingControls: View {
   }
 }
 
-private struct WorkspaceContextualTools: View {
-  @Bindable var workspace: StudioWorkspaceModel
-  let importModel: () -> Void
-
-  var body: some View {
-    switch workspace.activeWorkspace {
-    case .assets:
-      assetTools
-    case .rig:
-      rigTools
-    case .animate:
-      animationTools
-    case .show:
-      showTools
-    case .nodes:
-      nodeTools
-    case .hardware:
-      hardwareTools
-    }
-  }
-
-  private var assetTools: some View {
-    Group {
-      Button(action: importModel) {
-        Label("Import Model", systemImage: "plus.square.on.square")
-      }
-      .disabled(workspace.isLoadingModelHierarchy)
-      .help("Import a USD-family, STL, or OBJ model")
-
-      Button("Relink Asset", systemImage: "link") {}
-        .disabled(true)
-        .help("Asset relinking arrives with durable projects")
-    }
-  }
-
-  private var rigTools: some View {
-    Group {
-      gridButton
-      Button("Move", systemImage: "arrow.up.and.down.and.arrow.left.and.right") {}
-        .disabled(true)
-        .help("Move gizmos arrive with semantic parts")
-      Button("Rotate", systemImage: "rotate.right") {}
-        .disabled(true)
-        .help("Rotation gizmos arrive with typed mates and DOFs")
-      Button("Scale", systemImage: "arrow.up.left.and.arrow.down.right") {}
-        .disabled(true)
-        .help("Scale gizmos arrive with semantic parts")
-      frameSelectionButton
-      Button("Add Components", systemImage: "plus.square.dashed") {
-        workspace.showCreationTools()
-      }
-      .help("Expand the Rig creation ribbon")
-    }
-  }
-
-  private var animationTools: some View {
-    Group {
-      Button(action: workspace.stopPlayback) {
-        Label("Stop", systemImage: "stop.fill")
-      }
-      .help("Stop playback")
-      Button(action: workspace.togglePlayback) {
-        Label(
-          workspace.isPlaying ? "Pause" : "Play",
-          systemImage: workspace.isPlaying ? "pause.fill" : "play.fill")
-      }
-      .help(workspace.isPlaying ? "Pause playback" : "Play animation")
-      gridButton
-      frameSelectionButton
-      Button("Auto Key", systemImage: "record.circle") {}
-        .disabled(true)
-        .help("Auto-key arrives with editable animation commands")
-      bottomEditorButton(title: "Timeline")
-    }
-  }
-
-  private var showTools: some View {
-    Group {
-      gridButton
-      Button("Add Cue", systemImage: "plus.rectangle.on.rectangle") {}
-        .disabled(true)
-        .help("Show cues arrive with scene documents")
-      Button("Add Track", systemImage: "plus.rectangle.on.folder") {}
-        .disabled(true)
-        .help("Show tracks arrive with scene documents")
-      bottomEditorButton(title: "Show Timeline")
-    }
-  }
-
-  private var nodeTools: some View {
-    Group {
-      Button("Select", systemImage: "cursorarrow") {}
-        .disabled(true)
-        .help("Use Select in the node canvas toolbar")
-      Button("Add Node", systemImage: "plus.square.dashed") {}
-        .disabled(true)
-        .help("Use the docked Node Library to add scene actions")
-      Button("Connect", systemImage: "point.3.connected.trianglepath.dotted") {}
-        .disabled(true)
-        .help("Interactive edge authoring arrives with the graph compiler contract")
-      Button("Validate", systemImage: "checkmark.shield") {}
-        .disabled(true)
-        .help("Use Validate in the node canvas toolbar for draft-structure feedback")
-    }
-  }
-
-  private var hardwareTools: some View {
-    Group {
-      Button("Connect", systemImage: "cable.connector.horizontal") {}
-        .disabled(true)
-        .help("Studio transport integration is not connected yet")
-      Button("Add Driver", systemImage: "plus") {}
-        .disabled(true)
-        .help("Driver configuration follows actuator mapping")
-      Button("Emergency Stop", systemImage: "stop.circle.fill") {}
-        .disabled(true)
-        .help("No hardware session is active")
-    }
-  }
-
-  private var gridButton: some View {
-    Button {
-      workspace.showsPreviewGrid.toggle()
-    } label: {
-      Label(
-        workspace.showsPreviewGrid ? "Hide Grid" : "Show Grid",
-        systemImage: workspace.showsPreviewGrid ? "eye.fill" : "eye.slash"
-      )
-    }
-    .help(workspace.showsPreviewGrid ? "Hide viewport grid" : "Show viewport grid")
-  }
-
-  private var frameSelectionButton: some View {
-    Button {
-      workspace.frameSelection()
-    } label: {
-      Label("Frame Selection", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
-    }
-    .disabled(!workspace.canFrameSelection)
-    .help("Move the camera to frame the selected model node")
-  }
-
-  private func bottomEditorButton(title: String) -> some View {
-    Button {
-      workspace.toggleBottomEditor()
-    } label: {
-      Label(
-        workspace.activePresentation.showsBottomEditor ? "Hide \(title)" : "Show \(title)",
-        systemImage: "rectangle.bottomthird.inset.filled"
-      )
-    }
-    .help("Toggle this workspace's bottom editor")
-  }
-}
-
 struct WorkspacePanelHeader: View {
   let title: String
   let systemImage: String
   var closeAction: (() -> Void)?
 
   var body: some View {
-    HStack(spacing: 8) {
-      Label(title, systemImage: systemImage)
-        .font(.callout.weight(.semibold))
+    HStack(spacing: 7) {
+      Image(systemName: systemImage)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(StudioPalette.accent)
+        .frame(width: 16)
+      Text(title.uppercased())
+        .font(.system(size: 10.5, weight: .semibold))
+        .tracking(0.6)
       Spacer(minLength: 8)
       if let closeAction {
         Button(action: closeAction) {
@@ -510,9 +662,126 @@ struct WorkspacePanelHeader: View {
         .help("Clear selection")
       }
     }
-    .foregroundStyle(.white)
+    .foregroundStyle(Color.white.opacity(0.92))
     .padding(.horizontal, StudioMetrics.panelPadding)
     .frame(height: StudioMetrics.panelHeaderHeight)
-    .background(StudioPalette.accent)
+    .background(StudioPalette.panelInset.opacity(0.52))
+  }
+}
+
+struct StudioStatusBar: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  let isUIDevWorkspace: Bool
+
+  var body: some View {
+    HStack(spacing: 12) {
+      HStack(spacing: 5) {
+        Image(systemName: "hexagon.fill")
+          .foregroundStyle(StudioPalette.hardware)
+        Text("Anima Studio")
+          .fontWeight(.semibold)
+      }
+      Rectangle().fill(StudioPalette.border).frame(width: 1, height: 13)
+      Label(activeTitle, systemImage: activeSystemImage)
+      Text(workspace.animaCoreStatusLabel)
+      Spacer()
+      if let time = workspace.engineEvaluationTimeSeconds {
+        Label(
+          "\(time.formatted(.number.precision(.fractionLength(3)))) s",
+          systemImage: "waveform.path.ecg"
+        )
+      }
+      Text("Local macOS")
+      Text("⌘1–7 Workspaces")
+    }
+    .font(.system(size: 9))
+    .foregroundStyle(StudioPalette.muted.opacity(0.78))
+    .padding(.horizontal, 12)
+    .frame(height: 25)
+    .background(StudioPalette.documentChrome)
+    .overlay(alignment: .top) {
+      Rectangle().fill(StudioPalette.border).frame(height: 1)
+    }
+  }
+
+  private var activeTitle: String {
+    isUIDevWorkspace ? UIDevWorkspaceDescriptor.title : workspace.activeWorkspace.descriptor.title
+  }
+
+  private var activeSystemImage: String {
+    isUIDevWorkspace
+      ? UIDevWorkspaceDescriptor.systemImage : workspace.activeWorkspace.descriptor.systemImage
+  }
+}
+
+struct WorkspaceGuideCard: View {
+  @Bindable var workspace: StudioWorkspaceModel
+  @Binding var isUIDevWorkspace: Bool
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 12) {
+      Image(systemName: activeSystemImage)
+        .font(.system(size: 17, weight: .semibold))
+        .foregroundStyle(StudioPalette.accent)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("WORKSPACE WALKTHROUGH · \(activeIndex + 1) OF \(workspaceCount)")
+          .font(.system(size: 9, weight: .bold))
+          .foregroundStyle(StudioPalette.accent)
+        Text(activePurpose)
+          .font(.system(size: 11))
+          .lineLimit(1)
+      }
+      Divider().frame(height: 26)
+      Button {
+        select(offset: -1)
+      } label: {
+        Image(systemName: "chevron.left")
+      }
+      .buttonStyle(StudioChromeIconButtonStyle())
+      Button("Next") {
+        select(offset: 1)
+      }
+      .buttonStyle(StudioButtonStyle(expandsHorizontally: false))
+      Button(action: dismiss) {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(StudioChromeIconButtonStyle())
+    }
+    .padding(.horizontal, 13)
+    .frame(height: 48)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    .overlay {
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(StudioPalette.accent.opacity(0.55), lineWidth: 1)
+    }
+    .shadow(color: .black.opacity(0.34), radius: 18, y: 8)
+  }
+
+  private var workspaceCount: Int { StudioWorkspaceKind.centeredNavigation.count + 1 }
+
+  private var activeIndex: Int {
+    guard !isUIDevWorkspace else { return workspaceCount - 1 }
+    return StudioWorkspaceKind.centeredNavigation.firstIndex(of: workspace.activeWorkspace) ?? 0
+  }
+
+  private var activeSystemImage: String {
+    isUIDevWorkspace
+      ? UIDevWorkspaceDescriptor.systemImage : workspace.activeWorkspace.descriptor.systemImage
+  }
+
+  private var activePurpose: String {
+    isUIDevWorkspace
+      ? UIDevWorkspaceDescriptor.purpose : workspace.activeWorkspace.descriptor.purpose
+  }
+
+  private func select(offset: Int) {
+    let next = (activeIndex + offset + workspaceCount) % workspaceCount
+    if next == workspaceCount - 1 {
+      isUIDevWorkspace = true
+    } else {
+      isUIDevWorkspace = false
+      workspace.switchWorkspace(to: StudioWorkspaceKind.centeredNavigation[next])
+    }
   }
 }

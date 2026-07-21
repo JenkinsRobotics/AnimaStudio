@@ -20,7 +20,7 @@ struct ViewportEnvironmentSettingsView: View {
           Picker("Preset", selection: $background.preset) {
             ForEach(PreviewAppearance.allCases) { Text($0.title).tag($0) }
           }
-        } else {
+        } else if background.mode != .transparent {
           ColorPicker("Color", selection: primaryColor)
           if background.mode == .gradient {
             ColorPicker("Second Color", selection: secondaryColor)

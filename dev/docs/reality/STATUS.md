@@ -4,7 +4,7 @@
 > this file in the same commit — see `CONVENTIONS.md` → "STATUS stays
 > truthful."
 
-## Current state — 2026-07-18
+## Current state — 2026-07-20
 
 - **Repo:** `AnimaStudio` — open-source unified character animation
   system for AI robots (digital avatars + physical animatronics from
@@ -97,7 +97,78 @@
   comparison is in `dev/Codex Bench/Reports/2026-07-19-raw-webgpu/`. Sixteen Swift
   tests, recursive format lint, release packaging, deep signing, headless
   46-file probe, and all four signed-app assembly runs pass.
-- **Standalone interface walkthrough:** `dev/CodexUI/` builds the separate,
+- **Production Studio interface:** the real Swift app under `app/` now uses one
+  shared `StudioWorkspaceScaffold` for every workspace without replacing its
+  AnimaCore, project, import, selection, timeline, or RealityKit behavior. The
+  frame has one center and three deliberately separate authorities: the
+  centered top Tool sidebar creates or modifies model content; the left
+  Workspace sidebar chooses what content is being worked on; and the right View
+  sidebar controls camera, environment, appearance, and inspection. Both side
+  rails use the same interaction rule: a different tab switches and opens,
+  while clicking the active tab collapses it. Tool and camera navigation modes
+  are mutually exclusive, only one tool can be armed, and the shared prompt bar
+  owns repeat, background-click commit, and Escape/cancel behavior.
+
+  One app-global layout state drives exactly three Studio modes. Floating keeps
+  the center full-bleed and overlays content-sized translucent pill sidebars,
+  vertically centered at the window edges. Docked moves the same sidebar
+  content into flat, divided, full-height in-flow panels and forces the Tool
+  sidebar to Expanded density. Canvas hides the floating chrome, leaves plain
+  capsule handles, and uses 16-point edge hot zones plus bridged zone/sidebar
+  hover tracking so reveal does not flicker. Compact, Standard, and Expanded
+  tool densities share persistent settings; Expanded workspaces may expose a
+  divider-free category strip above a captioned Fusion-style tool row. Sidebar
+  tabs live in workspace-observable state, right presentation and camera state
+  are app-wide, tool density/category is shared, and the Studio mode is global,
+  so switching workspaces or view branches does not reset the shell. The
+  pre-scaffold `WorkspaceToolBar`/`WorkspaceRibbonPresentation` rendering path
+  has been removed; the retained `WorkspaceRibbonCatalog` is now data consumed
+  only by the live shared Tool sidebar.
+
+  The condensed 54-point document header keeps project/save state at the far
+  left, all seven workspace destinations in a centered capsule, and engine,
+  preview, layout, and help controls at the right. A bottom status bar and
+  non-layout walkthrough overlay complete the frame. The empty-Rig call to
+  action remains centered in the usable viewport. UI Dev retains the actual
+  production specimens. All 308 Swift unit tests, 22 live bridge/integration
+  tests, recursive format lint, the native Xcode build, root-app helper
+  embedding, strict deep signing, launch, and diff check pass. Renderer-pipeline
+  integration from Codex Bench remains a separate phase.
+  The empty-Rig call to action is centered in the usable viewport instead of
+  inheriting the viewport overlay stack's top alignment.
+  The project header follows the compact CAD layout used by the approved demo:
+  project identity and file commands remain left, an absolutely centered stage
+  capsule shows the active workspace name while inactive workspaces stay as
+  icons, and runtime plus Studio-mode controls remain right. The Studio-mode
+  control cycles Floating, Docked, and Canvas, and the same global choice is
+  available from its menu and Settings.
+  The main macOS window uses full-size content with a hidden transparent title
+  bar, so the native traffic-light controls share the header's continuous
+  surface instead of occupying a separate dark title strip.
+- **Character-workspace shell parity:** The production Character workspace is
+  split into center collection, left browser, and right import/preview content
+  and supplies those pieces to the same scaffold as Rig, Animate, Show,
+  Hardware, Nodes, and UI Dev. Its selection and left-tab state are model-owned
+  and initialize only once, so changing Studio mode cannot reset the active
+  collection or selected Part. The structured collection is intentionally not
+  treated like an unbounded 3D canvas: Floating presents it as a rounded,
+  content-sized document (300–520 points tall) inside safe top/left/right
+  overlay insets, while Docked remains a full-height in-flow table. Canvas uses
+  the broad center while its sidebars are hidden, then animates the collection
+  inside the same safe boundary when an edge-revealed sidebar enters. Spatial
+  3D and node canvases remain full-bleed because only structured center content
+  consumes the shell's overlay-inset environment. The Character browser and
+  import/preview inspector are likewise content-sized in Floating mode.
+- **Timeline-workspace shell parity:** Animate and Show keep their timelines as
+  center/bottom structured editors without constraining the spatial viewport
+  above them. Docked timelines remain flat, full-width, and in-flow. Floating
+  and Canvas render the same editors as bounded rounded windows with a broad
+  default width; when a left or right overlay is present—or is temporarily
+  revealed from a Canvas edge—the timeline animates inside the published safe
+  boundary so transport controls, track headers, keys, and cues are never
+  covered. Top-tool clearance is intentionally ignored by the bottom editor.
+- **Archived interface walkthrough:** `dev/archive/CodexUI/` contains the
+  separate,
   clickable `CodexUI.app`, a presentation-only exploration of a modern CAD
   animatronic authoring environment. It imports no Anima Studio or AnimaCore
   target and performs no project, engine, model, hardware, or filesystem work.
@@ -171,7 +242,7 @@
   hover/press/spring feedback cover shared chrome, tree rows, workspace tabs,
   panels, and ribbon tools. The
   scrolling workspace row and duplicate header dropdown have been replaced by
-  one centered capsule navigator. It lists all seven workspaces—Assets, Rig,
+  one centered capsule navigator. It lists all workspaces—Character, Rig,
   Animate, Show, Hardware, Nodes, and UI Kit—with a subtle divider preserving
   the authoring/utility distinction and a spring-traveling active capsule.
   Workspace-tab labels are operator-configurable in Settings as Automatic,
@@ -181,10 +252,19 @@
   is condensed into one 54-point header matching the sibling AnimaStudio
   Demo's density: 24-point icon controls and 28–30-point workspace chips keep
   the stage capsule centered without making the chrome feel oversized. The
-  first upper-left element is always the open project identity:
-  orange cube, **Atlas Animatronic**, and **SAVED**, including at compact
-  widths. The centered selected tab owns the current workspace/mode name.
-  Settings, project/file access, and undo/redo follow left. Compact **Live**
+  first upper-left element is always the open project identity: a directly
+  actionable Home icon, **Atlas Animatronic**, and **SAVED**, including at
+  compact widths. The Home icon returns to the project browser without needing
+  a second header control. The document bar resolves explicit expanded,
+  compact, and minimal densities instead of allowing SwiftUI to crush its
+  contents. The editable project-name field follows the rendered name's natural
+  width and only caps long names, while save state remains a single-line fixed
+  capsule. The centered workspace navigator keeps a protected width, and both
+  sides occupy balanced zones around it. File/history commands
+  progressively fold into the document menu; at the minimum supported window
+  width, Settings and project commands become one overflow menu while
+  retaining every action. The centered selected tab owns the current
+  workspace/mode name. Settings, project/file access, and undo/redo follow left. Compact **Live**
   status and **Preview** playback capsules remain right. The layout-mode
   control sits at the far right immediately before walkthrough Help: it is
   icon-only, cycles on primary click, retains its complete placement menu, and
@@ -196,7 +276,7 @@
   The CodexUI app name and mark are deliberately quiet in the footer. Theme
   and detailed layout preferences remain in the native Settings window. The
   workspaces remain:
-  Assets (three-column content manager), Rig (semantic tree + CAD viewport +
+  Character (three-column content manager), Rig (semantic tree + CAD viewport +
   mate inspector), Animate (viewport + multi-track keyframe/audio timeline),
   Show (stage preview + multimedia cues), Hardware (device/channel/safety
   dashboard), Nodes (typed visual logic canvas), and UI Kit (reusable panels,
@@ -228,8 +308,9 @@
   deterministic catalog/tour/layout/header-density/drag-boundary/UI-Kit-coverage tests,
   recursive Swift format lint,
   debug/release builds, deep signature verification, launch, and process-health
-  verification pass. The prototype stays isolated under `dev/` beside the renamed
-  `dev/Codex Bench/` renderer benchmark. Its launcher also reuses an existing
+  verification pass. The prototype is retained as a read-only design-history
+  reference after its approved system was migrated into the production app.
+  Its launcher also reuses an existing
   CodexUI process rather than forcing duplicate instances. The separate
   `dev/Codex Spatial/` source and app were removed after those useful specimens
   were consolidated here.
@@ -302,9 +383,9 @@
   existing viewport theme/render/lighting/material/reflection preferences. A
   launch-only invalid Recent Projects SF Symbol that previously prevented
   window construction for operators with saved recents is also corrected. A
-  new project now opens as a genuinely empty project in the first **Assets**
+  new project now opens as a genuinely empty project in the first **Character**
   workspace rather than silently inserting the sample mechanism or jumping
-  ahead to Rig. Assets is now a dedicated character-management surface backed
+  ahead to Rig. Character is now a dedicated character-management surface backed
   by `project.json`: it lists every indexed character, marks and switches the
   active character used by Rig/Animate, and gives an empty project a prominent
   first-character action. New Character validates a project-unique name and
@@ -482,7 +563,7 @@
   right-side app panel. One explicitly labeled **Detached Window** is the sole
   floating UI Dev surface; it demonstrates the always-above-workspace utility
   panel pattern for compact temporary tools and reuses one saved panel instance.
-  UI Dev opens on an **all-surfaces Template Matrix**: thirty-one current app
+  UI Dev opens on an **all-surfaces Template Matrix**: thirty-six current app
   specimens grouped into Windows & Workspaces, Timelines & Editors, Inspectors,
   Panels & Tools, Dialogs/Menus/Popovers, Buttons & Inputs, and Status & Empty
   States. Every specimen is visible together in a responsive board and names
@@ -622,7 +703,23 @@
   the last completed camera interaction. High-quality rendering enables real
   4x MSAA. Lighting/environment/render-quality choices persist as user-local
   preferences; backgrounds, section state, and named views live in
-  `<character>.editor.json`; none enter `.character.anima`. Cube face names are
+  `<character>.editor.json`; none enter `.character.anima`. A lower-left
+  **Visualization** control now joins the main 3D workspace.
+  Its shared Material/Environment widget searches reusable Plastic, Metal, and
+  Glass presets, lists deduplicated materials already assigned in the active
+  Character, and applies color/PBR finish/opacity to the selected Part through
+  the existing `PreviewPartAppearance` editor state. The Environment tab is a
+  visual Studio browser with five live presets: Default, Transparent, Colored
+  Mood, Gradient Mood, and Black and White Stage. Each card applies the real
+  viewport background, generated studio environment, intensity, and rotation;
+  Transparent is a true clear viewport-background mode, not a checkerboard-only
+  sample. A detailed-settings button still exposes the same background,
+  studio-lighting, rotation, and section-plane bindings as the Display menu.
+  The production trigger and both browser tabs are also the thirty-sixth UI Dev
+  specimen, so their styling remains a shared component rather than a separate
+  mock. Material assignment remains renderer-only
+  `<character>.editor.json` data and never changes `.character.anima` solve
+  semantics. Cube face names are
   affine-projected decals:
   each label is centered in and foreshortens with its projected face quad,
   receives a readability correction rather than becoming mirrored or
@@ -762,17 +859,21 @@
   `NSOpenPanel`; the Anima Character command uses a separate single-file native
   panel. This replaces competing SwiftUI importer modifiers that could accept a
   click without presenting a chooser. A single
-  unit-preparation sheet reviews the batch and
-  gives each unitless file its own mm/cm/m setting; loading remains asynchronous
-  and reports the current file. Imports are copied into the active character's portable
+  character-targeted staging sheet reviews the batch, makes its destination
+  explicit, explains that source files become rigid Parts, and gives each
+  unitless file its own mm/cm/m setting; loading remains asynchronous and
+  reports the current file. The destination may be any indexed character in
+  the project; Studio safely saves and switches to it before loading. Imports
+  are copied into that character's portable
   `assets/` directory, authored into AnimaCore's full rig DTO as safe relative
   per-part `model` references, serialized and reloaded by the engine, and
   rendered at each part's `resolve_pose` transform. A multi-node USD can create
   persistent semantic parts sharing the same model with distinct `model_node`
   paths. A multi-renderable-node USD is automatically expanded into persistent
   Parts sharing the source asset with distinct `model_node` references. On a
-  successful batch Studio saves the project and enters Rig; failed imports stay
-  on Assets with a readable inline error. Unitless-file scale lives in
+  successful batch Studio saves the project and remains in Assets so the
+  operator can review and organize the imported assembly before moving to Rig;
+  failed imports stay on Assets with a readable inline error. Unitless-file scale lives in
   `<character>.editor.json`, so save/reopen
   restores the same metre-sized rendering. The complete entity hierarchy is
   projected into value-only nodes with unique sibling paths, shown as a
@@ -788,7 +889,17 @@
   `characters/<name>/<name>.character.anima` and
   `scenes/<name>.scene.anima` remain separate canonical engine documents;
   character assets live under `characters/<name>/assets/`. The manifest never
-  encodes the Swift rig or clips. Saves are
+  encodes the Swift rig or clips.
+  The user-level `Character Library/` now stores reusable, self-contained
+  Character packages outside projects. Assets distinguishes **Project
+  Characters** from **Character Library**: Publish creates/updates a stable
+  library UUID with a simple revision counter; Add copies the complete package
+  into the Project as a pinned, portable snapshot. `project.json` records
+  `source_kind`, `library_character_id`, and `library_revision` without putting
+  app bookkeeping into `.character.anima`. Project-local Characters remain
+  supported and older version-2 manifests decode them as `project_local`.
+  This intentionally prevents a later library edit from silently changing a
+  deployed show. Saves are
   atomic (staged temp directory swapped into place — a crashed save never
   corrupts an existing package) and deterministic (sorted keys, stable
   asset ordering: identical input encodes byte-identically). Assets are
