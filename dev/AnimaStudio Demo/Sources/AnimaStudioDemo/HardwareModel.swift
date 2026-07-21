@@ -27,7 +27,7 @@ struct ServoChannel: Identifiable, Equatable, Codable {
   // float/dock flip that rebuilds the workspace view.
   let hardwarePanels = PanelStackState(
     order: ["Controller", "Channels"],
-    defaults: ["Controller"], side: .left)
+    defaults: [], side: .left)
 
   var selectedChannel: ServoChannel? { channels.first { $0.id == selectedChannelID } }
 

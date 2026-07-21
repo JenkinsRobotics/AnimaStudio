@@ -10,7 +10,7 @@ import SwiftUI
   var selectedNode: String? = "Clip"
   let showPanels = PanelStackState(
     order: ["Scenes", "Nodes"],
-    defaults: ["Scenes"], side: .left)
+    defaults: [], side: .left)
 }
 
 struct ShowWorkspace: View {

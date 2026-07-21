@@ -86,7 +86,7 @@ enum DisplayMode: String, CaseIterable, Identifiable {
   /// Environment, Appearance, Inspector are parallel concerns.
   let panels = PanelStackState(
     order: ViewTab.allCases.map(\.rawValue),
-    defaults: [ViewTab.view.rawValue], side: .right)
+    defaults: [], side: .right)
 
   // View
   var viewPreset = "Standard"
@@ -127,13 +127,20 @@ struct SidebarTab: Identifiable, Equatable {
 /// behaviour is identical: a rail of tabs, each toggling its own stacked panel,
 /// any panel tear-off-able to float over the canvas and dockable back.
 @MainActor @Observable final class PanelStackState {
-  let order: [String]
+  var order: [String]
   let side: SidebarSide
   /// Exclusive = opening one panel closes the others (browser idiom). The left
   /// sidebar defaults to this; the right sidebar stacks freely.
   var exclusive: Bool
   var enabled: Set<String>
   var floatingOffset: [String: CGSize] = [:]
+
+  // Live drag: which panel is being dragged, its follow offset, and where it
+  // would land (an insertion index in the stack, or willFloat to tear off).
+  var draggingID: String?
+  var dragOffset: CGSize = .zero
+  var dropIndex: Int?
+  var willFloat = false
 
   init(order: [String], defaults: [String] = [], side: SidebarSide = .right,
     exclusive: Bool = false)
@@ -142,6 +149,20 @@ struct SidebarTab: Identifiable, Equatable {
     self.side = side
     self.exclusive = exclusive
     self.enabled = Set(defaults)
+  }
+
+  /// Move a stacked panel to a new index among the currently stacked panels.
+  func reorderStacked(_ id: String, to index: Int) {
+    let others = stacked.filter { $0 != id }
+    var open = others
+    open.insert(id, at: min(max(index, 0), others.count))
+    // Keep floating (in place) and closed tabs so they still work later.
+    let closed = order.filter { !enabled.contains($0) }
+    order = open + floating.filter { $0 != id } + closed
+  }
+
+  func endDrag() {
+    draggingID = nil; dragOffset = .zero; dropIndex = nil; willFloat = false
   }
 
   func isEnabled(_ id: String) -> Bool { enabled.contains(id) }
@@ -215,24 +236,27 @@ struct StackCard<Content: View>: View {
   var docked = false
   var floating = false
   var width: CGFloat = 200
-  /// Keeps a floating panel inside the visible canvas (set by the scaffold,
-  /// which knows the workspace size). Identity when stacked.
-  var clamp: (CGSize) -> CGSize = { $0 }
+  /// The whole header is a drag handle. The parent (which knows the stack
+  /// geometry) supplies the gesture; StackCard just renders + attaches it.
+  var dragGesture: AnyGesture<Void>?
+  /// Raised look while this card is the one being dragged.
+  var lifted = false
   @ViewBuilder var content: Content
-
-  @State private var dragBase: CGSize?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       header
       Divider().overlay(UI.stroke)
-      // Fit content — no forced height. The sidebar's own ScrollView handles
-      // overflow when stacked; a floating panel is only as tall as it needs.
+      // Fit content — no forced height. A floating panel is only as tall as it
+      // needs; stacked panels overflow into the sidebar's own scroll.
       content.padding(12)
     }
     .frame(width: docked && !floating ? nil : width)
     .fixedSize(horizontal: false, vertical: true)
     .modifier(SidebarChrome(docked: docked && !floating))
+    .scaleEffect(lifted ? 1.02 : 1)
+    .shadow(color: .black.opacity(lifted ? 0.35 : 0), radius: lifted ? 18 : 0, y: lifted ? 10 : 0)
+    .opacity(lifted && state.willFloat ? 0.9 : 1)
     .transition(.opacity.combined(with: .move(edge: state.side == .left ? .leading : .trailing)))
   }
 
@@ -242,40 +266,13 @@ struct StackCard<Content: View>: View {
       Text(title.uppercased()).font(.system(size: 10.5, weight: .semibold))
         .tracking(0.4).foregroundStyle(UI.text)
       Spacer(minLength: 12)
-      if floating {
-        Button { withAnimation(.easeOut(duration: 0.2)) { state.restack(id) } } label: {
-          Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 10))
-            .foregroundStyle(UI.text3)
-        }.buttonStyle(.plain).help("Dock back into the sidebar")
-      } else {
-        Button { withAnimation(.easeOut(duration: 0.2)) { state.detach(id) } } label: {
-          Image(systemName: "rectangle.portrait.and.arrow.right").font(.system(size: 10))
-            .foregroundStyle(UI.text3)
-        }.buttonStyle(.plain).help("Tear off into a floating panel")
-        Button { withAnimation(.easeOut(duration: 0.18)) { state.toggle(id) } } label: {
-          Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(UI.text3)
-        }.buttonStyle(.plain).help("Hide \(title)")
-      }
+      Button { withAnimation(.easeOut(duration: 0.18)) { state.toggle(id) } } label: {
+        Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(UI.text3)
+      }.buttonStyle(.plain).help("Hide \(title)")
     }
     .padding(.horizontal, 12).padding(.vertical, 9)
     .contentShape(Rectangle())
-    .gesture(floating ? dragToMove : nil)
-  }
-
-  private var dragToMove: some Gesture {
-    DragGesture(coordinateSpace: .global)
-      .onChanged { g in
-        let base = dragBase ?? (state.floatingOffset[id] ?? .zero)
-        if dragBase == nil { dragBase = base }
-        state.floatingOffset[id] = clamp(CGSize(
-          width: base.width + g.translation.width, height: base.height + g.translation.height))
-      }
-      .onEnded { _ in
-        dragBase = nil
-        if let o = state.floatingOffset[id], state.nearHomeEdge(o) {
-          withAnimation(.easeOut(duration: 0.2)) { state.restack(id) }
-        }
-      }
+    .gesture(dragGesture)
   }
 }
 
@@ -288,65 +285,152 @@ struct PanelSidebar<Content: View>: View {
   var docked = false
   @ViewBuilder var content: (String) -> Content
 
+  @State private var cardMids: [String: CGFloat] = [:]
+
   /// Rail width incl. its padding — the stack sits just inboard of it.
   private let railWidth: CGFloat = 44
+  private var cardWidth: CGFloat { state.side == .left ? 232 : 200 }
+  /// When set, the stack sits on the OUTER edge and the rail is pushed inboard.
+  private var outer: Bool { LayoutState.shared.panelsOnOuterEdge }
+  private var edgeSet: Edge.Set { state.side == .left ? .leading : .trailing }
 
   var body: some View {
     if docked { dockedLayout } else { floatingLayout }
   }
 
-  // Docked: rail + stack in-flow as one column.
+  // Docked: rail + stack in-flow as one column. `outer` flips their order so the
+  // rail ends up inboard.
   private var dockedLayout: some View {
     HStack(alignment: .top, spacing: 0) {
       let rail = StackRail(tabs: tabs, state: state, docked: true)
-      if state.side == .left { rail }
+      let railFirst = (state.side == .left) != outer   // XOR: rail nearest the edge
+      if railFirst { rail }
       if state.isOpen {
-        if state.side == .right { Divider().overlay(UI.stroke) }
+        Divider().overlay(UI.stroke)
         stackColumn(docked: true)
-        if state.side == .left { Divider().overlay(UI.stroke) }
       }
-      if state.side == .right { rail }
+      if !railFirst {
+        if state.isOpen { Divider().overlay(UI.stroke) }
+        rail
+      }
     }
   }
 
   // Floating: the rail and the stack are INDEPENDENT elements, each vertically
   // centered to the window. The rail never moves as panels stack; the stack
-  // grows about the window centre.
+  // grows about the window centre. `outer` swaps which one hugs the edge.
   private var floatingLayout: some View {
     ZStack(alignment: state.side == .left ? .leading : .trailing) {
       StackRail(tabs: tabs, state: state, docked: false)
         .frame(maxHeight: .infinity, alignment: .center)
+        // Rail inboard (past the stack) when panels are on the outer edge.
+        .padding(outer && state.isOpen ? edgeSet : [], cardWidth + 10)
       if state.isOpen {
         stackColumn(docked: false)
           .frame(maxHeight: .infinity, alignment: .center)
-          .padding(state.side == .left ? .leading : .trailing, railWidth + 10)
+          // Stack inboard (past the rail) in the default inner arrangement.
+          .padding(outer ? [] : edgeSet, railWidth + 10)
       }
     }
     .frame(maxHeight: .infinity)
   }
 
+  private var spaceName: String { "sidebar-\(state.side == .left ? "L" : "R")" }
+
   private func stackColumn(docked: Bool) -> some View {
     let cards = VStack(spacing: docked ? 0 : 10) {
-      ForEach(state.stacked, id: \.self) { id in
+      ForEach(Array(state.stacked.enumerated()), id: \.element) { index, id in
+        // Insertion indicator above the slot the dragged panel would land in.
+        if !docked, state.draggingID != nil, !state.willFloat, state.dropIndex == index {
+          dropIndicator
+        }
         if docked, id != state.stacked.first { Divider().overlay(UI.stroke) }
         card(id)
       }
+      if !docked, state.draggingID != nil, !state.willFloat,
+        state.dropIndex == state.stacked.count {
+        dropIndicator
+      }
     }
+    .coordinateSpace(name: spaceName)
+    .onPreferenceChange(CardMidKey.self) { cardMids = $0 }
     return Group {
       if docked {
-        ScrollView { cards }.frame(maxHeight: .infinity)
+        // Fixed-width docked column — don't let it swallow the canvas.
+        ScrollView { cards }.frame(width: cardWidth, alignment: .top).frame(maxHeight: .infinity)
       } else {
-        cards.fixedSize(horizontal: false, vertical: true)
+        // Fixed width so the stack (and the drop line) match the panel, not the
+        // whole window.
+        cards.frame(width: cardWidth)
       }
     }
   }
 
+  private var dropIndicator: some View {
+    Capsule().fill(UI.accent).frame(width: cardWidth - 16, height: 3)
+      .transition(.opacity)
+  }
+
   private func card(_ id: String) -> some View {
     let tab = tabs.first { $0.id == id }
+    let lifted = state.draggingID == id
     return StackCard(id: id, title: id, icon: tab?.icon ?? "square",
-      state: state, docked: docked, width: state.side == .left ? 232 : 200) {
+      state: state, docked: docked, width: cardWidth,
+      dragGesture: docked ? nil : AnyGesture(reorderGesture(id).map { _ in () }),
+      lifted: lifted) {
       content(id)
     }
+    .background(GeometryReader { geo in
+      Color.clear.preference(key: CardMidKey.self,
+        value: [id: geo.frame(in: .named(spaceName)).midY])
+    })
+    .offset(lifted ? state.dragOffset : .zero)
+    .zIndex(lifted ? 1 : 0)
+  }
+
+  /// Header drag on a stacked panel: mostly vertical → reorder (drop line),
+  /// pulled sideways off the stack → the panel becomes a window that follows the
+  /// cursor (no line), and floats where it's dropped.
+  private func reorderGesture(_ id: String) -> some Gesture {
+    DragGesture(coordinateSpace: .named(spaceName))
+      .onChanged { g in
+        state.draggingID = id
+        state.dragOffset = g.translation
+        // Off the stack once dragged sideways beyond the panel edge.
+        let sideways = abs(g.translation.width)
+        state.willFloat = sideways > cardWidth * 0.5 || sideways > abs(g.translation.height) * 1.5
+        if state.willFloat {
+          state.dropIndex = nil
+        } else {
+          let others = state.stacked.filter { $0 != id }
+          state.dropIndex = others.reduce(0) { acc, oid in
+            acc + ((cardMids[oid].map { g.location.y > $0 } ?? false) ? 1 : 0)
+          }
+        }
+      }
+      .onEnded { _ in
+        let tearOff = state.willFloat
+        let translation = state.dragOffset
+        let di = state.dropIndex
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+          if tearOff {
+            // Float where it was dragged to, not a fixed slot.
+            state.floatingOffset[id] = translation
+          } else if let di {
+            state.reorderStacked(id, to: di)
+          }
+          state.endDrag()
+        }
+      }
+  }
+}
+
+/// Collects each stacked card's vertical midpoint so a drag can compute where it
+/// would drop.
+private struct CardMidKey: PreferenceKey {
+  static let defaultValue: [String: CGFloat] = [:]
+  static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+    value.merge(nextValue(), uniquingKeysWith: { _, b in b })
   }
 }
 

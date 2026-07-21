@@ -11,7 +11,7 @@ struct SettingsWindow: View {
       LightingSettings().tabItem { Label("Lighting", systemImage: "light.max") }
       LayoutSettings().tabItem { Label("Layout", systemImage: "rectangle.split.3x1") }
       NavigationSettings().tabItem { Label("Navigation", systemImage: "cursorarrow.motionlines") }
-      InterfaceSettings().tabItem { Label("Interface", systemImage: "gearshape") }
+      InterfaceSettings().tabItem { Label("UI", systemImage: "sidebar.squares.left") }
     }
     .frame(width: 620, height: 570)
   }
@@ -215,6 +215,8 @@ struct LayoutSettings: View {
           ForEach(LayoutPreset.allCases) { Text($0.label).tag($0) }
         }
         .pickerStyle(.segmented).labelsHidden()
+        Toggle("Push panels to the outer edge", isOn: $layout.panelsOnOuterEdge)
+          .font(.system(size: 12))
       }
 
       SettingsSection(title: "Panels", icon: "sidebar.leading") {
@@ -361,6 +363,26 @@ struct InterfaceSettings: View {
 
       SettingsSection(title: "Chrome", icon: "macwindow") {
         Toggle("Show status bar", isOn: $layout.showStatusBar).font(.system(size: 12))
+      }
+
+      SettingsSection(title: "Sidebars", icon: "sidebar.squares.left",
+        footnote: "The tool sidebar (top), workspace sidebar (left), and view sidebar (right). Panels toggle from their rail, stack, and can be dragged off to float.") {
+        SettingsLabeledRow(label: "Layout mode") {
+          Picker("", selection: Binding(
+            get: { layout.detectedPreset ?? .floating },
+            set: { layout.apply($0) })) {
+            ForEach(LayoutPreset.allCases) { Label($0.label, systemImage: $0.icon).tag($0) }
+          }
+          .labelsHidden().frame(width: 170)
+        }
+        Toggle("Push panels to the outer edge", isOn: $layout.panelsOnOuterEdge)
+          .font(.system(size: 12))
+        SettingsLabeledRow(label: "Tool density") {
+          Picker("", selection: $ribbon.density) {
+            ForEach(ToolDensity.allCases) { Text($0.rawValue).tag($0) }
+          }
+          .pickerStyle(.segmented).labelsHidden().frame(width: 210)
+        }
         SettingsLabeledRow(label: "Tool popup") {
           Picker("", selection: $ribbon.popupStyle) {
             ForEach(ToolPopupStyle.allCases) { Text($0.rawValue).tag($0) }

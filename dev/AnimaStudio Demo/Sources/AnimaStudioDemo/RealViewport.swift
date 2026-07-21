@@ -27,7 +27,7 @@ struct ImportedPart: Identifiable {
   // float/dock flip that rebuilds the workspace view.
   let characterPanels = PanelStackState(
     order: ["Characters", "Parts"],
-    defaults: ["Characters"], side: .left)
+    defaults: [], side: .left)
   @ObservationIgnored private var importError: String?
 
   /// 0...1 across the whole import batch (nil while the first file is parsing).

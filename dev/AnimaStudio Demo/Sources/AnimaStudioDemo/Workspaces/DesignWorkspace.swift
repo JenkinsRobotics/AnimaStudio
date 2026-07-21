@@ -67,7 +67,7 @@ enum WorkspaceTab: String, CaseIterable, Identifiable {
   // (one panel at a time by default), but panels can still stack or tear off.
   let leftPanels = PanelStackState(
     order: WorkspaceTab.allCases.map(\.rawValue),
-    defaults: [WorkspaceTab.features.rawValue], side: .left)
+    defaults: [], side: .left)
   var defaultGeometryExpanded = true
 
   var selected: DesignShape? { shapes.first { $0.id == selectedID } }

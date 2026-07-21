@@ -15,9 +15,10 @@ import SwiftUI
   var rightDocked = false
   var rightPinned = false   // pin overrides the selection-driven auto-hide
   var ribbonDocked = false  // tool ribbon: false = floating pill, true = legacy full ribbon
-  var leftFloatOffset: CGSize = .zero   // drag position of the floating left card
-  var rightFloatOffset: CGSize = .zero  // drag position of the floating right card
   var showStatusBar = true              // the bottom status/footer bar
+  /// Panel stacks sit on the OUTER edge (rail pushed inboard) instead of the
+  /// default inboard position (rail on the edge, panels toward the centre).
+  var panelsOnOuterEdge = false
 }
 
 // Whole-app layout presets — flip every panel + ribbon between floating / docked
@@ -74,176 +75,9 @@ extension LayoutState {
   func cyclePreset() { apply((detectedPreset ?? .floating).next) }
 }
 
-// Floating panels are capped cards; docked panels stay full-height. A single
-// shared rule, so no per-workspace patching. (CodexUI's FloatingPanelSizing.)
-enum FloatingPanelSizing {
-  static func height(
-    available: CGFloat, preferredFraction: CGFloat = 0.72, minimum: CGFloat = 360, margins: CGFloat = 24
-  ) -> CGFloat {
-    let usable = max(0, available - margins)
-    let preferred = max(minimum, available * preferredFraction)
-    return min(usable, preferred)
-  }
-}
 
 enum SidebarSide { case left, right }
 
-struct FloatingWorkspace<L: View, C: View, R: View>: View {
-  var leftWidth: CGFloat = 250
-  var rightWidth: CGFloat = 268
-  var edgeToEdge: Bool = false   // true = full-bleed canvas (no border/padding)
-  var rightSelected: Bool = true // right panel auto-hides when false (unless pinned/docked)
-  @ViewBuilder var left: () -> L
-  @ViewBuilder var center: () -> C
-  @ViewBuilder var right: () -> R
-
-  private var layout: LayoutState { LayoutState.shared }
-  @State private var peekLeft = false    // hover-reveal a hidden left panel
-  @State private var peekRight = false
-  @State private var leftDrag: CGSize = .zero    // live drag delta while moving a card
-  @State private var rightDrag: CGSize = .zero
-  // The right panel is contextual: visible while something is selected, or when
-  // the user pins/docks it. The left panel is a plain manual show/hide.
-  private var rightShown: Bool {
-    layout.showRight && (layout.rightDocked || layout.rightPinned || rightSelected)
-  }
-
-  var body: some View {
-    HStack(spacing: 0) {
-      if layout.showLeft && layout.leftDocked {
-        docked(left(), width: leftWidth, side: .left)
-        Divider().overlay(UI.stroke)
-      }
-
-      GeometryReader { geo in
-        ZStack(alignment: .topLeading) {
-          center()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(edgeToEdge ? 0 : 12)
-
-          if (layout.showLeft && !layout.leftDocked) || (!layout.showLeft && peekLeft) {
-            floating(left(), width: leftWidth, side: .left, peek: !layout.showLeft, available: geo.size.height)
-              .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-          }
-          if (rightShown && !layout.rightDocked) || (!rightShown && peekRight) {
-            floating(right(), width: rightWidth, side: .right, peek: !rightShown, available: geo.size.height)
-              .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-          }
-
-          // Hidden panels reveal on a hover strip at the window edge.
-          if !layout.showLeft {
-            edgeReveal(.left).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-          }
-          if !rightShown {
-            edgeReveal(.right).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-          }
-        }
-      }
-
-      if layout.rightDocked {
-        Divider().overlay(UI.stroke)
-        docked(right(), width: rightWidth, side: .right)
-      }
-    }
-  }
-
-  // Docked: in the layout flow, full height, flush to the window edge.
-  private func docked(_ content: some View, width: CGFloat, side: SidebarSide) -> some View {
-    content
-      .frame(width: width)
-      .frame(maxHeight: .infinity)
-  }
-
-  // Floating: a capped card over the canvas (never full-height — that's docked).
-  private func floating(_ content: some View, width: CGFloat, side: SidebarSide, peek: Bool, available: CGFloat)
-    -> some View
-  {
-    content
-      .frame(width: width)
-      // Right-side content-aware widgets hug their content (compact card); left-side
-      // browsers/lists stay a capped, scrollable card.
-      .fixedSize(horizontal: false, vertical: side == .right)
-      .frame(height: side == .right ? nil : FloatingPanelSizing.height(available: available))
-      .overlay(alignment: .topTrailing) { closeButton(side) }
-      .contentShape(Rectangle())
-      .gesture(cardDrag(side))
-      .onTapGesture(count: 2) {
-        withAnimation(.spring(response: 0.3)) {
-          if side == .left { layout.leftFloatOffset = .zero } else { layout.rightFloatOffset = .zero }
-        }
-      }
-      .compositingGroup()
-      .shadow(color: .black.opacity(0.28), radius: 20, x: 0, y: 10)
-      .shadow(color: .black.opacity(0.10), radius: 2, y: 1)
-      .padding(.top, edgeToEdge ? 14 : 12)
-      .padding(side == .left ? .leading : .trailing, edgeToEdge ? 16 : 12)
-      .offset(floatOffset(side))
-      .onHover { hovering in
-        if peek && !hovering {
-          withAnimation(.spring(response: 0.3)) {
-            if side == .left { peekLeft = false } else { peekRight = false }
-          }
-        }
-      }
-      .transition(.move(edge: side == .left ? .leading : .trailing).combined(with: .opacity))
-  }
-
-  private func floatOffset(_ side: SidebarSide) -> CGSize {
-    let base = side == .left ? layout.leftFloatOffset : layout.rightFloatOffset
-    let live = side == .left ? leftDrag : rightDrag
-    return CGSize(width: base.width + live.width, height: base.height + live.height)
-  }
-
-  // Drag the whole card. Measured in GLOBAL space so applying `.offset` mid-drag
-  // doesn't shift the gesture's frame and cause the translation to jitter.
-  private func cardDrag(_ side: SidebarSide) -> some Gesture {
-    DragGesture(minimumDistance: 4, coordinateSpace: .global)
-      .onChanged { g in if side == .left { leftDrag = g.translation } else { rightDrag = g.translation } }
-      .onEnded { g in
-        if side == .left {
-          layout.leftFloatOffset.width += g.translation.width
-          layout.leftFloatOffset.height += g.translation.height
-          leftDrag = .zero
-        } else {
-          layout.rightFloatOffset.width += g.translation.width
-          layout.rightFloatOffset.height += g.translation.height
-          rightDrag = .zero
-        }
-      }
-  }
-
-  private func closeButton(_ side: SidebarSide) -> some View {
-    Button { closePanel(side) } label: {
-      Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(UI.text3)
-        .frame(width: 20, height: 20)
-        .background(.regularMaterial, in: Circle())
-        .overlay(Circle().stroke(UI.stroke, lineWidth: 1))
-    }
-    .buttonStyle(.plain).padding(8).help("Close (reveals on edge hover)")
-  }
-
-  private func closePanel(_ side: SidebarSide) {
-    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-      if side == .left { layout.showLeft = false; peekLeft = false }
-      else { layout.showRight = false; peekRight = false }
-    }
-  }
-
-  private func edgeReveal(_ side: SidebarSide) -> some View {
-    Color.clear
-      .frame(width: 24)
-      .frame(maxHeight: .infinity)
-      .contentShape(Rectangle())
-      .onHover { hovering in
-        if hovering {
-          withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-            if side == .left { peekLeft = true } else { peekRight = true }
-          }
-        }
-      }
-  }
-
-}
 
 // Floating bottom-center tray (ShaprUI-style). Each icon opens a popover so
 // controls that would otherwise be hidden behind the floating sidebars live

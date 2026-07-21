@@ -64,7 +64,7 @@ struct RigPartRow: Identifiable {
   // float/dock flip that rebuilds the workspace view.
   let rigPanels = PanelStackState(
     order: ["Structure", "Mates"],
-    defaults: ["Structure"], side: .left)
+    defaults: [], side: .left)
 
   private var project: ProjectModel { ProjectModel.shared }
 

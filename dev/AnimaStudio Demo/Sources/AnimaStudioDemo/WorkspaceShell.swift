@@ -269,6 +269,8 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
   /// Canvas is the third Studio-layout preset: same floating look, but the
   /// sidebars start hidden and the center gets the whole window.
   private var isCanvas: Bool { layout.detectedPreset == .canvas }
+  /// Floating sidebars always keep their margin off the window edge.
+  private let edgePad: CGFloat = 14
 
   private var viewPanels: PanelStackState { ViewSidebarState.shared.panels }
 
@@ -324,11 +326,36 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
       let off = floatClamp(state.floatingOffset[id] ?? .zero, side: state.side, size: size, cardW: cardW)
       StackCard(id: id, title: id, icon: tab?.icon ?? "square",
         state: state, floating: true, width: cardW,
-        clamp: { floatClamp($0, side: state.side, size: size, cardW: cardW) }) {
+        dragGesture: AnyGesture(floatMoveGesture(id, state: state, size: size, cardW: cardW).map { _ in () })) {
         content(id)
       }
       .offset(x: base.width + off.width, y: base.height + off.height)
     }
+  }
+
+  /// Drag a floating panel; releasing near its home edge docks it back.
+  private func floatMoveGesture(_ id: String, state: PanelStackState, size: CGSize,
+    cardW: CGFloat) -> some Gesture
+  {
+    DragGesture(coordinateSpace: .global)
+      .onChanged { g in
+        // dragOffset holds the panel's offset at gesture start.
+        if state.draggingID != id {
+          state.draggingID = id
+          state.dragOffset = state.floatingOffset[id] ?? .zero
+        }
+        let proposed = CGSize(
+          width: state.dragOffset.width + g.translation.width,
+          height: state.dragOffset.height + g.translation.height)
+        state.floatingOffset[id] = floatClamp(proposed, side: state.side, size: size, cardW: cardW)
+      }
+      .onEnded { _ in
+        let docks = state.nearHomeEdge(state.floatingOffset[id] ?? .zero)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+          if docks { state.restack(id) }
+          state.endDrag()
+        }
+      }
   }
 
   // Overlays (not ZStack layers) so each surface only hit-tests its own bounds.
@@ -340,12 +367,12 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
       .overlay(alignment: .top) { if tools.isArmed { PromptBar() } }
       .overlay(alignment: .leading) {
         edgeReveal(.leading, shown: $hoverLeft) {
-          workspaceSidebar(docked: false).padding(.leading, 14)
+          workspaceSidebar(docked: false).padding(.leading, edgePad)
         }
       }
       .overlay(alignment: .trailing) {
         edgeReveal(.trailing, shown: $hoverRight) {
-          ViewSidebar { inspector }.padding(.trailing, 14)
+          ViewSidebar { inspector }.padding(.trailing, edgePad)
         }
       }
       .overlay(alignment: .topTrailing) {
@@ -355,21 +382,24 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
       }
   }
 
+  // Docked: side sidebars span the FULL height; the tool bar lives at the top of
+  // the centre column (with the viewport/timeline below it), so the sidebars
+  // aren't shortened by a full-width toolbar.
   private var dockedBody: some View {
-    VStack(spacing: 0) {
-      toolSidebar(docked: true)
+    HStack(spacing: 0) {
+      workspaceSidebar(docked: true)
       Divider().overlay(UI.stroke)
-      HStack(spacing: 0) {
-        workspaceSidebar(docked: true)
+      VStack(spacing: 0) {
+        toolSidebar(docked: true)
         Divider().overlay(UI.stroke)
         center
           .overlay(alignment: .top) { if tools.isArmed { PromptBar() } }
           .overlay(alignment: .topTrailing) {
             if showViewCube { ViewCube(yaw: 0.7, pitch: 0.42).padding(14) }
           }
-        Divider().overlay(UI.stroke)
-        ViewSidebar(docked: true) { inspector }
       }
+      Divider().overlay(UI.stroke)
+      ViewSidebar(docked: true) { inspector }
     }
   }
 

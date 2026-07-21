@@ -35,7 +35,7 @@ struct Clip: Identifiable, Equatable, Codable {
   // float/dock flip that rebuilds the workspace view.
   let animatePanels = PanelStackState(
     order: ["Clips", "Channels"],
-    defaults: ["Clips"], side: .left)
+    defaults: [], side: .left)
 
   @ObservationIgnored private var timer: Timer?
 
