@@ -1879,3 +1879,12 @@ does the heavy implementation; Codex reviews it and plans what's next.
   Strict touched lint, 318 XCTest tests, 22 bridge/integration tests,
   native/root build, helper embedding, deep signing, and clean launch (PID
   78099) pass.
+
+- **2026-07-20 — OUT: production tool bars now use bounded categories.** In
+  Expanded density, every workspace has the reference-style category strip and
+  one captioned family row. Animate no longer lays out all 32 commands at once:
+  Transport, Keyframes, Curves, Tracks, and Reference each show at most seven.
+  Standard and Compact collapse families into menu buttons while preserving
+  every action. Strict touched lint, 319 XCTest tests, 22 bridge/integration
+  tests, the native/root build, helper embedding, strict deep signing, and a
+  clean root-app launch (PID 93863) pass.

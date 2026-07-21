@@ -3506,3 +3506,12 @@ change needed in the Handoff log instead of inventing commands.
   mapping coverage; strict touched lint, 318 XCTest tests, 22 bridge/integration
   tests, native/root build, helper embedding, deep signing, and clean launch
   (PID 78099) pass.
+- **2026-07-20 (Codex, condensed workspace tool bars):** Applied the reference
+  expanded-ribbon hierarchy to every production workspace. A scroll-safe top
+  category strip chooses one captioned tool family; Animate is split into
+  Transport, Keyframes, Curves, Tracks, and Reference with at most seven tools
+  visible at once. Standard and Compact render one menu per family, retaining
+  every command without the previous oversized row. Deterministic catalog/
+  density coverage joins the suite; strict touched lint, 319 XCTest tests, 22
+  bridge/integration tests, the native/root build, helper embedding, and strict
+  deep signing pass. The rebuilt root app launched cleanly as PID 93863.

@@ -337,8 +337,11 @@ struct StudioWorkspaceView: View {
   }
 
   private var workspaceToolCategories: [StudioToolCategory] {
-    guard !isUIDevWorkspace, workspace.activeWorkspace == .rig else { return [] }
-    return StudioWorkspaceToolCatalog.rigCategories(workspace: workspace)
+    guard !isUIDevWorkspace else { return [] }
+    if workspace.activeWorkspace == .rig {
+      return StudioWorkspaceToolCatalog.rigCategories(workspace: workspace)
+    }
+    return StudioWorkspaceToolCatalog.categories(for: workspace.activeWorkspace)
   }
 
   @ViewBuilder

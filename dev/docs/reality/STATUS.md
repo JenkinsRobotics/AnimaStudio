@@ -124,8 +124,13 @@
   Expanded density. Canvas hides the floating chrome, leaves plain
   capsule handles, and uses 16-point edge hot zones plus bridged zone/sidebar
   hover tracking so reveal does not flicker. Compact, Standard, and Expanded
-  tool densities share persistent settings; Expanded workspaces may expose a
-  divider-free category strip above a captioned Fusion-style tool row. Sidebar
+  tool densities share persistent settings; Expanded workspaces expose a
+  divider-free, horizontally bounded category strip above a captioned
+  Fusion-style tool row. Every production workspace now supplies those
+  categories. Animate exposes Transport, Keyframes, Curves, Tracks, and
+  Reference independently, limiting its expanded row to seven tools; Standard
+  and Compact collapse each family into one menu button instead of squeezing
+  every command into one oversized row. Sidebar
   tabs live in workspace-observable state, right presentation and camera state
   are app-wide, tool density/category is shared, and the Studio mode is global,
   so switching workspaces or view branches does not reset the shell. The

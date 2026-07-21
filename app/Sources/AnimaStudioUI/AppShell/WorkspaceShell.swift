@@ -40,6 +40,8 @@ enum StudioToolDensity: String, CaseIterable, Identifiable, Sendable {
     case .expanded: "square.grid.2x2"
     }
   }
+
+  var usesGroupedMenus: Bool { self != .expanded }
 }
 
 enum StudioSidebarSizing {
@@ -489,6 +491,12 @@ enum StudioWorkspaceToolCatalog {
     }
   }
 
+  static func categories(for workspace: StudioWorkspaceKind) -> [StudioToolCategory] {
+    groups(for: workspace).map { group in
+      StudioToolCategory(id: group.id, title: group.title, groups: [group])
+    }
+  }
+
   @MainActor
   static func rigCategories(workspace: StudioWorkspaceModel) -> [StudioToolCategory] {
     let canCreateRevoluteJoint = workspace.canCreateRevoluteJoint
@@ -688,7 +696,12 @@ struct StudioToolSidebar: View {
     let selected = settings.activeCategory(for: workspaceKind, fallback: first.id)
     return categories.first { $0.id == selected } ?? first
   }
-  private var activeGroups: [StudioToolGroup] { activeCategory?.groups ?? groups }
+  private var allGroups: [StudioToolGroup] {
+    groups.isEmpty ? categories.flatMap(\.groups) : groups
+  }
+  private var activeGroups: [StudioToolGroup] {
+    density == .expanded ? (activeCategory?.groups ?? allGroups) : allGroups
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -704,56 +717,99 @@ struct StudioToolSidebar: View {
   }
 
   private var categoryStrip: some View {
-    HStack(spacing: 2) {
-      ForEach(categories) { category in
-        let active = activeCategory?.id == category.id
-        Button {
-          settings.setActiveCategory(category.id, for: workspaceKind)
-        } label: {
-          Text(category.title.uppercased())
-            .font(.system(size: 9.5, weight: .semibold))
-            .tracking(0.4)
-            .foregroundStyle(active ? StudioPalette.accent : StudioPalette.muted)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-              active ? StudioPalette.accent.opacity(0.14) : Color.clear,
-              in: RoundedRectangle(cornerRadius: 6)
-            )
+    ScrollView(.horizontal) {
+      HStack(spacing: 2) {
+        ForEach(categories) { category in
+          let active = activeCategory?.id == category.id
+          Button {
+            settings.setActiveCategory(category.id, for: workspaceKind)
+          } label: {
+            Text(category.title.uppercased())
+              .font(.system(size: 9.5, weight: .semibold))
+              .tracking(0.4)
+              .foregroundStyle(active ? StudioPalette.accent : StudioPalette.muted)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 3)
+              .background(
+                active ? StudioPalette.accent.opacity(0.14) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 6)
+              )
+          }
+          .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
       }
-      Spacer(minLength: 8)
     }
+    .scrollIndicators(.hidden)
     .padding(.bottom, 2)
   }
 
   private var toolRow: some View {
     HStack(alignment: .top, spacing: density == .expanded ? 13 : 2) {
-      ForEach(activeGroups) { group in
-        if density == .expanded {
-          VStack(spacing: 1) {
-            HStack(spacing: 2) { ForEach(group.tools) { toolButton($0) } }
-            Text(group.title.uppercased())
-              .font(.system(size: 8.5, weight: .semibold))
-              .tracking(0.7)
-              .foregroundStyle(StudioPalette.muted)
-          }
+      ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
+        if density.usesGroupedMenus {
+          groupedMenu(group)
         } else {
-          ForEach(group.tools) { toolButton($0) }
+          if index > 0 {
+            Divider()
+              .frame(height: 46)
+              .padding(.horizontal, 2)
+          }
+          expandedGroup(group)
         }
       }
       densityMenu
     }
   }
 
+  private func expandedGroup(_ group: StudioToolGroup) -> some View {
+    VStack(spacing: 1) {
+      HStack(spacing: 2) { ForEach(group.tools) { toolButton($0) } }
+      Text(group.title.uppercased())
+        .font(.system(size: 8.5, weight: .semibold))
+        .tracking(0.7)
+        .foregroundStyle(StudioPalette.muted)
+    }
+  }
+
+  private func groupedMenu(_ group: StudioToolGroup) -> some View {
+    let compact = density == .compact
+    let active = group.tools.contains { $0.id == state.armedTool?.id }
+    return Menu {
+      ForEach(group.tools) { tool in
+        Button {
+          activate(tool)
+        } label: {
+          Label(tool.title, systemImage: tool.systemImage)
+        }
+        .disabled(!isEnabled(tool))
+      }
+    } label: {
+      VStack(spacing: 3) {
+        Image(systemName: group.tools.first?.systemImage ?? "square.grid.2x2")
+          .font(.system(size: compact ? 14 : 16, weight: .medium))
+        if !compact {
+          Text(group.title)
+            .font(.system(size: 9.5, weight: .medium))
+            .lineLimit(1)
+        }
+      }
+      .foregroundStyle(active ? Color.white : StudioPalette.muted)
+      .frame(width: compact ? 34 : 62, height: compact ? 34 : 48)
+      .background(
+        active ? StudioPalette.accent : Color.clear,
+        in: RoundedRectangle(cornerRadius: 8)
+      )
+      .contentShape(Rectangle())
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .help("\(group.title) tools")
+  }
+
   private func toolButton(_ tool: StudioToolDescriptor) -> some View {
     let active = state.armedTool?.id == tool.id
     let compact = density == .compact
-    let enabled: Bool = {
-      if case .unavailable = tool.behavior { return false }
-      return true
-    }()
+    let enabled = isEnabled(tool)
     return Button {
       activate(tool)
     } label: {
@@ -776,6 +832,11 @@ struct StudioToolSidebar: View {
     .disabled(!enabled)
     .opacity(enabled ? 1 : 0.32)
     .help(tool.help)
+  }
+
+  private func isEnabled(_ tool: StudioToolDescriptor) -> Bool {
+    if case .unavailable = tool.behavior { return false }
+    return true
   }
 
   private var densityMenu: some View {

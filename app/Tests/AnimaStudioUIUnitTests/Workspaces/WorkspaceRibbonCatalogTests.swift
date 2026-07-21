@@ -34,6 +34,22 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
     XCTAssertTrue(titles.contains("Lip Sync"))
   }
 
+  func testAnimationExpandedRibbonIsSplitIntoBoundedCategories() {
+    let categories = StudioWorkspaceToolCatalog.categories(for: .animate)
+    XCTAssertEqual(
+      categories.map(\.title),
+      ["Transport", "Keyframes", "Curves", "Tracks", "Reference"]
+    )
+    XCTAssertTrue(
+      categories.allSatisfy { category in
+        category.groups.flatMap(\.tools).count <= 7
+      }
+    )
+    XCTAssertTrue(StudioToolDensity.standard.usesGroupedMenus)
+    XCTAssertTrue(StudioToolDensity.compact.usesGroupedMenus)
+    XCTAssertFalse(StudioToolDensity.expanded.usesGroupedMenus)
+  }
+
   func testShowCatalogIncludesMediaEventsAndSync() {
     let groups = WorkspaceRibbonCatalog.groups(for: .show)
     XCTAssertEqual(groups.map(\.title), ["Sequence", "Clips", "Events", "Sync"])
