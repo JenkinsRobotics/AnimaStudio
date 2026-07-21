@@ -81,6 +81,9 @@ struct StudioDocumentBar: View {
       .padding(.horizontal, 14)
     }
     .frame(height: StudioMetrics.documentBarHeight)
+    // The native title bar is visually hidden, so empty header regions must
+    // explicitly restore standard drag and double-click window behavior.
+    .background(StudioWindowControlArea())
     .background(StudioPalette.documentChrome)
     .overlay(alignment: .bottom) {
       Rectangle().fill(StudioPalette.border).frame(height: 1)

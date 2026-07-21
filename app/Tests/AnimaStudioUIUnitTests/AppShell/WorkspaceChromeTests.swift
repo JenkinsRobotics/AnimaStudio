@@ -3,6 +3,13 @@ import XCTest
 @testable import AnimaStudioUI
 
 final class WorkspaceChromeTests: XCTestCase {
+  func testWindowHeaderDoubleClickFollowsMacOSPreference() {
+    XCTAssertEqual(StudioWindowDoubleClickAction.resolve(preference: nil), .zoom)
+    XCTAssertEqual(StudioWindowDoubleClickAction.resolve(preference: "Maximize"), .zoom)
+    XCTAssertEqual(StudioWindowDoubleClickAction.resolve(preference: "Minimize"), .minimize)
+    XCTAssertEqual(StudioWindowDoubleClickAction.resolve(preference: "None"), .none)
+  }
+
   func testCenteredWorkspaceNavigatorKeepsAReadableWidth() {
     XCTAssertGreaterThanOrEqual(WorkspaceSelectorMetrics.minimumWidth, 280)
     XCTAssertGreaterThanOrEqual(

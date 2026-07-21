@@ -3497,3 +3497,12 @@ change needed in the Handoff log instead of inventing commands.
   Added a deterministic mirrored-edge/layer-order test; strict touched-file
   lint, 317 XCTest tests, 22 bridge/integration tests, native/root build,
   helper embedding, deep signing, and clean launch (PID 70392) pass.
+- **2026-07-20 (Codex, native macOS window behavior):** Kept the seamless
+  hidden-titlebar chrome while restoring the behaviors it had displaced. The
+  Window scene now uses content-minimum resizability so edge/corner hit regions
+  and cursors remain native above the minimum size; empty document-header areas
+  use an AppKit control layer for native drag and the operator's macOS
+  double-click preference (zoom/minimize/none). Added deterministic preference
+  mapping coverage; strict touched lint, 318 XCTest tests, 22 bridge/integration
+  tests, native/root build, helper embedding, deep signing, and clean launch
+  (PID 78099) pass.

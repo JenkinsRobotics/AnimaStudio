@@ -158,7 +158,12 @@
   available from its menu and Settings.
   The main macOS window uses full-size content with a hidden transparent title
   bar, so the native traffic-light controls share the header's continuous
-  surface instead of occupying a separate dark title strip.
+  surface instead of occupying a separate dark title strip. The Window scene
+  explicitly uses content-minimum resizability, preserving standard macOS edge
+  and corner resize hit regions/cursors above the 1100x720 minimum. A transparent
+  AppKit control area behind the custom document header restores native window
+  dragging and preference-aware double-click behavior (zoom, minimize, or no
+  action) without intercepting the header's SwiftUI controls.
 - **Character-workspace shell parity:** The production Character workspace is
   split into center collection, left browser, and right import/preview content
   and supplies those pieces to the same scaffold as Rig, Animate, Show,

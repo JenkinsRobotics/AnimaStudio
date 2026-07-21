@@ -1870,3 +1870,12 @@ does the heavy implementation; Codex reviews it and plans what's next.
   closing, matching the preferred right-side behavior. Strict touched lint,
   317 XCTest tests, 22 bridge/integration tests, native/root build, helper
   embedding, deep signing, and clean launch (PID 70392) pass.
+
+- **2026-07-20 — OUT: native macOS window interaction is restored.** The main
+  scene uses content-minimum resizability, preserving standard edge/corner
+  resize targets and cursors, while a transparent AppKit layer behind empty
+  document-header regions supplies native window drag and preference-aware
+  double-click zoom/minimize/none. Header buttons remain above that layer.
+  Strict touched lint, 318 XCTest tests, 22 bridge/integration tests,
+  native/root build, helper embedding, deep signing, and clean launch (PID
+  78099) pass.

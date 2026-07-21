@@ -12,6 +12,11 @@ struct AnimaStudioApp: App {
     // the transparent title-bar region keeps the traffic lights on the same
     // continuous surface instead of adding a second dark strip above it.
     .windowStyle(.hiddenTitleBar)
+    // The window may grow freely above the root view's minimum. Without this,
+    // SwiftUI can size-lock hidden-title-bar windows and suppress native edge
+    // resize hit regions/cursors.
+    .windowResizability(.contentMinSize)
+    .defaultSize(width: 1_440, height: 900)
 
     Settings {
       AnimaStudioSettingsView()
