@@ -57,6 +57,16 @@ final class WorkspaceShellTests: XCTestCase {
     XCTAssertFalse(workspace.isActiveWorkspaceSidebarOpen)
   }
 
+  func testAssetsSidebarExposesOnlyProjectCharacterWorkflows() {
+    XCTAssertEqual(
+      StudioWorkspaceSidebarCatalog.tabs(for: .assets).map(\.title),
+      ["Characters", "Collections"]
+    )
+    XCTAssertFalse(
+      StudioWorkspaceSidebarCatalog.tabs(for: .assets).contains { $0.title == "Library" }
+    )
+  }
+
   func testPanelStacksStartUnselectedAndAllowMultipleOpenPanels() {
     let panels = StudioPanelStackState(
       order: ["A", "B", "C"],

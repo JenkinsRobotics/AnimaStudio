@@ -146,7 +146,10 @@ struct AssetBuilderContentView: View {
           .help("Delete the selected parts from this character")
         }
       }
-      if selection == .characters, activeCharacterID != nil {
+      if AssetBuilderFeatureAvailability.showsLibraries,
+        selection == .characters,
+        activeCharacterID != nil
+      {
         Button(action: publishActiveCharacter) {
           Label(
             activeCharacter?.sourceKind == .librarySnapshot ? "Update Library" : "Publish",

@@ -23,7 +23,7 @@ enum AssetsWorkspacePanelSizing {
   }
 
   static func browserHeight(characterCount: Int, hasActiveCharacter: Bool) -> CGFloat {
-    let rootRows = 2
+    let rootRows = 1
     let characterRows = max(characterCount, 0)
     let activeCollectionRows = hasActiveCharacter ? AssetBuilderCollection.allCases.count : 0
     let treeHeight = CGFloat(rootRows + characterRows + activeCollectionRows) * 30
@@ -68,6 +68,7 @@ struct AssetsWorkspaceView: View {
       }
     }
     .onAppear {
+      normalizeSelectionForAvailableFeatures()
       guard surface == .center, !workspace.hasInitializedAssetBuilderSelection else {
         return
       }
@@ -77,6 +78,16 @@ struct AssetsWorkspaceView: View {
     .onChange(of: activeCharacterID) { _, newValue in
       workspace.assetBuilderSelection = .initial(activeCharacterID: newValue)
       workspace.hasInitializedAssetBuilderSelection = true
+    }
+  }
+
+  private func normalizeSelectionForAvailableFeatures() {
+    guard !AssetBuilderFeatureAvailability.showsLibraries else { return }
+    switch workspace.assetBuilderSelection {
+    case .characterLibrary, .partsLibrary:
+      workspace.assetBuilderSelection = .initial(activeCharacterID: activeCharacterID)
+    case .characters, .characterCollection:
+      break
     }
   }
 

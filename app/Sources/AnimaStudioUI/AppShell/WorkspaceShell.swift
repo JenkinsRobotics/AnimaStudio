@@ -436,7 +436,6 @@ enum StudioWorkspaceSidebarCatalog {
     case .assets:
       [
         tab("Characters", "person.2"), tab("Collections", "square.stack.3d.up"),
-        tab("Library", "books.vertical"),
       ]
     case .rig:
       [

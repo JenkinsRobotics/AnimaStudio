@@ -14,7 +14,7 @@ struct AssetBuilderSidebar: View {
   let selectCharacter: (ProjectCharacterReference) -> Void
 
   @State private var filterText = ""
-  @State private var expandedIDs: Set<AssetBuilderTreeNodeID> = [.characters, .library]
+  @State private var expandedIDs: Set<AssetBuilderTreeNodeID> = [.characters]
   @State private var activeDragPayload: NavigatorDragPayload?
 
   var body: some View {

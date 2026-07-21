@@ -1896,3 +1896,12 @@ does the heavy implementation; Codex reviews it and plans what's next.
   A deterministic no-loss test covers every original node tool. Strict touched
   lint, 320 XCTest tests, 22 bridge/integration tests, native/root build, helper
   embedding, deep signing, and clean launch (PID 4025) pass.
+
+- **2026-07-20 — OUT: production Character libraries are temporarily hidden.**
+  The Character workspace now exposes only Characters and Collections. Its
+  tree contains one Project Characters root; Character Library, Parts Library,
+  the Library rail, and Publish action are absent. A single production feature
+  gate leaves the underlying store/data untouched for later reactivation, and
+  stale library selections normalize to the active project Character. Strict
+  touched lint, 321 XCTest tests, 22 bridge/integration tests, native/root
+  build, helper embedding, deep signing, and clean launch (PID 57890) pass.

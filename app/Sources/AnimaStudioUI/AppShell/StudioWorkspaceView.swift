@@ -240,7 +240,9 @@ struct StudioWorkspaceView: View {
       )
       await workspace.connectToAnimaCore()
       await loadIndexedCharacterIfNeeded()
-      refreshCharacterLibrary()
+      if AssetBuilderFeatureAvailability.showsLibraries {
+        refreshCharacterLibrary()
+      }
     }
     .onChange(of: workspace.detectedLayoutPreset) { _, preset in
       if let preset {
@@ -383,8 +385,6 @@ struct StudioWorkspaceView: View {
     switch tab {
     case "Characters":
       workspace.assetBuilderSelection = .characters
-    case "Library":
-      workspace.assetBuilderSelection = .characterLibrary
     case "Collections":
       if let characterID = session.document.activeCharacter?.id {
         workspace.assetBuilderSelection = .characterCollection(

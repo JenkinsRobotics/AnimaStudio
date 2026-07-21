@@ -3523,3 +3523,13 @@ change needed in the Handoff log instead of inventing commands.
   reorganized catalog preserves the complete tool-title multiset. Strict
   touched lint, 320 XCTest tests, 22 bridge/integration tests, native/root
   build, helper embedding, deep signing, and clean launch (PID 4025) pass.
+- **2026-07-20 (Codex, streamlined production Character workspace):** Hid the
+  experimental cross-project Character Library and planned Parts Library from
+  production testing. Assets now has only Characters/Collections rails and one
+  Project Characters tree root; Publish and library category affordances are
+  absent. The implementation uses one disabled availability gate, preserves
+  existing library files/storage code, and normalizes stale library selection
+  state back to the active project Character. Deterministic tree/rail tests,
+  strict touched lint, 321 XCTest tests, 22 bridge/integration tests,
+  native/root build, helper embedding, deep signing, and clean launch (PID
+  57890) pass.

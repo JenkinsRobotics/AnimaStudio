@@ -426,8 +426,11 @@
   left, one context-sensitive collection surface in the center, and a compact
   import tool plus live RealityKit selection preview on the right. The current
   project name and revision appear once in a compact non-tree header;
-  **Characters** and **Parts Library** are direct tree roots, so the active
+  **Project Characters** is the sole production tree root, so the active
   project is not redundantly nested as a folder around its own contents.
+  Character Library, Parts Library, their rail tab, and the Publish affordance
+  are intentionally hidden for the current production-test phase; their
+  underlying storage remains dormant rather than being deleted.
   The tree does not invent a parallel catalog: Parts, mates/relations/groups,
   clips, and scene scripts project the retained engine/project data, while
   material/appearance rows project the active character's `editor.json`.

@@ -220,6 +220,12 @@ enum AssetLibraryCategory: String, CaseIterable, Hashable, Identifiable, Sendabl
   }
 }
 
+/// Keeps experimental cross-project libraries out of the production workflow
+/// until their operator experience is ready to return as a complete feature.
+enum AssetBuilderFeatureAvailability {
+  static let showsLibraries = false
+}
+
 enum AssetBuilderSelection: Hashable, Sendable {
   case characters
   case characterLibrary
@@ -299,6 +305,9 @@ enum AssetBuilderTreeAdapter {
       children: characterNodes,
       filterTokens: []
     )
+    guard AssetBuilderFeatureAvailability.showsLibraries else {
+      return [charactersRoot]
+    }
     let characterLibrary = AssetBuilderTreeNode(
       id: .characterLibrary,
       selectionValue: .characterLibrary,
