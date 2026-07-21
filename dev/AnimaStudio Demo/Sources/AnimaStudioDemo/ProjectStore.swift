@@ -1,6 +1,11 @@
-// Project persistence — a JSON `.animastudio` document holding the imported
-// part sources plus the authored rig, clips, hardware channels, and theme.
-// Geometry itself is not copied; parts are re-imported from their source files.
+// Project persistence — a JSON scene document holding the imported part sources
+// plus the authored rig, clips, hardware channels, and theme.
+//
+// On import the operator chooses Copy (default) or Reference. Copy writes the
+// file into `project/assets/` so the project is self-contained and portable
+// (SolidWorks Pack-and-Go style); the stored path then points inside the
+// project. Reference keeps the original path. Either way, parts are re-read from
+// those paths on open — the tessellated geometry itself isn't serialised.
 import AppKit
 import Foundation
 import GeomKit
@@ -111,6 +116,24 @@ enum ProjectStore {
       let file = try read(from: url)
       restoreState(from: file)
       DemoModel.shared.reimport(paths: file.parts, projectName: file.name)
+    } catch {
+      DemoModel.shared.status = "Open failed — \(error.localizedDescription)"
+    }
+  }
+
+  /// Reloads parts + state from the currently-open project's scene file. Call
+  /// after `StudioProject.open(folder)` so a reopened project shows its parts.
+  static func loadCurrentScene() {
+    guard let url = StudioProject.shared.mainSceneURL,
+      FileManager.default.fileExists(atPath: url.path)
+    else {
+      DemoModel.shared.reimport(paths: [], projectName: StudioProject.shared.name)
+      return
+    }
+    do {
+      let file = try read(from: url)
+      restoreState(from: file)
+      DemoModel.shared.reimport(paths: file.parts, projectName: StudioProject.shared.name)
     } catch {
       DemoModel.shared.status = "Open failed — \(error.localizedDescription)"
     }

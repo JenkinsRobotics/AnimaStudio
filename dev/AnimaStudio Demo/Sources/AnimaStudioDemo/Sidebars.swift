@@ -247,9 +247,7 @@ struct StackCard<Content: View>: View {
     VStack(alignment: .leading, spacing: 0) {
       header
       Divider().overlay(UI.stroke)
-      // Fit content — no forced height. A floating panel is only as tall as it
-      // needs; stacked panels overflow into the sidebar's own scroll.
-      content.padding(12)
+      scrollableContent
     }
     .frame(width: docked && !floating ? nil : width)
     .fixedSize(horizontal: false, vertical: true)
@@ -258,6 +256,19 @@ struct StackCard<Content: View>: View {
     .shadow(color: .black.opacity(lifted ? 0.35 : 0), radius: lifted ? 18 : 0, y: lifted ? 10 : 0)
     .opacity(lifted && state.willFloat ? 0.9 : 1)
     .transition(.opacity.combined(with: .move(edge: state.side == .left ? .leading : .trailing)))
+  }
+
+  /// Docked panels scroll at the sidebar-column level; floating panels fit their
+  /// content but scroll internally once they'd grow taller than `maxContentHeight`.
+  private let maxContentHeight: CGFloat = 520
+  @ViewBuilder private var scrollableContent: some View {
+    if docked && !floating {
+      content.padding(12)
+    } else {
+      ScrollView { content.padding(12) }
+        .frame(maxHeight: maxContentHeight)
+        .fixedSize(horizontal: false, vertical: true)
+    }
   }
 
   private var header: some View {
@@ -560,18 +571,20 @@ struct ViewTabContent<Inspector: View>: View {
   }
 
   @ViewBuilder private var environmentSettings: some View {
+    // Bound to RenderState — these actually drive the RealityKit viewport.
+    let render = RenderState.shared
     Text("Scene").font(.system(size: 10.5, weight: .medium)).foregroundStyle(UI.text3)
-    Toggle("Grid", isOn: Binding(
-      get: { view.showGrid }, set: { view.showGrid = $0 }))
+    Toggle("Grid", isOn: Binding(get: { render.showGrid }, set: { render.showGrid = $0 }))
       .font(.system(size: 11.5)).toggleStyle(.switch).controlSize(.mini)
-    Toggle("Origin", isOn: Binding(
-      get: { view.showOrigin }, set: { view.showOrigin = $0 }))
+    Toggle("Origin", isOn: Binding(get: { render.showOrigin }, set: { render.showOrigin = $0 }))
+      .font(.system(size: 11.5)).toggleStyle(.switch).controlSize(.mini)
+    Toggle("View cube", isOn: Binding(get: { render.showViewCube }, set: { render.showViewCube = $0 }))
       .font(.system(size: 11.5)).toggleStyle(.switch).controlSize(.mini)
     Toggle("Ground shadow", isOn: Binding(
-      get: { view.groundShadow }, set: { view.groundShadow = $0 }))
+      get: { render.groundShadow }, set: { render.groundShadow = $0 }))
       .font(.system(size: 11.5)).toggleStyle(.switch).controlSize(.mini)
     slider("Key light", value: Binding(
-      get: { view.keyLight }, set: { view.keyLight = $0 }), range: 0...2)
+      get: { render.keyLightScale }, set: { render.keyLightScale = $0 }), range: 0...2)
   }
 
   @ViewBuilder private var appearanceSettings: some View {

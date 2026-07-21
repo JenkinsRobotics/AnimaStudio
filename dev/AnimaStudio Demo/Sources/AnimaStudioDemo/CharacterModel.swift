@@ -126,6 +126,18 @@ enum CharacterMath {
   var characters: [Character] = []
   var activeCharacterID: UUID?
 
+  // Character-tree UI state (project navigator on the Character tab).
+  var projectFilter = ""
+  var charactersExpanded = true
+  var expandedCharacters: Set<UUID> = []
+  /// Which child folder of a character is focused, e.g. "Parts", "Animations".
+  var focusedFolder: String?
+
+  func toggleExpanded(_ id: UUID) {
+    if expandedCharacters.contains(id) { expandedCharacters.remove(id) }
+    else { expandedCharacters.insert(id) }
+  }
+
   var activeIndex: Int? {
     if let id = activeCharacterID, let i = characters.firstIndex(where: { $0.id == id }) { return i }
     return characters.isEmpty ? nil : 0

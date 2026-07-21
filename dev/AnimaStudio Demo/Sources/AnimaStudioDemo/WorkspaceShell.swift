@@ -36,7 +36,17 @@ struct ToolGroup: Identifiable {
   let id = UUID()
   let name: String
   let tools: [RibbonTool]
-  init(_ name: String, _ tools: [RibbonTool]) { self.name = name; self.tools = tools }
+  private let explicitIcon: String?
+  init(_ name: String, _ tools: [RibbonTool]) {
+    self.name = name; self.tools = tools; self.explicitIcon = nil
+  }
+  init(_ name: String, icon: String, _ tools: [RibbonTool]) {
+    self.name = name; self.tools = tools; self.explicitIcon = icon
+  }
+  /// The category glyph shown at Compact density.
+  var categoryIcon: String { explicitIcon ?? tools.first?.icon ?? "square.grid.2x2" }
+  var primaryTools: [RibbonTool] { tools.filter(\.primary) }
+  var overflowTools: [RibbonTool] { tools.filter { !$0.primary } }
 }
 
 /// A top-level tool category (Design · Sketch · Surface · Sheet Metal …). A
@@ -80,33 +90,115 @@ struct ToolSidebar: View {
   /// The groups the icon row / expanded bar draws right now.
   private var activeGroups: [ToolGroup] { activeCategory?.groups ?? groups }
 
+  @State private var openGroup: UUID?
+
   var body: some View {
-    if density == .expanded && hasCategories {
-      categoryRibbon
-    } else {
-      iconRow
+    switch density {
+    case .compact: compactRow
+    case .standard: standardRow
+    case .expanded: hasCategories ? AnyView(categoryRibbon) : AnyView(expandedRow)
     }
   }
 
-  // MARK: Compact / standard — a single row of (optionally labelled) icons.
-  private var iconRow: some View {
-    HStack(spacing: density == .compact ? 1 : 2) {
-      ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
-        if density == .expanded {
-          expandedGroup(group)
-        } else {
-          HStack(spacing: density == .compact ? 1 : 2) {
-            ForEach(group.tools) { button($0) }
-          }
-        }
-        if index < activeGroups.count - 1 {
-          Divider().frame(height: density == .expanded ? 46 : 30).overlay(UI.stroke)
-        }
-      }
-      Divider().frame(height: density == .expanded ? 46 : 30).overlay(UI.stroke)
+  // MARK: Compact — one icon per category; its tools live in a popover.
+  private var compactRow: some View {
+    HStack(spacing: 2) {
+      ForEach(activeGroups) { group in categoryIcon(group) }
+      Divider().frame(height: 30).overlay(UI.stroke)
       settingsMenu
     }
-    .padding(.horizontal, 8).padding(.vertical, density == .compact ? 3 : 4)
+    .padding(.horizontal, 8).padding(.vertical, 3)
+    .modifier(SidebarChrome(docked: docked, radius: 14))
+    .frame(maxWidth: docked ? .infinity : nil, alignment: .leading)
+  }
+
+  private func categoryIcon(_ group: ToolGroup) -> some View {
+    let open = openGroup == group.id
+    let active = group.tools.contains { $0.id == tools.tool?.id }
+    return Button { openGroup = open ? nil : group.id } label: {
+      Image(systemName: group.categoryIcon).font(.system(size: 16, weight: .medium))
+        .foregroundStyle(open || active ? UI.accent : UI.text)
+        .frame(width: 36, height: 36)
+        .background(open || active ? UI.accent.opacity(0.14) : .clear,
+          in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+    .buttonStyle(.plain).help(group.name)
+    .popover(isPresented: Binding(
+      get: { openGroup == group.id }, set: { if !$0 { openGroup = nil } }),
+      arrowEdge: .bottom) { toolPopover(group) }
+  }
+
+  /// A category's tools as a labelled list — used by Compact + Standard overflow.
+  private func toolPopover(_ group: ToolGroup, tools list: [RibbonTool]? = nil) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(group.name.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.6)
+        .foregroundStyle(UI.text3).padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 2)
+      ForEach(list ?? group.tools) { tool in
+        let active = tools.tool?.id == tool.id
+        Button { arm(tool); openGroup = nil } label: {
+          HStack(spacing: 10) {
+            Image(systemName: tool.icon).font(.system(size: 13)).frame(width: 20)
+              .foregroundStyle(active ? UI.accent : UI.text2)
+            Text(tool.label).font(.system(size: 12.5)).foregroundStyle(UI.text)
+            Spacer(minLength: 16)
+            if active {
+              Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+                .foregroundStyle(UI.accent)
+            }
+          }
+          .padding(.horizontal, 10).padding(.vertical, 6)
+          .background(active ? UI.accent.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 7))
+          .contentShape(Rectangle())
+        }.buttonStyle(.plain)
+      }
+    }
+    .padding(6).frame(width: 190)
+  }
+
+  // MARK: Standard — key (primary) tools inline; the rest in a per-group overflow.
+  private var standardRow: some View {
+    HStack(spacing: 2) {
+      ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
+        HStack(spacing: 2) {
+          ForEach(group.primaryTools) { button($0) }
+          if !group.overflowTools.isEmpty { overflowButton(group) }
+        }
+        if index < activeGroups.count - 1 {
+          Divider().frame(height: 30).overlay(UI.stroke)
+        }
+      }
+      Divider().frame(height: 30).overlay(UI.stroke)
+      settingsMenu
+    }
+    .padding(.horizontal, 8).padding(.vertical, 4)
+    .modifier(SidebarChrome(docked: docked, radius: 14))
+    .frame(maxWidth: docked ? .infinity : nil, alignment: .leading)
+  }
+
+  private func overflowButton(_ group: ToolGroup) -> some View {
+    Button { openGroup = openGroup == group.id ? nil : group.id } label: {
+      Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(UI.text3).frame(width: 22, height: 52)
+    }
+    .buttonStyle(.plain).help("More \(group.name.lowercased())")
+    .popover(isPresented: Binding(
+      get: { openGroup == group.id }, set: { if !$0 { openGroup = nil } }),
+      arrowEdge: .bottom) { toolPopover(group, tools: group.overflowTools) }
+  }
+
+  // MARK: Expanded (no categories) — every tool, grouped with captions.
+  private var expandedRow: some View {
+    HStack(spacing: 2) {
+      ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
+        expandedGroup(group)
+        if index < activeGroups.count - 1 {
+          Divider().frame(height: 46).overlay(UI.stroke)
+        }
+      }
+      Divider().frame(height: 46).overlay(UI.stroke)
+      settingsMenu
+    }
+    .padding(.horizontal, 8).padding(.vertical, 4)
     .modifier(SidebarChrome(docked: docked, radius: 14))
     .frame(maxWidth: docked ? .infinity : nil, alignment: .leading)
   }
@@ -255,7 +347,6 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
   var toolArmGroup = RibbonGroup("Tools", "wrench", .accentColor, [])
   let leftTabs: [SidebarTab]
   var leftPanels: PanelStackState
-  var showViewCube = true
   @ViewBuilder var center: Center
   @ViewBuilder var left: (String) -> Left
   @ViewBuilder var inspector: Inspector
@@ -375,11 +466,6 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
           ViewSidebar { inspector }.padding(.trailing, edgePad)
         }
       }
-      .overlay(alignment: .topTrailing) {
-        if showViewCube {
-          ViewCube(yaw: 0.7, pitch: 0.42).padding(.top, 14).padding(.trailing, 62)
-        }
-      }
   }
 
   // Docked: side sidebars span the FULL height; the tool bar lives at the top of
@@ -394,9 +480,6 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
         Divider().overlay(UI.stroke)
         center
           .overlay(alignment: .top) { if tools.isArmed { PromptBar() } }
-          .overlay(alignment: .topTrailing) {
-            if showViewCube { ViewCube(yaw: 0.7, pitch: 0.42).padding(14) }
-          }
       }
       Divider().overlay(UI.stroke)
       ViewSidebar(docked: true) { inspector }

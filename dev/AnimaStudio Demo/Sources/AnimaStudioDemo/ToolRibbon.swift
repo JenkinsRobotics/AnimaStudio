@@ -32,7 +32,13 @@ enum ToolPopupStyle: String, CaseIterable, Identifiable {
   var isArmed: Bool { tool != nil }
   var prompt: String { tool.map { "\($0.label) — click in the viewport. Esc to cancel." } ?? "" }
 
+  /// The active workspace can claim tools that are immediate actions (import,
+  /// create, …) rather than canvas-arm tools. Returns true if it handled the
+  /// tap, in which case the tool does NOT stay armed. Set in .onAppear.
+  @ObservationIgnored var actionHandler: ((RibbonTool) -> Bool)?
+
   func arm(_ tool: RibbonTool, in group: RibbonGroup) {
+    if actionHandler?(tool) == true { return }   // immediate action, don't arm
     self.tool = tool
     groupName = group.name
     tint = group.tint
@@ -48,7 +54,11 @@ struct RibbonTool: Identifiable {
   let id = UUID()
   let icon: String
   let label: String
-  init(_ icon: String, _ label: String) { self.icon = icon; self.label = label }
+  /// Shown inline at Standard density; non-primary tools fall into the overflow.
+  let primary: Bool
+  init(_ icon: String, _ label: String, primary: Bool = true) {
+    self.icon = icon; self.label = label; self.primary = primary
+  }
 }
 
 struct RibbonGroup: Identifiable {

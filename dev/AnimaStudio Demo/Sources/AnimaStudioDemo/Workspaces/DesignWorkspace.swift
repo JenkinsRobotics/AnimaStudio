@@ -409,25 +409,12 @@ struct WorkspaceBrowserContent: View {
     ForEach(names, id: \.self) { name in row(icon: icon, title: name, muted: false, indent: 0) }
   }
 
+  // Shared TreeRow so the Design browser matches every other tree panel.
   private func row(icon: String, title: String, muted: Bool, indent: CGFloat,
     selected: Bool = false) -> some View
   {
-    HStack(spacing: 9) {
-      Image(systemName: icon).font(.system(size: 12))
-        .foregroundStyle(muted ? UI.text3 : (selected ? UI.accent : UI.accent2))
-        .frame(width: 16)
-      Text(title).font(.system(size: 11.5, weight: selected ? .medium : .regular))
-        .foregroundStyle(muted ? UI.text3 : UI.text)
-      Spacer(minLength: 8)
-    }
-    .padding(.leading, 12 + indent).padding(.trailing, 12).padding(.vertical, 5.5)
-    .background(selected ? UI.accent.opacity(0.14) : .clear)
-    .overlay(alignment: .leading) {
-      if selected {
-        Rectangle().fill(UI.accent).frame(width: 2)   // selection bar, like Xcode/Fusion
-      }
-    }
-    .contentShape(Rectangle())
+    TreeRow(depth: Int(indent / 16), icon: icon, title: title,
+      selected: selected, muted: muted)
   }
 }
 

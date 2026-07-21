@@ -94,6 +94,9 @@ enum RenderEngine: String, CaseIterable, Identifiable {
   var pinPerformance = false                // pinned live-stats HUD in the viewport corner
   var showOrigin = true                     // character-origin axes in the 3D view
   var showViewCube = true                   // orientation cube in the viewport corner
+  var showGrid = true                       // ground grid in the 3D view
+  var groundShadow = true                   // parts cast a grounding shadow
+  var keyLightScale = 1.0                   // overall lighting intensity multiplier
 }
 
 // Navigation preferences — speed/scale + invert, adjustable in Settings.

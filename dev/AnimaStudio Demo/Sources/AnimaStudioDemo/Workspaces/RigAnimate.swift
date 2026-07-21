@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// How asset-library rows are displayed.
+enum AssetViewMode: String, CaseIterable, Identifiable {
+  case compact = "List", thumbnail = "Tiles"
+  var id: String { rawValue }
+  var icon: String { self == .compact ? "list.bullet" : "square.grid.2x2" }
+}
+
 // MARK: - Rig / mates + DOF (Onshape-style joint authoring)
 
 struct RigWorkspace: View {
@@ -11,33 +18,46 @@ struct RigWorkspace: View {
       toolGroups: RigTools.groups,
       toolOverflow: RigTools.overflow,
       toolArmGroup: RigTools.armGroup,
-      leftTabs: [SidebarTab("Structure", "cube.transparent"),
+      // Rig builds assemblies from the character's imported parts. The Assets
+      // panel is the library you pull from; Structure is the assembly you build;
+      // Mates are the joints.
+      leftTabs: [SidebarTab("Assets", "shippingbox"),
+                 SidebarTab("Structure", "cube.transparent"),
                  SidebarTab("Mates", "point.3.connected.trianglepath.dotted")],
       leftPanels: rig.rigPanels
     ) {
       center
     } left: { tab in
-      if tab == "Structure" { structureTab } else { matesTab }
+      switch tab {
+      case "Assets": AssetLibraryPanel()
+      case "Structure": structureTab
+      default: matesTab
+      }
     } inspector: {
       MateInspectorHost()
     }
   }
 
-  /// The REAL assembly tree from the imported STEP.
+  /// The assembly being built — parts and sub-assemblies imported from the
+  /// Assets panel, organisable with folders/drag/delete like every tree.
   @ViewBuilder private var structureTab: some View {
     VStack(spacing: 0) {
-      Text(structureSubtitle.uppercased()).font(.system(size: 8.5, weight: .medium)).tracking(0.4)
-        .foregroundStyle(UI.text3)
+      Text("CURRENT ASSEMBLY · \(rig.assembly.nodes.count) ITEMS")
+        .font(.system(size: 8.5, weight: .medium)).tracking(0.4).foregroundStyle(UI.text3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12).padding(.bottom, 3)
-      if rig.partRows.isEmpty {
-        emptyHint("No model imported", "Import a STEP file in Assets to rig it.")
+        .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 3)
+      if rig.assembly.nodes.isEmpty {
+        emptyHint("Empty assembly",
+          "Open the Assets panel and import parts into this assembly.")
       } else {
-        ForEach(rig.partRows) { row in
-          ListRow(icon: "cube", title: row.name, detail: "\(row.faceCount)f",
-            level: row.depth, selected: rig.selectedParts.contains(row.id),
-            onTap: { rig.togglePart(row.id, extending: true) })
-        }
+        TreeView(model: rig.assembly)
+        Divider().overlay(UI.stroke)
+        HStack(spacing: 8) {
+          PanelAction(icon: "square.and.arrow.down", label: "Save Assembly") {
+            rig.saveAssembly()
+          }
+          Spacer()
+        }.padding(10)
       }
     }
   }
@@ -49,7 +69,7 @@ struct RigWorkspace: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12).padding(.bottom, 3)
       ForEach(rig.mates) { mate in
-        ListRow(icon: mate.type.icon, title: mate.name,
+        TreeRow(icon: mate.type.icon, title: mate.name,
           detail: "\(rig.partName(mate.parent)) → \(rig.partName(mate.child))",
           selected: rig.selectedMateID == mate.id,
           onTap: { rig.selectedMateID = mate.id })
@@ -146,6 +166,133 @@ enum RigTools {
   static let overflow: [RibbonTool] = []
   static let armGroup = RibbonGroup(
     "Rig", "point.3.connected.trianglepath.dotted", .accentColor, [])
+}
+
+// MARK: - Asset library (importable parts + assemblies for the assembly)
+
+/// The character's assets — parts and sub-assemblies — that can be imported into
+/// the current assembly. Mirrors what was imported/organised in Character. Shown
+/// as a compact list or rendered tiles.
+struct AssetLibraryPanel: View {
+  private var rig: RigModel { RigModel.shared }
+  private var model: DemoModel { DemoModel.shared }
+
+  private var mode: AssetViewMode { rig.assetViewMode }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      header
+      Divider().overlay(UI.stroke)
+      ScrollView {
+        VStack(spacing: 0) {
+          sectionTitle("PARTS", model.parts.count)
+          if model.parts.isEmpty {
+            hint("Import parts in the Character tab first.")
+          } else if mode == .compact {
+            ForEach(model.parts) { part in compactRow(part.name, "cube",
+              detail: "\(part.document.faces.count)f", payload: part.id) }
+          } else {
+            tileGrid(model.parts.map { ($0.name, "cube", $0.id) })
+          }
+
+          sectionTitle("ASSEMBLIES", assemblies.count)
+          if assemblies.isEmpty {
+            hint("No sub-assemblies yet — build one in Structure, then Save Assembly.")
+          } else {
+            ForEach(assemblies, id: \.name) { asm in
+              HStack(spacing: 8) {
+                Image(systemName: "square.stack.3d.up").font(.system(size: 12))
+                  .foregroundStyle(UI.accent2).frame(width: 18)
+                Text(asm.name).font(.system(size: 12)).foregroundStyle(UI.text).lineLimit(1)
+                Spacer(minLength: 6)
+                Button { withAnimation { rig.importAssembly(asm.url) } } label: {
+                  Image(systemName: "plus.circle.fill").font(.system(size: 14))
+                    .foregroundStyle(UI.accent)
+                }.buttonStyle(.plain).help("Import this sub-assembly")
+              }
+              .padding(.horizontal, 12).padding(.vertical, 5)
+            }
+          }
+        }.padding(.bottom, 8)
+      }
+    }
+  }
+
+  /// Real saved sub-assemblies on disk.
+  private var assemblies: [(name: String, url: URL)] { rig.savedAssemblies() }
+
+  private var header: some View {
+    HStack(spacing: 6) {
+      Text("LIBRARY").font(.system(size: 9.5, weight: .semibold)).tracking(0.6)
+        .foregroundStyle(UI.text3)
+      Spacer()
+      Picker("", selection: Binding(
+        get: { rig.assetViewMode }, set: { rig.assetViewMode = $0 })) {
+        ForEach(AssetViewMode.allCases) { Image(systemName: $0.icon).tag($0) }
+      }
+      .pickerStyle(.segmented).labelsHidden().frame(width: 76).controlSize(.small)
+    }
+    .padding(.horizontal, 12).padding(.vertical, 8)
+  }
+
+  private func sectionTitle(_ text: String, _ n: Int) -> some View {
+    HStack {
+      Text(text).font(.system(size: 9, weight: .semibold)).tracking(0.5).foregroundStyle(UI.text3)
+      Spacer()
+      Text("\(n)").font(.system(size: 9)).foregroundStyle(UI.text3)
+    }
+    .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 3)
+  }
+
+  private func hint(_ text: String) -> some View {
+    Text(text).font(.system(size: 10)).foregroundStyle(UI.text3)
+      .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: .infinity).padding(.vertical, 12).padding(.horizontal, 14)
+  }
+
+  /// One importable asset as a tight row with an add button.
+  private func compactRow(_ name: String, _ icon: String, detail: String,
+    payload: UUID?) -> some View
+  {
+    HStack(spacing: 8) {
+      Image(systemName: icon).font(.system(size: 12)).foregroundStyle(UI.accent2).frame(width: 18)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(name).font(.system(size: 12)).foregroundStyle(UI.text).lineLimit(1)
+        Text(detail).font(.system(size: 9)).foregroundStyle(UI.text3)
+      }
+      Spacer(minLength: 6)
+      importButton(name, icon, payload)
+    }
+    .padding(.horizontal, 12).padding(.vertical, 5)
+    .contentShape(Rectangle())
+  }
+
+  private func tileGrid(_ items: [(String, String, UUID)]) -> some View {
+    LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+      ForEach(items, id: \.2) { name, icon, pid in
+        VStack(spacing: 6) {
+          // "Render" tile — placeholder until real thumbnails exist.
+          ZStack {
+            RoundedRectangle(cornerRadius: 8).fill(UI.panelHi)
+            Image(systemName: icon).font(.system(size: 26, weight: .light)).foregroundStyle(UI.accent2)
+          }
+          .frame(height: 64)
+          .overlay(alignment: .topTrailing) { importButton(name, icon, pid).padding(4) }
+          Text(name).font(.system(size: 10)).foregroundStyle(UI.text).lineLimit(1)
+        }
+      }
+    }
+    .padding(.horizontal, 10)
+  }
+
+  private func importButton(_ name: String, _ icon: String, _ payload: UUID?) -> some View {
+    Button { withAnimation(.easeOut(duration: 0.18)) {
+      rig.importAsset(name, icon: icon, payload: payload)
+    } } label: {
+      Image(systemName: "plus.circle.fill").font(.system(size: 14))
+        .foregroundStyle(UI.accent).background(Circle().fill(UI.panel).padding(2))
+    }.buttonStyle(.plain).help("Import into the assembly")
+  }
 }
 
 // MARK: - Animate / timeline (Bottango-style dope sheet + curves)

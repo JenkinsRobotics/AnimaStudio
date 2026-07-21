@@ -28,7 +28,6 @@ struct ShowWorkspace: View {
       leftTabs: [SidebarTab("Scenes", "rectangle.3.group"),
                  SidebarTab("Nodes", "point.3.connected.trianglepath.dotted")],
       leftPanels: show.showPanels,
-      showViewCube: false
     ) {
       center
     } left: { tab in
@@ -247,7 +246,6 @@ struct HardwareWorkspace: View {
       leftTabs: [SidebarTab("Controller", "cpu"),
                  SidebarTab("Channels", "slider.horizontal.3")],
       leftPanels: hw.hardwarePanels,
-      showViewCube: false
     ) {
       center
     } left: { tab in

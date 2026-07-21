@@ -63,10 +63,55 @@ struct RigPartRow: Identifiable {
   // Rig workspace sidebar. Model-owned, not @State, so it survives the
   // float/dock flip that rebuilds the workspace view.
   let rigPanels = PanelStackState(
-    order: ["Structure", "Mates"],
+    order: ["Assets", "Structure", "Mates"],
     defaults: [], side: .left)
 
+  /// How the asset library rows are shown: a tight list or a rendered tile.
+  var assetViewMode: AssetViewMode = .compact
+  /// The assembly currently being built — parts/sub-assemblies imported into it.
+  let assembly = TreeModel()
+
+  var assemblyName = "Assembly 1"
+
+  /// Import an asset (a part or a saved sub-assembly) into the current assembly.
+  func importAsset(_ name: String, icon: String, payload: UUID?) {
+    assembly.nodes.append(TreeNode(name: name, icon: icon, payload: payload))
+  }
+
+  /// Save the current assembly as a reusable document under assets/assemblies/.
+  func saveAssembly() {
+    guard let dir = StudioProject.shared.assembliesURL else {
+      DemoModel.shared.status = "Save the project first to store assemblies."; return
+    }
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let file = AssemblyFile(name: assemblyName, nodes: assembly.nodes)
+    let url = dir.appendingPathComponent("\(assemblyName).animasm")
+    if let data = try? JSONEncoder().encode(file) {
+      try? data.write(to: url, options: .atomic)
+      DemoModel.shared.status = "Saved assembly “\(assemblyName)”"
+    }
+  }
+
+  /// Saved sub-assemblies on disk (name + file), for the Assets library.
+  func savedAssemblies() -> [(name: String, url: URL)] {
+    guard let dir = StudioProject.shared.assembliesURL,
+      let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+    else { return [] }
+    return items.filter { $0.pathExtension == "animasm" }
+      .map { ($0.deletingPathExtension().lastPathComponent, $0) }
+      .sorted { $0.0 < $1.0 }
+  }
+
+  /// Import a saved sub-assembly (as one collapsed node) into the current one.
+  func importAssembly(_ url: URL) {
+    guard let data = try? Data(contentsOf: url),
+      let file = try? JSONDecoder().decode(AssemblyFile.self, from: data) else { return }
+    assembly.nodes.append(TreeNode(name: file.name, icon: "square.stack.3d.up",
+      detail: "\(file.nodes.count) parts", isFolder: true, children: file.nodes))
+  }
+
   private var project: ProjectModel { ProjectModel.shared }
+
 
   /// Mates belong to the active character.
   var mates: [Mate] {

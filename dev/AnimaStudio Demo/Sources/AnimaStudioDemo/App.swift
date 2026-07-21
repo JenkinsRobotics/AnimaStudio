@@ -1,8 +1,33 @@
 // ClaudeUI — the app shell. A workspace walkthrough for a CAD-animatronic tool.
 // Reference-only mockup: Onshape tree/mates + Shapr3D restraint + Bottango
 // timeline/hardware + Codex-bench chrome. No engine, no persistence.
+import AppKit
 import GeomKit
 import SwiftUI
+
+/// A transparent AppKit layer that gives our custom (hidden-title-bar) header
+/// the standard window behaviours: drag to move, double-click to zoom/minimise
+/// per the user's macOS preference. Sits behind the header's controls, so the
+/// buttons still receive their own clicks; only the empty areas act on it.
+struct WindowControlArea: NSViewRepresentable {
+  func makeNSView(context: Context) -> NSView { WindowControlNSView() }
+  func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class WindowControlNSView: NSView {
+  override func mouseDown(with event: NSEvent) {
+    guard let window else { return super.mouseDown(with: event) }
+    if event.clickCount == 2 {
+      switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+      case "Minimize": window.miniaturize(nil)
+      case "None": break
+      default: window.zoom(nil)          // "Maximize" (default)
+      }
+    } else {
+      window.performDrag(with: event)     // native title-bar drag
+    }
+  }
+}
 
 enum Workspace: String, CaseIterable, Identifiable {
   case home = "Home"
@@ -28,7 +53,9 @@ enum Workspace: String, CaseIterable, Identifiable {
   }
   // The directed pipeline order (downstream stages gate on upstream ones).
   var stageIndex: Int { Workspace.pipeline.firstIndex(of: self) ?? 0 }
-  static let pipeline: [Workspace] = [.character, .design, .rig, .animate, .show, .hardware, .uiKit]
+  // Design is hidden for now — its tools moved to Rig. Keep the case so the
+  // sandbox can be re-enabled by adding `.design` back here.
+  static let pipeline: [Workspace] = [.character, .rig, .animate, .show, .hardware, .uiKit]
 }
 
 @main
@@ -44,6 +71,9 @@ struct ClaudeUIApp: App {
         .frame(minWidth: 1180, minHeight: 740)
     }
     .windowStyle(.hiddenTitleBar)
+    // Resizable above the content's minimum — otherwise SwiftUI can pin the
+    // window to its content size and the edge resize affordance disappears.
+    .windowResizability(.contentMinSize)
     .defaultSize(width: 1360, height: 860)
 
     // Mac-standard preferences window (⌘,)
@@ -177,6 +207,9 @@ struct TopBar: View {
     }
     .frame(height: 54)
     .frame(maxWidth: .infinity)
+    // Behind the controls: the header acts like a title bar — drag to move,
+    // double-click to zoom (the hidden title bar can't do this itself).
+    .background(WindowControlArea())
     .background(UI.panel.opacity(0.6))
   }
 

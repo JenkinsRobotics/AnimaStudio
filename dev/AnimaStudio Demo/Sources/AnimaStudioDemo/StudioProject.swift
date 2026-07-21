@@ -112,6 +112,25 @@ struct RecentProject: Codable, Identifiable, Equatable {
   var scenesURL: URL? { url?.appendingPathComponent("scenes", isDirectory: true) }
   var assetsURL: URL? { url?.appendingPathComponent("assets", isDirectory: true) }
 
+  /// Typed asset subfolders, so imports land where they belong (models/,
+  /// assemblies/, audio/, …) instead of one flat pile.
+  static let assetSubfolders = ["models", "assemblies", "audio", "video", "images", "scripts", "renders"]
+  func assetFolder(_ kind: String) -> URL? {
+    assetsURL?.appendingPathComponent(kind, isDirectory: true)
+  }
+  var modelsURL: URL? { assetFolder("models") }
+  var assembliesURL: URL? { assetFolder("assemblies") }
+
+  /// Makes sure the asset subfolders exist (older projects may predate them).
+  func ensureAssetFolders() {
+    guard let assetsURL else { return }
+    for kind in Self.assetSubfolders {
+      try? FileManager.default.createDirectory(
+        at: assetsURL.appendingPathComponent(kind, isDirectory: true),
+        withIntermediateDirectories: true)
+    }
+  }
+
   // MARK: - Lifecycle
 
   /// Creates the folder skeleton and its `project.json`.
@@ -122,6 +141,13 @@ struct RecentProject: Codable, Identifiable, Equatable {
     for child in ["characters", "scenes", "assets"] {
       try fm.createDirectory(
         at: url.appendingPathComponent(child, isDirectory: true),
+        withIntermediateDirectories: true)
+    }
+    // Typed subfolders under assets/.
+    for kind in assetSubfolders {
+      try fm.createDirectory(
+        at: url.appendingPathComponent("assets", isDirectory: true)
+          .appendingPathComponent(kind, isDirectory: true),
         withIntermediateDirectories: true)
     }
     var meta = ProjectMeta(name: name)
@@ -161,6 +187,7 @@ struct RecentProject: Codable, Identifiable, Equatable {
   private func adopt(url: URL, name: String) {
     self.url = url
     self.name = name
+    ensureAssetFolders()   // backfill typed subfolders for older projects
     DemoModel.shared.projectName = name
     RecentProjects.add(url, name: name)
   }

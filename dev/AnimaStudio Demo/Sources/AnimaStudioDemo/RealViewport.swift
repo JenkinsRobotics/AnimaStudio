@@ -13,6 +13,20 @@ struct ImportedPart: Identifiable {
   let document: GeometryDocument
 }
 
+/// How an imported asset relates to its source file. Chosen at import time.
+enum AssetImportMode: String, CaseIterable, Identifiable {
+  case copy = "Copy", reference = "Reference"
+  var id: String { rawValue }
+  var label: String { rawValue }
+  var detail: String {
+    switch self {
+    case .copy: return "Copy into the project — portable, source untouched"
+    case .reference: return "Link to the file in place — no copy, not portable"
+    }
+  }
+  var icon: String { self == .copy ? "doc.on.doc" : "link" }
+}
+
 @MainActor @Observable final class DemoModel {
   static let shared = DemoModel()   // one library, shared across every workspace
   var parts: [ImportedPart] = []
@@ -20,14 +34,42 @@ struct ImportedPart: Identifiable {
   var status = "No model loaded — import a STEP file"
   var projectName = "Untitled"
   var loading = false
+  /// How new imports are stored. Copy = self-contained project (default).
+  var importMode: AssetImportMode = .copy
   var importTotal = 0
   var importDone = 0
   var importingName = ""
   // Character workspace sidebar. Model-owned, not @State, so it survives the
   // float/dock flip that rebuilds the workspace view.
   let characterPanels = PanelStackState(
-    order: ["Characters", "Parts"],
+    order: CharacterSection.railOrder,
     defaults: [], side: .left)
+
+  /// Organisable tree of the imported parts (folders live here; leaves mirror
+  /// `parts`). Kept in sync as parts are added/removed.
+  let partsTree = TreeModel()
+  func syncPartsTree() {
+    let present = Set(partsLeafPayloads())
+    for part in parts where !present.contains(part.id) {
+      partsTree.nodes.append(TreeNode(name: part.name, icon: "cube",
+        detail: "\(part.document.faces.count)f", payload: part.id))
+    }
+    // Drop leaves whose part is gone.
+    let live = Set(parts.map(\.id))
+    partsTree.nodes = TreeModel.removing(deadLeafIDs(live: live), from: partsTree.nodes)
+  }
+  private func partsLeafPayloads() -> [UUID] {
+    func walk(_ ns: [TreeNode]) -> [UUID] { ns.flatMap { [$0.payload].compactMap { $0 } + walk($0.children) } }
+    return walk(partsTree.nodes)
+  }
+  private func deadLeafIDs(live: Set<UUID>) -> Set<UUID> {
+    func walk(_ ns: [TreeNode]) -> [UUID] {
+      ns.flatMap { n -> [UUID] in
+        (n.payload != nil && !live.contains(n.payload!) ? [n.id] : []) + walk(n.children)
+      }
+    }
+    return Set(walk(partsTree.nodes))
+  }
   @ObservationIgnored private var importError: String?
 
   /// 0...1 across the whole import batch (nil while the first file is parsing).
@@ -42,14 +84,56 @@ struct ImportedPart: Identifiable {
     panel.allowsMultipleSelection = true
     panel.canChooseDirectories = false
     panel.allowedContentTypes = ["step", "stp"].compactMap { UTType(filenameExtension: $0) }
-    guard panel.runModal() == .OK else { return }
-    load(panel.urls)
+    guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+    let urls = panel.urls
+
+    // Ask the operator how the files should be stored.
+    let alert = NSAlert()
+    alert.messageText = "Import \(urls.count) file\(urls.count == 1 ? "" : "s")"
+    alert.informativeText = StudioProject.shared.isOpen
+      ? "Copy the files into this project (portable, source untouched), or reference them where they are?"
+      : "No project is open, so files will be referenced in place. Create/open a project to copy them in."
+    if StudioProject.shared.isOpen {
+      alert.addButton(withTitle: "Copy into Project")
+      alert.addButton(withTitle: "Reference in Place")
+      alert.addButton(withTitle: "Cancel")
+      switch alert.runModal() {
+      case .alertFirstButtonReturn: importMode = .copy
+      case .alertSecondButtonReturn: importMode = .reference
+      default: return
+      }
+    } else {
+      importMode = .reference
+      alert.addButton(withTitle: "Import"); alert.addButton(withTitle: "Cancel")
+      guard alert.runModal() == .alertFirstButtonReturn else { return }
+    }
+    load(urls)
   }
 
-  /// Re-imports the part files recorded in a project document.
+  /// Where a file is loaded from: a copy inside the project's assets folder
+  /// (Copy mode) or the original location (Reference mode).
+  private func resolvedSource(_ url: URL) -> URL {
+    guard importMode == .copy, let assets = StudioProject.shared.modelsURL else { return url }
+    try? FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+    var dest = assets.appendingPathComponent(url.lastPathComponent)
+    var n = 2
+    while FileManager.default.fileExists(atPath: dest.path),
+      (try? Data(contentsOf: dest)) != (try? Data(contentsOf: url)) {
+      let base = url.deletingPathExtension().lastPathComponent
+      dest = assets.appendingPathComponent("\(base) \(n).\(url.pathExtension)"); n += 1
+    }
+    if !FileManager.default.fileExists(atPath: dest.path) {
+      try? FileManager.default.copyItem(at: url, to: dest)
+    }
+    return FileManager.default.fileExists(atPath: dest.path) ? dest : url
+  }
+
+  /// Re-imports the part files recorded in a project document. `persist: false`
+  /// so it neither re-copies nor autosaves (it's reading existing paths).
   func reimport(paths: [String], projectName: String) {
     self.projectName = projectName
     parts.removeAll()
+    partsTree.nodes.removeAll()
     selectedID = nil
     let urls = paths.map { URL(fileURLWithPath: $0) }
       .filter { FileManager.default.fileExists(atPath: $0.path) }
@@ -59,10 +143,10 @@ struct ImportedPart: Identifiable {
         : "Opened \(projectName) — part files not found at their saved paths"
       return
     }
-    load(urls)
+    load(urls, persist: false)
   }
 
-  func load(_ urls: [URL]) {
+  func load(_ urls: [URL], persist: Bool = true) {
     guard !urls.isEmpty else { return }
     let deflection = RenderState.shared.deflectionMillimetres / 1000.0   // mm → metres
     loading = true
@@ -75,13 +159,17 @@ struct ImportedPart: Identifiable {
       // One file at a time so progress advances and the first part appears early.
       for url in urls {
         importingName = url.lastPathComponent
+        // Copy into the project (or reference in place) BEFORE loading, so the
+        // part's sourceURL — which is what gets persisted — is the stored copy.
+        let source = persist ? resolvedSource(url) : url
         do {
           let document = try await Task.detached(priority: .userInitiated) {
-            try GeometryDocument.loadSTEP(url, linearDeflectionMetres: deflection)
+            try GeometryDocument.loadSTEP(source, linearDeflectionMetres: deflection)
           }.value
           let part = ImportedPart(name: url.lastPathComponent, document: document)
           parts.append(part)
           selectedID = part.id
+          syncPartsTree()
           // Commit the asset's nodes as parts of the active character.
           ProjectModel.shared.addAsset(part)
         } catch {
@@ -98,6 +186,8 @@ struct ImportedPart: Identifiable {
       } else if let s = selected {
         status = "\(s.name) · \(s.document.faces.count) faces · \(s.document.triangleCount) tris"
       }
+      // Persist the new parts into the project so they reload next open.
+      if persist { ProjectStore.autosave() }
     }
   }
 
@@ -128,6 +218,7 @@ struct ImportedPart: Identifiable {
   func remove(_ id: UUID) {
     parts.removeAll { $0.id == id }
     if selectedID == id { selectedID = parts.last?.id }
+    syncPartsTree()
   }
 }
 
@@ -149,9 +240,15 @@ struct PartViewport: View {
     let selected = session.isModelSelected
     let pick = SelectionModel.shared
     let selectionKey = "\(pick.assemblyNode ?? -1)|\(pick.faceID.map(String.init) ?? "-")|\(pick.level)"
+    // Read env prefs here so the RealityView update re-runs when they change.
+    let render = RenderState.shared
+    let showGrid = render.showGrid
+    let showOrigin = render.showOrigin
+    let groundShadow = render.groundShadow
+    let keyLightScale = Float(render.keyLightScale)
     return ZStack {
-      RenderState.shared.theme.backgroundColor
-      PerspectiveGrid()
+      render.theme.backgroundColor
+      if showGrid { PerspectiveGrid() }
       RealityView { content in
       let camera = PerspectiveCamera()
       camera.name = "camera"
@@ -198,11 +295,22 @@ struct PartViewport: View {
         }
       }
       if let origin = content.entities.first(where: { $0.name == "origin" }) {
-        origin.isEnabled = RenderState.shared.showOrigin
+        origin.isEnabled = showOrigin
+      }
+      // Live grounding-shadow toggle across the current parts.
+      if let container = content.entities.first(where: { $0.name == "part" }) {
+        for node in container.children {
+          if groundShadow {
+            node.components.set(GroundingShadowComponent(castsShadow: true))
+          } else {
+            node.components.remove(GroundingShadowComponent.self)
+          }
+        }
       }
       for (name, light) in [("light-key", theme.key), ("light-fill", theme.fill), ("light-rim", theme.rim)] {
         if let e = content.entities.first(where: { $0.name == name }) {
-          e.components.set(DirectionalLightComponent(color: Self.nsColor3(light.color), intensity: light.intensity))
+          e.components.set(DirectionalLightComponent(
+            color: Self.nsColor3(light.color), intensity: light.intensity * keyLightScale))
           e.look(at: .zero, from: light.directionFrom, relativeTo: nil)
         }
       }

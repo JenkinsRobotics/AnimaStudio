@@ -271,6 +271,7 @@ struct HomeWorkspace: View {
     do {
       ProjectStore.newProject()
       try studio.open(entry.url)
+      ProjectStore.loadCurrentScene()   // reload the project's parts
       recents = RecentProjects.merged()
       error = nil
       go(.character)
@@ -441,6 +442,7 @@ struct HomeWorkspace: View {
     do {
       ProjectStore.newProject()
       try studio.open(url)
+      ProjectStore.loadCurrentScene()   // reload the project's parts
       recents = RecentProjects.merged()
       error = nil
       go(.character)
@@ -497,45 +499,195 @@ struct CharacterWorkspace: View {
       toolGroups: CharacterTools.groups,
       toolOverflow: CharacterTools.overflow,
       toolArmGroup: CharacterTools.armGroup,
-      leftTabs: [SidebarTab("Characters", "person.crop.square"),
-                 SidebarTab("Parts", "cube.transparent")],
+      leftTabs: [SidebarTab("Characters", "person.crop.square")]
+        + CharacterSection.allCases.map { SidebarTab($0.rawValue, $0.icon) },
       leftPanels: model.characterPanels
     ) {
       center
     } left: { tab in
-      if tab == "Characters" { charactersTab } else { partsTab }
+      if tab == "Characters" { charactersTab }
+      else if let section = CharacterSection(rawValue: tab) { sectionPanel(section) }
     } inspector: {
       partInspector
     }
+    // Import/Manage/Prepare tools are immediate actions, not canvas-arm tools.
+    // The handler runs at tap time and returns true so the tool never arms.
+    .onAppear {
+      ToolState.shared.actionHandler = { tool in
+        guard CharacterTools.isAction(tool.label) else { return false }
+        characterAction(tool.label)
+        return true
+      }
+    }
+    .onDisappear { ToolState.shared.actionHandler = nil }
     .sheet(isPresented: $home.showNewCharacter) {
       NewCharacterDialog { name in project.addCharacter(named: name) }
     }
   }
 
+  private func characterAction(_ label: String) {
+    switch label {
+    case "Character": home.showNewCharacter = true
+    case "3D Model": model.importFiles()
+    case "Audio", "Video", "Image":
+      model.status = "\(label) import — coming soon (\(model.importMode.label.lowercased()))"
+    case "Reveal":
+      if let url = StudioProject.shared.url { NSWorkspace.shared.open(url) }
+      else { model.status = "No project folder to reveal — save the project first." }
+    case "Duplicate":
+      if let c = project.active { _ = project.addCharacter(named: "\(c.name) Copy") }
+    case "Replace": model.importFiles()
+    case "Folder", "Units", "Up Axis", "Origin", "Hierarchy", "Validate":
+      model.status = "\(label) — prep step (placeholder)"
+    default: break
+    }
+  }
+
   // MARK: Sidebars
 
+  // The project navigator: a character and everything it contains (parts,
+  // source assets, renders, assemblies, scripts, animations).
   @ViewBuilder private var charactersTab: some View {
     VStack(spacing: 0) {
-      if project.characters.isEmpty {
-        Text("No characters yet — create one to start assembling parts.")
+      HStack {
+        Text("PROJECT: \(model.projectName.uppercased())")
+          .font(.system(size: 10, weight: .semibold)).tracking(0.4).foregroundStyle(UI.text3)
+        Spacer()
+        Text("V1").font(.system(size: 9, weight: .bold)).foregroundStyle(UI.text2)
+          .padding(.horizontal, 7).padding(.vertical, 2).background(UI.panelHi, in: Capsule())
+      }.padding(.horizontal, 12).padding(.bottom, 6)
+
+      HStack(spacing: 6) {
+        Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(UI.text3)
+        TextField("Filter project contents", text: Binding(
+          get: { project.projectFilter }, set: { project.projectFilter = $0 }))
+          .textFieldStyle(.plain).font(.system(size: 12)).foregroundStyle(UI.text)
+      }
+      .padding(.horizontal, 10).padding(.vertical, 8)
+      .background(UI.panelHi, in: RoundedRectangle(cornerRadius: 8))
+      .padding(.horizontal, 10).padding(.bottom, 8)
+
+      Divider().overlay(UI.stroke)
+
+      projectTree
+    }
+  }
+
+  @ViewBuilder private var projectTree: some View {
+    // "Project Characters" group.
+    treeRow(icon: "person.2", title: "Project Characters",
+      count: filteredCharacters.count, indent: 0, bold: true,
+      chevron: project.charactersExpanded) { project.charactersExpanded.toggle() }
+
+    if project.charactersExpanded {
+      if filteredCharacters.isEmpty {
+        Text(project.characters.isEmpty
+          ? "No characters yet — create one to start assembling parts."
+          : "No matches.")
           .font(.system(size: 10)).foregroundStyle(UI.text3)
           .multilineTextAlignment(.center)
-          .frame(maxWidth: .infinity).padding(.vertical, 16).padding(.horizontal, 12)
+          .frame(maxWidth: .infinity).padding(.vertical, 14).padding(.horizontal, 16)
       }
-      ForEach(project.characters) { character in
-        ListRow(icon: "figure.stand", title: character.name,
-          detail: "\(character.parts.count)p",
-          selected: project.activeCharacterID == character.id,
+      ForEach(filteredCharacters) { character in
+        let active = project.activeCharacterID == character.id
+        treeRow(icon: "figure.stand", title: character.name, count: nil, indent: 1,
+          selected: active, chevron: project.expandedCharacters.contains(character.id),
+          trailing: active ? "circle.fill" : nil,
+          onChevron: { project.toggleExpanded(character.id) },
           onTap: { project.activeCharacterID = character.id })
+
+        if project.expandedCharacters.contains(character.id) {
+          ForEach(CharacterSection.allCases) { section in
+            let focused = active && project.focusedFolder == section.rawValue
+            treeRow(icon: section.icon, title: section.rawValue,
+              count: section.count(character), indent: 2, selected: focused) {
+              project.activeCharacterID = character.id
+              project.focusedFolder = section.rawValue
+              // Open that section's panel in the rail, like clicking its icon.
+              if !model.characterPanels.isEnabled(section.rawValue) {
+                withAnimation(.easeOut(duration: 0.18)) {
+                  model.characterPanels.toggle(section.rawValue)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // MARK: Section panels — one per character folder, all built from the same
+  // list row so every section looks and behaves identically.
+
+  @ViewBuilder private func sectionPanel(_ section: CharacterSection) -> some View {
+    if section == .parts {
+      partsTab                       // real: model.parts + import + import-mode
+    } else {
+      genericSection(section)
+    }
+  }
+
+  @ViewBuilder private func genericSection(_ section: CharacterSection) -> some View {
+    let rows = sectionRows(section)
+    VStack(spacing: 0) {
+      sectionHeader(section, count: rows.count)
+      if rows.isEmpty {
+        Text("No \(section.rawValue.lowercased()) yet.")
+          .font(.system(size: 10)).foregroundStyle(UI.text3)
+          .frame(maxWidth: .infinity).padding(.vertical, 16)
+      }
+      ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+        TreeRow(icon: section.icon, title: row.title, detail: row.detail)
       }
       Divider().overlay(UI.stroke).padding(.top, 4)
       HStack(spacing: 8) {
-        PanelAction(icon: "plus", label: "Character") { home.showNewCharacter = true }
-        PanelAction(icon: "square.and.arrow.up", label: "Publish") { publish() }
-          .opacity(project.active == nil ? 0.45 : 1)
+        PanelAction(icon: "plus", label: "Add") { model.status = "Add \(section.rawValue) (placeholder)" }
+        PanelAction(icon: "folder.badge.plus", label: "Folder") {
+          model.status = "New folder in \(section.rawValue) (placeholder)"
+        }
         Spacer()
       }.padding(10)
     }
+  }
+
+  private func sectionHeader(_ section: CharacterSection, count: Int) -> some View {
+    Text("\((project.active?.name ?? "—").uppercased()) · \(count) \(section.rawValue.uppercased())")
+      .font(.system(size: 8.5, weight: .medium)).tracking(0.4).foregroundStyle(UI.text3)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 3)
+  }
+
+  /// The items in a section, as consistent (title, detail) rows.
+  private func sectionRows(_ section: CharacterSection) -> [(title: String, detail: String)] {
+    guard let c = project.active else { return [] }
+    switch section {
+    case .parts: return model.parts.map { ($0.name, "\($0.document.faces.count)f") }
+    case .sourceAssets: return c.sourceAssets.map { ($0, "source") }
+    case .renders: return []
+    case .assemblies: return c.groups.map { ($0.name, "group") }
+    case .scripts: return c.channels.map { ("Channel \($0.channel)", "servo") }
+    case .animations: return c.clips.map { ($0.name, String(format: "%.1fs", $0.duration)) }
+    }
+  }
+
+  private var filteredCharacters: [Character] {
+    let q = project.projectFilter.trimmingCharacters(in: .whitespaces).lowercased()
+    guard !q.isEmpty else { return project.characters }
+    return project.characters.filter { $0.name.lowercased().contains(q) }
+  }
+
+
+  /// Thin adapter onto the shared TreeRow so the character tree matches every
+  /// other browser panel.
+  private func treeRow(icon: String, title: String, count: Int?, indent: Int,
+    bold: Bool = false, selected: Bool = false, chevron: Bool? = nil,
+    trailing: String? = nil, onChevron: (() -> Void)? = nil,
+    onTap: (() -> Void)? = nil) -> some View
+  {
+    TreeRow(depth: indent, icon: icon, title: title, count: count,
+      expandable: chevron != nil, expanded: chevron ?? false,
+      selected: selected, bold: bold,
+      onToggleExpand: onChevron ?? onTap, onTap: onTap)
   }
 
   @ViewBuilder private var partsTab: some View {
@@ -549,14 +701,28 @@ struct CharacterWorkspace: View {
           .font(.system(size: 10)).foregroundStyle(UI.text3)
           .multilineTextAlignment(.center)
           .frame(maxWidth: .infinity).padding(.vertical, 16).padding(.horizontal, 12)
-      }
-      ForEach(model.parts) { part in
-        ListRow(icon: "cube", title: part.name,
-          detail: "\(part.document.faces.count)f",
-          selected: model.selectedID == part.id,
-          onTap: { model.selectedID = part.id })
+      } else {
+        // Organisable tree — folders, drag-and-drop, group, delete.
+        TreeView(model: model.partsTree) { node in
+          if let pid = node.payload { model.selectedID = pid }
+        }
       }
       Divider().overlay(UI.stroke).padding(.top, 4)
+      // How new imports are stored — an option at import time.
+      HStack(spacing: 8) {
+        Text("NEW IMPORTS").font(.system(size: 8.5, weight: .semibold)).tracking(0.4)
+          .foregroundStyle(UI.text3)
+        Spacer()
+        Picker("", selection: Binding(
+          get: { model.importMode }, set: { model.importMode = $0 })) {
+          ForEach(AssetImportMode.allCases) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+      }
+      .padding(.horizontal, 10).padding(.top, 6)
+      Text(model.importMode.detail).font(.system(size: 9.5)).foregroundStyle(UI.text3)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.bottom, 2)
       HStack(spacing: 8) {
         PanelAction(icon: model.loading ? "hourglass" : "plus", label: "Import Model") {
           model.importFiles()
@@ -637,18 +803,69 @@ struct CharacterWorkspace: View {
 /// Character's tool catalog for the shared ToolSidebar — the transform + inspect
 /// verbs from the legacy ribbon. The center tray's one ACTION (Import) moves to
 /// overflow so retiring the tray loses nothing.
+/// A folder inside a character — the single source of truth for the tree, the
+/// left-rail tabs, and the section panels, so all three stay consistent.
+enum CharacterSection: String, CaseIterable, Identifiable {
+  case parts = "Parts", sourceAssets = "Source Assets", renders = "Renders"
+  case assemblies = "Assemblies", scripts = "Scripts", animations = "Animations"
+
+  var id: String { rawValue }
+  var icon: String {
+    switch self {
+    case .parts: return "shippingbox"
+    case .sourceAssets: return "cube"
+    case .renders: return "photo"
+    case .assemblies: return "square.stack.3d.up"
+    case .scripts: return "curlybraces"
+    case .animations: return "waveform.path"
+    }
+  }
+  func count(_ c: Character) -> Int {
+    switch self {
+    case .parts: return c.parts.count
+    case .sourceAssets: return c.sourceAssets.count
+    case .renders: return 0
+    case .assemblies: return c.groups.count
+    case .scripts: return c.channels.count
+    case .animations: return c.clips.count
+    }
+  }
+  /// Left-rail tab order: the Characters tree, then a tab per section.
+  static var railOrder: [String] { ["Characters"] + allCases.map(\.rawValue) }
+}
+
 enum CharacterTools {
+  // Import / Manage / Prepare — everything you do to bring a character and its
+  // assets into the project. These fire immediately (see characterAction) rather
+  // than arming a canvas tool.
+  static let actionLabels: Set<String> = [
+    "Character", "3D Model", "Audio", "Video", "Image",
+    "Replace", "Reveal", "Folder", "Duplicate",
+    "Units", "Up Axis", "Origin", "Hierarchy", "Validate",
+  ]
+  static func isAction(_ label: String) -> Bool { actionLabels.contains(label) }
+
   static let groups: [ToolGroup] = [
-    ToolGroup("Transform", [
-      RibbonTool("cursorarrow", "Select"), RibbonTool("move.3d", "Move"),
-      RibbonTool("rotate.3d", "Rotate"),
-      RibbonTool("arrow.up.left.and.arrow.down.right", "Scale"),
+    ToolGroup("Import", icon: "square.and.arrow.down", [
+      RibbonTool("person.crop.square", "Character"), RibbonTool("cube", "3D Model"),
+      RibbonTool("waveform", "Audio", primary: false),
+      RibbonTool("play.rectangle", "Video", primary: false),
+      RibbonTool("photo", "Image", primary: false),
     ]),
-    ToolGroup("Inspect", [
-      RibbonTool("ruler", "Measure"), RibbonTool("square.dashed", "Section"),
+    ToolGroup("Manage", icon: "slider.horizontal.3", [
+      RibbonTool("arrow.triangle.2.circlepath", "Replace"),
+      RibbonTool("magnifyingglass", "Reveal"),
+      RibbonTool("folder.badge.plus", "Folder", primary: false),
+      RibbonTool("square.on.square", "Duplicate", primary: false),
+    ]),
+    ToolGroup("Prepare", icon: "wrench.and.screwdriver", [
+      RibbonTool("ruler", "Units"), RibbonTool("checkmark.seal", "Validate"),
+      RibbonTool("arrow.up.to.line", "Up Axis", primary: false),
+      RibbonTool("scope", "Origin", primary: false),
+      RibbonTool("list.bullet.indent", "Hierarchy", primary: false),
     ]),
   ]
 
-  static let overflow: [RibbonTool] = [RibbonTool("plus", "Import")]
+  static let overflow: [RibbonTool] = []
   static let armGroup = RibbonGroup("Character", "person.crop.square", .accentColor, [])
 }
