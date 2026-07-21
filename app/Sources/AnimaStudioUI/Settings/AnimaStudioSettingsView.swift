@@ -13,7 +13,7 @@ public struct AnimaStudioSettingsView: View {
     StudioSettingsTab.workspace.rawValue
   @AppStorage(StudioPreferenceKey.workspaceRootPath) private var workspaceRootPath = ""
   @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
-    StudioLayoutPreset.studio.rawValue
+    StudioLayoutPreset.floating.rawValue
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var appearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile) private var profileRawValue =
@@ -261,7 +261,7 @@ public struct AnimaStudioSettingsView: View {
 
   private var defaultLayoutPresetBinding: Binding<StudioLayoutPreset> {
     Binding(
-      get: { StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .studio },
+      get: { StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .floating },
       set: { defaultLayoutPresetRawValue = $0.rawValue }
     )
   }

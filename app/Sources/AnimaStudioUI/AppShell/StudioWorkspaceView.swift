@@ -39,7 +39,7 @@ struct StudioWorkspaceView: View {
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
-    StudioLayoutPreset.studio.rawValue
+    StudioLayoutPreset.floating.rawValue
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile)
   private var viewportNavigationProfileRawValue =
     PreviewNavigationProfile.default.rawValue
@@ -236,7 +236,7 @@ struct StudioWorkspaceView: View {
     }
     .task {
       workspace.applyLayoutPreset(
-        StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .studio
+        StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .floating
       )
       await workspace.connectToAnimaCore()
       await loadIndexedCharacterIfNeeded()
@@ -311,7 +311,20 @@ struct StudioWorkspaceView: View {
         workspaceSidebarContent(tab: tab)
       },
       right: { tab in
-        StudioViewSidebarPanel(tab: tab) {
+        StudioViewSidebarPanel(
+          tab: tab,
+          viewport: StudioViewportSidebarBindings(
+            renderStyle: viewportRenderStyleBinding,
+            edgeDisplay: viewportEdgeDisplayBinding,
+            showsGrid: Binding(
+              get: { workspace.showsPreviewGrid },
+              set: { workspace.showsPreviewGrid = $0 }
+            ),
+            showsShadows: $viewportShowsShadows,
+            lightingIntensity: $viewportLightingIntensity,
+            appearance: viewportAppearanceBinding
+          )
+        ) {
           workspaceInspectorContent
         }
       }
@@ -382,18 +395,12 @@ struct StudioWorkspaceView: View {
   }
 
   private func performWorkspaceRibbonAction(_ action: WorkspaceRibbonAction) {
-    switch action {
-    case .importAnimaCharacter: presentAnimaCharacterImportPanel()
-    case .importModel: presentModelImportPanel()
-    case .stopPlayback: workspace.stopPlayback()
-    case .togglePlayback: workspace.togglePlayback()
-    case .toggleLoop: workspace.loopsPreviewPlayback.toggle()
-    case .previousKeyframe: workspace.seekAdjacentKeyframe(forward: false)
-    case .nextKeyframe: workspace.seekAdjacentKeyframe(forward: true)
-    case .frameSelection: workspace.frameSelection()
-    case .toggleGrid: workspace.showsPreviewGrid.toggle()
-    case .toggleBottomEditor: workspace.toggleBottomEditor()
-    }
+    WorkspaceRibbonActionDispatcher.perform(
+      action,
+      workspace: workspace,
+      importModel: presentModelImportPanel,
+      importAnimaCharacter: presentAnimaCharacterImportPanel
+    )
   }
 
   /// Applies the currently armed model tool. Camera navigation always disarms
@@ -401,27 +408,19 @@ struct StudioWorkspaceView: View {
   private func commitArmedTool() {
     let toolState = StudioToolState.shared
     guard let tool = toolState.armedTool,
-      case .arm(let command) = tool.behavior
+      case .arm(let payload) = tool.behavior
     else { return }
 
-    if command.hasPrefix("rig.part."),
-      let kind = RigPrimitiveKind(rawValue: String(command.dropFirst("rig.part.".count)))
-    {
+    switch payload {
+    case .addPart(let kind):
       workspace.addPart(kind: kind)
       toolState.committed()
-      return
-    }
-
-    if command == "rig.mate.revolute" {
+    case .createRevoluteMate:
       workspace.beginRevoluteMatePlacement()
       toolState.committed()
-      return
-    }
-
-    if command.hasPrefix("rig.relation.") {
-      let rawKind = String(command.dropFirst("rig.relation.".count))
+    case .createRelation(let kindID):
       if let relation = workspace.engineRelationTypes.first(where: {
-        $0.kind.rawValue == rawKind
+        $0.kind.rawValue == kindID
       }) {
         workspace.beginRelationDraft(relation)
         toolState.committed()
@@ -534,12 +533,12 @@ struct StudioWorkspaceView: View {
   }
 
   private var showsFloatingNavigator: Bool {
-    StudioLayoutState.shared.detectedPreset == .studio
+    StudioLayoutState.shared.detectedPreset == .floating
       && workspace.isActiveWorkspaceSidebarOpen
   }
 
   private var showsFloatingInspector: Bool {
-    StudioLayoutState.shared.detectedPreset == .studio
+    StudioLayoutState.shared.detectedPreset == .floating
       && StudioViewSidebarState.shared.isOpen
   }
 
@@ -940,27 +939,23 @@ struct StudioWorkspaceView: View {
   }
 
   private var shellRenderStyle: ViewportRenderStyle {
-    switch StudioViewSidebarState.shared.displayMode {
-    case .wireframe: .wireframe
-    case .hiddenLine: .shadedWithEdges
-    case .shaded: viewportRenderStyle
-    }
+    viewportRenderStyle
   }
 
   private var shellEdgeDisplay: ViewportEdgeDisplay {
-    StudioViewSidebarState.shared.showsEdges ? viewportEdgeDisplay : .hidden
+    viewportEdgeDisplay
   }
 
   private var shellShowsGrid: Bool {
-    workspace.showsPreviewGrid && StudioViewSidebarState.shared.showsGrid
+    workspace.showsPreviewGrid
   }
 
   private var shellShowsShadows: Bool {
-    viewportShowsShadows && StudioViewSidebarState.shared.showsGroundShadow
+    viewportShowsShadows
   }
 
   private var shellLightingIntensity: Float {
-    Float(viewportLightingIntensity * StudioViewSidebarState.shared.lightingIntensity)
+    Float(viewportLightingIntensity)
   }
 
   private var viewportRenderStyleBinding: Binding<ViewportRenderStyle> {

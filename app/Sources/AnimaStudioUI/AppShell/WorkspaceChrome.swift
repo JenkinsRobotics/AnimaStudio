@@ -304,7 +304,7 @@ struct WorkspaceLayoutMenu: View {
 
       Divider()
       Button("Reset Studio Layout") {
-        workspace.applyLayoutPreset(.studio)
+        workspace.applyLayoutPreset(.floating)
       }
     } label: {
       Image(systemName: currentIcon)
@@ -336,7 +336,7 @@ struct WorkspaceLayoutMenu: View {
 
   private var currentColor: Color {
     switch workspace.detectedLayoutPreset {
-    case .studio: StudioPalette.semanticPart
+    case .floating: StudioPalette.semanticPart
     case .docked: StudioPalette.joint
     case .canvas: StudioPalette.hardware
     case nil: StudioPalette.accent
@@ -577,39 +577,23 @@ private struct WorkspaceFloatingGroupPopover: View {
 
   private func isEnabled(_ tool: WorkspaceRibbonToolDescriptor) -> Bool {
     guard let action = tool.action else { return false }
-    return switch action {
-    case .importAnimaCharacter: workspace.animaCoreState != .connecting
-    case .importModel: !workspace.isLoadingModelHierarchy
-    case .frameSelection: workspace.canFrameSelection
-    case .stopPlayback, .togglePlayback, .toggleLoop, .previousKeyframe, .nextKeyframe,
-      .toggleGrid, .toggleBottomEditor:
-      true
-    }
+    return WorkspaceRibbonActionDispatcher.isEnabled(action, workspace: workspace)
   }
 
   private func isSelected(_ tool: WorkspaceRibbonToolDescriptor) -> Bool {
-    switch tool.action {
-    case .toggleLoop: workspace.loopsPreviewPlayback
-    case .toggleGrid: workspace.showsPreviewGrid
-    case .toggleBottomEditor: workspace.activePresentation.showsBottomEditor
-    default: false
-    }
+    tool.action.map {
+      WorkspaceRibbonActionDispatcher.isSelected($0, workspace: workspace)
+    } ?? false
   }
 
   private func perform(_ action: WorkspaceRibbonAction?) {
     guard let action else { return }
-    switch action {
-    case .importAnimaCharacter: importAnimaCharacter()
-    case .importModel: importModel()
-    case .stopPlayback: workspace.stopPlayback()
-    case .togglePlayback: workspace.togglePlayback()
-    case .toggleLoop: workspace.loopsPreviewPlayback.toggle()
-    case .previousKeyframe: workspace.seekAdjacentKeyframe(forward: false)
-    case .nextKeyframe: workspace.seekAdjacentKeyframe(forward: true)
-    case .frameSelection: workspace.frameSelection()
-    case .toggleGrid: workspace.showsPreviewGrid.toggle()
-    case .toggleBottomEditor: workspace.toggleBottomEditor()
-    }
+    WorkspaceRibbonActionDispatcher.perform(
+      action,
+      workspace: workspace,
+      importModel: importModel,
+      importAnimaCharacter: importAnimaCharacter
+    )
   }
 }
 

@@ -1852,3 +1852,14 @@ does the heavy implementation; Codex reviews it and plans what's next.
   persistent outer-edge preference reverses rail/stack order without removing
   the edge margin. Inspector selection opens the real Inspector stack entry.
   Strict touched lint, 314 XCTest tests, and 22 bridge/integration tests pass.
+
+- **2026-07-20 — OUT: shell-alignment quality cleanup is complete.** Rig tools
+  now carry typed payloads rather than `rig.part.*` strings; one dispatcher
+  owns every ribbon action's enablement, selection, and execution. Both sides
+  render the same rail component, and the View sidebar edits the persisted
+  RealityKit render/grid/shadow/lighting/appearance bindings directly instead
+  of duplicating them in sidebar state. The internal layout case is now
+  `floating` with the legacy `"studio"` raw value retained for existing user
+  preferences. Recursive format lint, 316 XCTest tests, 22 bridge/integration
+  tests, the native Xcode build, root rebuild/helper embedding, strict deep
+  signing, live launch (PID 74679), and diff check pass.

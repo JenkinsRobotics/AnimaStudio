@@ -39,7 +39,7 @@ enum StudioFloatingRibbonEdge: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
-  case studio
+  case floating = "studio"
   case docked
   case canvas
 
@@ -47,7 +47,7 @@ enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
 
   var title: String {
     switch self {
-    case .studio: "Floating"
+    case .floating: "Floating"
     case .docked: "Docked"
     case .canvas: "Canvas"
     }
@@ -55,7 +55,7 @@ enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
 
   var systemImage: String {
     switch self {
-    case .studio: "macwindow.on.rectangle"
+    case .floating: "macwindow.on.rectangle"
     case .docked: "rectangle.split.3x1"
     case .canvas: "viewfinder"
     }
@@ -63,7 +63,7 @@ enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
 
   var tintRole: WorkspaceRibbonGroupRole {
     switch self {
-    case .studio: .components
+    case .floating: .components
     case .docked: .mates
     case .canvas: .hardware
     }
@@ -71,7 +71,7 @@ enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
 
   var navigatorPlacement: StudioPanelPlacement {
     switch self {
-    case .studio: .floating
+    case .floating: .floating
     case .docked: .docked
     case .canvas: .hidden
     }
@@ -81,16 +81,16 @@ enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
 
   var ribbonPlacement: StudioPanelPlacement {
     switch self {
-    case .studio, .canvas: .floating
+    case .floating, .canvas: .floating
     case .docked: .docked
     }
   }
 
   var next: Self {
     switch self {
-    case .studio: .docked
+    case .floating: .docked
     case .docked: .canvas
-    case .canvas: .studio
+    case .canvas: .floating
     }
   }
 }

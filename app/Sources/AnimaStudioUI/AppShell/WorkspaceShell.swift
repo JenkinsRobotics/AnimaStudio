@@ -1,5 +1,6 @@
 import AnimaModel
 import Observation
+import RealityKitViewport
 import SwiftUI
 
 // MARK: - Shared shell state
@@ -76,8 +77,14 @@ final class StudioToolSettings {
   }
 }
 
+enum StudioToolPayload: Sendable {
+  case addPart(RigPrimitiveKind)
+  case createRevoluteMate
+  case createRelation(kindID: String)
+}
+
 enum StudioToolBehavior: Sendable {
-  case arm(command: String)
+  case arm(StudioToolPayload)
   case command(WorkspaceRibbonAction)
   case unavailable
 }
@@ -182,6 +189,22 @@ enum StudioViewportDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case .shaded: "cube.fill"
     }
   }
+
+  static func resolve(renderStyle: ViewportRenderStyle) -> Self {
+    switch renderStyle {
+    case .wireframe: .wireframe
+    case .shadedWithEdges: .hiddenLine
+    case .shaded, .unshaded, .translucent: .shaded
+    }
+  }
+
+  var renderStyle: ViewportRenderStyle {
+    switch self {
+    case .wireframe: .wireframe
+    case .hiddenLine: .shadedWithEdges
+    case .shaded: .shaded
+    }
+  }
 }
 
 @MainActor
@@ -195,15 +218,9 @@ final class StudioViewSidebarState {
     side: .trailing
   )
   var navigationMode = StudioCameraNavigationMode.select
-  var displayMode = StudioViewportDisplayMode.shaded
   var viewPreset = "Standard"
   var showsHiddenEdges = true
-  var showsGrid = true
   var showsOrigin = true
-  var showsGroundShadow = true
-  var lightingIntensity = 1.0
-  var appearanceTheme = "Studio Blue"
-  var showsEdges = true
   var keepsImportedColors = true
   var opacity = 1.0
 
@@ -398,16 +415,6 @@ enum StudioFloatingPanelGeometry {
   }
 }
 
-enum StudioSidebarInteraction {
-  static func select<T: Equatable>(
-    _ tab: T,
-    current: T,
-    isOpen: Bool
-  ) -> (selection: T, isOpen: Bool) {
-    tab == current ? (current, !isOpen) : (tab, true)
-  }
-}
-
 enum StudioWorkspaceSidebarCatalog {
   static func tabs(for workspace: StudioWorkspaceKind) -> [StudioWorkspaceSidebarTab] {
     switch workspace {
@@ -478,7 +485,7 @@ enum StudioWorkspaceToolCatalog {
         title: kind.displayName,
         systemImage: kind.systemImage,
         help: "Add a \(kind.displayName.lowercased()) to the semantic rig.",
-        behavior: .arm(command: "rig.part.\(kind.rawValue)")
+        behavior: .arm(.addPart(kind))
       )
     }
     let mateTools = MateCreationToolKind.allCases.map { kind in
@@ -488,7 +495,7 @@ enum StudioWorkspaceToolCatalog {
         systemImage: kind.systemImage,
         help: kind.motionSummary,
         behavior: kind == .revolute && canCreateRevoluteJoint
-          ? .arm(command: "rig.mate.revolute") : .unavailable
+          ? .arm(.createRevoluteMate) : .unavailable
       )
     }
     let relationTools = workspace.engineRelationTypes.map { relation in
@@ -497,7 +504,7 @@ enum StudioWorkspaceToolCatalog {
         title: relation.label,
         systemImage: relation.kind.systemImage,
         help: "Create an engine-backed \(relation.label.lowercased()) relation.",
-        behavior: .arm(command: "rig.relation.\(relation.kind.rawValue)")
+        behavior: .arm(.createRelation(kindID: relation.kind.rawValue))
       )
     }
     return [
@@ -530,6 +537,55 @@ enum StudioWorkspaceToolCatalog {
         ]
       ),
     ]
+  }
+}
+
+@MainActor
+enum WorkspaceRibbonActionDispatcher {
+  static func perform(
+    _ action: WorkspaceRibbonAction,
+    workspace: StudioWorkspaceModel,
+    importModel: () -> Void,
+    importAnimaCharacter: () -> Void
+  ) {
+    switch action {
+    case .importAnimaCharacter: importAnimaCharacter()
+    case .importModel: importModel()
+    case .stopPlayback: workspace.stopPlayback()
+    case .togglePlayback: workspace.togglePlayback()
+    case .toggleLoop: workspace.loopsPreviewPlayback.toggle()
+    case .previousKeyframe: workspace.seekAdjacentKeyframe(forward: false)
+    case .nextKeyframe: workspace.seekAdjacentKeyframe(forward: true)
+    case .frameSelection: workspace.frameSelection()
+    case .toggleGrid: workspace.showsPreviewGrid.toggle()
+    case .toggleBottomEditor: workspace.toggleBottomEditor()
+    }
+  }
+
+  static func isEnabled(
+    _ action: WorkspaceRibbonAction,
+    workspace: StudioWorkspaceModel
+  ) -> Bool {
+    switch action {
+    case .importAnimaCharacter: workspace.animaCoreState != .connecting
+    case .importModel: !workspace.isLoadingModelHierarchy
+    case .frameSelection: workspace.canFrameSelection
+    case .stopPlayback, .togglePlayback, .toggleLoop, .previousKeyframe, .nextKeyframe,
+      .toggleGrid, .toggleBottomEditor:
+      true
+    }
+  }
+
+  static func isSelected(
+    _ action: WorkspaceRibbonAction,
+    workspace: StudioWorkspaceModel
+  ) -> Bool {
+    switch action {
+    case .toggleLoop: workspace.loopsPreviewPlayback
+    case .toggleGrid: workspace.showsPreviewGrid
+    case .toggleBottomEditor: workspace.activePresentation.showsBottomEditor
+    default: false
+    }
   }
 }
 
@@ -1285,8 +1341,18 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
 
 // MARK: - Presentation cards used by the right sidebar
 
+struct StudioViewportSidebarBindings {
+  let renderStyle: Binding<ViewportRenderStyle>
+  let edgeDisplay: Binding<ViewportEdgeDisplay>
+  let showsGrid: Binding<Bool>
+  let showsShadows: Binding<Bool>
+  let lightingIntensity: Binding<Double>
+  let appearance: Binding<PreviewAppearance>
+}
+
 struct StudioViewSidebarPanel<Inspector: View>: View {
   let tab: StudioViewSidebarTab
+  let viewport: StudioViewportSidebarBindings
   @ViewBuilder let inspector: Inspector
   @Environment(\.studioPanelSurfaceMode) private var surfaceMode
   private var state: StudioViewSidebarState { .shared }
@@ -1324,12 +1390,13 @@ struct StudioViewSidebarPanel<Inspector: View>: View {
       HStack(spacing: 5) {
         ForEach(StudioViewportDisplayMode.allCases) { mode in
           Button {
-            state.displayMode = mode
+            displayMode.wrappedValue = mode
           } label: {
             Image(systemName: mode.systemImage)
               .frame(width: 34, height: 30)
               .background(
-                state.displayMode == mode ? StudioPalette.accent : StudioPalette.panelInset,
+                displayMode.wrappedValue == mode
+                  ? StudioPalette.accent : StudioPalette.panelInset,
                 in: RoundedRectangle(cornerRadius: 7)
               )
           }
@@ -1367,19 +1434,11 @@ struct StudioViewSidebarPanel<Inspector: View>: View {
   private var environmentControls: some View {
     Group {
       Text("SCENE").studioSidebarCaption()
-      Toggle("Grid", isOn: Binding(get: { state.showsGrid }, set: { state.showsGrid = $0 }))
+      Toggle("Grid", isOn: viewport.showsGrid)
       Toggle("Origin", isOn: Binding(get: { state.showsOrigin }, set: { state.showsOrigin = $0 }))
-      Toggle(
-        "Ground shadow",
-        isOn: Binding(get: { state.showsGroundShadow }, set: { state.showsGroundShadow = $0 })
-      )
+      Toggle("Ground shadow", isOn: viewport.showsShadows)
       Text("KEY LIGHT").studioSidebarCaption()
-      Slider(
-        value: Binding(
-          get: { state.lightingIntensity }, set: { state.lightingIntensity = $0 }
-        ),
-        in: 0...2
-      )
+      Slider(value: viewport.lightingIntensity, in: 0.1...3)
     }
     .controlSize(.small)
   }
@@ -1388,14 +1447,14 @@ struct StudioViewSidebarPanel<Inspector: View>: View {
     Group {
       Picker(
         "Theme",
-        selection: Binding(get: { state.appearanceTheme }, set: { state.appearanceTheme = $0 })
+        selection: viewport.appearance
       ) {
-        ForEach(["Studio Blue", "Graphite", "Blueprint", "High Contrast"], id: \.self) {
-          Text($0)
+        ForEach(PreviewAppearance.allCases) { appearance in
+          Text(appearance.title).tag(appearance)
         }
       }
       .controlSize(.small)
-      Toggle("Show edges", isOn: Binding(get: { state.showsEdges }, set: { state.showsEdges = $0 }))
+      Toggle("Show edges", isOn: showsEdges)
       Toggle(
         "Keep imported colors",
         isOn: Binding(get: { state.keepsImportedColors }, set: { state.keepsImportedColors = $0 })
@@ -1404,6 +1463,20 @@ struct StudioViewSidebarPanel<Inspector: View>: View {
       Slider(value: Binding(get: { state.opacity }, set: { state.opacity = $0 }), in: 0.2...1)
     }
     .controlSize(.small)
+  }
+
+  private var displayMode: Binding<StudioViewportDisplayMode> {
+    Binding(
+      get: { StudioViewportDisplayMode.resolve(renderStyle: viewport.renderStyle.wrappedValue) },
+      set: { viewport.renderStyle.wrappedValue = $0.renderStyle }
+    )
+  }
+
+  private var showsEdges: Binding<Bool> {
+    Binding(
+      get: { viewport.edgeDisplay.wrappedValue != .hidden },
+      set: { viewport.edgeDisplay.wrappedValue = $0 ? .mesh : .hidden }
+    )
   }
 }
 

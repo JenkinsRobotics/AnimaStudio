@@ -129,14 +129,20 @@
   so switching workspaces or view branches does not reset the shell. The
   pre-scaffold `WorkspaceToolBar`/`WorkspaceRibbonPresentation` rendering path
   has been removed; the retained `WorkspaceRibbonCatalog` is now data consumed
-  only by the live shared Tool sidebar.
+  only by the live shared Tool sidebar. Rig actions carry typed payloads instead
+  of parsed command strings and one dispatcher now owns ribbon enablement,
+  selection, and execution. The two former rail implementations are one shared
+  rail, and the View sidebar edits the same persisted viewport bindings that
+  drive RealityKit rather than maintaining a second display-state copy. The
+  internal layout case is now named `floating` while retaining its legacy
+  `"studio"` raw value for preference compatibility.
 
   The condensed 54-point document header keeps project/save state at the far
   left, all seven workspace destinations in a centered capsule, and engine,
   preview, layout, and help controls at the right. A bottom status bar and
   non-layout walkthrough overlay complete the frame. The empty-Rig call to
   action remains centered in the usable viewport. UI Dev retains the actual
-  production specimens. All 314 Swift unit tests, 22 live bridge/integration
+  production specimens. All 316 Swift unit tests, 22 live bridge/integration
   tests, recursive format lint, the native Xcode build, root-app helper
   embedding, strict deep signing, launch, and diff check pass. Renderer-pipeline
   integration from Codex Bench remains a separate phase.

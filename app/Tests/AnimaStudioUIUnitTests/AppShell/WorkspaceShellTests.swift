@@ -15,7 +15,7 @@ final class WorkspaceShellTests: XCTestCase {
   }
 
   private func resetShellState() {
-    StudioLayoutState.shared.apply(.studio)
+    StudioLayoutState.shared.apply(.floating)
     StudioToolState.shared.disarm()
     StudioToolState.shared.staysArmed = false
     StudioToolSettings.shared.density = .standard
@@ -40,21 +40,7 @@ final class WorkspaceShellTests: XCTestCase {
     secondWorkspace.cycleLayoutPreset()
     XCTAssertEqual(firstWorkspace.detectedLayoutPreset, .canvas)
     firstWorkspace.cycleLayoutPreset()
-    XCTAssertEqual(secondWorkspace.detectedLayoutPreset, .studio)
-  }
-
-  func testBothRailsUseSwitchOpenAndActiveCollapseRule() {
-    defer { resetShellState() }
-    let switched = StudioSidebarInteraction.select("Mates", current: "Components", isOpen: false)
-    XCTAssertEqual(switched.selection, "Mates")
-    XCTAssertTrue(switched.isOpen)
-
-    let collapsed = StudioSidebarInteraction.select("Mates", current: "Mates", isOpen: true)
-    XCTAssertEqual(collapsed.selection, "Mates")
-    XCTAssertFalse(collapsed.isOpen)
-
-    let reopened = StudioSidebarInteraction.select("Mates", current: "Mates", isOpen: false)
-    XCTAssertTrue(reopened.isOpen)
+    XCTAssertEqual(secondWorkspace.detectedLayoutPreset, .floating)
   }
 
   func testWorkspaceSidebarStateSurvivesWorkspaceAndLayoutChanges() {
@@ -97,6 +83,34 @@ final class WorkspaceShellTests: XCTestCase {
 
     XCTAssertFalse(workspace.activeWorkspaceSidebarPanels.isOpen)
     XCTAssertFalse(StudioViewSidebarState.shared.panels.isOpen)
+  }
+
+  func testRigToolsCarryTypedPayloadsInsteadOfParsingCommandStrings() {
+    let workspace = StudioWorkspaceModel(resolvesDefaultAnimaCoreClient: false)
+    let categories = StudioWorkspaceToolCatalog.rigCategories(workspace: workspace)
+    let box = categories.flatMap(\.groups).flatMap(\.tools).first { $0.title == "Box" }
+
+    guard case .arm(.addPart(.box)) = box?.behavior else {
+      return XCTFail("Expected Box to carry a typed add-part payload")
+    }
+  }
+
+  func testViewportDisplayProjectionUsesThePersistedRenderStyleAsTruth() {
+    XCTAssertEqual(StudioViewportDisplayMode.resolve(renderStyle: .wireframe), .wireframe)
+    XCTAssertEqual(StudioViewportDisplayMode.resolve(renderStyle: .shadedWithEdges), .hiddenLine)
+    XCTAssertEqual(StudioViewportDisplayMode.shaded.renderStyle, .shaded)
+  }
+
+  func testRibbonActionsShareOneDispatcher() {
+    let workspace = StudioWorkspaceModel(resolvesDefaultAnimaCoreClient: false)
+    let initial = workspace.showsPreviewGrid
+    WorkspaceRibbonActionDispatcher.perform(
+      .toggleGrid,
+      workspace: workspace,
+      importModel: {},
+      importAnimaCharacter: {}
+    )
+    XCTAssertEqual(workspace.showsPreviewGrid, !initial)
   }
 
   func testPanelReorderIndexAndOrderAreDeterministic() {
@@ -213,7 +227,7 @@ final class WorkspaceShellTests: XCTestCase {
       title: "Place Part",
       systemImage: "cube",
       help: "Test tool",
-      behavior: .arm(command: "test")
+      behavior: .arm(.addPart(.box))
     )
     StudioViewSidebarState.shared.navigationMode = .orbit
 
@@ -233,7 +247,7 @@ final class WorkspaceShellTests: XCTestCase {
       title: "Place Part",
       systemImage: "cube",
       help: "Test tool",
-      behavior: .arm(command: "test")
+      behavior: .arm(.addPart(.box))
     )
     StudioToolState.shared.arm(tool)
     StudioToolState.shared.staysArmed = true

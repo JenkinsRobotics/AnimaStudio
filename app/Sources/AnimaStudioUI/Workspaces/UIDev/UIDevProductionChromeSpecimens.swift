@@ -48,7 +48,7 @@ struct UIDevProductionChromeSpecimen: View {
 struct UIDevWorkspaceLayoutSpecimen: View {
   var body: some View {
     HStack(spacing: 12) {
-      layoutCard(.studio)
+      layoutCard(.floating)
       layoutCard(.docked)
       layoutCard(.canvas)
     }
@@ -64,8 +64,8 @@ struct UIDevWorkspaceLayoutSpecimen: View {
           .fill(StudioPalette.canvas)
         grid
         if preset != .canvas {
-          panel(side: .leading, floating: preset == .studio)
-          panel(side: .trailing, floating: preset == .studio)
+          panel(side: .leading, floating: preset == .floating)
+          panel(side: .trailing, floating: preset == .floating)
         } else {
           HStack {
             Capsule().fill(StudioPalette.muted.opacity(0.35)).frame(width: 2, height: 34)
@@ -121,7 +121,7 @@ struct UIDevWorkspaceLayoutSpecimen: View {
 
   private func tint(for preset: StudioLayoutPreset) -> Color {
     switch preset {
-    case .studio: StudioPalette.semanticPart
+    case .floating: StudioPalette.semanticPart
     case .docked: StudioPalette.joint
     case .canvas: StudioPalette.hardware
     }
@@ -129,7 +129,7 @@ struct UIDevWorkspaceLayoutSpecimen: View {
 
   private func layoutDetail(_ preset: StudioLayoutPreset) -> String {
     switch preset {
-    case .studio: "Full-bleed spatial canvas with content-sized overlay widgets."
+    case .floating: "Full-bleed spatial canvas with content-sized overlay widgets."
     case .docked: "Panels reserve space; tables and timelines remain unobstructed."
     case .canvas: "Hidden panels reveal from the window edges on hover."
     }

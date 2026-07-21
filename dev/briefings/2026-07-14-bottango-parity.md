@@ -48,7 +48,7 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
-| Codex | Align and finish the production workspace shell against the Demo standard | `app/Sources/AnimaStudioUI/AppShell/{WorkspaceChrome,WorkspaceLayout,WorkspaceShell,StudioWorkspaceModel,StudioWorkspaceView}.swift`, live workspace ribbon/catalog files under `app/Sources/AnimaStudioUI/Workspaces/**`, `app/Sources/AnimaStudioUI/Settings/**`, focused shell/presentation tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | remove the zero-reference legacy ribbon views; Docked uses full-height fixed-width side panels around a center column with its tool bar at top; shared panel stacks support multiple open panels, deterministic reorder, tear-off/clamped floating/re-dock, unselected defaults, independently centered rails, and optional outer-edge placement; quality cleanup leaves typed rig commands, one viewport display owner, and one shared rail implementation; deterministic tests/lint/build/launch and diff check pass | active |
+| Codex | Align and finish the production workspace shell against the Demo standard | `app/Sources/AnimaStudioUI/AppShell/{WorkspaceChrome,WorkspaceLayout,WorkspaceShell,StudioWorkspaceModel,StudioWorkspaceView}.swift`, live workspace ribbon/catalog files under `app/Sources/AnimaStudioUI/Workspaces/**`, `app/Sources/AnimaStudioUI/Settings/**`, focused shell/presentation tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | remove the zero-reference legacy ribbon views; Docked uses full-height fixed-width side panels around a center column with its tool bar at top; shared panel stacks support multiple open panels, deterministic reorder, tear-off/clamped floating/re-dock, unselected defaults, independently centered rails, and optional outer-edge placement; quality cleanup leaves typed rig commands, one viewport display owner, and one shared rail implementation; deterministic tests/lint/build/launch and diff check pass | released 2026-07-20 |
 
 | Codex | Protect Animate and Show timelines from floating/Canvas widgets | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, shared timeline surface under `app/Sources/AnimaStudioUI/Workspaces/{Animate,Show}/**`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{AppShell,Workspaces/Animate}/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | Animate and Show timelines remain center/bottom editors; Docked stays full-width in-flow; Floating/Canvas use bounded rounded timeline windows; hidden Canvas panels preserve broad width; revealed side panels animate the timeline inside safe left/right boundaries without shrinking the 3D center; lint/tests/native/root build/sign/launch/diff check pass | released: shared protected timeline surface covers Animate + Show; safe left/right Canvas reveal reflow; top tools do not shrink the bottom editor; 311 XCTest + 22 bridge/integration tests, recursive lint, native/root build, helper embed, deep sign, launch pass |
 
@@ -3479,3 +3479,14 @@ change needed in the Handoff log instead of inventing commands.
   selection opens the actual Inspector panel. Deterministic stack/reorder/
   tear-off/clamp/outer-edge tests join the existing shell contracts; strict
   touched lint, 314 XCTest tests, and 22 bridge/integration tests pass.
+- **2026-07-20 (Codex, shell alignment quality cleanup):** Finished the shell
+  consolidation without changing engine ownership. Rig tools now carry typed
+  payloads, one `WorkspaceRibbonActionDispatcher` owns enablement, selection,
+  and execution, both sides use the same rail implementation, and the View
+  sidebar directly binds the persisted RealityKit display settings instead of
+  holding a second copy. Renamed the internal layout case to `floating` while
+  preserving the stored `"studio"` raw value for compatibility. Deterministic
+  tests cover the typed payload, shared dispatcher, and single viewport source
+  of truth; recursive format lint, 316 XCTest tests, 22 bridge/integration
+  tests, the native Xcode build, root-app helper embedding, strict deep signing,
+  live launch, and diff check pass. Claim released.

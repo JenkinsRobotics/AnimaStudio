@@ -18,12 +18,12 @@ final class WorkspaceChromeTests: XCTestCase {
   }
 
   func testStudioModesUseOperatorFacingNamesAndCycleInOrder() {
-    XCTAssertEqual(StudioLayoutPreset.studio.title, "Floating")
+    XCTAssertEqual(StudioLayoutPreset.floating.title, "Floating")
     XCTAssertEqual(StudioLayoutPreset.docked.title, "Docked")
     XCTAssertEqual(StudioLayoutPreset.canvas.title, "Canvas")
-    XCTAssertEqual(StudioLayoutPreset.studio.next, .docked)
+    XCTAssertEqual(StudioLayoutPreset.floating.next, .docked)
     XCTAssertEqual(StudioLayoutPreset.docked.next, .canvas)
-    XCTAssertEqual(StudioLayoutPreset.canvas.next, .studio)
+    XCTAssertEqual(StudioLayoutPreset.canvas.next, .floating)
   }
 
   func testDocumentBarUsesStableResponsiveDensities() {
@@ -75,7 +75,7 @@ final class WorkspaceChromeTests: XCTestCase {
     XCTAssertEqual(workspace.inspectorPlacement, .docked)
     XCTAssertEqual(workspace.ribbonPlacement, .docked)
 
-    workspace.applyLayoutPreset(.studio)
+    workspace.applyLayoutPreset(.floating)
     XCTAssertEqual(workspace.navigatorPlacement, .floating)
     XCTAssertEqual(workspace.inspectorPlacement, .floating)
     XCTAssertEqual(workspace.ribbonPlacement, .floating)
