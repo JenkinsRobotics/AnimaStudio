@@ -84,6 +84,21 @@ final class WorkspaceShellTests: XCTestCase {
     )
   }
 
+  func testDockedSidebarsUseFixedPanelWidthsAroundTheCenterColumn() {
+    XCTAssertEqual(
+      StudioSidebarSizing.dockedWidth(side: .leading, panelsAreOpen: true),
+      StudioSidebarSizing.railWidth + StudioSidebarSizing.workspacePanelWidth + 1
+    )
+    XCTAssertEqual(
+      StudioSidebarSizing.dockedWidth(side: .trailing, panelsAreOpen: true),
+      StudioSidebarSizing.railWidth + StudioSidebarSizing.viewPanelWidth + 1
+    )
+    XCTAssertEqual(
+      StudioSidebarSizing.dockedWidth(side: .leading, panelsAreOpen: false),
+      StudioSidebarSizing.railWidth
+    )
+  }
+
   func testToolAndCameraModesAreMutuallyExclusive() {
     defer { resetShellState() }
     let tool = StudioToolDescriptor(

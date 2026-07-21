@@ -41,6 +41,24 @@ enum StudioToolDensity: String, CaseIterable, Identifiable, Sendable {
   }
 }
 
+enum StudioSidebarSizing {
+  static let railWidth: CGFloat = 44
+  static let workspacePanelWidth: CGFloat = StudioMetrics.navigatorWidth
+  static let viewPanelWidth: CGFloat = StudioMetrics.inspectorWidth
+
+  static func dockedWidth(side: StudioSidebarSide, panelsAreOpen: Bool) -> CGFloat {
+    railWidth
+      + (panelsAreOpen
+        ? (side == .leading ? workspacePanelWidth : viewPanelWidth) + 1
+        : 0)
+  }
+}
+
+enum StudioSidebarSide: String, Sendable {
+  case leading
+  case trailing
+}
+
 @MainActor
 @Observable
 final class StudioToolSettings {
@@ -702,16 +720,16 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
   }
 
   private var dockedBody: some View {
-    VStack(spacing: 0) {
-      toolSidebar(docked: true)
+    HStack(spacing: 0) {
+      workspaceSidebar(docked: true)
       Divider().overlay(StudioPalette.border)
-      HStack(spacing: 0) {
-        workspaceSidebar(docked: true)
+      VStack(spacing: 0) {
+        toolSidebar(docked: true)
         Divider().overlay(StudioPalette.border)
         center
-        Divider().overlay(StudioPalette.border)
-        viewSidebar(docked: true)
       }
+      Divider().overlay(StudioPalette.border)
+      viewSidebar(docked: true)
     }
   }
 

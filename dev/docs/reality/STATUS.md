@@ -112,8 +112,9 @@
   One app-global layout state drives exactly three Studio modes. Floating keeps
   the center full-bleed and overlays content-sized translucent pill sidebars,
   vertically centered at the window edges. Docked moves the same sidebar
-  content into flat, divided, full-height in-flow panels and forces the Tool
-  sidebar to Expanded density. Canvas hides the floating chrome, leaves plain
+  content into fixed-width, flat, divided, full-height in-flow side panels;
+  the Tool sidebar occupies only the top of the center column and is forced to
+  Expanded density. Canvas hides the floating chrome, leaves plain
   capsule handles, and uses 16-point edge hot zones plus bridged zone/sidebar
   hover tracking so reveal does not flicker. Compact, Standard, and Expanded
   tool densities share persistent settings; Expanded workspaces may expose a

@@ -1837,3 +1837,9 @@ does the heavy implementation; Codex reviews it and plans what's next.
   `WorkspaceRibbonCatalog` data layer remains and feeds the production shared
   Tool sidebar. Three tests that only pinned the retired presentation enum were
   removed; 308 XCTest tests plus 22 bridge/integration tests pass.
+
+- **2026-07-20 — OUT: shell-alignment docked-layout phase is complete.**
+  Docked now lays out full-height fixed-width Workspace and View sidebars around
+  a center column whose Expanded Tool sidebar sits above the center document.
+  The top Tool sidebar no longer shortens either side panel. Eight focused
+  shell tests and strict touched-file lint pass.

@@ -3466,3 +3466,8 @@ change needed in the Handoff log instead of inventing commands.
   `WorkspaceRibbonCatalog` data layer used by the shared Tool sidebar. Retired
   the three enum/height tests that existed only for that dead view path. Full
   Swift verification passes: 308 XCTest tests and 22 bridge/integration tests.
+- **2026-07-20 (Codex, shell alignment docked layout):** Reordered the Docked
+  scaffold into full-height fixed-width left sidebar | center Tool+document |
+  full-height fixed-width right sidebar. The Tool ribbon no longer spans above
+  or shortens the side panels. Eight focused shell tests and strict touched-file
+  lint pass.
