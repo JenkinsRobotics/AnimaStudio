@@ -1,3 +1,5 @@
+import AnimaCAD
+import AnimaCADViewport
 import AnimaDocument
 import AnimaEvaluation
 import AnimaModel
@@ -83,6 +85,20 @@ struct StudioWorkspaceView: View {
   private var viewportEnvironmentRotationDegrees = 0.0
   @AppStorage(StudioPreferenceKey.viewportRenderQuality)
   private var viewportRenderQualityRawValue = ViewportRenderQuality.standard.rawValue
+  @AppStorage(StudioPreferenceKey.cadRenderBackend) private var cadRenderBackendRawValue =
+    CADRenderBackend.realityKit.rawValue
+  @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName =
+    CADViewportTheme.studioBlue.name
+  @AppStorage(StudioPreferenceKey.cadPreservesImportedColors) private
+    var cadPreservesImportedColors = true
+  @AppStorage(StudioPreferenceKey.cadShowsFeatureEdges) private var cadShowsFeatureEdges = true
+  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var cadEdgeStrength = 0.7
+  @AppStorage(StudioPreferenceKey.cadRoughness) private var cadRoughness = 0.5
+  @AppStorage(StudioPreferenceKey.cadMetallic) private var cadMetallic = 0.0
+  @AppStorage(StudioPreferenceKey.cadKeyLightIntensity) private var cadKeyLightIntensity = 3_000.0
+  @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity = 1_200.0
+  @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity = 900.0
+  @AppStorage(StudioPreferenceKey.cadShowsTelemetry) private var cadShowsTelemetry = false
 
   init(
     session: Binding<StudioProjectSession>,
@@ -547,105 +563,119 @@ struct StudioWorkspaceView: View {
 
   private var viewport: some View {
     ZStack(alignment: .top) {
-      RobotPreviewView(
-        rig: workspace.project.rig,
-        engineResolvedPartPoses: workspace.engineResolvedPartPoses,
-        partModelSources: workspace.enginePartModelSources,
-        modelURL: workspace.importedModelURL,
-        showsGrid: shellShowsGrid,
-        projection: workspace.cameraProjection,
-        viewpoint: workspace.cameraViewpoint,
-        cameraCommandRevision: workspace.cameraCommandRevision,
-        cameraState: workspace.cameraState,
-        navigationProfile: viewportNavigationProfile,
-        customNavigationMapping: viewportCustomNavigationMapping,
-        navigationSensitivity: viewportNavigationSensitivity,
-        reversesWheelZoom: viewportReversesWheelZoom,
-        focusedModelPath: workspace.selectedModelPath,
-        focusedPartID: workspace.selectedPartID,
-        highlightedPartIDs: workspace.viewportHighlightedPartIDs,
-        selectionCount: workspace.selectionCount,
-        partAppearances: workspace.viewportPartAppearances,
-        focusedPartIsLocked: workspace.selectedPartID.map {
-          workspace.isComponentLocked($0) || !workspace.isPartRestTransformEditable($0)
-        } ?? false,
-        mateCandidatePartIDs: workspace.mateCandidatePartIDs,
-        selectedMateCandidate: workspace.matePlacement?.sourceCandidate,
-        armIKTargetPose: workspace.activeWorkspace == .rig
-          ? workspace.armIKTargetPose : nil,
-        armIKTargetIsUnreachable: {
-          if case .unreachable = workspace.armIKReachState { return true }
-          return false
-        }(),
-        importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
-        rigGuideVisibility: workspace.activeWorkspace == .rig
-          ? workspace.rigGuideVisibility : .hidden,
-        appearance: workspace.viewportBackground.palette,
-        renderStyle: shellRenderStyle,
-        edgeDisplay: shellEdgeDisplay,
-        lightingPreset: viewportLightingPreset,
-        materialFinish: viewportMaterialFinish,
-        reflectionMode: viewportReflectionMode,
-        lightingIntensity: shellLightingIntensity,
-        environmentPreset: viewportEnvironmentPreset,
-        environmentRotationDegrees: Float(viewportEnvironmentRotationDegrees),
-        renderQuality: viewportRenderQuality,
-        backgroundSettings: workspace.viewportBackground,
-        sectionPlane: workspace.viewportSectionPlane,
-        showsShadows: shellShowsShadows,
-        fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
-        onSelectModelPath: { path in
-          viewportContextMenuRequest = nil
-          workspace.selectModelNode(
-            at: path,
-            extendingSelection: true
+      Group {
+        if usesDedicatedCADPipeline {
+          CADPipelineViewport(
+            sourceURLs: stepModelURLs,
+            backend: cadRenderBackend,
+            theme: cadViewportTheme,
+            showsTelemetry: cadShowsTelemetry,
+            isSelected: workspace.selectionCount > 0
           )
-        },
-        onSelectPartID: { id in
-          viewportContextMenuRequest = nil
-          workspace.selectPart(
-            id: id,
-            extendingSelection: true
+        } else {
+          RobotPreviewView(
+            rig: workspace.project.rig,
+            engineResolvedPartPoses: workspace.engineResolvedPartPoses,
+            partModelSources: workspace.enginePartModelSources,
+            modelURL: workspace.importedModelURL,
+            showsGrid: shellShowsGrid,
+            projection: workspace.cameraProjection,
+            viewpoint: workspace.cameraViewpoint,
+            cameraCommandRevision: workspace.cameraCommandRevision,
+            cameraState: workspace.cameraState,
+            navigationProfile: viewportNavigationProfile,
+            customNavigationMapping: viewportCustomNavigationMapping,
+            navigationSensitivity: viewportNavigationSensitivity,
+            reversesWheelZoom: viewportReversesWheelZoom,
+            focusedModelPath: workspace.selectedModelPath,
+            focusedPartID: workspace.selectedPartID,
+            highlightedPartIDs: workspace.viewportHighlightedPartIDs,
+            selectionCount: workspace.selectionCount,
+            partAppearances: workspace.viewportPartAppearances,
+            focusedPartIsLocked: workspace.selectedPartID.map {
+              workspace.isComponentLocked($0) || !workspace.isPartRestTransformEditable($0)
+            } ?? false,
+            mateCandidatePartIDs: workspace.mateCandidatePartIDs,
+            selectedMateCandidate: workspace.matePlacement?.sourceCandidate,
+            armIKTargetPose: workspace.activeWorkspace == .rig
+              ? workspace.armIKTargetPose : nil,
+            armIKTargetIsUnreachable: {
+              if case .unreachable = workspace.armIKReachState { return true }
+              return false
+            }(),
+            importedHierarchyRootPath: workspace.importedModelHierarchy?.id,
+            rigGuideVisibility: workspace.activeWorkspace == .rig
+              ? workspace.rigGuideVisibility : .hidden,
+            appearance: workspace.viewportBackground.palette,
+            renderStyle: shellRenderStyle,
+            edgeDisplay: shellEdgeDisplay,
+            lightingPreset: viewportLightingPreset,
+            materialFinish: viewportMaterialFinish,
+            reflectionMode: viewportReflectionMode,
+            lightingIntensity: shellLightingIntensity,
+            environmentPreset: viewportEnvironmentPreset,
+            environmentRotationDegrees: Float(viewportEnvironmentRotationDegrees),
+            renderQuality: viewportRenderQuality,
+            backgroundSettings: workspace.viewportBackground,
+            sectionPlane: workspace.viewportSectionPlane,
+            showsShadows: shellShowsShadows,
+            fieldOfViewDegrees: Float(viewportFieldOfViewDegrees),
+            onSelectModelPath: { path in
+              viewportContextMenuRequest = nil
+              workspace.selectModelNode(
+                at: path,
+                extendingSelection: true
+              )
+            },
+            onSelectPartID: { id in
+              viewportContextMenuRequest = nil
+              workspace.selectPart(
+                id: id,
+                extendingSelection: true
+              )
+            },
+            onSetPartPosition: { id, position in
+              workspace.setPartPosition(id: id, to: position)
+            },
+            onSetPartRotation: { id, rotation in
+              workspace.setPartRotation(id: id, to: rotation)
+            },
+            onSetArmIKTargetPose: { pose in
+              queueArmIKSolve(for: pose)
+            },
+            onSetSectionPosition: { positionMeters in
+              var section = workspace.viewportSectionPlane
+              section.positionMeters = positionMeters
+              workspace.setViewportSectionPlane(section)
+            },
+            onSelectMateCandidate: { candidate in
+              workspace.selectMateConnector(candidate)
+            },
+            onCameraStateChange: { state in
+              workspace.reportCameraState(state)
+            },
+            onPointerTargetChange: { target in
+              viewportPointerTarget = target
+            },
+            onContextMenuRequest: { location, target in
+              viewportContextMenuRequest = ViewportContextMenuRequest(
+                location: location,
+                pointerTarget: target
+              )
+            },
+            onBackgroundClick: { _ in commitArmedTool() },
+            onFrameAll: workspace.showHomeView,
+            onBoxSelectPartIDs: workspace.selectParts
           )
-        },
-        onSetPartPosition: { id, position in
-          workspace.setPartPosition(id: id, to: position)
-        },
-        onSetPartRotation: { id, rotation in
-          workspace.setPartRotation(id: id, to: rotation)
-        },
-        onSetArmIKTargetPose: { pose in
-          queueArmIKSolve(for: pose)
-        },
-        onSetSectionPosition: { positionMeters in
-          var section = workspace.viewportSectionPlane
-          section.positionMeters = positionMeters
-          workspace.setViewportSectionPlane(section)
-        },
-        onSelectMateCandidate: { candidate in
-          workspace.selectMateConnector(candidate)
-        },
-        onCameraStateChange: { state in
-          workspace.reportCameraState(state)
-        },
-        onPointerTargetChange: { target in
-          viewportPointerTarget = target
-        },
-        onContextMenuRequest: { location, target in
-          viewportContextMenuRequest = ViewportContextMenuRequest(
-            location: location,
-            pointerTarget: target
-          )
-        },
-        onBackgroundClick: { _ in commitArmedTool() },
-        onFrameAll: workspace.showHomeView,
-        onBoxSelectPartIDs: workspace.selectParts
-      )
+        }
+      }
       .frame(minWidth: 520, minHeight: 420)
 
       viewportTitle
-      cameraHUD
-      visualizationControl
+      if !usesDedicatedCADPipeline {
+        cameraHUD
+        visualizationControl
+      }
 
       if let engineEvaluationTimeSeconds = workspace.engineEvaluationTimeSeconds {
         engineFrameBadge(timeSeconds: engineEvaluationTimeSeconds)
@@ -702,6 +732,47 @@ struct StudioWorkspaceView: View {
     .padding(.vertical, 6)
     .background(.ultraThinMaterial, in: Capsule())
     .padding(.top, 12)
+  }
+
+  private var cadRenderBackend: CADRenderBackend {
+    CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .realityKit
+  }
+
+  private var stepModelURLs: [URL] {
+    var seen = Set<String>()
+    return workspace.enginePartModelSources.values.compactMap { source in
+      guard ["step", "stp"].contains(source.fileURL.pathExtension.lowercased()) else {
+        return nil
+      }
+      let path = source.fileURL.standardizedFileURL.path
+      guard seen.insert(path).inserted else { return nil }
+      return source.fileURL
+    }
+  }
+
+  /// RealityKit remains the editor-native path for mixed mesh scenes and
+  /// direct manipulators. The other retained Codex Bench engines take over
+  /// when the active character is backed entirely by STEP/STP geometry.
+  private var usesDedicatedCADPipeline: Bool {
+    guard cadRenderBackend != .realityKit, !stepModelURLs.isEmpty else { return false }
+    let modeledSources = workspace.enginePartModelSources.values.filter {
+      !$0.fileURL.pathExtension.isEmpty
+    }
+    return modeledSources.allSatisfy {
+      ["step", "stp"].contains($0.fileURL.pathExtension.lowercased())
+    }
+  }
+
+  private var cadViewportTheme: CADViewportTheme {
+    var theme = CADViewportTheme.named(cadThemeName)
+    theme.overrideColor = cadPreservesImportedColors ? nil : theme.neutralColor
+    theme.edgeStrength = cadShowsFeatureEdges ? Float(cadEdgeStrength) : 0
+    theme.roughness = Float(cadRoughness)
+    theme.metallic = Float(cadMetallic)
+    theme.key.intensity = Float(cadKeyLightIntensity)
+    theme.fill.intensity = Float(cadFillLightIntensity)
+    theme.rim.intensity = Float(cadRimLightIntensity)
+    return theme
   }
 
   private func engineFrameBadge(timeSeconds: Double) -> some View {
@@ -1551,7 +1622,7 @@ struct StudioWorkspaceView: View {
         let fileExtension = sourceURL.pathExtension.lowercased()
         let renderableNodes = importedHierarchy?.flattened.filter(\.hasRenderableGeometry) ?? []
         if !replacingSelectedPart,
-          ["usd", "usda", "usdc", "usdz"].contains(fileExtension),
+          ["step", "stp", "usd", "usda", "usdc", "usdz"].contains(fileExtension),
           renderableNodes.count > 1
         {
           for node in renderableNodes {

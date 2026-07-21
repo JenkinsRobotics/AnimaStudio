@@ -88,14 +88,14 @@ and output consume the same `EvaluatedFrame`.
 
 ## Model import contract
 
-The native import path accepts RealityKit-supported USD assets (`.usd`,
-`.usda`, `.usdc`, `.usdz`, and `.reality`) plus STL and OBJ through ModelIO.
-USD/USDZ is the preferred interchange from Blender or a CAD conversion
-pipeline because it carries hierarchy and units. STL and OBJ are unitless;
-Studio prompts for mm/cm/m, converts vertex positions to metres, and persists
-that interpretation in app-only character editor metadata. STEP has no native
-macOS mesh loader, so Studio presents an explicit export-to-STL-or-USD message
-instead of pretending the file can render.
+The native import path accepts STEP/STP through Studio's Open CASCADE/XDE
+adapter, RealityKit-supported USD assets (`.usd`, `.usda`, `.usdc`, `.usdz`),
+plus STL and OBJ through ModelIO. STEP is the preferred CAD interchange because
+the adapter retains assembly labels, XDE colors, B-Rep faces, and exact feature
+edges while tessellating to metres for the selected viewport. USD/USDZ remains
+the preferred authored-media interchange. STL and OBJ are unitless; Studio
+prompts for mm/cm/m, converts vertex positions to metres, and persists that
+interpretation in app-only character editor metadata.
 
 Import must:
 
@@ -106,8 +106,8 @@ Import must:
 4. Show structured diagnostics when an asset cannot be loaded.
 5. Keep asset identity separate from an instance placed in the character.
 
-Direct STEP, FBX, glTF/GLB, VRM, and URDF support requires future importer
-adapters and is not part of the native slice.
+Direct FBX, glTF/GLB, VRM, and URDF support requires future importer adapters
+and is not part of the native slice.
 
 ## Core document concepts
 

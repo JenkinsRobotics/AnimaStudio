@@ -1,3 +1,4 @@
+import AnimaCAD
 import Foundation
 import ModelIO
 import RealityKit
@@ -34,6 +35,7 @@ public enum RealityKitModelLoader {
     "usd", "usda", "usdc", "usdz", "reality",
   ]
   public static let modelIOFileExtensions: Set<String> = ["stl", "obj"]
+  public static let cadFileExtensions: Set<String> = ["step", "stp"]
 
   /// Per-file triangle budget for CAD-selection topology. Above it, the
   /// model still loads and renders (whole-part selection), but the
@@ -65,7 +67,21 @@ public enum RealityKitModelLoader {
     let fileExtension = url.pathExtension.lowercased()
     let root: Entity
     let importedMeshes: [ImportedMesh]
-    if nativeFileExtensions.contains(fileExtension) {
+    if cadFileExtensions.contains(fileExtension) {
+      let document = try await Task.detached(priority: .userInitiated) {
+        try CADGeometryDocument.loadSTEP(url)
+      }.value
+      root = try makeEntity(from: document, name: url.deletingPathExtension().lastPathComponent)
+      importedMeshes = document.faces.map { face in
+        ImportedMesh(
+          name: "Face \(face.id + 1)",
+          positions: face.positions,
+          normals: face.normals,
+          textureCoordinates: [],
+          indices: face.indices
+        )
+      }
+    } else if nativeFileExtensions.contains(fileExtension) {
       root = try await Entity(contentsOf: url)
       importedMeshes =
         (try? await Task.detached(priority: .userInitiated) {
@@ -142,6 +158,78 @@ public enum RealityKitModelLoader {
       let entity = ModelEntity(mesh: mesh, materials: [material])
       entity.name = imported.name
       root.addChild(entity)
+    }
+    return root
+  }
+
+  private static func makeEntity(
+    from document: CADGeometryDocument,
+    name: String
+  ) throws -> Entity {
+    let root = Entity()
+    root.name = name
+    let geometry = document.renderGeometry
+    let batchesByNode = Dictionary(grouping: geometry.batches, by: \.assemblyNode)
+    var nodeEntities: [Int: Entity] = [:]
+    for node in document.nodes {
+      let batches = batchesByNode[node.id] ?? []
+      let entity: Entity
+      if batches.isEmpty {
+        entity = Entity()
+      } else {
+        var descriptors: [MeshDescriptor] = []
+        var materials: [any RealityKit.Material] = []
+        for (index, batch) in batches.enumerated() {
+          var descriptor = MeshDescriptor(name: "CAD Material \(index + 1)")
+          let positions = Array(geometry.positions[batch.vertexRange])
+          let normals = Array(geometry.normals[batch.vertexRange])
+          let globalStart = UInt32(batch.vertexRange.lowerBound)
+          descriptor.positions = MeshBuffers.Positions(positions)
+          if normals.count == positions.count {
+            descriptor.normals = MeshBuffers.Normals(normals)
+          }
+          descriptor.primitives = .triangles(
+            geometry.indices[batch.indexRange].map { $0 - globalStart })
+          descriptors.append(descriptor)
+
+          let rgba = SIMD4<Float>(batch.materialColor) / 255
+          var material = PhysicallyBasedMaterial()
+          material.baseColor = .init(
+            tint: .init(
+              red: CGFloat(rgba.x), green: CGFloat(rgba.y), blue: CGFloat(rgba.z),
+              alpha: CGFloat(rgba.w)))
+          material.roughness = 0.5
+          materials.append(material)
+        }
+        let mesh = try MeshResource.generate(from: descriptors)
+        entity = ModelEntity(mesh: mesh, materials: materials)
+      }
+      entity.name = node.name.isEmpty ? "CAD Node \(node.id + 1)" : node.name
+      nodeEntities[node.id] = entity
+    }
+    for node in document.nodes {
+      guard let entity = nodeEntities[node.id] else { continue }
+      if let parent = node.parentIndex, let parentEntity = nodeEntities[parent] {
+        parentEntity.addChild(entity)
+      } else {
+        root.addChild(entity)
+      }
+    }
+
+    // Geometry without an XDE label is still renderable instead of being dropped.
+    for batch in batchesByNode[-1] ?? [] {
+      var descriptor = MeshDescriptor(name: "Unlabelled CAD Geometry")
+      let positions = Array(geometry.positions[batch.vertexRange])
+      let normals = Array(geometry.normals[batch.vertexRange])
+      let globalStart = UInt32(batch.vertexRange.lowerBound)
+      descriptor.positions = MeshBuffers.Positions(positions)
+      if normals.count == positions.count { descriptor.normals = MeshBuffers.Normals(normals) }
+      descriptor.primitives = .triangles(
+        geometry.indices[batch.indexRange].map { $0 - globalStart })
+      let mesh = try MeshResource.generate(from: [descriptor])
+      let model = ModelEntity(mesh: mesh, materials: [PhysicallyBasedMaterial()])
+      model.name = "Unlabelled CAD Geometry"
+      root.addChild(model)
     }
     return root
   }

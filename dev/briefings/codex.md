@@ -320,6 +320,19 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- **2026-07-20 — OUT: Codex Bench's retained CAD stack is now production.**
+  `app/` owns a guarded Open CASCADE/XDE loader and one shared STEP geometry
+  contract feeding RealityKit, MetalKit, Three.js WebGPU (with WebGL 2
+  fallback), and raw WebGPU. STEP/STP is the preferred import option; the
+  production Settings window owns renderer role, ten coordinated themes,
+  colors, XDE policy, exact edges, material response, three-point lighting, and
+  telemetry. The signed root app carries its browser resources and 27 native
+  dependencies, has no absolute Homebrew dylib references, and launched without
+  crash/dyld errors. Recursive lint, 321 XCTest tests, 26 Swift Testing tests,
+  native Xcode build, root rebuild, strict signing, and diff check pass. The
+  currently deleted CAD DEMO corpus was not restored or claimed, so Jonathan's
+  own STEP file is the final real-model acceptance test.
+
 - **2026-07-19 — OUT: raw WebGPU is shipped; explicit raw WebGL is retired.**
   P10 uses direct `navigator.gpu` and WGSL with no Three.js dependency or
   fallback, renders exact B-Rep edges plus themed surfaces, and passed the full

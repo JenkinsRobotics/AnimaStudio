@@ -57,6 +57,8 @@ IN before working, write your OUT before stopping.**
 6. The format document affected by the change:
    [`Character_Format.md`](dev/docs/roadmap/Character_Format.md) or
    [`Scene_Format.md`](dev/docs/roadmap/Scene_Format.md)
+7. For CAD import, viewport, or packaging work:
+   [`CAD_Rendering.md`](dev/docs/roadmap/CAD_Rendering.md)
 
 ## One engine (canonical) — read this first
 

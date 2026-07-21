@@ -43,6 +43,8 @@ struct ModelImportRequest: Identifiable, Equatable, Sendable {
 
   var partCreationDetail: String {
     switch url.pathExtension.lowercased() {
+    case "step", "stp":
+      "Open CASCADE assembly nodes become rigid Parts"
     case "usd", "usda", "usdc", "usdz":
       "Renderable nodes become rigid Parts"
     default:

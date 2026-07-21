@@ -123,7 +123,7 @@ character is portable.
   app-scoped security bookmark; subsequent panels open there directly. Existing
   preferences for the former `Anima Studio` default are migrated to
   `AnimaStudio`; operator-selected custom roots are preserved.
-- **Import model** → copy the STL/OBJ/USD into the active
+- **Import model** → copy the STEP/STP/STL/OBJ/USD into the active
   character's `assets/`, and set the imported part's `model` to the
   copied file's path **relative to the character folder**
   (`assets/<file>`), plus a `model_node` when the part is one node of a
@@ -131,11 +131,13 @@ character is portable.
   are opaque to the engine — it round-trips the strings and never parses
   the mesh (see the Parts section of `Character_Format.md`). A multi-file
   assembly gives each part its own `model`; a single multi-node USD gives
-  several parts a shared `model` with distinct `model_node`s. STL and OBJ
+  several parts a shared `model` with distinct `model_node`s. A multi-node STEP
+  follows the same pattern: Open CASCADE/XDE supplies assembly-node names and
+  one shared STEP asset remains the project source. STL and OBJ
   are unitless, so Studio records the operator's mm/cm/m interpretation in
   `<character>.editor.json` and converts positions to metres for rendering.
-  STEP is not advertised as natively loadable: selecting `.step`/`.stp`
-  presents conversion guidance to export STL or USD from the source CAD tool.
+  STEP/STP dimensions are converted from the STEP/XDE document to metres by the
+  CAD importer and do not show the unitless-mesh prompt.
 - **Publish to Character Library** -> save the active Project Character first,
   then copy its complete self-contained directory to its stable library UUID.
   First publish creates revision 1; each later publish increments the simple

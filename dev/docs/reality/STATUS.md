@@ -97,6 +97,39 @@
   comparison is in `dev/Codex Bench/Reports/2026-07-19-raw-webgpu/`. Sixteen Swift
   tests, recursive format lint, release packaging, deep signing, headless
   46-file probe, and all four signed-app assembly runs pass.
+- **Production STEP/CAD rendering:** the retained Codex Bench architecture is
+  now integrated under `app/` rather than remaining a prototype-only result.
+  `AnimaCADShim` is a crash-guarded C++ boundary over Open CASCADE 7.9 XDE;
+  `AnimaCAD` projects STEP/STP into one renderer-neutral document containing
+  metre-space triangles, assembly labels, per-face XDE colors, exact B-Rep
+  feature-edge polylines, topology IDs, transforms, tolerances, and staged load
+  timings. `RealityKitModelLoader` consumes that same document, so STEP is a
+  first-class picker/drop/import format and a multi-node STEP assembly can
+  author rigid Parts just like a multi-node USD. Malformed STEP becomes a
+  readable import error rather than allowing a native exception to abort
+  Studio.
+
+  The production renderer catalog contains only the four retained paths: Open
+  CASCADE → MetalKit (preferred high-volume STEP visualization), Open CASCADE → RealityKit
+  (native Studio editing/selection/media path), Open CASCADE → Three.js WebGPU
+  (optional virtual-stage experiment with reported WebGL 2 fallback), and Open
+  CASCADE → raw WebGPU (diagnostic WGSL path). All consume the same imported
+  document; none reparses STEP or changes saved rig meaning. Settings → CAD
+  Renderer owns backend selection, ten coordinated themes, XDE-color policy,
+  exact-edge visibility/strength, roughness, metallic response, key/fill/rim
+  intensity, and optional live telemetry. Browser-renderer assets live in
+  `App/Resources/CADWeb`, so archiving Codex Bench cannot break production.
+  The root-app builder follows the linked Homebrew OCCT Mach-O dependency
+  graph, copies the required dylibs into `Contents/Frameworks`, rewrites them
+  to `@rpath`, and signs them with the app. The local Homebrew bottle targets
+  macOS 26; a release for older supported macOS versions must build/vend OCCT
+  with the product deployment target before notarization. Verification passes:
+  recursive Swift format lint, 321 XCTest tests, 26 Swift Testing tests, the
+  native Xcode build, root-app rebuild, strict deep signing, a scan proving no
+  absolute Homebrew dylib links remain, and a clean root-app launch. Synthetic
+  topology and malformed-STEP crash containment are automated; a user-supplied
+  production STEP assembly remains the final manual import walkthrough because
+  the prior CAD DEMO corpus is absent from the current working tree.
 - **Production Studio interface:** the real Swift app under `app/` now uses one
   shared `StudioWorkspaceScaffold` for every workspace without replacing its
   AnimaCore, project, import, selection, timeline, or RealityKit behavior. The
@@ -153,8 +186,7 @@
   action remains centered in the usable viewport. UI Dev retains the actual
   production specimens. All 316 Swift unit tests, 22 live bridge/integration
   tests, recursive format lint, the native Xcode build, root-app helper
-  embedding, strict deep signing, launch, and diff check pass. Renderer-pipeline
-  integration from Codex Bench remains a separate phase.
+  embedding, strict deep signing, launch, and diff check pass.
   The empty-Rig call to action is centered in the usable viewport instead of
   inheriting the viewport overlay stack's top alignment.
   The project header follows the compact CAD layout used by the approved demo:
@@ -878,10 +910,12 @@
   a mate-guide foundation: labeled local XYZ axes, a revolute DOF ring, an
   optional reference plane, and a highlighted limit arc with independent layer
   toggles on every created mate. Project and asset names are also editable in
-  memory. The operator-facing import contract is deliberately closed to USD,
-  USDA, USDC, USDZ, STL, and OBJ models; picker and drop flows reject STEP,
-  Reality, URDF, glTF/GLB, and other extensions before loading. USD-family
-  files load natively; ModelIO converts STL/OBJ geometry into RealityKit meshes
+  memory. The operator-facing import contract is deliberately closed to STEP,
+  STP, USD, USDA, USDC, USDZ, STL, and OBJ models; picker and drop flows reject
+  Reality, URDF, glTF/GLB, and other extensions before loading. STEP/STP passes
+  through the app's Open CASCADE/XDE boundary and preserves assembly labels,
+  CAD colors, B-Rep faces, and feature edges in metres. USD-family files load
+  through RealityKit; ModelIO converts STL/OBJ geometry into RealityKit meshes
   after an explicit mm/cm/m prompt (STL defaults to mm). Every live model-import
   entry point — the Assets ribbon, center Import/Replace controls, right-hand
   drop-zone click, and navigator footer — calls one explicit native macOS
@@ -1253,7 +1287,11 @@
   analytic holes/cylinders and tangent curves are not inferred. Transform gizmos are currently
   world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display
   triangle mesh lines, not classified CAD feature edges; hidden-line removal
-  remains unimplemented. Section views and saved named views are now live. Typed
+  remains unimplemented. The Open CASCADE → MetalKit, Three.js/WebGPU, and raw
+  WebGPU selections are currently STEP inspection/visualization surfaces; live
+  AnimaCore per-Part pose transforms, semantic selection/manipulation, and media
+  surfaces remain on the RealityKit authoring renderer. Section views and saved
+  named views are now live. Typed
   prismatic/cylindrical/ball/planar/fastened joints and keyframes are not yet
   editable in the canonical rig DTO. Project folders and imported canonical
   characters persist. Rest-transform, suppress, and ground edits are projected

@@ -86,17 +86,8 @@ final class RealityKitModelLoadingTests: XCTestCase {
   }
 
   @MainActor
-  func testModelLoaderRejectsSTEPInsteadOfPretendingItIsRenderable() async {
-    do {
-      _ = try await RealityKitModelLoader.load(
-        contentsOf: URL(fileURLWithPath: "/tmp/model.step")
-      )
-      XCTFail("Expected STEP to remain an honest unsupported format")
-    } catch let RealityKitModelLoadingError.unsupportedFileType(fileExtension) {
-      XCTAssertEqual(fileExtension, "step")
-    } catch {
-      XCTFail("Unexpected error: \(error)")
-    }
+  func testSTEPAndSTPAreFirstClassCADInputs() {
+    XCTAssertEqual(RealityKitModelLoader.cadFileExtensions, ["step", "stp"])
   }
 
   @MainActor

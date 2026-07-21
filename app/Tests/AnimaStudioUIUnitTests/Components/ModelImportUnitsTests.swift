@@ -6,7 +6,7 @@ final class ModelImportUnitsTests: XCTestCase {
   func testSupportedModelImportContractIsExplicitAndClosed() {
     XCTAssertEqual(
       ModelImportFormatSupport.supportedFileExtensions,
-      ["usd", "usda", "usdc", "usdz", "stl", "obj"]
+      ["step", "stp", "usd", "usda", "usdc", "usdz", "stl", "obj"]
     )
     for fileExtension in ModelImportFormatSupport.supportedFileExtensions {
       XCTAssertTrue(
@@ -15,7 +15,7 @@ final class ModelImportUnitsTests: XCTestCase {
         )
       )
     }
-    for fileExtension in ["step", "stp", "reality", "urdf", "gltf", "glb"] {
+    for fileExtension in ["reality", "urdf", "gltf", "glb"] {
       XCTAssertFalse(
         ModelImportFormatSupport.supports(
           URL(fileURLWithPath: "/tmp/model.\(fileExtension)")
@@ -79,8 +79,10 @@ final class ModelImportUnitsTests: XCTestCase {
   func testStagingExplainsHowFilesBecomeRigidParts() {
     let stl = ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/base.stl"))
     let usd = ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/assembly.usd"))
+    let step = ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/assembly.step"))
 
     XCTAssertEqual(stl.partCreationDetail, "File becomes one rigid Part")
     XCTAssertEqual(usd.partCreationDetail, "Renderable nodes become rigid Parts")
+    XCTAssertEqual(step.partCreationDetail, "Open CASCADE assembly nodes become rigid Parts")
   }
 }

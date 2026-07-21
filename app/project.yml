@@ -25,6 +25,10 @@ targets:
           - AnimaCoreHelper.entitlements
           - AnimaStudio.entitlements
           - Resources/AppIconSource.svg
+          - Resources/CADWeb
+      - path: App/Resources/CADWeb
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: AnimaStudioPackage
         product: AnimaStudioUI

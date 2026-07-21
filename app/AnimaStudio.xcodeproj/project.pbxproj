@@ -12,6 +12,7 @@
 		236FD44525A878015E6E7FC6 /* ViewportSection.metal in Sources */ = {isa = PBXBuildFile; fileRef = 03E462CC2C75805CD2494A5B /* ViewportSection.metal */; };
 		366B2254EF977E31081A4F04 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E362632664BDB0FEC7AA3AAF /* Assets.xcassets */; };
 		6E15844F763F266E64E2C51F /* AnimaStudioUI in Frameworks */ = {isa = PBXBuildFile; productRef = 12A5A190D34DE723F7619A85 /* AnimaStudioUI */; };
+		7C68A26194F93B2D5605C183 /* CADWeb in Resources */ = {isa = PBXBuildFile; fileRef = 5F57B91081F46A16D6279BC6 /* CADWeb */; };
 		B403A99A4089B33F34F3FB72 /* AnimaStudioAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394BBFB29398F4351134AEDA /* AnimaStudioAppUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -30,6 +31,7 @@
 		394BBFB29398F4351134AEDA /* AnimaStudioAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimaStudioAppUITests.swift; sourceTree = "<group>"; };
 		3BAD0EB3940357ACAA6E2DAD /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; name = app; path = .; sourceTree = SOURCE_ROOT; };
 		59D1F830F21EBF78DCD375C3 /* AnimaStudioAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AnimaStudioAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F57B91081F46A16D6279BC6 /* CADWeb */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CADWeb; path = App/Resources/CADWeb; sourceTree = SOURCE_ROOT; };
 		7290CE010A6A4BCED2DF3ECC /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		7FD807500A5610B3B0F367A1 /* AnimaStudioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimaStudioApp.swift; sourceTree = "<group>"; };
 		8002684AF82B819B94955795 /* Anima Studio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Anima Studio.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				E362632664BDB0FEC7AA3AAF /* Assets.xcassets */,
+				5F57B91081F46A16D6279BC6 /* CADWeb */,
 				F058355D2985C312D6662D5C /* Localizable.xcstrings */,
 			);
 			path = Resources;
@@ -209,6 +212,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				366B2254EF977E31081A4F04 /* Assets.xcassets in Resources */,
+				7C68A26194F93B2D5605C183 /* CADWeb in Resources */,
 				0C2326E7A8D16484224C139D /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

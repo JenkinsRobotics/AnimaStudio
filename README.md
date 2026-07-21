@@ -96,6 +96,8 @@ Planning and design docs live under [dev/docs/](dev/docs/):
   runtime design, output nodes
 - [Studio app plan](dev/docs/roadmap/Studio_App.md) — Swift app architecture,
   RealityKit viewport, plugin system, and first build slice
+- [CAD rendering](dev/docs/roadmap/CAD_Rendering.md) — STEP/Open CASCADE
+  boundary, retained renderer roles, settings, and packaging contract
 - [Hardware animation milestone](dev/docs/roadmap/Hardware_Animation_Milestone.md)
   — workspace, model import, rigging, timeline, and first output loop
 - [Character format](dev/docs/roadmap/Character_Format.md) —

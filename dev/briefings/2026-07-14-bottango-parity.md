@@ -48,6 +48,8 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Integrate Codex Bench STEP/OCCT geometry and retained render pipelines into production | `app/Package.swift`, `app/project.yml`, new production CAD geometry/render targets under `app/Sources/**`, import/settings/viewport integration under `app/Sources/{AnimaStudioUI,RealityKitViewport}/**`, matching tests under `app/Tests/**`, `app/Scripts/**`, `app/App/**` only where packaging/resources require it, `dev/docs/{roadmap,reality}/**`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/Codex Bench/**` read-only reference | STEP/STP is first-class and preferred; one crash-guarded Open CASCADE/XDE import preserves assembly hierarchy, colors, faces, and edges; retained MetalKit, RealityKit, Three.js WebGPU, and raw WebGPU backends consume the shared geometry contract; renderer/theme/material/edge/lighting/quality/telemetry settings are production preferences; app packaging carries required runtime resources/dependencies; focused tests plus Swift lint/test, native/root build/sign/launch, representative STEP walk-through, and diff check pass | released 2026-07-20: implementation and synthetic/malformed STEP verification pass; the user corpus is absent from the current working tree, so a representative real-file walkthrough remains operator verification |
+
 | Codex | Align and finish the production workspace shell against the Demo standard | `app/Sources/AnimaStudioUI/AppShell/{WorkspaceChrome,WorkspaceLayout,WorkspaceShell,StudioWorkspaceModel,StudioWorkspaceView}.swift`, live workspace ribbon/catalog files under `app/Sources/AnimaStudioUI/Workspaces/**`, `app/Sources/AnimaStudioUI/Settings/**`, focused shell/presentation tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | remove the zero-reference legacy ribbon views; Docked uses full-height fixed-width side panels around a center column with its tool bar at top; shared panel stacks support multiple open panels, deterministic reorder, tear-off/clamped floating/re-dock, unselected defaults, independently centered rails, and optional outer-edge placement; quality cleanup leaves typed rig commands, one viewport display owner, and one shared rail implementation; deterministic tests/lint/build/launch and diff check pass | released 2026-07-20 |
 
 | Codex | Protect Animate and Show timelines from floating/Canvas widgets | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, shared timeline surface under `app/Sources/AnimaStudioUI/Workspaces/{Animate,Show}/**`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{AppShell,Workspaces/Animate}/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | Animate and Show timelines remain center/bottom editors; Docked stays full-width in-flow; Floating/Canvas use bounded rounded timeline windows; hidden Canvas panels preserve broad width; revealed side panels animate the timeline inside safe left/right boundaries without shrinking the 3D center; lint/tests/native/root build/sign/launch/diff check pass | released: shared protected timeline surface covers Animate + Show; safe left/right Canvas reveal reflow; top tools do not shrink the bottom editor; 311 XCTest + 22 bridge/integration tests, recursive lint, native/root build, helper embed, deep sign, launch pass |
@@ -3533,3 +3535,17 @@ change needed in the Handoff log instead of inventing commands.
   strict touched lint, 321 XCTest tests, 22 bridge/integration tests,
   native/root build, helper embedding, deep signing, and clean launch (PID
   57890) pass.
+- **2026-07-20 (Codex, production STEP/CAD integration):** Promoted the retained
+  Codex Bench work into self-contained production targets: a crash-guarded Open
+  CASCADE/XDE shim, one renderer-neutral CAD document, RealityKit and MetalKit
+  native views, Three.js WebGPU with WebGL 2 fallback, and a raw WebGPU
+  diagnostic view. STEP/STP is now first in import guidance and uses OCCT for
+  hierarchy, XDE color, exact feature edges, topology, and metre conversion.
+  Settings exposes the four roles plus coordinated theme, material, edge,
+  lighting, and telemetry controls. Browser resources and 27 OCCT/transitive
+  dylibs are bundled into the signed root app with no absolute Homebrew links.
+  Recursive Swift format lint, 321 XCTest tests, 26 Swift Testing tests, native
+  Xcode build, root rebuild, strict deep signing, launch, and diff check pass.
+  Synthetic geometry and malformed-STEP crash containment are covered; the
+  deleted CAD DEMO corpus was intentionally left untouched, so a real operator
+  STEP walkthrough is the remaining manual acceptance check.

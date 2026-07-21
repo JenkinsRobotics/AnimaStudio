@@ -44,15 +44,19 @@ is a small native stack:
 |---|---|---|
 | macOS application shell | SwiftUI with AppKit where needed | Windows, panels, commands, documents, inspectors |
 | App-side animation projection | Pure Swift (`AnimaModel` + `AnimaEvaluation`) | Typed project/rig/clip data plus deterministic preview evaluation conforming to AnimaCore contracts |
-| 3D viewport engine | RealityKit | Model rendering, camera, lights, materials, skeletal pose display, selection/hit testing |
-| GPU layer | Metal, normally through RealityKit | Actual GPU drawing; custom overlays and render passes only when needed |
+| CAD geometry kernel | Open CASCADE/XDE behind `AnimaCADShim` | STEP/STP hierarchy, colors, B-Rep faces/edges, tolerance, tessellation |
+| 3D viewport engines | MetalKit + RealityKit | Shared CAD rendering; RealityKit remains the native editing/selection/media path |
+| Optional environment experiments | Three.js WebGPU + raw WebGPU in WebKit | Virtual-stage comparison and direct browser-GPU diagnostics over the same CAD document |
+| GPU layer | Metal, directly or through RealityKit/WebGPU | Actual GPU drawing; custom edge/material passes where needed |
 | 2D character renderer | Live2D Cubism SDK for Native + Metal adapter | Cubism model loading, parameters, deformation, and drawing |
 | Runtime/hardware bridge | JaegerOS client adapter | Preview commands, telemetry, and live target output |
 
-RealityKit renders the 3D model, but it does **not** define Anima's animation
-semantics. `AnimaEvaluation` evaluates the timeline into a renderer-neutral
-`EvaluatedFrame`; viewport and output adapters consume that frame. This keeps
-scrubbing, offline export, runtime playback, and physical output consistent.
+No renderer defines Anima's animation semantics. AnimaCore evaluates the
+timeline into renderer-neutral state; viewport adapters consume that state.
+RealityKit remains the editing-native path for selection, manipulators, audio,
+video, and spatial content. `AnimaEvaluation` is transitional while remaining
+preview paths migrate to the bridge. This keeps scrubbing, offline export,
+runtime playback, and physical output consistent.
 
 ```text
 .character.anima + .scene.anima
@@ -324,9 +328,10 @@ shared typed-joint/DOF contract.
 - **Unity/Unreal:** useful future output or bridge plugins, but embedding one as
   Studio's foundation would add a second application runtime, weaken native
   macOS document/UI behavior, and couple the `.anima` engine to a vendor.
-- **Raw Metal:** available for specialized rendering, but too low-level for the
-  initial model viewport. RealityKit already supplies the scene, material,
-  camera, animation, and interaction layer above Metal.
+- **Raw Metal as the only viewport:** still too low-level for Studio's editing,
+  media, and spatial interaction layer. A focused MetalKit consumer is now the
+  high-volume STEP visualization path, while RealityKit supplies selection,
+  manipulators, audio/video, and the native scene graph.
 
 ## Application Architecture
 
@@ -341,8 +346,12 @@ AnimaStudioApp            @main lifecycle, resources, signing, entitlements
 └── AnimaStudioUI         app shell, workspaces, panels, timeline presentation
     ├── AnimaModel        project model, rigs, clips, validation
     ├── AnimaEvaluation   curves, mate math, evaluated preview frames
-    └── RealityKitViewport
-        ├── AnimaViewport renderer-neutral viewport contracts
+    ├── AnimaCADViewport  MetalKit, RealityKit, Three.js/raw WebGPU consumers
+    │   └── AnimaCAD      renderer-neutral OCCT geometry document
+    │       └── AnimaCADShim  guarded C++ Open CASCADE/XDE boundary
+    └── RealityKitViewport    Studio-native editing and media viewport
+        ├── AnimaViewport     renderer-neutral viewport contracts
+        ├── AnimaCAD          shared STEP importer, never a second parser
         ├── AnimaModel
         └── AnimaEvaluation
 ```
