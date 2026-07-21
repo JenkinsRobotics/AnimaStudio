@@ -294,14 +294,12 @@ struct StudioWorkspaceView: View {
       toolGroups: workspaceToolGroups,
       toolCategories: workspaceToolCategories,
       leftTabs: StudioWorkspaceSidebarCatalog.tabs(for: workspace.activeWorkspace),
-      leftSelection: Binding(
-        get: { workspace.activeWorkspaceSidebarSelection },
-        set: { selectWorkspaceSidebarTab($0) }
-      ),
-      leftOpen: Binding(
-        get: { workspace.isActiveWorkspaceSidebarOpen },
-        set: { workspace.isActiveWorkspaceSidebarOpen = $0 }
-      ),
+      leftPanels: workspace.activeWorkspaceSidebarPanels,
+      didToggleLeftPanel: { tab in
+        if workspace.activeWorkspaceSidebarPanels.isEnabled(tab) {
+          selectWorkspaceSidebarTab(tab)
+        }
+      },
       performCommand: performWorkspaceRibbonAction,
       center: {
         VStack(spacing: 0) {

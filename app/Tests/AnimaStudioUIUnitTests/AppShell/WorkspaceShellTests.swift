@@ -21,8 +21,9 @@ final class WorkspaceShellTests: XCTestCase {
     StudioToolSettings.shared.density = .standard
     StudioToolSettings.shared.activeCategoryByWorkspace.removeAll()
     StudioViewSidebarState.shared.selectedTab = .view
-    StudioViewSidebarState.shared.isOpen = true
+    StudioViewSidebarState.shared.isOpen = false
     StudioViewSidebarState.shared.navigationMode = .select
+    StudioLayoutState.shared.panelsOnOuterEdge = false
   }
 
   func testLayoutModeIsGlobalAndCyclesAcrossAllThreePresets() {
@@ -68,6 +69,112 @@ final class WorkspaceShellTests: XCTestCase {
 
     XCTAssertEqual(workspace.activeWorkspaceSidebarSelection, "Collections")
     XCTAssertFalse(workspace.isActiveWorkspaceSidebarOpen)
+  }
+
+  func testPanelStacksStartUnselectedAndAllowMultipleOpenPanels() {
+    let panels = StudioPanelStackState(
+      order: ["A", "B", "C"],
+      defaults: [],
+      side: .leading
+    )
+
+    XCTAssertFalse(panels.isOpen)
+    XCTAssertNil(panels.focusedID)
+
+    panels.toggle("A")
+    panels.toggle("C")
+    XCTAssertEqual(panels.stacked, ["A", "C"])
+    XCTAssertEqual(panels.focusedID, "C")
+
+    panels.toggle("A")
+    XCTAssertEqual(panels.stacked, ["C"])
+  }
+
+  func testProductionSidebarsDefaultToNoSelectedPanel() {
+    StudioViewSidebarState.shared.panels.closeAll()
+    defer { resetShellState() }
+    let workspace = StudioWorkspaceModel(resolvesDefaultAnimaCoreClient: false)
+
+    XCTAssertFalse(workspace.activeWorkspaceSidebarPanels.isOpen)
+    XCTAssertFalse(StudioViewSidebarState.shared.panels.isOpen)
+  }
+
+  func testPanelReorderIndexAndOrderAreDeterministic() {
+    let panels = StudioPanelStackState(
+      order: ["A", "B", "C"],
+      defaults: ["A", "B", "C"],
+      side: .leading
+    )
+    let index = StudioPanelStackState.reorderIndex(
+      locationY: 250,
+      excluding: "A",
+      stacked: panels.stacked,
+      cardMidpoints: ["B": 100, "C": 200]
+    )
+
+    XCTAssertEqual(index, 2)
+    panels.reorderStacked("A", to: index)
+    XCTAssertEqual(panels.stacked, ["B", "C", "A"])
+  }
+
+  func testPanelTearOffClampAndReturnToEdge() {
+    let panels = StudioPanelStackState(
+      order: ["View", "Inspector"],
+      defaults: ["View", "Inspector"],
+      side: .trailing
+    )
+    panels.detach("View", offset: CGSize(width: -240, height: 60))
+    XCTAssertEqual(panels.stacked, ["Inspector"])
+    XCTAssertEqual(panels.floating, ["View"])
+
+    let clamped = StudioFloatingPanelGeometry.clamp(
+      CGSize(width: -10_000, height: 10_000),
+      side: .trailing,
+      canvasSize: CGSize(width: 1_200, height: 800),
+      panelWidth: 280
+    )
+    XCTAssertGreaterThanOrEqual(clamped.width, -784)
+    XCTAssertLessThanOrEqual(clamped.height, 580)
+    XCTAssertTrue(panels.nearHomeEdge(CGSize(width: -40, height: 0)))
+
+    panels.restack("View")
+    XCTAssertEqual(panels.stacked, ["View", "Inspector"])
+    XCTAssertTrue(panels.floating.isEmpty)
+  }
+
+  func testOuterEdgeSettingFlipsRailWithoutRemovingPanelMargin() {
+    XCTAssertTrue(
+      StudioSidebarArrangement.railPrecedesStack(
+        side: .leading,
+        panelsOnOuterEdge: false
+      )
+    )
+    XCTAssertFalse(
+      StudioSidebarArrangement.railPrecedesStack(
+        side: .leading,
+        panelsOnOuterEdge: true
+      )
+    )
+    XCTAssertFalse(
+      StudioSidebarArrangement.railPrecedesStack(
+        side: .trailing,
+        panelsOnOuterEdge: false
+      )
+    )
+    XCTAssertTrue(
+      StudioSidebarArrangement.railPrecedesStack(
+        side: .trailing,
+        panelsOnOuterEdge: true
+      )
+    )
+
+    let suiteName = "WorkspaceShellTests.outerEdge"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let first = StudioLayoutState(defaults: defaults)
+    first.panelsOnOuterEdge = true
+    XCTAssertTrue(StudioLayoutState(defaults: defaults).panelsOnOuterEdge)
   }
 
   func testDockedForcesExpandedToolsWithoutLosingFloatingPreference() {

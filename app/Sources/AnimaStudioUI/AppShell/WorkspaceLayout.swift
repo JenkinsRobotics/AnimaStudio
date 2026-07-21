@@ -103,10 +103,22 @@ enum StudioLayoutPreset: String, CaseIterable, Identifiable, Sendable {
 final class StudioLayoutState {
   static let shared = StudioLayoutState()
 
+  @ObservationIgnored private let defaults: UserDefaults
+
   var navigatorPlacement: StudioPanelPlacement = .floating
   var inspectorPlacement: StudioPanelPlacement = .floating
   var ribbonPlacement: StudioPanelPlacement = .floating
   var floatingRibbonEdge: StudioFloatingRibbonEdge = .top
+  /// Keeps the floating panel stack against the window edge and moves the
+  /// icon rail inboard. The standard arrangement keeps the rail at the edge.
+  var panelsOnOuterEdge: Bool {
+    didSet { defaults.set(panelsOnOuterEdge, forKey: StudioPreferenceKey.panelsOnOuterEdge) }
+  }
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+    self.panelsOnOuterEdge = defaults.bool(forKey: StudioPreferenceKey.panelsOnOuterEdge)
+  }
 
   var detectedPreset: StudioLayoutPreset? {
     StudioLayoutPreset.allCases.first {

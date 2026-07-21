@@ -71,6 +71,8 @@ final class WorkspacePresentationTests: XCTestCase {
   }
 
   func testInspectableSelectionRevealsTheRightInspector() throws {
+    StudioViewSidebarState.shared.panels.closeAll()
+    defer { StudioViewSidebarState.shared.panels.closeAll() }
     let model = StudioWorkspaceModel()
     model.addPart(kind: .box)
     let part = try XCTUnwrap(model.project.rig.parts.first)
@@ -80,5 +82,8 @@ final class WorkspacePresentationTests: XCTestCase {
     model.selectPart(id: part.id, extendingSelection: false)
 
     XCTAssertTrue(model.activePresentation.showsInspector)
+    XCTAssertTrue(
+      StudioViewSidebarState.shared.panels.isEnabled(StudioViewSidebarTab.inspector.rawValue)
+    )
   }
 }

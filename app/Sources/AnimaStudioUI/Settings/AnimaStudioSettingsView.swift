@@ -147,6 +147,17 @@ public struct AnimaStudioSettingsView: View {
           )
           .font(.caption)
           .foregroundStyle(StudioPalette.muted)
+          Toggle(
+            "Push panels to the outer edge",
+            isOn: Binding(
+              get: { StudioLayoutState.shared.panelsOnOuterEdge },
+              set: { StudioLayoutState.shared.panelsOnOuterEdge = $0 }
+            )
+          )
+          .toggleStyle(.switch)
+          Text("Keeps the panel margin while moving the icon rail inboard.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
         }
         .studioCardSurface()
 

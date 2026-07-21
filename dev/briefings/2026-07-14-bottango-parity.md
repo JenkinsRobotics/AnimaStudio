@@ -3471,3 +3471,11 @@ change needed in the Handoff log instead of inventing commands.
   full-height fixed-width right sidebar. The Tool ribbon no longer spans above
   or shortens the side panels. Eight focused shell tests and strict touched-file
   lint pass.
+- **2026-07-20 (Codex, shell alignment panel stacks):** Ported the Demo's shared
+  multi-panel state to both production rails: unselected defaults, independent
+  toggles, ordered stacking, header drag with panel-width insertion feedback,
+  sideways tear-off, canvas clamping, edge re-docking, independently centered
+  rails, and a persisted outer-edge arrangement preference. Inspectable
+  selection opens the actual Inspector panel. Deterministic stack/reorder/
+  tear-off/clamp/outer-edge tests join the existing shell contracts; strict
+  touched lint, 314 XCTest tests, and 22 bridge/integration tests pass.

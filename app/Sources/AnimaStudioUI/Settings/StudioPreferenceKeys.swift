@@ -3,6 +3,7 @@ enum StudioPreferenceKey {
   static let workspaceRootPath = "workspaceRootPath"
   static let workspaceRootBookmark = "workspaceRootBookmark"
   static let defaultLayoutPreset = "defaultLayoutPreset"
+  static let panelsOnOuterEdge = "panelsOnOuterEdge"
 
   static let viewportAppearance = "viewportAppearance"
   static let viewportNavigationProfile = "viewportNavigationProfile"

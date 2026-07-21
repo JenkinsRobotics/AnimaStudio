@@ -189,8 +189,11 @@ enum StudioViewportDisplayMode: String, CaseIterable, Identifiable, Sendable {
 final class StudioViewSidebarState {
   static let shared = StudioViewSidebarState()
 
-  var selectedTab = StudioViewSidebarTab.view
-  var isOpen = true
+  let panels = StudioPanelStackState(
+    order: StudioViewSidebarTab.allCases.map(\.rawValue),
+    defaults: [],
+    side: .trailing
+  )
   var navigationMode = StudioCameraNavigationMode.select
   var displayMode = StudioViewportDisplayMode.shaded
   var viewPreset = "Standard"
@@ -204,10 +207,24 @@ final class StudioViewSidebarState {
   var keepsImportedColors = true
   var opacity = 1.0
 
+  var selectedTab: StudioViewSidebarTab {
+    get { StudioViewSidebarTab(rawValue: panels.focusedID ?? "") ?? .view }
+    set { panels.focusedID = newValue.rawValue }
+  }
+
+  var isOpen: Bool {
+    get { panels.isOpen }
+    set {
+      if newValue {
+        panels.enable(selectedTab.rawValue)
+      } else {
+        panels.closeAll()
+      }
+    }
+  }
+
   func select(_ tab: StudioViewSidebarTab) {
-    let result = StudioSidebarInteraction.select(tab, current: selectedTab, isOpen: isOpen)
-    selectedTab = result.selection
-    isOpen = result.isOpen
+    panels.toggle(tab.rawValue)
     StudioToolState.shared.disarm()
   }
 
@@ -223,6 +240,162 @@ struct StudioWorkspaceSidebarTab: Identifiable, Equatable, Sendable {
   let id: String
   let title: String
   let systemImage: String
+}
+
+/// Shared state engine for both sidebars. It owns open order, multi-panel
+/// stacking, transient reorder feedback, and torn-off panel positions. Views
+/// only project this state, so layout-branch changes cannot reset it.
+@MainActor
+@Observable
+final class StudioPanelStackState {
+  var order: [String]
+  let side: StudioSidebarSide
+  var exclusive: Bool
+  var enabled: Set<String>
+  var focusedID: String?
+  var floatingOffset: [String: CGSize] = [:]
+  var draggingID: String?
+  var dragOffset: CGSize = .zero
+  var dropIndex: Int?
+  var willFloat = false
+
+  init(
+    order: [String],
+    defaults: [String] = [],
+    side: StudioSidebarSide,
+    exclusive: Bool = false
+  ) {
+    self.order = order
+    self.side = side
+    self.exclusive = exclusive
+    self.enabled = Set(defaults)
+    self.focusedID = defaults.last
+  }
+
+  var ordered: [String] { order.filter(enabled.contains) }
+  var stacked: [String] { ordered.filter { floatingOffset[$0] == nil } }
+  var floating: [String] { ordered.filter { floatingOffset[$0] != nil } }
+  var isOpen: Bool { !enabled.isEmpty }
+
+  func configure(order newOrder: [String]) {
+    guard newOrder != order else { return }
+    let valid = Set(newOrder)
+    order = newOrder
+    enabled.formIntersection(valid)
+    floatingOffset = floatingOffset.filter { valid.contains($0.key) }
+    if focusedID.map({ !valid.contains($0) }) == true { focusedID = nil }
+  }
+
+  func isEnabled(_ id: String) -> Bool { enabled.contains(id) }
+
+  func enable(_ id: String) {
+    guard order.contains(id) else { return }
+    if exclusive {
+      enabled.removeAll()
+      floatingOffset.removeAll()
+    }
+    enabled.insert(id)
+    focusedID = id
+  }
+
+  func toggle(_ id: String) {
+    guard order.contains(id) else { return }
+    if enabled.contains(id) {
+      enabled.remove(id)
+      floatingOffset[id] = nil
+      if focusedID == id { focusedID = ordered.last }
+    } else {
+      enable(id)
+    }
+  }
+
+  func closeAll() {
+    enabled.removeAll()
+    floatingOffset.removeAll()
+  }
+
+  func reorderStacked(_ id: String, to index: Int) {
+    guard stacked.contains(id) else { return }
+    let others = stacked.filter { $0 != id }
+    var open = others
+    open.insert(id, at: min(max(index, 0), others.count))
+    let closed = order.filter { !enabled.contains($0) }
+    order = open + floating.filter { $0 != id } + closed
+  }
+
+  func detach(_ id: String, offset: CGSize? = nil) {
+    guard enabled.contains(id) else { return }
+    let count = floatingOffset.count
+    let defaultX = side == .leading ? 230.0 : -230.0
+    floatingOffset[id] =
+      offset
+      ?? CGSize(
+        width: defaultX + CGFloat(count) * (side == .leading ? 18 : -18),
+        height: 40 + CGFloat(count) * 28
+      )
+  }
+
+  func restack(_ id: String) { floatingOffset[id] = nil }
+  func isFloating(_ id: String) -> Bool { floatingOffset[id] != nil }
+
+  func nearHomeEdge(_ offset: CGSize) -> Bool {
+    side == .leading ? offset.width < 110 : offset.width > -110
+  }
+
+  func endDrag() {
+    draggingID = nil
+    dragOffset = .zero
+    dropIndex = nil
+    willFloat = false
+  }
+
+  static func reorderIndex(
+    locationY: CGFloat,
+    excluding id: String,
+    stacked: [String],
+    cardMidpoints: [String: CGFloat]
+  ) -> Int {
+    stacked.filter { $0 != id }.reduce(0) { result, candidate in
+      result + ((cardMidpoints[candidate].map { locationY > $0 } ?? false) ? 1 : 0)
+    }
+  }
+}
+
+enum StudioSidebarArrangement {
+  static func railPrecedesStack(side: StudioSidebarSide, panelsOnOuterEdge: Bool) -> Bool {
+    (side == .leading) != panelsOnOuterEdge
+  }
+}
+
+enum StudioFloatingPanelGeometry {
+  static let leftInset: CGFloat = 72
+  static let rightInset: CGFloat = 72
+  static let topInset: CGFloat = 56
+  static let bottomInset: CGFloat = 24
+  static let minimumVisibleHeight: CGFloat = 140
+
+  static func base(side: StudioSidebarSide, canvasSize: CGSize, panelWidth: CGFloat) -> CGSize {
+    side == .leading
+      ? CGSize(width: 64, height: 60)
+      : CGSize(width: canvasSize.width - 64 - panelWidth, height: 60)
+  }
+
+  static func clamp(
+    _ offset: CGSize,
+    side: StudioSidebarSide,
+    canvasSize: CGSize,
+    panelWidth: CGFloat
+  ) -> CGSize {
+    let origin = base(side: side, canvasSize: canvasSize, panelWidth: panelWidth)
+    let minimumX = leftInset - origin.width
+    let maximumX = canvasSize.width - rightInset - panelWidth - origin.width
+    let minimumY = topInset - origin.height
+    let maximumY = canvasSize.height - bottomInset - minimumVisibleHeight - origin.height
+    return CGSize(
+      width: min(max(offset.width, minimumX), max(minimumX, maximumX)),
+      height: min(max(offset.height, minimumY), max(minimumY, maximumY))
+    )
+  }
 }
 
 enum StudioSidebarInteraction {
@@ -391,25 +564,20 @@ extension View {
   }
 }
 
-private struct StudioSidebarRail: View {
+private struct StudioStackRail: View {
   let tabs: [StudioWorkspaceSidebarTab]
-  @Binding var selection: String
-  @Binding var isOpen: Bool
+  let state: StudioPanelStackState
   let docked: Bool
+  var onToggle: (String) -> Void = { _ in }
 
   var body: some View {
     VStack(spacing: 3) {
       ForEach(tabs) { tab in
-        let active = selection == tab.id && isOpen
+        let active = state.isEnabled(tab.id)
         Button {
           withAnimation(.easeOut(duration: 0.18)) {
-            let result = StudioSidebarInteraction.select(
-              tab.id,
-              current: selection,
-              isOpen: isOpen
-            )
-            selection = result.selection
-            isOpen = result.isOpen
+            state.toggle(tab.id)
+            onToggle(tab.id)
           }
         } label: {
           Image(systemName: tab.systemImage)
@@ -423,36 +591,6 @@ private struct StudioSidebarRail: View {
         }
         .buttonStyle(.plain)
         .help(tab.title)
-      }
-    }
-    .padding(5)
-    .frame(maxHeight: docked ? .infinity : nil, alignment: docked ? .top : .center)
-    .sidebarChrome(docked: docked)
-  }
-}
-
-private struct StudioViewRail: View {
-  let docked: Bool
-  private var state: StudioViewSidebarState { .shared }
-
-  var body: some View {
-    VStack(spacing: 3) {
-      ForEach(StudioViewSidebarTab.allCases) { tab in
-        let active = state.selectedTab == tab && state.isOpen
-        Button {
-          state.select(tab)
-        } label: {
-          Image(systemName: tab.systemImage)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(active ? Color.white : StudioPalette.muted)
-            .frame(width: 34, height: 34)
-            .background(
-              active ? StudioPalette.accent : Color.clear,
-              in: RoundedRectangle(cornerRadius: 8)
-            )
-        }
-        .buttonStyle(.plain)
-        .help(tab.rawValue)
       }
     }
     .padding(5)
@@ -637,50 +775,174 @@ struct StudioToolPromptBar: View {
 
 // MARK: - Sidebars and scaffold
 
-private struct StudioWorkspaceSidebar<Content: View>: View {
+private struct StudioPanelSidebar<Content: View>: View {
   let tabs: [StudioWorkspaceSidebarTab]
-  @Binding var selection: String
-  @Binding var isOpen: Bool
+  let state: StudioPanelStackState
   let docked: Bool
+  var onToggle: (String) -> Void = { _ in }
   @ViewBuilder let content: (String) -> Content
+  @State private var cardMidpoints: [String: CGFloat] = [:]
+
+  private var panelWidth: CGFloat {
+    state.side == .leading
+      ? StudioSidebarSizing.workspacePanelWidth
+      : StudioSidebarSizing.viewPanelWidth
+  }
+  private var panelsOnOuterEdge: Bool { StudioLayoutState.shared.panelsOnOuterEdge }
+  private var edgePadding: Edge.Set { state.side == .leading ? .leading : .trailing }
+  private var spaceName: String { "studio-sidebar-\(state.side.rawValue)" }
 
   var body: some View {
-    HStack(alignment: .center, spacing: docked ? 0 : 9) {
-      StudioSidebarRail(
-        tabs: tabs,
-        selection: $selection,
-        isOpen: $isOpen,
-        docked: docked
+    if docked { dockedLayout } else { floatingLayout }
+  }
+
+  private var rail: some View {
+    StudioStackRail(tabs: tabs, state: state, docked: docked, onToggle: onToggle)
+  }
+
+  private var dockedLayout: some View {
+    HStack(alignment: .top, spacing: 0) {
+      let railFirst = StudioSidebarArrangement.railPrecedesStack(
+        side: state.side,
+        panelsOnOuterEdge: panelsOnOuterEdge
       )
-      if isOpen {
-        if docked { Divider().overlay(StudioPalette.border) }
-        content(selection)
-          .frame(width: StudioMetrics.navigatorWidth)
-          .frame(maxHeight: docked ? .infinity : nil)
-          .environment(\.studioPanelSurfaceMode, docked ? .docked : .floating)
-          .transition(.move(edge: .leading).combined(with: .opacity))
+      if railFirst { rail }
+      if !state.stacked.isEmpty {
+        Divider().overlay(StudioPalette.border)
+        stackColumn(docked: true)
+      }
+      if !railFirst {
+        if !state.stacked.isEmpty { Divider().overlay(StudioPalette.border) }
+        rail
       }
     }
   }
+
+  private var floatingLayout: some View {
+    ZStack(alignment: state.side == .leading ? .leading : .trailing) {
+      rail
+        .frame(maxHeight: .infinity, alignment: .center)
+        .padding(
+          panelsOnOuterEdge && !state.stacked.isEmpty ? edgePadding : [],
+          panelWidth + 10
+        )
+      if !state.stacked.isEmpty {
+        stackColumn(docked: false)
+          .frame(maxHeight: .infinity, alignment: .center)
+          .padding(
+            panelsOnOuterEdge ? [] : edgePadding,
+            StudioSidebarSizing.railWidth + 10
+          )
+      }
+    }
+    .frame(maxHeight: .infinity)
+  }
+
+  private func stackColumn(docked: Bool) -> some View {
+    let cards = VStack(spacing: docked ? 0 : 10) {
+      ForEach(Array(state.stacked.enumerated()), id: \.element) { index, id in
+        if !docked, state.draggingID != nil, !state.willFloat, state.dropIndex == index {
+          dropIndicator
+        }
+        if docked, index > 0 { Divider().overlay(StudioPalette.border) }
+        panelCard(id, docked: docked)
+      }
+      if !docked, state.draggingID != nil, !state.willFloat,
+        state.dropIndex == state.stacked.count
+      {
+        dropIndicator
+      }
+    }
+    .coordinateSpace(name: spaceName)
+    .onPreferenceChange(StudioPanelCardMidpointKey.self) { cardMidpoints = $0 }
+
+    return Group {
+      if docked {
+        ScrollView { cards }
+          .frame(width: panelWidth, alignment: .top)
+          .frame(maxHeight: .infinity)
+      } else {
+        cards.frame(width: panelWidth)
+      }
+    }
+  }
+
+  private var dropIndicator: some View {
+    Capsule()
+      .fill(StudioPalette.accent)
+      .frame(width: panelWidth - 16, height: 3)
+      .transition(.opacity)
+  }
+
+  private func panelCard(_ id: String, docked: Bool) -> some View {
+    let lifted = state.draggingID == id
+    return content(id)
+      .frame(width: panelWidth)
+      .environment(\.studioPanelSurfaceMode, docked ? .docked : .floating)
+      .background {
+        GeometryReader { geometry in
+          Color.clear.preference(
+            key: StudioPanelCardMidpointKey.self,
+            value: [id: geometry.frame(in: .named(spaceName)).midY]
+          )
+        }
+      }
+      .overlay(alignment: .topLeading) {
+        if !docked {
+          Color.clear
+            .frame(height: 32)
+            .padding(.trailing, 40)
+            .contentShape(Rectangle())
+            .gesture(reorderGesture(id))
+        }
+      }
+      .offset(lifted ? state.dragOffset : .zero)
+      .scaleEffect(lifted ? 1.01 : 1)
+      .shadow(color: .black.opacity(lifted ? 0.3 : 0), radius: lifted ? 16 : 0, y: 8)
+      .opacity(lifted && state.willFloat ? 0.88 : 1)
+      .zIndex(lifted ? 1 : 0)
+  }
+
+  private func reorderGesture(_ id: String) -> some Gesture {
+    DragGesture(coordinateSpace: .named(spaceName))
+      .onChanged { gesture in
+        state.draggingID = id
+        state.dragOffset = gesture.translation
+        let sideways = abs(gesture.translation.width)
+        state.willFloat =
+          sideways > panelWidth * 0.5
+          || sideways > abs(gesture.translation.height) * 1.5
+        state.dropIndex =
+          state.willFloat
+          ? nil
+          : StudioPanelStackState.reorderIndex(
+            locationY: gesture.location.y,
+            excluding: id,
+            stacked: state.stacked,
+            cardMidpoints: cardMidpoints
+          )
+      }
+      .onEnded { _ in
+        let tearOff = state.willFloat
+        let translation = state.dragOffset
+        let dropIndex = state.dropIndex
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+          if tearOff {
+            state.detach(id, offset: translation)
+          } else if let dropIndex {
+            state.reorderStacked(id, to: dropIndex)
+          }
+          state.endDrag()
+        }
+      }
+  }
 }
 
-private struct StudioViewSidebar<Content: View>: View {
-  let docked: Bool
-  @ViewBuilder let content: (StudioViewSidebarTab) -> Content
-  private var state: StudioViewSidebarState { .shared }
+private struct StudioPanelCardMidpointKey: PreferenceKey {
+  static let defaultValue: [String: CGFloat] = [:]
 
-  var body: some View {
-    HStack(alignment: .center, spacing: docked ? 0 : 9) {
-      if state.isOpen {
-        content(state.selectedTab)
-          .frame(width: StudioMetrics.inspectorWidth)
-          .frame(maxHeight: docked ? .infinity : nil)
-          .environment(\.studioPanelSurfaceMode, docked ? .docked : .floating)
-          .transition(.move(edge: .trailing).combined(with: .opacity))
-        if docked { Divider().overlay(StudioPalette.border) }
-      }
-      StudioViewRail(docked: docked)
-    }
+  static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+    value.merge(nextValue(), uniquingKeysWith: { _, newer in newer })
   }
 }
 
@@ -695,8 +957,8 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
   var toolGroups: [StudioToolGroup]
   var toolCategories: [StudioToolCategory]
   let leftTabs: [StudioWorkspaceSidebarTab]
-  @Binding var leftSelection: String
-  @Binding var leftOpen: Bool
+  let leftPanels: StudioPanelStackState
+  var didToggleLeftPanel: (String) -> Void = { _ in }
   let performCommand: (WorkspaceRibbonAction) -> Void
   @ViewBuilder let center: Center
   @ViewBuilder let left: (String) -> Left
@@ -704,6 +966,7 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
 
   private var layout: StudioLayoutState { .shared }
   private var tools: StudioToolState { .shared }
+  private var viewPanels: StudioPanelStackState { StudioViewSidebarState.shared.panels }
   @State private var hoveredZones: Set<StudioShellEdge> = []
   @State private var hoveredSidebars: Set<StudioShellEdge> = []
   @State private var revealedEdges: Set<StudioShellEdge> = []
@@ -715,6 +978,22 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
   var body: some View {
     Group {
       if isDocked { dockedBody } else { floatingBody }
+    }
+    .overlay {
+      GeometryReader { geometry in
+        ZStack(alignment: .topLeading) {
+          floatingPanels(
+            state: leftPanels,
+            canvasSize: geometry.size,
+            content: left
+          )
+          floatingPanels(
+            state: viewPanels,
+            canvasSize: geometry.size,
+            content: { id in right(StudioViewSidebarTab(rawValue: id) ?? .view) }
+          )
+        }
+      }
     }
     .animation(.spring(response: 0.28, dampingFraction: 0.88), value: layout.detectedPreset)
   }
@@ -765,14 +1044,18 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
     if isCanvas {
       return StudioWorkspaceOverlayInsets(
         top: revealedEdges.contains(.top) ? StudioMetrics.rigCreationRibbonHeight + 24 : 0,
-        leading: revealedEdges.contains(.leading) ? StudioMetrics.navigatorWidth + 76 : 0,
-        trailing: revealedEdges.contains(.trailing) ? StudioMetrics.inspectorWidth + 76 : 0
+        leading: revealedEdges.contains(.leading)
+          ? (leftPanels.stacked.isEmpty ? 58 : StudioMetrics.navigatorWidth + 76)
+          : 0,
+        trailing: revealedEdges.contains(.trailing)
+          ? (viewPanels.stacked.isEmpty ? 58 : StudioMetrics.inspectorWidth + 76)
+          : 0
       )
     }
     return StudioWorkspaceOverlayInsets(
       top: StudioMetrics.rigCreationRibbonHeight + 24,
-      leading: leftOpen ? StudioMetrics.navigatorWidth + 76 : 58,
-      trailing: StudioViewSidebarState.shared.isOpen ? StudioMetrics.inspectorWidth + 76 : 58
+      leading: leftPanels.stacked.isEmpty ? 58 : StudioMetrics.navigatorWidth + 76,
+      trailing: viewPanels.stacked.isEmpty ? 58 : StudioMetrics.inspectorWidth + 76
     )
   }
 
@@ -787,17 +1070,114 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
   }
 
   private func workspaceSidebar(docked: Bool) -> some View {
-    StudioWorkspaceSidebar(
+    StudioPanelSidebar(
       tabs: leftTabs,
-      selection: $leftSelection,
-      isOpen: $leftOpen,
+      state: leftPanels,
       docked: docked,
+      onToggle: didToggleLeftPanel,
       content: left
     )
   }
 
   private func viewSidebar(docked: Bool) -> some View {
-    StudioViewSidebar(docked: docked, content: right)
+    StudioPanelSidebar(
+      tabs: viewSidebarTabs,
+      state: viewPanels,
+      docked: docked,
+      onToggle: { id in
+        if let tab = StudioViewSidebarTab(rawValue: id), viewPanels.isEnabled(id) {
+          StudioViewSidebarState.shared.selectedTab = tab
+          StudioToolState.shared.disarm()
+        }
+      },
+      content: { id in right(StudioViewSidebarTab(rawValue: id) ?? .view) }
+    )
+  }
+
+  private var viewSidebarTabs: [StudioWorkspaceSidebarTab] {
+    StudioViewSidebarTab.allCases.map {
+      StudioWorkspaceSidebarTab(
+        id: $0.rawValue,
+        title: $0.rawValue,
+        systemImage: $0.systemImage
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func floatingPanels<PanelContent: View>(
+    state: StudioPanelStackState,
+    canvasSize: CGSize,
+    @ViewBuilder content: @escaping (String) -> PanelContent
+  ) -> some View {
+    let panelWidth =
+      state.side == .leading
+      ? StudioSidebarSizing.workspacePanelWidth
+      : StudioSidebarSizing.viewPanelWidth
+    ForEach(state.floating, id: \.self) { id in
+      let origin = StudioFloatingPanelGeometry.base(
+        side: state.side,
+        canvasSize: canvasSize,
+        panelWidth: panelWidth
+      )
+      let offset = StudioFloatingPanelGeometry.clamp(
+        state.floatingOffset[id] ?? .zero,
+        side: state.side,
+        canvasSize: canvasSize,
+        panelWidth: panelWidth
+      )
+      content(id)
+        .frame(width: panelWidth)
+        .environment(\.studioPanelSurfaceMode, .floating)
+        .overlay(alignment: .topLeading) {
+          Color.clear
+            .frame(height: 32)
+            .padding(.trailing, 40)
+            .contentShape(Rectangle())
+            .gesture(
+              floatingMoveGesture(
+                id,
+                state: state,
+                canvasSize: canvasSize,
+                panelWidth: panelWidth
+              )
+            )
+        }
+        .offset(x: origin.width + offset.width, y: origin.height + offset.height)
+        .zIndex(10)
+    }
+  }
+
+  private func floatingMoveGesture(
+    _ id: String,
+    state: StudioPanelStackState,
+    canvasSize: CGSize,
+    panelWidth: CGFloat
+  ) -> some Gesture {
+    DragGesture(coordinateSpace: .global)
+      .onChanged { gesture in
+        if state.draggingID != id {
+          state.draggingID = id
+          state.dragOffset = state.floatingOffset[id] ?? .zero
+        }
+        let proposed = CGSize(
+          width: state.dragOffset.width + gesture.translation.width,
+          height: state.dragOffset.height + gesture.translation.height
+        )
+        state.floatingOffset[id] = StudioFloatingPanelGeometry.clamp(
+          proposed,
+          side: state.side,
+          canvasSize: canvasSize,
+          panelWidth: panelWidth
+        )
+      }
+      .onEnded { _ in
+        let shouldDock = state.nearHomeEdge(state.floatingOffset[id] ?? .zero)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+          if shouldDock { state.restack(id) }
+          state.endDrag()
+        }
+      }
   }
 
   @ViewBuilder

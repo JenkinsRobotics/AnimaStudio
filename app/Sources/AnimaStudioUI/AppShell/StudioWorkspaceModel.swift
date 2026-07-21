@@ -59,13 +59,17 @@ final class StudioWorkspaceModel {
     get { StudioLayoutState.shared.floatingRibbonEdge }
     set { StudioLayoutState.shared.floatingRibbonEdge = newValue }
   }
-  var workspaceSidebarSelections = Dictionary(
+  var workspaceSidebarPanels = Dictionary(
     uniqueKeysWithValues: StudioWorkspaceKind.allCases.map {
-      ($0, StudioWorkspaceSidebarCatalog.defaultSelection(for: $0))
+      (
+        $0,
+        StudioPanelStackState(
+          order: StudioWorkspaceSidebarCatalog.tabs(for: $0).map(\.id),
+          defaults: [],
+          side: .leading
+        )
+      )
     }
-  )
-  var workspaceSidebarOpen = Dictionary(
-    uniqueKeysWithValues: StudioWorkspaceKind.allCases.map { ($0, true) }
   )
   var assetBuilderSelection = AssetBuilderSelection.characters
   var hasInitializedAssetBuilderSelection = false
@@ -1307,15 +1311,35 @@ final class StudioWorkspaceModel {
 
   var activeWorkspaceSidebarSelection: String {
     get {
-      workspaceSidebarSelections[activeWorkspace]
+      activeWorkspaceSidebarPanels.focusedID
         ?? StudioWorkspaceSidebarCatalog.defaultSelection(for: activeWorkspace)
     }
-    set { workspaceSidebarSelections[activeWorkspace] = newValue }
+    set { activeWorkspaceSidebarPanels.focusedID = newValue }
   }
 
   var isActiveWorkspaceSidebarOpen: Bool {
-    get { workspaceSidebarOpen[activeWorkspace] ?? true }
-    set { workspaceSidebarOpen[activeWorkspace] = newValue }
+    get { activeWorkspaceSidebarPanels.isOpen }
+    set {
+      if newValue {
+        activeWorkspaceSidebarPanels.enable(activeWorkspaceSidebarSelection)
+      } else {
+        activeWorkspaceSidebarPanels.closeAll()
+      }
+    }
+  }
+
+  var activeWorkspaceSidebarPanels: StudioPanelStackState {
+    if let state = workspaceSidebarPanels[activeWorkspace] {
+      state.configure(order: StudioWorkspaceSidebarCatalog.tabs(for: activeWorkspace).map(\.id))
+      return state
+    }
+    let state = StudioPanelStackState(
+      order: StudioWorkspaceSidebarCatalog.tabs(for: activeWorkspace).map(\.id),
+      defaults: [],
+      side: .leading
+    )
+    workspaceSidebarPanels[activeWorkspace] = state
+    return state
   }
 
   func setNavigatorPlacement(_ placement: StudioPanelPlacement) {
@@ -2201,7 +2225,9 @@ final class StudioWorkspaceModel {
         false
       }
     }
-    guard hasInspectableSelection, !activePresentation.showsInspector else { return }
+    guard hasInspectableSelection else { return }
+    StudioViewSidebarState.shared.panels.enable(StudioViewSidebarTab.inspector.rawValue)
+    guard !activePresentation.showsInspector else { return }
     if inspectorPlacement == .hidden {
       inspectorPlacement = .floating
     }

@@ -1843,3 +1843,12 @@ does the heavy implementation; Codex reviews it and plans what's next.
   a center column whose Expanded Tool sidebar sits above the center document.
   The top Tool sidebar no longer shortens either side panel. Eight focused
   shell tests and strict touched-file lint pass.
+
+- **2026-07-20 — OUT: shell-alignment panel-stack/drag phase is complete.**
+  Both sidebars now use one `StudioPanelStackState`, default unselected, and can
+  keep multiple panels open. Floating stacks retain a separately centered rail,
+  show a panel-width reorder line, tear a header-dragged panel into a
+  canvas-clamped floating window, and re-dock it near its home edge. The
+  persistent outer-edge preference reverses rail/stack order without removing
+  the edge margin. Inspector selection opens the real Inspector stack entry.
+  Strict touched lint, 314 XCTest tests, and 22 bridge/integration tests pass.

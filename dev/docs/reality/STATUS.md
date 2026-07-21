@@ -104,10 +104,15 @@
   centered top Tool sidebar creates or modifies model content; the left
   Workspace sidebar chooses what content is being worked on; and the right View
   sidebar controls camera, environment, appearance, and inspection. Both side
-  rails use the same interaction rule: a different tab switches and opens,
-  while clicking the active tab collapses it. Tool and camera navigation modes
-  are mutually exclusive, only one tool can be armed, and the shared prompt bar
-  owns repeat, background-click commit, and Escape/cancel behavior.
+  rails use one panel-stack engine and default to no selected panel. Each tab
+  independently opens or closes its panel, so several panels can stack in rail
+  order. Floating panel headers reorder with a panel-width insertion line or
+  tear off into canvas-clamped windows; a torn-off window re-docks when returned
+  near its home edge. The rail remains vertically centered independently of the
+  growing stack, and a persistent setting can put panels on the outer edge while
+  retaining the margin. Tool and camera navigation modes are mutually exclusive,
+  only one tool can be armed, and the shared prompt bar owns repeat,
+  background-click commit, and Escape/cancel behavior.
 
   One app-global layout state drives exactly three Studio modes. Floating keeps
   the center full-bleed and overlays content-sized translucent pill sidebars,
@@ -131,7 +136,7 @@
   preview, layout, and help controls at the right. A bottom status bar and
   non-layout walkthrough overlay complete the frame. The empty-Rig call to
   action remains centered in the usable viewport. UI Dev retains the actual
-  production specimens. All 308 Swift unit tests, 22 live bridge/integration
+  production specimens. All 314 Swift unit tests, 22 live bridge/integration
   tests, recursive format lint, the native Xcode build, root-app helper
   embedding, strict deep signing, launch, and diff check pass. Renderer-pipeline
   integration from Codex Bench remains a separate phase.
