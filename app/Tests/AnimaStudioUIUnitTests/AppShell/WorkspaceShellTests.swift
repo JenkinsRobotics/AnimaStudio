@@ -191,6 +191,12 @@ final class WorkspaceShellTests: XCTestCase {
     XCTAssertTrue(StudioLayoutState(defaults: defaults).panelsOnOuterEdge)
   }
 
+  func testFloatingPanelMotionMirrorsSidesAndKeepsRailAboveStack() {
+    XCTAssertEqual(StudioSidebarMotion.revealEdge(for: .leading), .leading)
+    XCTAssertEqual(StudioSidebarMotion.revealEdge(for: .trailing), .trailing)
+    XCTAssertGreaterThan(StudioSidebarMotion.railLayer, StudioSidebarMotion.stackLayer)
+  }
+
   func testDockedForcesExpandedToolsWithoutLosingFloatingPreference() {
     defer { resetShellState() }
     StudioToolSettings.shared.density = .compact

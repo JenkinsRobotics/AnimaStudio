@@ -1863,3 +1863,10 @@ does the heavy implementation; Codex reviews it and plans what's next.
   preferences. Recursive format lint, 316 XCTest tests, 22 bridge/integration
   tests, the native Xcode build, root rebuild/helper embedding, strict deep
   signing, live launch (PID 74679), and diff check pass.
+
+- **2026-07-20 — OUT: Floating sidebar motion is now symmetric.** Both panel
+  stacks reveal from their corresponding outer edge beneath a higher, fixed
+  rail layer. The left panel no longer covers its icons while opening or
+  closing, matching the preferred right-side behavior. Strict touched lint,
+  317 XCTest tests, 22 bridge/integration tests, native/root build, helper
+  embedding, deep signing, and clean launch (PID 70392) pass.

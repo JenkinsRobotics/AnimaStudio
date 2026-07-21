@@ -108,7 +108,9 @@
   independently opens or closes its panel, so several panels can stack in rail
   order. Floating panel headers reorder with a panel-width insertion line or
   tear off into canvas-clamped windows; a torn-off window re-docks when returned
-  near its home edge. The rail remains vertically centered independently of the
+  near its home edge. Opening and closing stacks use mirrored edge transitions
+  beneath a higher rail layer, so neither side can cover or disable its icons
+  during animation. The rail remains vertically centered independently of the
   growing stack, and a persistent setting can put panels on the outer edge while
   retaining the margin. Tool and camera navigation modes are mutually exclusive,
   only one tool can be armed, and the shared prompt bar owns repeat,

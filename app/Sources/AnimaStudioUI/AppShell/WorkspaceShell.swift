@@ -384,6 +384,19 @@ enum StudioSidebarArrangement {
   }
 }
 
+enum StudioSidebarMotion {
+  static let stackLayer = 1.0
+  static let railLayer = 2.0
+
+  static func revealEdge(for side: StudioSidebarSide) -> Edge {
+    side == .leading ? .leading : .trailing
+  }
+
+  static func panelTransition(for side: StudioSidebarSide) -> AnyTransition {
+    .move(edge: revealEdge(for: side)).combined(with: .opacity)
+  }
+}
+
 enum StudioFloatingPanelGeometry {
   static let leftInset: CGFloat = 72
   static let rightInset: CGFloat = 72
@@ -882,6 +895,10 @@ private struct StudioPanelSidebar<Content: View>: View {
           panelsOnOuterEdge && !state.stacked.isEmpty ? edgePadding : [],
           panelWidth + 10
         )
+        // The stack reveals from beneath this fixed rail. Keeping the rail on
+        // the upper layer makes its icons continuously readable and clickable
+        // during both the opening and closing animation on either side.
+        .zIndex(StudioSidebarMotion.railLayer)
       if !state.stacked.isEmpty {
         stackColumn(docked: false)
           .frame(maxHeight: .infinity, alignment: .center)
@@ -889,6 +906,8 @@ private struct StudioPanelSidebar<Content: View>: View {
             panelsOnOuterEdge ? [] : edgePadding,
             StudioSidebarSizing.railWidth + 10
           )
+          .transition(StudioSidebarMotion.panelTransition(for: state.side))
+          .zIndex(StudioSidebarMotion.stackLayer)
       }
     }
     .frame(maxHeight: .infinity)

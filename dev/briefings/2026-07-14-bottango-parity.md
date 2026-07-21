@@ -3490,3 +3490,10 @@ change needed in the Handoff log instead of inventing commands.
   of truth; recursive format lint, 316 XCTest tests, 22 bridge/integration
   tests, the native Xcode build, root-app helper embedding, strict deep signing,
   live launch, and diff check pass. Claim released.
+- **2026-07-20 (Codex, mirrored sidebar animation):** Corrected Floating-mode
+  panel layering so both leading and trailing stacks reveal from their home
+  edge beneath a permanently higher icon rail. The left rail therefore remains
+  as readable and clickable as the right rail throughout opening and closing.
+  Added a deterministic mirrored-edge/layer-order test; strict touched-file
+  lint, 317 XCTest tests, 22 bridge/integration tests, native/root build,
+  helper embedding, deep signing, and clean launch (PID 70392) pass.
