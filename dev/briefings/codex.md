@@ -320,6 +320,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
 
+- 2026-07-20: Completed the Character asset-ownership and adaptive toolbar
+  packet. Current CAD/mesh import is now explicitly presented as a portable,
+  non-destructive copy into the Character; the original is never moved or
+  modified. `Project_Format.md` now separates reusable Character-owned assets
+  (geometry, materials, character audio/LED/motion/calibration) from
+  Project-owned show assets (stages, scene media, cues) and reserves external
+  security-scoped links as an advanced future option for large media, not rig
+  geometry. Expanded toolbars use one row through 24 tools and tabs only for
+  truly large catalogs; Standard/Compact remain grouped menus. Focused lint,
+  322 XCTest tests, 26 Swift Testing tests, native/root builds, and strict deep
+  signing pass.
+
 - **2026-07-20 — OUT: Codex Bench's retained CAD stack is now production.**
   `app/` owns a guarded Open CASCADE/XDE loader and one shared STEP geometry
   contract feeding RealityKit, MetalKit, Three.js WebGPU (with WebGL 2

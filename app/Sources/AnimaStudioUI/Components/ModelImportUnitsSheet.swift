@@ -100,7 +100,7 @@ struct ModelImportUnitsSheet: View {
       .font(.title3.weight(.semibold))
 
       Text(
-        "Review the destination and source files before loading. Imported files are stored as assets inside one character, then represented by rigid Parts that can be positioned and mated in Rig."
+        "Review the destination and source files before loading. Studio copies each model into one Character without moving or changing the original, then creates rigid Parts that can be positioned and mated in Rig."
       )
       .font(.callout)
       .foregroundStyle(.secondary)
@@ -223,14 +223,14 @@ struct ModelImportUnitsSheet: View {
         .labelsHidden()
         .disabled(isReplacingPart)
         Spacer()
-        Text("assets/ → Parts")
+        Label("Copy into Character", systemImage: "doc.on.doc")
           .font(.caption.monospaced())
           .foregroundStyle(.secondary)
       }
       Text(
         isReplacingPart
-          ? "Replacement stays assigned to the selected Part in this character."
-          : "The source files and generated Parts belong to this character. You can organize and mate them after import."
+          ? "A copied replacement stays assigned to the selected Part. The source file remains untouched."
+          : "Portable copies go into this Character's assets/ folder. The source files remain in their original location."
       )
       .font(.caption)
       .foregroundStyle(.secondary)

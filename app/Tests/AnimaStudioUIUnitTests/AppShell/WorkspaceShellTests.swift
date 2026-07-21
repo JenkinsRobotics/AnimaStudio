@@ -105,6 +105,33 @@ final class WorkspaceShellTests: XCTestCase {
     }
   }
 
+  func testExpandedRibbonUsesOneRowUntilTheCatalogIsActuallyLarge() {
+    XCTAssertFalse(
+      StudioToolCategoryPresentation.usesTabs(
+        groups: StudioWorkspaceToolCatalog.groups(for: .assets),
+        categories: StudioWorkspaceToolCatalog.categories(for: .assets)
+      )
+    )
+    XCTAssertFalse(
+      StudioToolCategoryPresentation.usesTabs(
+        groups: StudioWorkspaceToolCatalog.groups(for: .show),
+        categories: StudioWorkspaceToolCatalog.categories(for: .show)
+      )
+    )
+    XCTAssertTrue(
+      StudioToolCategoryPresentation.usesTabs(
+        groups: StudioWorkspaceToolCatalog.groups(for: .animate),
+        categories: StudioWorkspaceToolCatalog.categories(for: .animate)
+      )
+    )
+    XCTAssertTrue(
+      StudioToolCategoryPresentation.usesTabs(
+        groups: StudioWorkspaceToolCatalog.groups(for: .nodes),
+        categories: StudioWorkspaceToolCatalog.categories(for: .nodes)
+      )
+    )
+  }
+
   func testViewportDisplayProjectionUsesThePersistedRenderStyleAsTruth() {
     XCTAssertEqual(StudioViewportDisplayMode.resolve(renderStyle: .wireframe), .wireframe)
     XCTAssertEqual(StudioViewportDisplayMode.resolve(renderStyle: .shadedWithEdges), .hiddenLine)

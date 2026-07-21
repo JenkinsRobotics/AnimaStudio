@@ -35,6 +35,48 @@
 Extensible: `project.json` indexes what's present, so future kinds
 (audio, exports, LED maps) become new folders without a format change.
 
+## Character and Project asset ownership
+
+A Character may carry more than rigid geometry. Character-owned assets are the
+files required whenever that reusable Character appears: CAD/mesh geometry,
+material and texture maps, facial or LED layouts, character-specific audio,
+reusable poses and animation clips, and calibration/reference data that does
+not contain a physical device address. Project-owned assets are specific to one
+show: stages and environments, show music/video, cue sheets, scene scripts, and
+world-space placement. Hardware connection addresses and safety calibration
+remain deployment data.
+
+The live importers expose only formats they can load honestly. STEP/STP,
+USD-family, STL, and OBJ are live for rigid 3D Parts. Audio, video, images,
+animated image sequences, PBR texture sets, LED/pixel maps, motion capture,
+URDF, and reusable animation/scene documents are valid future import families,
+but each remains labelled planned until its parser and destination workflow
+ship.
+
+## Asset ingestion policy
+
+- **Copy into Character/Project is the default and the current model-import
+  behavior.** Studio copies the bytes into the owning `assets/` directory and
+  never changes or deletes the operator's original file. This makes Save As,
+  backup, sharing, and offline robot playback deterministic.
+- **Link to Original is an advanced option for large media (planned UI).** The
+  document layer already models security-scoped bookmarks and missing-link
+  recovery, but a linked asset is intentionally non-portable. Link becomes a
+  live import choice when audio/video/media consumers can resolve the project
+  asset registry end to end.
+- **Rig-defining CAD is copied, not linked.** Canonical Character model paths
+  are relative (`assets/<file>`), so mates and Parts cannot silently break when
+  an external CAD file moves. Reimport/Replace copies a newer source over the
+  managed asset while retaining identity and incrementing the simple version.
+- **Move is never an import choice.** Import must not destructively reorganize
+  an operator's source library. A separate explicit Finder/export operation can
+  move files if the operator requests it.
+
+When the media importers ship, their staging sheet should offer **Copy
+(recommended)** and **Link to Original**, explain portability and missing-file
+risk inline, and remember the last choice per asset family. It must not present
+Link for a format whose downstream engine/renderer path cannot resolve it.
+
 **Real projects are plain folders** (browsable, versionable). A
 single-file **`.animastudio` bundle is an Export form only** — "Export
 Project" zips the folder into one shareable/double-clickable item;

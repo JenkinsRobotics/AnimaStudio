@@ -157,15 +157,15 @@
   Expanded density. Canvas hides the floating chrome, leaves plain
   capsule handles, and uses 16-point edge hot zones plus bridged zone/sidebar
   hover tracking so reveal does not flicker. Compact, Standard, and Expanded
-  tool densities share persistent settings; Expanded workspaces expose a
-  divider-free, horizontally bounded category strip above a captioned
-  Fusion-style tool row. Every production workspace now supplies those
-  categories. Animate exposes Transport, Keyframes, Curves, Tracks, and
-  Reference independently, limiting its expanded row to seven tools; Standard
-  and Compact collapse each family into one menu button instead of squeezing
-  every command into one oversized row. Nodes likewise condenses its ten source
-  families into Canvas, Authoring, Logic, Data, AI + Voice, and Outputs while
-  retaining the complete node catalog. Sidebar
+  tool densities share persistent settings. Expanded is one captioned
+  Fusion-style row by default: catalogs of up to 24 tools show all groups
+  together, with horizontal overflow available in a narrow window. A
+  divider-free category strip appears only when a catalog is actually larger.
+  Animate therefore exposes Transport, Keyframes, Curves, Tracks, and Reference
+  as bounded categories; Nodes condenses its ten source families into Canvas,
+  Authoring, Logic, Data, AI + Voice, and Outputs. Standard and Compact always
+  collapse each family into a labelled or icon-only menu, respectively, without
+  removing less-used commands. Sidebar
   tabs live in workspace-observable state, right presentation and camera state
   are app-wide, tool density/category is shared, and the Studio mode is global,
   so switching workspaces or view branches does not reset the shell. The
@@ -184,8 +184,8 @@
   preview, layout, and help controls at the right. A bottom status bar and
   non-layout walkthrough overlay complete the frame. The empty-Rig call to
   action remains centered in the usable viewport. UI Dev retains the actual
-  production specimens. All 316 Swift unit tests, 22 live bridge/integration
-  tests, recursive format lint, the native Xcode build, root-app helper
+  production specimens. All 322 XCTest tests and 26 Swift Testing tests,
+  recursive format lint, the native Xcode build, root-app helper
   embedding, strict deep signing, launch, and diff check pass.
   The empty-Rig call to action is centered in the usable viewport instead of
   inheriting the viewport overlay stack's top alignment.

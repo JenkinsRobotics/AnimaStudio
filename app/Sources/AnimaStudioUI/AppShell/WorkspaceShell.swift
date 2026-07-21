@@ -111,6 +111,22 @@ struct StudioToolCategory: Identifiable, Sendable {
   let groups: [StudioToolGroup]
 }
 
+enum StudioToolCategoryPresentation {
+  /// A single expanded ribbon remains easier to scan until the complete tool
+  /// catalog becomes too wide to be useful. Above this count, category tabs
+  /// bound the visible row while preserving every tool.
+  static let expandedToolLimit = 24
+
+  static func usesTabs(
+    groups: [StudioToolGroup],
+    categories: [StudioToolCategory]
+  ) -> Bool {
+    guard categories.count > 1 else { return false }
+    let completeCatalog = groups.isEmpty ? categories.flatMap(\.groups) : groups
+    return completeCatalog.reduce(0) { $0 + $1.tools.count } > expandedToolLimit
+  }
+}
+
 @MainActor
 @Observable
 final class StudioToolState {
@@ -722,13 +738,17 @@ struct StudioToolSidebar: View {
   private var allGroups: [StudioToolGroup] {
     groups.isEmpty ? categories.flatMap(\.groups) : groups
   }
+  private var usesCategoryTabs: Bool {
+    density == .expanded
+      && StudioToolCategoryPresentation.usesTabs(groups: groups, categories: categories)
+  }
   private var activeGroups: [StudioToolGroup] {
-    density == .expanded ? (activeCategory?.groups ?? allGroups) : allGroups
+    usesCategoryTabs ? (activeCategory?.groups ?? allGroups) : allGroups
   }
 
   var body: some View {
     VStack(spacing: 0) {
-      if density == .expanded, !categories.isEmpty {
+      if usesCategoryTabs {
         categoryStrip
       }
       toolRow
@@ -767,21 +787,25 @@ struct StudioToolSidebar: View {
   }
 
   private var toolRow: some View {
-    HStack(alignment: .top, spacing: density == .expanded ? 13 : 2) {
-      ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
-        if density.usesGroupedMenus {
-          groupedMenu(group)
-        } else {
-          if index > 0 {
-            Divider()
-              .frame(height: 46)
-              .padding(.horizontal, 2)
+    ScrollView(.horizontal) {
+      HStack(alignment: .top, spacing: density == .expanded ? 13 : 2) {
+        ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
+          if density.usesGroupedMenus {
+            groupedMenu(group)
+          } else {
+            if index > 0 {
+              Divider()
+                .frame(height: 46)
+                .padding(.horizontal, 2)
+            }
+            expandedGroup(group)
           }
-          expandedGroup(group)
         }
+        densityMenu
       }
-      densityMenu
     }
+    .scrollIndicators(.hidden)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   private func expandedGroup(_ group: StudioToolGroup) -> some View {
