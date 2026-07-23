@@ -4,6 +4,31 @@ import XCTest
 
 @MainActor
 final class WorkspaceShellTests: XCTestCase {
+  func testToolPresentationPreferencesPersist() {
+    let suiteName = "WorkspaceShellTests.ToolSettings.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let settings = StudioToolSettings(defaults: defaults)
+    settings.density = .expanded
+    settings.chromeShape = .square
+
+    let restored = StudioToolSettings(defaults: defaults)
+    XCTAssertEqual(restored.density, .expanded)
+    XCTAssertEqual(restored.chromeShape, .square)
+  }
+
+  func testViewOriginPreferenceDefaultsVisibleAndPersists() {
+    let suiteName = "WorkspaceShellTests.ViewSidebar.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let state = StudioViewSidebarState(defaults: defaults)
+    XCTAssertTrue(state.showsOrigin)
+    state.showsOrigin = false
+    XCTAssertFalse(StudioViewSidebarState(defaults: defaults).showsOrigin)
+  }
+
   func testStructuredCentersCanConsumeTemporaryOverlayInsets() {
     let hidden = StudioWorkspaceOverlayInsets()
     let revealed = StudioWorkspaceOverlayInsets(
@@ -46,7 +71,10 @@ final class WorkspaceShellTests: XCTestCase {
     )
 
     XCTAssertEqual(floating.top, 98)
-    XCTAssertEqual(floating.leading, StudioSidebarSizing.workspacePanelWidth + 68)
+    XCTAssertEqual(
+      floating.leading,
+      StudioSidebarSizing.workspacePanelWidth + StudioVisibleZoneLayout.openStackInset
+    )
     XCTAssertEqual(floating.trailing, StudioVisibleZoneLayout.sideRailInset)
     XCTAssertEqual(floating.bottom, StudioVisibleZoneLayout.bottomSwitcherInset)
 
@@ -91,8 +119,8 @@ final class WorkspaceShellTests: XCTestCase {
         StudioFloatingPanelFootprint(side: .trailing, minimumX: 870, maximumX: 1_070),
       ]
     )
-    XCTAssertEqual(insets.leading, 462)
-    XCTAssertEqual(insets.trailing, 340)
+    XCTAssertEqual(insets.leading, 452 + StudioVisibleZoneLayout.floatingPanelGap)
+    XCTAssertEqual(insets.trailing, 1_200 - 870 + StudioVisibleZoneLayout.floatingPanelGap)
   }
 
   private func resetShellState() {
@@ -141,10 +169,13 @@ final class WorkspaceShellTests: XCTestCase {
     XCTAssertFalse(workspace.isActiveWorkspaceSidebarOpen)
   }
 
-  func testAssetsSidebarExposesOnlyProjectCharacterWorkflows() {
+  func testAssetsSidebarExposesProjectCharacterAssetWorkflows() {
     XCTAssertEqual(
       StudioWorkspaceSidebarCatalog.tabs(for: .assets).map(\.title),
-      ["Characters", "Collections"]
+      [
+        "Characters", "Parts", "Source Assets", "Renders", "Assemblies",
+        "Scripts", "Animations",
+      ]
     )
     XCTAssertFalse(
       StudioWorkspaceSidebarCatalog.tabs(for: .assets).contains { $0.title == "Library" }
@@ -216,8 +247,8 @@ final class WorkspaceShellTests: XCTestCase {
     )
   }
 
-  func testExpandedIsTheDefaultToolDensity() {
-    XCTAssertEqual(StudioToolSettings.defaultDensity, .expanded)
+  func testStandardIsTheDefaultFloatingToolDensity() {
+    XCTAssertEqual(StudioToolSettings.defaultDensity, .standard)
     XCTAssertFalse(StudioToolDensity.expanded.usesVisualCategoryPalette)
     XCTAssertFalse(StudioToolDensity.standard.usesVisualCategoryPalette)
     XCTAssertTrue(StudioToolDensity.compact.usesVisualCategoryPalette)

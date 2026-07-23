@@ -63,6 +63,8 @@ enum StudioProjectIdentityMetrics {
 
 struct StudioDocumentBar: View {
   @Environment(\.openSettings) private var openSettings
+  @AppStorage(StudioPreferenceKey.appAppearanceMode) private var appAppearanceModeRawValue =
+    StudioAppearanceMode.dark.rawValue
   @Bindable var workspace: StudioWorkspaceModel
   @Binding var isUIDevWorkspace: Bool
   @Binding var showsWorkspaceGuide: Bool
@@ -144,6 +146,8 @@ struct StudioDocumentBar: View {
 
       WorkspaceLayoutMenu(workspace: workspace)
 
+      appearanceToggle
+
       Button {
         showsWorkspaceGuide.toggle()
       } label: {
@@ -153,6 +157,24 @@ struct StudioDocumentBar: View {
       .help("Workspace walkthrough")
     }
     .fixedSize(horizontal: true, vertical: false)
+  }
+
+  /// Header light/dark toggle (imported from the demo). Cycles
+  /// System → Light → Dark and applies it app-wide immediately.
+  private var appearanceToggle: some View {
+    let mode = StudioAppearanceMode(rawValue: appAppearanceModeRawValue) ?? .dark
+    return Button {
+      let modes = StudioAppearanceMode.allCases
+      let next = modes[(modes.firstIndex(of: mode).map { $0 + 1 } ?? 0) % modes.count]
+      appAppearanceModeRawValue = next.rawValue
+      next.apply()
+    } label: {
+      Image(systemName: mode.systemImage)
+    }
+    .buttonStyle(.plain)
+    .foregroundStyle(StudioPalette.muted)
+    .help("Appearance: \(mode.title) — click to change")
+    .accessibilityLabel("Appearance \(mode.title)")
   }
 
   private func projectIdentity(
@@ -320,9 +342,21 @@ struct StudioDocumentBar: View {
 /// preview controls would imply an active document, so they are absent here.
 struct StudioHomeDocumentBar: View {
   @Environment(\.openSettings) private var openSettings
+  @AppStorage(StudioPreferenceKey.appAppearanceMode) private var appAppearanceModeRawValue =
+    StudioAppearanceMode.dark.rawValue
   let createProject: () -> Void
   let openProject: () -> Void
   let toggleTheme: () -> Void
+
+  private var homeAppearanceToggle: some View {
+    let mode = StudioAppearanceMode(rawValue: appAppearanceModeRawValue) ?? .dark
+    return homeAction("Appearance: \(mode.title)", systemImage: mode.systemImage) {
+      let modes = StudioAppearanceMode.allCases
+      let next = modes[(modes.firstIndex(of: mode).map { $0 + 1 } ?? 0) % modes.count]
+      appAppearanceModeRawValue = next.rawValue
+      next.apply()
+    }
+  }
 
   var body: some View {
     HStack(spacing: 12) {
@@ -344,28 +378,17 @@ struct StudioHomeDocumentBar: View {
       Spacer(minLength: 8)
 
       HStack(spacing: 7) {
+        // Only actions that make sense with no project open: create/open, then
+        // appearance + settings. (Import/Save were disabled placeholders that
+        // just read as broken greyed icons.)
         homeAction(
           "New Character — starts a Studio project",
           systemImage: "person.crop.square.badge.plus",
           action: createProject
         )
-        homeAction(
-          "Import Model — open a project first",
-          systemImage: "square.and.arrow.down",
-          isEnabled: false,
-          action: {}
-        )
         homeAction("Open Project", systemImage: "folder", action: openProject)
-        homeAction(
-          "Save — no project is open",
-          systemImage: "square.and.arrow.up",
-          isEnabled: false,
-          action: {}
-        )
         Divider().frame(height: 16)
-        homeAction("Toggle interface contrast", systemImage: "circle.lefthalf.filled") {
-          toggleTheme()
-        }
+        homeAppearanceToggle
         homeAction("Settings", systemImage: "gearshape") { openSettings() }
       }
       .fixedSize()
@@ -762,7 +785,7 @@ struct WorkspacePanelHeader: View {
         .help("Clear selection")
       }
     }
-    .foregroundStyle(Color.white.opacity(0.92))
+    .foregroundStyle(StudioPalette.ink.opacity(0.92))
     .padding(.horizontal, StudioMetrics.panelPadding)
     .frame(height: StudioMetrics.panelHeaderHeight)
     .background(StudioPalette.panelInset.opacity(0.52))
@@ -860,6 +883,13 @@ struct WorkspaceGuideCard: View {
   @Binding var isUIDevWorkspace: Bool
   let dismiss: () -> Void
 
+  @AppStorage(StudioPreferenceKey.showsNodesWorkspaceTab) private var showsNodesWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsNodes
+  @AppStorage(StudioPreferenceKey.showsDesignWorkspaceTab) private var showsDesignWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsDesign
+  @AppStorage(StudioPreferenceKey.showsUIDevWorkspaceTab) private var showsUIDevWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsUIDev
+
   var body: some View {
     HStack(spacing: 12) {
       Image(systemName: activeSystemImage)
@@ -899,11 +929,18 @@ struct WorkspaceGuideCard: View {
     .shadow(color: .black.opacity(0.34), radius: 18, y: 8)
   }
 
-  private var workspaceCount: Int { StudioWorkspaceKind.centeredNavigation.count + 1 }
+  private var visibleStages: [StudioWorkspaceKind] {
+    StudioWorkspaceNavigation.visibleStages(
+      showNodes: showsNodesWorkspaceTab,
+      showDesign: showsDesignWorkspaceTab
+    )
+  }
+
+  private var workspaceCount: Int { visibleStages.count + (showsUIDevWorkspaceTab ? 1 : 0) }
 
   private var activeIndex: Int {
-    guard !isUIDevWorkspace else { return workspaceCount - 1 }
-    return StudioWorkspaceKind.centeredNavigation.firstIndex(of: workspace.activeWorkspace) ?? 0
+    guard !isUIDevWorkspace, !visibleStages.isEmpty else { return max(0, workspaceCount - 1) }
+    return visibleStages.firstIndex(of: workspace.activeWorkspace) ?? 0
   }
 
   private var activeSystemImage: String {
@@ -917,12 +954,13 @@ struct WorkspaceGuideCard: View {
   }
 
   private func select(offset: Int) {
+    guard workspaceCount > 0 else { return }
     let next = (activeIndex + offset + workspaceCount) % workspaceCount
-    if next == workspaceCount - 1 {
+    if showsUIDevWorkspaceTab, next == workspaceCount - 1 {
       isUIDevWorkspace = true
     } else {
       isUIDevWorkspace = false
-      workspace.switchWorkspace(to: StudioWorkspaceKind.centeredNavigation[next])
+      workspace.switchWorkspace(to: visibleStages[next])
     }
   }
 }

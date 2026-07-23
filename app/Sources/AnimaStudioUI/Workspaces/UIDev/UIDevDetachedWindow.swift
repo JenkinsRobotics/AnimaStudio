@@ -42,7 +42,7 @@ enum UIDevDetachedWindowRegistry {
       UIDevFloatingPanelTemplateView()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(StudioPalette.canvas)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(StudioAppearanceMode.current.colorScheme)
     }
   }
 }

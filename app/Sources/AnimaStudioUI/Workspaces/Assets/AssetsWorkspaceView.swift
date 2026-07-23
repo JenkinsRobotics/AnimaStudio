@@ -37,6 +37,10 @@ struct AssetsWorkspaceView: View {
   @Environment(\.studioWorkspaceOverlayInsets) private var overlayInsets
   var surface = AssetsWorkspaceSurface.center
   var centerLayoutMode: AssetBuilderLayoutMode? = nil
+  /// Which left-rail tab this sidebar instance represents. Each open panel is
+  /// bound to its own tab, so multiple stacked panels show different content
+  /// instead of all mirroring the shared `assetBuilderSelection`.
+  var sidebarTab: String? = nil
   let projectName: String
   let projectRevision: Int
   let characters: [ProjectCharacterReference]
@@ -170,17 +174,78 @@ struct AssetsWorkspaceView: View {
     .studioPanelSurface()
   }
 
+  // The "Characters" rail tab shows the full character profile; every collection
+  // rail tab opens only that collection's own file list. Previously all tabs
+  // rendered the same full browser.
+  /// The collection this panel instance renders, from its own rail tab (NOT the
+  /// shared selection) — so stacked panels stay independent.
+  private var sidebarCollection: AssetBuilderCollection? {
+    guard let sidebarTab else { return nil }
+    return AssetBuilderCollection.allCases.first { $0.title == sidebarTab }
+  }
+
   @ViewBuilder private var sidebarSurface: some View {
-    if panelSurfaceMode == .docked {
-      sidebar.frame(maxHeight: .infinity, alignment: .top)
+    if let collection = sidebarCollection {
+      let items = collectionItems(collection)
+      sizedPanel(
+        AssetCollectionSidebarPanel(collection: collection, items: items),
+        floatingHeight: AssetsWorkspacePanelSizing.collectionHeight(itemCount: items.count)
+      )
     } else {
-      sidebar.frame(
-        height: AssetsWorkspacePanelSizing.browserHeight(
+      // "Characters" (or any non-collection tab) → the full character profile.
+      sizedPanel(
+        sidebar,
+        floatingHeight: AssetsWorkspacePanelSizing.browserHeight(
           characterCount: characters.count,
           hasActiveCharacter: activeCharacterID != nil
-        ),
-        alignment: .top
+        )
       )
+    }
+  }
+
+  @ViewBuilder private func sizedPanel<V: View>(_ panel: V, floatingHeight: CGFloat) -> some View {
+    if panelSurfaceMode == .docked {
+      panel.frame(maxHeight: .infinity, alignment: .top)
+    } else {
+      panel.frame(height: floatingHeight, alignment: .top)
+    }
+  }
+
+  private func collectionItems(_ collection: AssetBuilderCollection) -> [AssetBuilderListItem] {
+    switch collection {
+    case .parts:
+      partRows.map { row in
+        AssetBuilderListItem(
+          id: row.id.rawValue.uuidString,
+          title: row.name,
+          detail: row.sourceLabel,
+          systemImage: "cube",
+          badge: "v\(row.version)"
+        )
+      }
+    case .sourceAssets:
+      activeCharacterAssets.map { asset in
+        AssetBuilderListItem(
+          id: asset.id.rawValue.uuidString,
+          title: asset.originalFilename,
+          detail: asset.kind,
+          systemImage: "shippingbox",
+          badge: ""
+        )
+      }
+    case .animations:
+      workspace.project.clips.enumerated().map { index, clip in
+        AssetBuilderListItem(
+          id: "clip:\(index):\(clip.name)",
+          title: clip.name,
+          detail: "",
+          systemImage: "waveform.path",
+          badge: ""
+        )
+      }
+    case .renders: renderItems
+    case .assemblies: assemblyItems
+    case .scripts: scriptItems
     }
   }
 
@@ -346,5 +411,5 @@ struct AssetsWorkspaceView: View {
     dropModels: { _ in }
   )
   .frame(width: 1380, height: 760)
-  .preferredColorScheme(.dark)
+  .preferredColorScheme(StudioAppearanceMode.current.colorScheme)
 }

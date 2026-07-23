@@ -101,10 +101,18 @@ struct StudioFloatingPanelFootprint: Equatable, Sendable {
 }
 
 enum StudioVisibleZoneLayout {
-  static let sideRailInset: CGFloat = 58
+  // Rail edge (14 pad + 44 rail = 58) plus the same gap panels use, so the
+  // visible zone never sits flush against the side rails — the left/right
+  // margins read symmetric with the top/bottom breathing room.
+  static let sideRailInset: CGFloat = 58 + 22
   static let bottomSwitcherInset: CGFloat = 76
   static let dockedInset: CGFloat = 10
-  static let floatingPanelGap: CGFloat = 10
+  // Breathing room between a floating panel's outer edge and the center canvas,
+  // so the sidebar stack doesn't sit flush against the visual workspace.
+  static let floatingPanelGap: CGFloat = 22
+  /// An open docked-in-floating stack's origin is rail(44) + edge pad(14) inboard
+  /// of the window edge; add the panel width + this to clear it plus the gap.
+  static let openStackInset: CGFloat = 44 + 14 + floatingPanelGap
 
   static func insets(
     preset: StudioLayoutPreset,
@@ -133,11 +141,11 @@ enum StudioVisibleZoneLayout {
     var result = StudioVisibleZoneInsets(
       top: topVisible ? toolInset : 0,
       leading: leadingVisible
-        ? (leftStackOpen ? StudioSidebarSizing.workspacePanelWidth + 68 : sideRailInset)
+        ? (leftStackOpen ? StudioSidebarSizing.workspacePanelWidth + openStackInset : sideRailInset)
         : 0,
       bottom: hasCenterSwitcher ? bottomSwitcherInset : 0,
       trailing: trailingVisible
-        ? (rightStackOpen ? StudioSidebarSizing.viewPanelWidth + 68 : sideRailInset)
+        ? (rightStackOpen ? StudioSidebarSizing.viewPanelWidth + openStackInset : sideRailInset)
         : 0
     )
 

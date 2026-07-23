@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum StudioPanelSurfaceMode {
@@ -18,21 +19,57 @@ extension EnvironmentValues {
 
 enum StudioPalette {
   private static var profile: StudioDesignProfile { StudioDesignRuntime.shared.profile }
+  private static var lightProfile: StudioDesignProfile { .standardLight }
 
-  static var canvas: Color { profile.canvas.color }
-  static var documentChrome: Color { profile.documentChrome.color }
-  static var chrome: Color { profile.chrome.color }
-  static var ribbonChrome: Color { profile.ribbonChrome.color }
-  static var panel: Color { profile.panel.color }
-  static var panelInset: Color { profile.panelInset.color }
-  static var field: Color { profile.field.color }
+  // Structural surfaces resolve per appearance: dark from the (user-editable)
+  // profile, light from the fixed light profile. Semantic/accent colors are
+  // vivid on both grounds and stay from the active profile (so a custom accent
+  // still applies in both modes).
+  static var canvas: Color { dynamic(profile.canvas.color, lightProfile.canvas.color) }
+  static var documentChrome: Color {
+    dynamic(profile.documentChrome.color, lightProfile.documentChrome.color)
+  }
+  static var chrome: Color { dynamic(profile.chrome.color, lightProfile.chrome.color) }
+  static var ribbonChrome: Color {
+    dynamic(profile.ribbonChrome.color, lightProfile.ribbonChrome.color)
+  }
+  static var panel: Color { dynamic(profile.panel.color, lightProfile.panel.color) }
+  static var panelInset: Color {
+    dynamic(profile.panelInset.color, lightProfile.panelInset.color)
+  }
+  static var field: Color { dynamic(profile.field.color, lightProfile.field.color) }
   static var accent: Color { profile.accent.color }
   static var sourceModel: Color { profile.sourceModel.color }
   static var semanticPart: Color { profile.semanticPart.color }
   static var joint: Color { profile.joint.color }
   static var hardware: Color { profile.hardware.color }
-  static var muted: Color { Color.white.opacity(profile.mutedOpacity) }
-  static var border: Color { Color.white.opacity(profile.borderOpacity) }
+  /// Primary text/icon ink on adaptive surfaces: near-white on dark, near-black
+  /// on light. Use instead of a literal `Color.white` for chrome that sits on a
+  /// panel/canvas (a literal white goes invisible in light mode). Text/icons on
+  /// the accent color should stay `.white` (accent is dark enough in both modes).
+  static var ink: Color { dynamic(.white, Color(red: 0.10, green: 0.11, blue: 0.13)) }
+
+  // Ink flips: white-on-dark, black-on-light.
+  static var muted: Color {
+    dynamic(
+      Color.white.opacity(profile.mutedOpacity),
+      Color.black.opacity(lightProfile.mutedOpacity))
+  }
+  static var border: Color {
+    dynamic(
+      Color.white.opacity(profile.borderOpacity), Color.black.opacity(lightProfile.borderOpacity))
+  }
+
+  /// A color that resolves to `dark` under a dark appearance and `light`
+  /// otherwise, so every surface adapts automatically without views observing
+  /// the color scheme.
+  static func dynamic(_ dark: Color, _ light: Color) -> Color {
+    Color(
+      nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return NSColor(isDark ? dark : light)
+      })
+  }
 }
 
 enum StudioMetrics {

@@ -799,3 +799,314 @@ def test_subprocess_smoke_module_invocation():
     assert len(responses) == 2
     assert responses[0]["result"]["engine"] == "animacore"
     assert responses[1] == {"id": 2, "ok": True, "result": {}}
+
+
+# Rig authoring (mates + relations) -------------------------------------------
+
+# A clean rig for authoring: no clips animate these DOFs, and ``tool`` is a
+# free part with no joint, so mates/relations can be added, replaced, removed,
+# and coupled without a driven-dof or one-source-of-truth conflict.
+AUTHORING = """
+anima_version: "2.0"
+type: character
+identity: { name: authoring }
+parts:
+  base: {}
+  arm: { parent: base }
+  hand: { parent: arm }
+  tool: {}
+joints:
+  shoulder:
+    type: revolute
+    parent: base
+    child: arm
+    dofs:
+      rotation: { limits: { min_deg: -90, max_deg: 90 }, neutral_deg: 0 }
+  elbow:
+    type: revolute
+    parent: arm
+    child: hand
+    dofs:
+      rotation: { limits: { min_deg: -90, max_deg: 90 }, neutral_deg: 0 }
+"""
+
+
+def _author(session: Session, handle: str, method: str, **params) -> dict:
+    params["handle"] = handle
+    return handle_request(
+        session, {"id": 1, "method": method, "params": params}
+    )
+
+
+def _joint_names(rig: dict) -> list:
+    return [joint["name"] for joint in rig["joints"]]
+
+
+def test_add_mate_appends_joint_and_persists():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "add_mate",
+        joint={
+            "name": "weld",
+            "type": "fastened",
+            "parent_part": "hand",
+            "child_part": "tool",
+        },
+    )
+    assert response["ok"], response
+    assert "weld" in _joint_names(response["result"]["rig"])
+    # The mutation persisted behind the handle for the next call.
+    again = _author(session, handle, "remove_mate", name="weld")
+    assert again["ok"]
+    assert "weld" not in _joint_names(again["result"]["rig"])
+
+
+def test_add_mate_duplicate_name_rejected():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "add_mate",
+        joint={
+            "name": "elbow",
+            "type": "fastened",
+            "parent_part": "hand",
+            "child_part": "tool",
+        },
+    )
+    assert not response["ok"]
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_add_mate_dangling_part_is_format_error():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "add_mate",
+        joint={
+            "name": "ghost_weld",
+            "type": "fastened",
+            "parent_part": "ghost",
+            "child_part": "tool",
+        },
+    )
+    assert not response["ok"]
+    assert response["error"]["code"] == "format_error"
+
+
+def test_update_mate_replaces_existing_joint():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "update_mate",
+        joint={
+            "name": "elbow",
+            "type": "fastened",
+            "parent_part": "arm",
+            "child_part": "hand",
+        },
+    )
+    assert response["ok"], response
+    elbow = next(
+        joint
+        for joint in response["result"]["rig"]["joints"]
+        if joint["name"] == "elbow"
+    )
+    assert elbow["type"] == "fastened"
+
+
+def test_update_mate_unknown_name_rejected():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "update_mate",
+        joint={
+            "name": "nope",
+            "type": "fastened",
+            "parent_part": "arm",
+            "child_part": "hand",
+        },
+    )
+    assert not response["ok"]
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_remove_mate_unknown_name_rejected():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(session, handle, "remove_mate", name="nope")
+    assert not response["ok"]
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_add_relation_couples_two_dofs():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "add_relation",
+        relation={
+            "kind": "gear",
+            "driver": "shoulder.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 2.0,
+        },
+    )
+    assert response["ok"], response
+    assert len(response["result"]["rig"]["relations"]) == 1
+
+
+def test_add_relation_duplicate_driven_rejected():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    first = _author(
+        session,
+        handle,
+        "add_relation",
+        relation={
+            "kind": "gear",
+            "driver": "shoulder.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 2.0,
+        },
+    )
+    assert first["ok"], first
+    second = _author(
+        session,
+        handle,
+        "add_relation",
+        relation={
+            "kind": "gear",
+            "driver": "shoulder.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 3.0,
+        },
+    )
+    assert not second["ok"]
+    assert second["error"]["code"] == "bad_request"
+
+
+def test_add_relation_self_couple_is_format_error():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "add_relation",
+        relation={
+            "kind": "gear",
+            "driver": "elbow.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 2.0,
+        },
+    )
+    assert not response["ok"]
+    assert response["error"]["code"] == "format_error"
+
+
+def test_update_relation_replaces_ratio():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    _author(
+        session,
+        handle,
+        "add_relation",
+        relation={
+            "kind": "gear",
+            "driver": "shoulder.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 2.0,
+        },
+    )
+    response = _author(
+        session,
+        handle,
+        "update_relation",
+        relation={
+            "kind": "gear",
+            "driver": "shoulder.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 5.0,
+        },
+    )
+    assert response["ok"], response
+    assert len(response["result"]["rig"]["relations"]) == 1
+
+
+def test_remove_relation_drops_it():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    _author(
+        session,
+        handle,
+        "add_relation",
+        relation={
+            "kind": "gear",
+            "driver": "shoulder.rotation",
+            "driven": "elbow.rotation",
+            "ratio": 2.0,
+        },
+    )
+    response = _author(
+        session, handle, "remove_relation", driven="elbow.rotation"
+    )
+    assert response["ok"], response
+    assert response["result"]["rig"]["relations"] == []
+
+
+def test_remove_relation_unknown_rejected():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session, handle, "remove_relation", driven="elbow.rotation"
+    )
+    assert not response["ok"]
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_authoring_unknown_handle():
+    response = handle_request(
+        Session(),
+        {"id": 1, "method": "add_mate", "params": {"handle": "rigX", "joint": {}}},
+    )
+    assert not response["ok"]
+    assert response["error"]["code"] == "unknown_handle"
+
+
+def test_add_mate_then_evaluate_sees_new_dof():
+    """An authored mate is live for the very next evaluate on the handle."""
+    session = Session()
+    handle = _load(session, AUTHORING)
+    added = _author(
+        session,
+        handle,
+        "add_mate",
+        joint={
+            "name": "wrist",
+            "type": "revolute",
+            "parent_part": "hand",
+            "child_part": "tool",
+            "dofs": [
+                {
+                    "name": "rotation",
+                    "kind": "rotation",
+                    "min": -1.0,
+                    "max": 1.0,
+                    "neutral": 0.0,
+                }
+            ],
+        },
+    )
+    assert added["ok"], added
+    assert "wrist" in _joint_names(added["result"]["rig"])

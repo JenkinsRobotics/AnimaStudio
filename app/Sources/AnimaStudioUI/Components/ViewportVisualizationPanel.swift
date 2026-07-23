@@ -10,6 +10,18 @@ enum ViewportVisualizationTab: String, CaseIterable, Identifiable, Sendable {
   var title: String { rawValue.capitalized }
 }
 
+enum ViewportVisualizationPresentation: Equatable, Sendable {
+  case popover
+  case sidebar
+}
+
+struct ViewportVisualizationRenderBindings {
+  let lightingPreset: Binding<ViewportLightingPreset>
+  let materialFinish: Binding<ViewportMaterialFinish>
+  let reflectionMode: Binding<ViewportReflectionMode>
+  let showsShadows: Binding<Bool>
+}
+
 enum VisualizationMaterialCategory: String, CaseIterable, Identifiable, Sendable {
   case plastic
   case metal
@@ -194,49 +206,6 @@ struct VisualizationUsedMaterial: Identifiable, Equatable, Sendable {
   let assignmentCount: Int
 }
 
-struct ViewportVisualizationControl: View {
-  @Bindable var workspace: StudioWorkspaceModel
-  @Binding var lightingIntensity: Double
-  @Binding var environmentPreset: ViewportEnvironmentPreset
-  @Binding var environmentRotationDegrees: Double
-
-  @State private var isPresented = false
-
-  var body: some View {
-    Button {
-      isPresented.toggle()
-    } label: {
-      HStack(spacing: 8) {
-        VisualizationColorWheelIcon()
-          .frame(width: 20, height: 20)
-        Text("Visualization")
-          .font(.callout.weight(.semibold))
-      }
-      .foregroundStyle(.primary)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 7)
-      .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 9))
-      .overlay {
-        RoundedRectangle(cornerRadius: 9)
-          .stroke(isPresented ? StudioPalette.accent : StudioPalette.border, lineWidth: 1)
-      }
-      .shadow(color: .black.opacity(0.18), radius: 7, y: 3)
-    }
-    .buttonStyle(.plain)
-    .help("Materials and environment")
-    .accessibilityLabel("Visualization")
-    .accessibilityValue(isPresented ? "Open" : "Closed")
-    .popover(isPresented: $isPresented, arrowEdge: .leading) {
-      ViewportVisualizationPanel(
-        workspace: workspace,
-        lightingIntensity: $lightingIntensity,
-        environmentPreset: $environmentPreset,
-        environmentRotationDegrees: $environmentRotationDegrees
-      )
-    }
-  }
-}
-
 struct VisualizationColorWheelIcon: View {
   var body: some View {
     Circle()
@@ -262,13 +231,33 @@ struct VisualizationColorWheelIcon: View {
   }
 }
 
-private struct ViewportVisualizationPanel: View {
+struct ViewportVisualizationPanel: View {
   @Bindable var workspace: StudioWorkspaceModel
   @Binding var lightingIntensity: Double
   @Binding var environmentPreset: ViewportEnvironmentPreset
   @Binding var environmentRotationDegrees: Double
+  let renderSettings: ViewportVisualizationRenderBindings?
+  let presentation: ViewportVisualizationPresentation
 
-  @State private var selectedTab = ViewportVisualizationTab.material
+  @State private var selectedTab: ViewportVisualizationTab
+
+  init(
+    workspace: StudioWorkspaceModel,
+    lightingIntensity: Binding<Double>,
+    environmentPreset: Binding<ViewportEnvironmentPreset>,
+    environmentRotationDegrees: Binding<Double>,
+    renderSettings: ViewportVisualizationRenderBindings? = nil,
+    presentation: ViewportVisualizationPresentation = .popover,
+    initialTab: ViewportVisualizationTab = .material
+  ) {
+    self.workspace = workspace
+    _lightingIntensity = lightingIntensity
+    _environmentPreset = environmentPreset
+    _environmentRotationDegrees = environmentRotationDegrees
+    self.renderSettings = renderSettings
+    self.presentation = presentation
+    _selectedTab = State(initialValue: initialTab)
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -285,23 +274,60 @@ private struct ViewportVisualizationPanel: View {
 
       switch selectedTab {
       case .material:
-        VisualizationMaterialBrowser(
-          selectedPartName: selectedPart?.displayName,
-          usedMaterials: usedMaterials,
-          applyPreset: apply,
-          applyUsedMaterial: apply
-        )
+        VStack(spacing: 0) {
+          if let renderSettings {
+            Picker("Default finish", selection: renderSettings.materialFinish) {
+              ForEach(ViewportMaterialFinish.allCases) { finish in
+                Text(finish.title).tag(finish)
+              }
+            }
+            .controlSize(.small)
+            .padding(12)
+            Divider()
+          }
+          VisualizationMaterialBrowser(
+            selectedPartName: selectedPart?.displayName,
+            usedMaterials: usedMaterials,
+            applyPreset: apply,
+            applyUsedMaterial: apply,
+            compact: presentation == .sidebar
+          )
+        }
       case .environment:
-        VisualizationEnvironmentBrowser(
-          background: backgroundBinding,
-          sectionPlane: sectionPlaneBinding,
-          lightingIntensity: $lightingIntensity,
-          environmentPreset: $environmentPreset,
-          environmentRotationDegrees: $environmentRotationDegrees
-        )
+        VStack(spacing: 0) {
+          if let renderSettings {
+            VStack(alignment: .leading, spacing: 8) {
+              Picker("Lighting", selection: renderSettings.lightingPreset) {
+                ForEach(ViewportLightingPreset.allCases) { preset in
+                  Text(preset.title).tag(preset)
+                }
+              }
+              Picker("Reflections", selection: renderSettings.reflectionMode) {
+                ForEach(ViewportReflectionMode.allCases) { mode in
+                  Text(mode.title).tag(mode)
+                }
+              }
+              Toggle("Cast shadows", isOn: renderSettings.showsShadows)
+            }
+            .controlSize(.small)
+            .padding(12)
+            Divider()
+          }
+          VisualizationEnvironmentBrowser(
+            background: backgroundBinding,
+            sectionPlane: sectionPlaneBinding,
+            lightingIntensity: $lightingIntensity,
+            environmentPreset: $environmentPreset,
+            environmentRotationDegrees: $environmentRotationDegrees
+          )
+        }
       }
     }
-    .frame(width: 360, height: 650)
+    .frame(
+      width: presentation == .popover ? 360 : nil,
+      height: presentation == .popover ? 650 : nil
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .background(StudioPalette.panel)
   }
 
@@ -548,6 +574,7 @@ struct VisualizationMaterialBrowser: View {
   let usedMaterials: [VisualizationUsedMaterial]
   let applyPreset: (VisualizationMaterialPreset) -> Void
   let applyUsedMaterial: (PreviewPartAppearance) -> Void
+  var compact = false
 
   @State private var searchText = ""
   @State private var expandedCategories = Set(VisualizationMaterialCategory.allCases)
@@ -686,7 +713,9 @@ struct VisualizationMaterialBrowser: View {
 
         if expandedCategories.contains(category) {
           LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible())],
+            columns: compact
+              ? [GridItem(.flexible())]
+              : [GridItem(.flexible(), spacing: 6), GridItem(.flexible())],
             spacing: 6
           ) {
             ForEach(presets) { preset in

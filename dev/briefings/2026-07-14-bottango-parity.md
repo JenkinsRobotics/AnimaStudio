@@ -48,6 +48,24 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Complete and reorganize production Settings from the Demo catalog, including a dedicated Developer page | `app/Sources/AnimaStudioUI/Settings/**`, narrow preference wiring in `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome,WorkspaceSelector,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Components/ModelImportUnitsSheet.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{Settings,AppShell,Components}/**`, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; preserve all unrelated shared-tree hunks and treat `dev/AnimaStudio Demo/**` as read-only reference | every Demo Settings page exists in production alongside retained production controls; pages are grouped as Workspace, Renderer, Appearance, Materials & Edges, Lighting, Layout, Navigation, UI, Developer; Developer owns zones plus Nodes/Design/UI Dev tab visibility; imported controls have real persisted bindings; tests/lint/native/root build/sign/launch pass | released 2026-07-21 — nine grouped pages, real persisted bindings, optional workspace visibility, 352 XCTest + 27 Swift Testing, lint/native/root build/sign/live Settings walkthrough pass |
+
+| Codex | Consolidate viewport visualization, display, input help, and environment controls into the single production View sidebar | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `app/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportCameraControls,ViewportVisualizationPanel,ViewportSidebarPanel}.swift`, removal of the unreferenced legacy sidebar block only at the end of `app/Sources/AnimaStudioUI/AppShell/WorkspaceShell.swift`, focused component/app-shell tests, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; preserve every Claude-authored hunk in `WorkspaceDescriptor.swift`, `WorkspaceSelector.swift`, and the active shell implementation | viewport retains only the spatial ViewCube plus Home; display/camera/navigation/mouse help live under View; Visualization Material/Environment and render-environment settings live under Environment; no floating Visualization pill or duplicate Display menu; tests/lint/native/root build/sign/launch pass | released 2026-07-21 — one consolidated right-sidebar implementation is live; the viewport HUD contains only ViewCube + Home; the floating Visualization pill and obsolete duplicate render menu are gone; 346 XCTest + 27 Swift Testing tests, touched lint, native/root build, deep signing, and launch PID 20348 pass; Claude's concurrent shell edits were preserved |
+
+| Codex | Port per-workspace Center View switcher and first-class visible-zone layout system | `app/Sources/AnimaStudioUI/AppShell/{WorkspaceLayout,WorkspaceShell,StudioWorkspaceModel,StudioWorkspaceView}.swift`, center-mode views under `app/Sources/AnimaStudioUI/Workspaces/**`, UI setting keys/views, focused tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/AnimaStudio Demo/**` read-only reference | bottom-center per-workspace switcher; full-bleed spatial layer versus content-safe table/gallery/timeline/graph modes; visible-zone insets respond to live floating/Canvas chrome and torn-off footprints while Docked remains in-flow; optional dev zone overlay; deterministic tests, lint, native/root build/sign/launch | released 2026-07-21 — exact Character/Rig/Animate/Show/Hardware center catalogs are live; structured views use shell-owned visible-zone insets while spatial views remain full-bleed; torn-off panels contribute footprints; the UI setting exposes a live zone overlay; 348 XCTest + 27 Swift Testing tests, touched lint, native/root build, strict deep signing, and live launch PID 17397 pass; demo stayed read-only |
+
+| Codex | Additively port Demo workspace tools, Design sandbox, and UI Kit gallery into production | additive production sources under `app/Sources/AnimaStudioUI/{AppShell,Workspaces}/**`, focused tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/AnimaStudio Demo/**` read-only reference | retain existing production components and real command wiring; add missing demo catalogs with unavailable tools visibly planned, a labelled Design sandbox, and a namespaced Demo UI Kit/gallery including every handoff widget family; lint/tests/native/root build/sign/launch pass | released 2026-07-21 — additive catalogs live across Character/Rig/Animate/Show/Hardware; production command collisions win; Design sandbox has six categories plus browser/inspector/typed placement; namespaced Demo UI Kit gallery covers the full requested component vocabulary; 344 XCTest + 27 Swift Testing tests, touched lint, native/root build, signing, and live process pass; demo stayed read-only |
+
+| Codex | Port project-folder, Pack-and-Go import, reload, and reusable-assembly persistence | `app/Sources/AnimaDocument/**`, focused import/session integration under `app/Sources/AnimaStudioUI/{AppShell,Components,Workspaces/Assets}/**`, matching tests under `app/Tests/{AnimaDocumentTests,AnimaStudioUIUnitTests}/**`, `dev/docs/{roadmap/Project_Format.md,reality/STATUS.md}`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/AnimaStudio Demo/**` read-only reference | typed asset folders created/backfilled; import asks Copy(default) vs Reference and never moves; copied models persist/reload after autosave; first-class versioned `.animasm` documents save/list/import; lint/tests/native/root build/sign/launch pass | released 2026-07-21 |
+
+| Codex | Faithfully port the Demo Home workspace and live footer into production | `app/Sources/AnimaStudioUI/AppShell/{StudioHomeView,AnimaStudioRootView,ProjectLifecycle,RecentProjects,StudioWorkspaceView,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/PreviewSupport/StudioPreviewCatalog.swift`, renderer metric hooks under `app/Sources/{AnimaCADViewport,RealityKitViewport}/**`, focused tests under `app/Tests/AnimaStudioUIUnitTests/AppShell/**`, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/AnimaStudio Demo/**` read-only reference | match `Home_And_Footer_Handoff.md`: merged three-column Home with Home-only header, default-location New flow, disk-discovered recents and sample fallback, archetype routing, and a toggled 24-point footer wired to real workspace/selection/renderer/theme/OCCT values; tests/lint/native/root build/sign/launch pass | released 2026-07-21 — demo remained read-only; 332 XCTest + 27 Swift Testing tests, recursive lint, native/root build, deep sign, and fresh launch pass |
+
+| Codex | Faithfully port the AnimaStudio Demo shell into the production app | production shell/header/tool/sidebar/tree sources under `app/Sources/AnimaStudioUI/{AppShell,Components/Tree,Workspaces}/**`, app lifecycle wiring under `app/App/**` only as required for window behavior, matching tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/AnimaStudio Demo/**` read-only reference | match `Shell_Port_Handoff.md`: demo-faithful layout math, breakpoints, float/dock/canvas scaffold, three tool densities/lifecycle, shared panel stacks/rails/tear-off, universal tree interactions, and responsive Home/header behavior while retaining production AnimaCore/AnimaDocument/workspace content; staged tests plus lint/native/root build/sign/launch pass | released 2026-07-20 — demo `4757cdc` remained read-only; responsive Home/document headers, exact shell geometry, toolbar primary/overflow/category model and immediate-action lifecycle landed; retained production stack/tear-off/tree engines; 328 XCTest + 27 Swift Testing tests, lint, native/root build, sign, live launch pass |
+
+| Codex | Production widget audit and universal editable-tree operations | `app/Sources/AnimaStudioUI/Components/Tree/**`, `app/Sources/AnimaStudioUI/Components/{ProjectNavigatorView,PartTreeRow}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, supporting app-side rig-edit methods under `app/Sources/{AnimaCoreClient,AnimaStudioUI/AppShell}/**`, focused tests under `app/Tests/**`, new widget inventory under `dev/docs/reality/**`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | inventory every production panel and classify it operational/read-only/unavailable; editable trees expose selection, filter, rename, folder/group, reorder/nest drag feedback, lock/state, delete, keyboard and context paths where their backing data supports it; fixed source/taxonomy trees state why they are read-only; sidebar tabs render their own working set instead of duplicate generic content; no enabled no-op production controls; deterministic tests/lint/build/sign/launch pass | released 2026-07-20 — shared bulk-removal contract; Instances folder/group/reorder/lock/bulk-delete; engine-backed mate/relation delete with dependent-reference cleanup; workspace-specific navigator tabs; enabled no-op audit; complete production panel matrix; 326 XCTest + 27 Swift Testing tests, lint, native/root build, deep sign, launch pass |
+
+| Codex | Correct the Character top Tool sidebar and its three density presentations | `app/Sources/AnimaStudioUI/AppShell/WorkspaceShell.swift`, `app/Sources/AnimaStudioUI/Workspaces/WorkspaceRibbonCatalog.swift`, focused shell/catalog tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | Expanded launches by default as a full-width, full-height icon-and-label ribbon; Standard is a centered medium capsule with primary tools and per-group overflow chevrons; Compact is a centered small category capsule whose anchored visual palettes contain every tool; content insets track toolbar height; Docked remains Expanded; focused lint/test/build/sign/launch pass | released 2026-07-20: Compact is 48-point category/palette geometry, Standard is 64-point primary-tool/overflow geometry, and Expanded is the full-width 88-point complete ribbon; Character terminology is consistent across all presentations; one shared state owner drives density and palette state; 325 XCTest tests and 26 Swift Testing tests pass |
+
 | Codex | Simplify expanded tool presentation and clarify character asset-ingestion ownership | `app/Sources/AnimaStudioUI/AppShell/WorkspaceShell.swift`, focused shell/catalog tests under `app/Tests/AnimaStudioUIUnitTests/**`, `app/Sources/AnimaStudioUI/Components/ModelImportUnitsSheet.swift` only for truthful current storage copy, `dev/docs/{roadmap/Project_Format.md,reality/STATUS.md}`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | Expanded renders all tool groups in one row when the workspace catalog is modest and introduces category tabs only above the documented high-tool-count threshold; Standard/Compact keep grouped menus; model import explicitly communicates non-destructive portable copy into the Character; docs distinguish Character-owned, Project-owned, and future externally linked media | released 2026-07-20: expanded uses one horizontally scrollable row through 24 tools and category tabs only above that threshold; Standard/Compact retain grouped menus; CAD import truthfully describes portable non-destructive copy; project-format docs define Character/Project ownership and copy/link/move policy; focused lint, 322 XCTest tests, 26 Swift Testing tests, native/root builds, and strict deep signing pass |
 
 | Codex | Integrate Codex Bench STEP/OCCT geometry and retained render pipelines into production | `app/Package.swift`, `app/project.yml`, new production CAD geometry/render targets under `app/Sources/**`, import/settings/viewport integration under `app/Sources/{AnimaStudioUI,RealityKitViewport}/**`, matching tests under `app/Tests/**`, `app/Scripts/**`, `app/App/**` only where packaging/resources require it, `dev/docs/{roadmap,reality}/**`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; `dev/Codex Bench/**` read-only reference | STEP/STP is first-class and preferred; one crash-guarded Open CASCADE/XDE import preserves assembly hierarchy, colors, faces, and edges; retained MetalKit, RealityKit, Three.js WebGPU, and raw WebGPU backends consume the shared geometry contract; renderer/theme/material/edge/lighting/quality/telemetry settings are production preferences; app packaging carries required runtime resources/dependencies; focused tests plus Swift lint/test, native/root build/sign/launch, representative STEP walk-through, and diff check pass | released 2026-07-20: implementation and synthetic/malformed STEP verification pass; the user corpus is absent from the current working tree, so a representative real-file walkthrough remains operator verification |
@@ -60,7 +78,7 @@ change needed in the Handoff log instead of inventing commands.
 
 | Codex | Implement the shared three-sidebar workspace-shell standard in production | `app/Sources/AnimaStudioUI/AppShell/{WorkspaceLayout,WorkspaceShell,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome}.swift`, focused Assets integration under `app/Sources/AnimaStudioUI/Workspaces/Assets/**`, `app/Sources/RealityKitViewport/RobotPreviewView.swift` only for the shared canvas-commit hook, focused tests under `app/Tests/{AnimaStudioUIUnitTests,RealityKitViewportTests}/**`, `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every authoring workspace uses one shared center/top-tool/left-workspace/right-view scaffold; global Floating/Docked/Canvas state, identical rail toggle rule, canvas edge reveal without flicker, docked expanded tools, shared density/category/tool state, tool-camera exclusivity, prompt/commit/cancel lifecycle, state survives mode/workspace switches; lint/tests/native/root build/sign/launch/diff check pass | released 2026-07-20 (304 XCTest + 22 bridge/integration tests; recursive lint; native/root build; deep sign; live app + bundled bridge) |
 
-| Codex | Audit and complete production parity before deleting archived CodexUI | `app/Sources/AnimaStudioUI/**`, `app/Tests/AnimaStudioUIUnitTests/**`, `dev/archive/CodexUI/**` read-only until deletion is proven safe, app/CodexUI paragraphs in `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every archived workspace/component/setting/interaction/specimen has a documented production equivalent or an explicit intentional exclusion; missing useful UI is migrated through shared production components and UI Dev coverage; full Swift lint/tests, native build, root rebuild/sign/launch, and diff check pass before archive is labeled safe to delete | active |
+| Codex | Audit and complete production parity before deleting archived CodexUI | `app/Sources/AnimaStudioUI/**`, `app/Tests/AnimaStudioUIUnitTests/**`, `dev/archive/CodexUI/**` read-only until deletion is proven safe, app/CodexUI paragraphs in `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | every archived workspace/component/setting/interaction/specimen has a documented production equivalent or an explicit intentional exclusion; missing useful UI is migrated through shared production components and UI Dev coverage; full Swift lint/tests, native build, root rebuild/sign/launch, and diff check pass before archive is labeled safe to delete | paused 2026-07-21 while the bounded project-persistence claim owns overlapping app files |
 
 | Codex | Separate reusable Characters from pinned project snapshots | `app/Sources/AnimaDocument/**`, `app/Tests/AnimaDocumentTests/**`, Assets UI additions within the existing active UI claim, `dev/docs/roadmap/Project_Format.md`, app/project paragraphs in `dev/docs/reality/STATUS.md`, append-only coordination entries in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | reusable Character Library packages live outside projects; adding one creates a self-contained pinned project snapshot with source ID/revision metadata; project-local Characters remain supported; Assets distinguishes both scopes; canonical `.character.anima` content remains engine-owned; tests/lint/build/sign/launch and diff check pass | released 2026-07-20 — user-level library packages + stable UUID/revision; project-local vs pinned-snapshot provenance; Assets Publish/Add flow; old v2 manifest compatibility; 292 XCTest + 22 bridge tests, lint, native/root build, deep sign, launch, diff check pass |
 
@@ -3562,3 +3580,101 @@ change needed in the Handoff log instead of inventing commands.
   Standard and Compact retain grouped category menus. Focused format lint, 322
   XCTest tests, 26 Swift Testing tests, native/root builds, and strict deep
   signing pass.
+- **2026-07-20 (Codex, corrected Tool-sidebar density presentations):** Fixed
+  the visible mismatch reported from the rebuilt Character workspace and made
+  the three settings structurally distinct. Compact is a centered 48-point
+  category capsule whose anchored icon-and-label palettes expose every tool.
+  Standard is a centered 64-point capsule with two primary tools per group and
+  chevrons for the remaining actions. Expanded is the full-width 88-point
+  complete ribbon with captions and separators; it remains the launch default
+  and the Docked requirement. The center safe inset follows those heights, and
+  the visible import tool is consistently named Character. Focused lint and
+  325 XCTest tests plus 26 Swift Testing tests, native/root rebuild, and strict
+  deep signing pass; the rebuilt root app launches for operator review.
+- **2026-07-20 (Codex, production widget/tree completion pass):** Audited every
+  production panel and published the ownership/capability matrix in
+  `dev/docs/reality/Widget_Production_Audit.md`. The reusable tree model now
+  supports atomic ordered bulk removal; the Instances tree retains folders,
+  grouping, rename, locks, state icons, insertion-line reorder, drag-on-row
+  auto-group, keyboard/context deletion, and confirmed bulk deletion. Rig
+  navigator tabs now show distinct Components, Mates, Relations, Clips,
+  Scenes, Media, Cues, Nodes, Drivers, Outputs, and Safety working sets instead
+  of repeating one generic list. Engine mates and relations can be deleted
+  through the retained rig DTO; dependent relations, outputs, and keyframe
+  channels are pruned before AnimaCore reload/validation. Fixed project/source
+  hierarchies remain intentionally read-only, and the Nodes transport controls
+  are now visibly disabled instead of enabled no-ops. Recursive lint, 326
+  XCTest tests plus 27 Swift Testing tests, native/root build, embedded-helper
+  signing, strict deep signature verification, and live launch pass.
+- **2026-07-20 (Codex, faithful demo-shell production port):** Used frozen demo
+  checkpoint `4757cdc` as read-only reference and completed the remaining
+  production parity gaps without replacing the app's real engine/document
+  content. Document and Home headers now use the demo's centered layout and
+  independent 1320/1060/880 collapse rules; shell panel widths, margins, and
+  floating/Docked tool geometry match the reference. Toolbar data now declares
+  category icons and primary tools, Compact/Standard/Expanded render distinct
+  presentations, and immediate commands execute through the shared tool-state
+  `.onAppear` handler while armed commands keep prompt/commit/cancel and camera
+  exclusivity. Existing production panel stacking, reorder/tear-off/re-dock,
+  Canvas hover, and reusable-tree implementations were retained as the single
+  richer paths. Recursive Swift format lint, 328 XCTest tests plus 27 Swift
+  Testing tests, native Xcode build, root rebuild/helper embedding, strict
+  signing, and live launch (PID 55266) pass. Claim released; demo untouched.
+- **2026-07-21 (Codex, faithful Demo Home/footer production port):** Kept the
+  frozen demo read-only and ported its three-column Home, Home-only header,
+  direct default-root project creation, disk-discovered/stored recents union,
+  sample fallback, archetype routing, connected resources, and global 24-point
+  footer into production. The footer is present on Home and open workspaces and
+  reads real selection, renderer-published triangle counts, backend, theme, and
+  OCCT version. RealityKit and retained CAD views expose geometry metrics without
+  moving rendering truth into the engine. Recursive format lint, 332 XCTest +
+  27 Swift Testing tests, native/root build, strict deep sign, and fresh launch
+  (PID 32445) pass. Claim released; broad production-parity audit resumed.
+- **2026-07-21 (Codex, Pack-and-Go project persistence):** Ported the demo's
+  file-lifecycle behavior into the real `AnimaDocument` layer. New and reopened
+  projects create/backfill `assets/{models,assemblies,audio,video,images,scripts,renders}`;
+  model import explicitly offers Copy into Project (default) or Reference in
+  Place and never moves the source. Copied and linked geometry resolve through
+  stable document asset IDs, imports autosave, and reopen/Save As reconfigure
+  renderer sources from the reloaded manifest. Added versioned `.animasm`
+  documents with legacy migration plus Save/Import Assembly in the Rig asset
+  library. Recursive format lint, 338 XCTest tests plus 27 Swift Testing tests,
+  native Xcode build, root rebuild/helper embedding, deep signing, and launch
+  pass. Claim released; demo sources stayed read-only.
+- **2026-07-21 (Codex, additive Demo tools + Design + UI Kit):** Preserved the
+  production catalogs and command behaviors, then appended the Demo's missing
+  Character, Rig, Animate, Show, and Hardware concepts through one namespaced
+  catalog. The special category-driven Rig ribbon now includes the additive
+  concepts in its live categories without duplicate production tools. Added a
+  clearly labelled Design sandbox with the six Fusion-style categories,
+  typed tool payloads, a flat placement canvas, Documents/Features/Bodies/Mates
+  browser tabs, and editable placeholder properties. UI Dev gained a separate
+  namespaced Demo UI Kit gallery containing every handoff family, including
+  panels, rows, chips, overlays, mate/material/environment controls, timeline,
+  nodes, servo/feature tracks, document tabs, gizmos, and ViewCube. The frozen
+  Demo remained read-only. Touched Swift format lint, 344 XCTest tests plus 27
+  Swift Testing tests, native Xcode build, root rebuild/helper embedding,
+  signing verification, and a live root-app process all pass.
+- **2026-07-21 (Codex, Center View + visible-zone production port):** Ported
+  the demo's bottom-center representation switcher into the production shell
+  with exact Character, Rig, Animate, Show, and Hardware catalogs. Spatial 3D
+  centers remain full-bleed; real gallery, table, dope-sheet, curve, node,
+  exploded, and servo-timeline centers consume one shell-owned visible-zone
+  environment inset that responds to tool chrome, open panel stacks, Canvas
+  reveals, the bottom switcher, and torn-off window footprints. Docked panels
+  remain in-flow. Settings now exposes the live dashed layout-zone overlay.
+  Full `swift test` passes 348 XCTest plus 27 Swift Testing tests, touched
+  format lint and the native/root builds pass, the root bundle satisfies
+  strict deep signing, and the rebuilt app remains live as PID 17397. The demo
+  stayed read-only.
+- **2026-07-21 (Codex, viewport control consolidation):** Replaced the two
+  parallel production viewport-control paths with one right-sidebar surface.
+  View owns camera/display/navigation/mouse settings/help; Environment owns
+  the reusable Material/Environment visualization panel; Appearance owns only
+  viewport-level theme/color behavior. The viewport HUD now contains only the
+  spatial ViewCube and Home action. Removed the floating Visualization pill,
+  obsolete `ViewportRenderMenu`, its legacy sidebar duplicate, and their stale
+  test path. Added a deterministic placement contract so future controls have
+  one owner. Claude's concurrent shell changes were retained. Touched lint,
+  346 XCTest + 27 Swift Testing tests, native/root builds, strict deep signing,
+  and live launch PID 20348 pass.

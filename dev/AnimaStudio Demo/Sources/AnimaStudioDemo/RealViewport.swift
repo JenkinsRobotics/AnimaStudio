@@ -36,6 +36,8 @@ enum AssetImportMode: String, CaseIterable, Identifiable {
   var loading = false
   /// How new imports are stored. Copy = self-contained project (default).
   var importMode: AssetImportMode = .copy
+  /// Which center representation the Character workspace shows.
+  var centerView = "3D"
   var importTotal = 0
   var importDone = 0
   var importingName = ""

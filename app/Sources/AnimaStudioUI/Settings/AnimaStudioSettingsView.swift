@@ -4,20 +4,28 @@ import AppKit
 import RealityKitViewport
 import SwiftUI
 
-enum StudioSettingsTab: String {
-  case workspace
-  case navigation
-  case appearance
-  case rendering
-}
-
 public struct AnimaStudioSettingsView: View {
+  @AppStorage(StudioPreferenceKey.appAppearanceMode) private var appAppearanceModeRawValue =
+    StudioAppearanceMode.dark.rawValue
   @AppStorage(StudioPreferenceKey.settingsSelectedTab) private var selectedTabRawValue =
     StudioSettingsTab.workspace.rawValue
   @AppStorage(StudioPreferenceKey.workspaceRootPath) private var workspaceRootPath = ""
   @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
     StudioLayoutPreset.floating.rawValue
   @AppStorage(StudioPreferenceKey.showsStatusBar) private var showsStatusBar = true
+  @AppStorage(StudioPreferenceKey.projectDefaultImportUnit) private var defaultImportUnitRawValue =
+    ModelImportUnit.millimeters.rawValue
+  @AppStorage(StudioPreferenceKey.projectAutosavesAfterImport) private var autosavesAfterImport =
+    true
+  @AppStorage(StudioPreferenceKey.projectDefaultFrameRate) private var defaultFrameRate = 30.0
+  @AppStorage(StudioPreferenceKey.viewportShowsViewCube) private var showsViewCube = true
+  @AppStorage(StudioPreferenceKey.viewportShowsOrigin) private var showsOrigin = true
+  @AppStorage(StudioPreferenceKey.showsNodesWorkspaceTab) private var showsNodesWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsNodes
+  @AppStorage(StudioPreferenceKey.showsDesignWorkspaceTab) private var showsDesignWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsDesign
+  @AppStorage(StudioPreferenceKey.showsUIDevWorkspaceTab) private var showsUIDevWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsUIDev
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var appearanceRawValue =
     PreviewAppearance.midnight.rawValue
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile) private var profileRawValue =
@@ -66,29 +74,44 @@ public struct AnimaStudioSettingsView: View {
   @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity = 1_200.0
   @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity = 900.0
   @AppStorage(StudioPreferenceKey.cadShowsTelemetry) private var cadShowsTelemetry = false
+  // Per-color theme overrides imported from the demo settings (empty = use the
+  // named theme's color; resolved in CADViewportTheme.applyingOverrides).
+  @AppStorage(StudioPreferenceKey.cadEdgeColorHex) private var cadEdgeColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadSelectedEdgeColorHex) private var cadSelectedEdgeColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadBackgroundColorHex) private var cadBackgroundColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadFaceSelectionColorHex) private
+    var cadFaceSelectionColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadNeutralColorHex) private var cadNeutralColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadKeyLightColorHex) private var cadKeyLightColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadFillLightColorHex) private var cadFillLightColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadRimLightColorHex) private var cadRimLightColorHex = ""
 
   @State private var workspaceLocationError: String?
+  @State private var designProfile = StudioDesignPersistence.load()
 
   public init() {}
 
   public var body: some View {
-    TabView(selection: selectedTabBinding) {
-      workspacePage
-        .tabItem { Label("Workspace", systemImage: "folder") }
-        .tag(StudioSettingsTab.workspace)
-      navigationPage
-        .tabItem { Label("Navigation", systemImage: "computermouse") }
-        .tag(StudioSettingsTab.navigation)
-      appearancePage
-        .tabItem { Label("Appearance", systemImage: "paintpalette") }
-        .tag(StudioSettingsTab.appearance)
-      renderingPage
-        .tabItem { Label("CAD Renderer", systemImage: "cube.transparent") }
-        .tag(StudioSettingsTab.rendering)
+    NavigationSplitView {
+      List(selection: selectedTabOptionalBinding) {
+        ForEach(StudioSettingsGroup.allCases) { group in
+          Section(group.rawValue) {
+            ForEach(StudioSettingsTab.allCases.filter { $0.group == group }) { tab in
+              Label(tab.title, systemImage: tab.systemImage)
+                .tag(tab)
+                .help(tab.detail)
+            }
+          }
+        }
+      }
+      .navigationSplitViewColumnWidth(min: 180, ideal: 205, max: 230)
+    } detail: {
+      selectedPage
     }
-    .frame(width: 720, height: 700)
+    .navigationSplitViewStyle(.balanced)
+    .frame(width: 850, height: 700)
     .background(StudioPalette.canvas)
-    .preferredColorScheme(.dark)
+    .preferredColorScheme(StudioAppearanceMode.current.colorScheme)
     .alert(
       "Workspace Location Could Not Be Changed",
       isPresented: Binding(
@@ -99,6 +122,21 @@ public struct AnimaStudioSettingsView: View {
       Button("OK", role: .cancel) { workspaceLocationError = nil }
     } message: {
       Text(workspaceLocationError ?? "Unknown error")
+    }
+  }
+
+  @ViewBuilder
+  private var selectedPage: some View {
+    switch selectedTabBinding.wrappedValue {
+    case .workspace: workspacePage
+    case .renderer: renderingPage
+    case .appearance: appearancePage
+    case .materialsAndEdges: materialsAndEdgesPage
+    case .lighting: lightingPage
+    case .layout: layoutPage
+    case .navigation: navigationPage
+    case .interface: interfacePage
+    case .developer: developerPage
     }
   }
 
@@ -153,48 +191,26 @@ public struct AnimaStudioSettingsView: View {
 
         VStack(alignment: .leading, spacing: 12) {
           StudioSectionHeader(
-            title: "Interface Layout",
-            detail: "Choose how new workspace sessions present browsers, inspectors, and tools.",
-            systemImage: "macwindow.on.rectangle"
+            title: "Authoring Defaults",
+            detail: "Defaults for newly imported assets and newly created animation clips.",
+            systemImage: "slider.horizontal.3"
           )
-          Picker("Default Studio mode", selection: defaultLayoutPresetBinding) {
-            ForEach(StudioLayoutPreset.allCases) { preset in
-              Label(preset.title, systemImage: preset.systemImage).tag(preset)
+          Picker("Unitless model units", selection: defaultImportUnitBinding) {
+            ForEach(ModelImportUnit.allCases) { unit in
+              Text(unit.label).tag(unit)
             }
           }
-          .pickerStyle(.segmented)
+          Toggle("Autosave after import", isOn: $autosavesAfterImport)
+            .toggleStyle(.switch)
+          VStack(alignment: .leading, spacing: 6) {
+            LabeledContent("Default frame rate", value: "\(Int(defaultFrameRate)) fps")
+            Slider(value: $defaultFrameRate, in: 12...60, step: 1)
+          }
           Text(
-            "Floating keeps spatial canvases full-size. Docked reserves space for structured work. Canvas hides panels until the pointer reaches an edge."
+            "STL and OBJ are unitless. The import review sheet still lets the operator override this choice per file."
           )
           .font(.caption)
           .foregroundStyle(StudioPalette.muted)
-          Toggle(
-            "Push panels to the outer edge",
-            isOn: Binding(
-              get: { StudioLayoutState.shared.panelsOnOuterEdge },
-              set: { StudioLayoutState.shared.panelsOnOuterEdge = $0 }
-            )
-          )
-          .toggleStyle(.switch)
-          Text("Keeps the panel margin while moving the icon rail inboard.")
-            .font(.caption)
-            .foregroundStyle(StudioPalette.muted)
-          Toggle("Show workspace status bar", isOn: $showsStatusBar)
-            .toggleStyle(.switch)
-          Text("Shows engine timing, workspace identity, and local runtime status at the bottom.")
-            .font(.caption)
-            .foregroundStyle(StudioPalette.muted)
-          Toggle(
-            "Dev: show layout zones",
-            isOn: Binding(
-              get: { StudioLayoutState.shared.showsLayoutZones },
-              set: { StudioLayoutState.shared.showsLayoutZones = $0 }
-            )
-          )
-          .toggleStyle(.switch)
-          Text("Draws the live content-safe zone and the four workspace edges over the canvas.")
-            .font(.caption)
-            .foregroundStyle(StudioPalette.muted)
         }
         .studioCardSurface()
 
@@ -231,27 +247,12 @@ public struct AnimaStudioSettingsView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
         StudioSectionHeader(
-          title: "Viewport Appearance",
-          detail: "These operator preferences apply to every project on this Mac.",
+          title: "Appearance",
+          detail:
+            "Coordinate the viewport background, imported colors, reflections, and environment.",
           systemImage: "paintpalette"
         )
         settingsPicker("Theme", selection: appearanceBinding, values: PreviewAppearance.allCases) {
-          $0.title
-        }
-        settingsPicker(
-          "Render style", selection: renderStyleBinding, values: ViewportRenderStyle.allCases
-        ) {
-          $0.title
-        }
-        settingsPicker(
-          "Lighting", selection: lightingPresetBinding, values: ViewportLightingPreset.allCases
-        ) {
-          $0.title
-        }
-        settingsPicker(
-          "Material finish", selection: materialFinishBinding,
-          values: ViewportMaterialFinish.allCases
-        ) {
           $0.title
         }
         settingsPicker(
@@ -264,22 +265,41 @@ public struct AnimaStudioSettingsView: View {
           values: ViewportEnvironmentPreset.allCases
         ) { $0.title }
         VStack(alignment: .leading, spacing: 8) {
-          LabeledContent(
-            "Lighting intensity",
-            value: lightingIntensity.formatted(.number.precision(.fractionLength(2)))
-          )
-          Slider(value: $lightingIntensity, in: 0.1...3)
           LabeledContent("Environment rotation", value: "\(Int(environmentRotationDegrees))°")
           Slider(value: $environmentRotationDegrees, in: 0...360)
         }
         .studioCardSurface()
-        settingsPicker(
-          "Render quality", selection: renderQualityBinding,
-          values: ViewportRenderQuality.allCases
-        ) { $0.title }
-        Toggle("Cast viewport shadows", isOn: $showsShadows)
-          .toggleStyle(.switch)
-          .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Coordinated CAD theme", selection: $cadThemeName) {
+            ForEach(CADViewportTheme.all) { theme in Text(theme.name).tag(theme.name) }
+          }
+          Toggle("Preserve STEP/XDE colors", isOn: $cadPreservesImportedColors)
+            .toggleStyle(.switch)
+          Text("Turn imported colors off to use the coordinated diagnostic material instead.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
+          Text("SCENE COLORS")
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(StudioPalette.muted)
+          themeColorRow(
+            "Viewport background", $cadBackgroundColorHex, default: currentCADTheme.background
+          )
+          themeColorRow(
+            "Unspecified model color", $cadNeutralColorHex,
+            default: SIMD3(
+              currentCADTheme.neutralColor.x, currentCADTheme.neutralColor.y,
+              currentCADTheme.neutralColor.z
+            )
+          )
+          themeColorRow(
+            "Face selection", $cadFaceSelectionColorHex, default: currentCADTheme.selectionColor
+          )
+        }
+        .studioCardSurface()
       }
       .padding(22)
     }
@@ -289,7 +309,7 @@ public struct AnimaStudioSettingsView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
         StudioSectionHeader(
-          title: "CAD Rendering",
+          title: "Renderer",
           detail:
             "Every backend consumes the same Open CASCADE STEP/XDE geometry, hierarchy, colors, faces, and feature edges.",
           systemImage: "cube.transparent"
@@ -314,33 +334,223 @@ public struct AnimaStudioSettingsView: View {
           LabeledContent("Geometry kernel", value: "Open CASCADE \(CADGeometryKernel.version)")
           Toggle("Show performance telemetry", isOn: $cadShowsTelemetry)
             .toggleStyle(.switch)
+          Toggle("Show orientation ViewCube", isOn: $showsViewCube)
+            .toggleStyle(.switch)
+          Toggle("Show character origin axes", isOn: $showsOrigin)
+            .toggleStyle(.switch)
         }
         .studioCardSurface()
 
+        settingsPicker(
+          "Render style", selection: renderStyleBinding, values: ViewportRenderStyle.allCases
+        ) { $0.title }
+        settingsPicker(
+          "Render quality", selection: renderQualityBinding,
+          values: ViewportRenderQuality.allCases
+        ) { $0.title }
+      }
+      .padding(22)
+    }
+  }
+
+  private var materialsAndEdgesPage: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        StudioSectionHeader(
+          title: "Materials & Edges",
+          detail: "Configure the common surface finish and exact CAD feature-edge treatment.",
+          systemImage: "square.3.layers.3d"
+        )
+        settingsPicker(
+          "Material finish", selection: materialFinishBinding,
+          values: ViewportMaterialFinish.allCases
+        ) { $0.title }
         VStack(alignment: .leading, spacing: 12) {
-          Picker("Coordinated theme", selection: $cadThemeName) {
-            ForEach(CADViewportTheme.all) { theme in Text(theme.name).tag(theme.name) }
-          }
-          Toggle("Preserve STEP/XDE colors", isOn: $cadPreservesImportedColors)
-            .toggleStyle(.switch)
+          settingSlider("Surface roughness", value: $cadRoughness, range: 0...1)
+          settingSlider("Surface metallic", value: $cadMetallic, range: 0...1)
+          Text("Renderer-neutral values map to each backend's closest native material model.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
           Toggle("Show exact B-Rep feature edges", isOn: $cadShowsFeatureEdges)
             .toggleStyle(.switch)
           settingSlider("Edge strength", value: $cadEdgeStrength, range: 0...1)
             .disabled(!cadShowsFeatureEdges)
-          settingSlider("Surface roughness", value: $cadRoughness, range: 0...1)
-          settingSlider("Surface metallic", value: $cadMetallic, range: 0...1)
+          themeColorRow("Edge color", $cadEdgeColorHex, default: currentCADTheme.edgeColor)
+          themeColorRow(
+            "Selected edge", $cadSelectedEdgeColorHex, default: currentCADTheme.edgeSelectionColor
+          )
         }
         .studioCardSurface()
+      }
+      .padding(22)
+    }
+  }
 
+  private var lightingPage: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        StudioSectionHeader(
+          title: "Lighting",
+          detail: "Balance the interactive viewport and the renderer-neutral CAD light rig.",
+          systemImage: "light.max"
+        )
+        settingsPicker(
+          "Viewport preset", selection: lightingPresetBinding,
+          values: ViewportLightingPreset.allCases
+        ) { $0.title }
+        VStack(alignment: .leading, spacing: 12) {
+          settingSlider("Viewport intensity", value: $lightingIntensity, range: 0.1...3)
+          Toggle("Cast viewport shadows", isOn: $showsShadows)
+            .toggleStyle(.switch)
+        }
+        .studioCardSurface()
         VStack(alignment: .leading, spacing: 12) {
           settingSlider("Key light", value: $cadKeyLightIntensity, range: 0...8_000)
+          themeColorRow("Key light color", $cadKeyLightColorHex, default: currentCADTheme.key.color)
           settingSlider("Fill light", value: $cadFillLightIntensity, range: 0...8_000)
-          settingSlider("Rim light", value: $cadRimLightIntensity, range: 0...8_000)
-          Text(
-            "These renderer-neutral values map to the closest native material and light model in each backend."
+          themeColorRow(
+            "Fill light color", $cadFillLightColorHex, default: currentCADTheme.fill.color
           )
-          .font(.caption)
-          .foregroundStyle(StudioPalette.muted)
+          settingSlider("Rim light", value: $cadRimLightIntensity, range: 0...8_000)
+          themeColorRow("Rim light color", $cadRimLightColorHex, default: currentCADTheme.rim.color)
+          Text("The relationship is normalized into each renderer's closest native light model.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+      }
+      .padding(22)
+    }
+  }
+
+  private var layoutPage: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        StudioSectionHeader(
+          title: "Layout",
+          detail: "Control the app-global Studio mode and panel relationship.",
+          systemImage: "rectangle.split.3x1"
+        )
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Default Studio mode", selection: defaultLayoutPresetBinding) {
+            ForEach(StudioLayoutPreset.allCases) { preset in
+              Label(preset.title, systemImage: preset.systemImage).tag(preset)
+            }
+          }
+          .pickerStyle(.segmented)
+          Text("The selected default is applied to new workspace sessions.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
+          Toggle(
+            "Push panels to the outer edge",
+            isOn: Binding(
+              get: { StudioLayoutState.shared.panelsOnOuterEdge },
+              set: { StudioLayoutState.shared.panelsOnOuterEdge = $0 }
+            )
+          )
+          .toggleStyle(.switch)
+          Text("Keeps the panel margin while moving the icon rail inboard.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+      }
+      .padding(22)
+    }
+  }
+
+  private var interfacePage: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        StudioSectionHeader(
+          title: "UI",
+          detail: "App chrome, tool presentation, status, and shared design tokens.",
+          systemImage: "sidebar.squares.left"
+        )
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Appearance", selection: appearanceModeBinding) {
+            ForEach(StudioAppearanceMode.allCases) { mode in
+              Label(mode.title, systemImage: mode.systemImage).tag(mode)
+            }
+          }
+          .pickerStyle(.segmented)
+          Text("Dark is the default; Light and System adapt every panel to the chosen appearance.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Design preset", selection: designPresetBinding) {
+            ForEach(StudioDesignPreset.allCases) { preset in Text(preset.title).tag(preset) }
+          }
+          .pickerStyle(.segmented)
+          ColorPicker("Accent color", selection: accentColorBinding, supportsOpacity: false)
+          Text("The shared profile updates panels, ribbons, fields, and semantic chrome together.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Tool density", selection: toolDensityBinding) {
+            ForEach(StudioToolDensity.allCases) { density in
+              Label(density.rawValue, systemImage: density.systemImage).tag(density)
+            }
+          }
+          .pickerStyle(.segmented)
+          Picker("Floating chrome", selection: chromeShapeBinding) {
+            ForEach(StudioChromeShape.allCases) { shape in
+              Label(shape.rawValue, systemImage: shape.systemImage).tag(shape)
+            }
+          }
+          .pickerStyle(.segmented)
+          Toggle("Show workspace status bar", isOn: $showsStatusBar)
+            .toggleStyle(.switch)
+        }
+        .studioCardSurface()
+      }
+      .padding(22)
+    }
+  }
+
+  private var developerPage: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        StudioSectionHeader(
+          title: "Developer",
+          detail:
+            "Diagnostics and optional development surfaces. These controls never change project data.",
+          systemImage: "hammer"
+        )
+        VStack(alignment: .leading, spacing: 12) {
+          Toggle(
+            "Show live layout zones",
+            isOn: Binding(
+              get: { StudioLayoutState.shared.showsLayoutZones },
+              set: { StudioLayoutState.shared.showsLayoutZones = $0 }
+            )
+          )
+          .toggleStyle(.switch)
+          Text("Draws the content-safe visible zone and all four shell edges over the center view.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+        VStack(alignment: .leading, spacing: 12) {
+          Text("WORKSPACE TABS")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(StudioPalette.muted)
+          Toggle("Nodes", isOn: $showsNodesWorkspaceTab).toggleStyle(.switch)
+          Toggle("Design sandbox", isOn: $showsDesignWorkspaceTab).toggleStyle(.switch)
+          Toggle("UI Dev", isOn: $showsUIDevWorkspaceTab).toggleStyle(.switch)
+          Text("Hiding a tab does not remove its implementation or saved content.")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
         }
         .studioCardSurface()
       }
@@ -367,6 +577,25 @@ public struct AnimaStudioSettingsView: View {
     }
   }
 
+  /// The named theme, used to seed a color override control with the preset's
+  /// value until the operator picks a custom color.
+  private var currentCADTheme: CADViewportTheme { CADViewportTheme.named(cadThemeName) }
+
+  /// A labelled color override row: shows `default` (the theme color) until the
+  /// hex string is set, then persists the picked color as hex.
+  private func themeColorRow(
+    _ label: String, _ hex: Binding<String>, default themeDefault: SIMD3<Float>
+  ) -> some View {
+    HStack {
+      Text(label).font(.system(size: 12))
+      Spacer()
+      ColorPicker(
+        "", selection: hex.cadColor(themeDefault: themeDefault), supportsOpacity: false
+      )
+      .labelsHidden()
+    }
+  }
+
   private var workspaceLocation: WorkspaceLocationPreference {
     WorkspaceLocationPreference()
   }
@@ -378,11 +607,73 @@ public struct AnimaStudioSettingsView: View {
     )
   }
 
+  private var selectedTabOptionalBinding: Binding<StudioSettingsTab?> {
+    Binding(
+      get: { selectedTabBinding.wrappedValue },
+      set: { if let value = $0 { selectedTabBinding.wrappedValue = value } }
+    )
+  }
+
   private var defaultLayoutPresetBinding: Binding<StudioLayoutPreset> {
     Binding(
       get: { StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .floating },
       set: { defaultLayoutPresetRawValue = $0.rawValue }
     )
+  }
+
+  private var defaultImportUnitBinding: Binding<ModelImportUnit> {
+    rawBinding($defaultImportUnitRawValue, fallback: .millimeters)
+  }
+
+  private var appearanceModeBinding: Binding<StudioAppearanceMode> {
+    Binding(
+      get: { StudioAppearanceMode(rawValue: appAppearanceModeRawValue) ?? .dark },
+      set: {
+        appAppearanceModeRawValue = $0.rawValue
+        $0.apply()
+      }
+    )
+  }
+
+  private var toolDensityBinding: Binding<StudioToolDensity> {
+    Binding(
+      get: { StudioToolSettings.shared.density },
+      set: { StudioToolSettings.shared.density = $0 }
+    )
+  }
+
+  private var chromeShapeBinding: Binding<StudioChromeShape> {
+    Binding(
+      get: { StudioToolSettings.shared.chromeShape },
+      set: { StudioToolSettings.shared.chromeShape = $0 }
+    )
+  }
+
+  private var designPresetBinding: Binding<StudioDesignPreset> {
+    Binding(
+      get: {
+        StudioDesignPreset.allCases.first(where: { $0.profile == designProfile }) ?? .standard
+      },
+      set: { applyDesignProfile($0.profile) }
+    )
+  }
+
+  private var accentColorBinding: Binding<Color> {
+    Binding(
+      get: { designProfile.accent.color },
+      set: { color in
+        var updated = designProfile
+        updated.accent = StudioColorToken(color: color)
+        applyDesignProfile(updated)
+      }
+    )
+  }
+
+  private func applyDesignProfile(_ profile: StudioDesignProfile) {
+    let applied = profile.clamped()
+    designProfile = applied
+    StudioDesignRuntime.shared.apply(applied)
+    StudioDesignPersistence.save(applied)
   }
 
   @MainActor

@@ -1,4 +1,5 @@
 enum StudioPreferenceKey {
+  static let appAppearanceMode = "appAppearanceMode"
   static let settingsSelectedTab = "settingsSelectedTab"
   static let workspaceRootPath = "workspaceRootPath"
   static let workspaceRootBookmark = "workspaceRootBookmark"
@@ -6,6 +7,14 @@ enum StudioPreferenceKey {
   static let panelsOnOuterEdge = "panelsOnOuterEdge"
   static let showsStatusBar = "showsStatusBar"
   static let showsLayoutZones = "showsLayoutZones"
+  static let projectDefaultImportUnit = "projectDefaultImportUnit"
+  static let projectAutosavesAfterImport = "projectAutosavesAfterImport"
+  static let projectDefaultFrameRate = "projectDefaultFrameRate"
+  static let toolDensity = "toolDensity"
+  static let chromeShape = "chromeShape"
+  static let showsNodesWorkspaceTab = "showsNodesWorkspaceTab"
+  static let showsDesignWorkspaceTab = "showsDesignWorkspaceTab"
+  static let showsUIDevWorkspaceTab = "showsUIDevWorkspaceTab"
 
   static let viewportAppearance = "viewportAppearance"
   static let viewportNavigationProfile = "viewportNavigationProfile"
@@ -27,6 +36,8 @@ enum StudioPreferenceKey {
   static let viewportEnvironmentPreset = "viewportEnvironmentPreset"
   static let viewportEnvironmentRotationDegrees = "viewportEnvironmentRotationDegrees"
   static let viewportRenderQuality = "viewportRenderQuality"
+  static let viewportShowsViewCube = "viewportShowsViewCube"
+  static let viewportShowsOrigin = "viewportShowsOrigin"
   static let cadRenderBackend = "cadRenderBackend"
   static let cadThemeName = "cadThemeName"
   static let cadPreservesImportedColors = "cadPreservesImportedColors"
@@ -38,4 +49,16 @@ enum StudioPreferenceKey {
   static let cadFillLightIntensity = "cadFillLightIntensity"
   static let cadRimLightIntensity = "cadRimLightIntensity"
   static let cadShowsTelemetry = "cadShowsTelemetry"
+
+  // Per-color theme overrides (imported from the demo settings). Empty string
+  // means "use the named theme's color"; see CADThemeOverrides.swift.
+  static let cadEdgeColorHex = "cadEdgeColorHex"
+  static let cadSelectedEdgeColorHex = "cadSelectedEdgeColorHex"
+  static let cadBackgroundColorHex = "cadBackgroundColorHex"
+  static let cadFaceSelectionColorHex = "cadFaceSelectionColorHex"
+  static let cadNeutralColorHex = "cadNeutralColorHex"
+  static let cadKeyLightColorHex = "cadKeyLightColorHex"
+  static let cadFillLightColorHex = "cadFillLightColorHex"
+  static let cadRimLightColorHex = "cadRimLightColorHex"
+
 }

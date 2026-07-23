@@ -48,10 +48,15 @@ struct TreeView<Node: TreeNode, RowContent: View>: View {
 
   var body: some View {
     ScrollViewReader { proxy in
-      ForEach(rows) { row in
-        renderedRow(row)
-          .id(row.node.id)
-          .tag(row.node.selectionValue)
+      // The rows MUST live in a vertical stack. A bare ForEach directly inside
+      // ScrollViewReader has no layout container, so every row renders at the
+      // same origin and they overlap (visible in the plain-ScrollView callers).
+      LazyVStack(spacing: 2) {
+        ForEach(rows) { row in
+          renderedRow(row)
+            .id(row.node.id)
+            .tag(row.node.selectionValue)
+        }
       }
       .onChange(of: revealRequest) { _, request in
         guard let request, model.node(id: request.id) != nil else { return }

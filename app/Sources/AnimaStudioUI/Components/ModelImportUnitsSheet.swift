@@ -34,10 +34,14 @@ struct ModelImportRequest: Identifiable, Equatable, Sendable {
     ["stl", "obj"].contains(url.pathExtension.lowercased())
   }
 
-  static func staged(url: URL) -> Self {
-    Self(
+  static func staged(url: URL, defaults: UserDefaults = .standard) -> Self {
+    let preferredUnit =
+      ModelImportUnit(
+        rawValue: defaults.string(forKey: StudioPreferenceKey.projectDefaultImportUnit) ?? ""
+      ) ?? .millimeters
+    return Self(
       url: url,
-      unit: url.pathExtension.lowercased() == "stl" ? .millimeters : .meters
+      unit: ["stl", "obj"].contains(url.pathExtension.lowercased()) ? preferredUnit : .meters
     )
   }
 
@@ -87,7 +91,7 @@ struct ModelImportUnitsSheet: View {
     self.cancel = cancel
     self.importModels = importModels
     _requests = State(
-      initialValue: urls.map(ModelImportRequest.staged)
+      initialValue: urls.map { ModelImportRequest.staged(url: $0) }
     )
     _targetCharacterID = State(
       initialValue: characters.contains(where: { $0.id == initialTargetCharacterID })

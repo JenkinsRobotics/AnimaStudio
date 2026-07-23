@@ -17,7 +17,7 @@ struct StudioAgentPanelView: View {
       composer
     }
     .background(StudioPalette.panel)
-    .preferredColorScheme(.dark)
+    .preferredColorScheme(StudioAppearanceMode.current.colorScheme)
   }
 
   private var windowHeader: some View {

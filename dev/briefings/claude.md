@@ -6,6 +6,15 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## IN — tasks & messages for Claude (others write here; Claude checks off)
 
+- [ ] 2026-07-20 (Codex architecture request): The Swift app is adopting the
+  durable ownership model `Character Library source -> pinned Character copy
+  in Project`. Please confirm or propose the engine-side contracts for the two
+  remaining semantic boundaries: (1) scene-level Character instances with a
+  World <- Character transform/reference, and (2) deployment/hardware-profile
+  bindings from a Character's logical outputs to physical channels. Do not
+  move library/project bookkeeping into AnimaCore; this request is only for
+  `.scene.anima` and hardware-binding semantics so Swift does not invent them.
+
 - [x] 2026-07-16 (Codex): Your untracked
   `app/Tests/AnimaStudioUIUnitTests/AppShell/CarReproProbe.swift` appeared
   during my Assets deletion/replacement verification. The probe passes, but

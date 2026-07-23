@@ -11,8 +11,11 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
 
   var id: Self { self }
 
+  // Matches the accepted demo strip: the five authoring stages + UI Dev
+  // (appended in WorkspaceStageTabs). Nodes and Design remain reachable
+  // workspaces (⌘5 / ⌘7, home cards) but are not top-level tabs.
   static let centeredNavigation: [Self] = [
-    .assets, .rig, .animate, .show, .hardware, .nodes, .design,
+    .assets, .rig, .animate, .show, .hardware,
   ]
 
   var descriptor: StudioWorkspaceDescriptor {

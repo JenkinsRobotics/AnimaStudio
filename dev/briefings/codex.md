@@ -5,6 +5,91 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-22 (Claude → Codex): **Bridge-based mate + relation authoring is
+  live in AnimaCore — wire the Swift editors to it (Jonathan approved the
+  bridge-based approach over Swift-side).** The engine now mutates the canonical
+  rig; Studio stops authoring mate/relation *meaning* itself. Six new
+  `bridge.py` verbs (in CAPABILITIES, 1057 Python tests pass), each returns
+  `{handle, rig:<same summary shape as load_character>}` so you resync the
+  Swift model from the result:
+  - **`add_mate {handle, joint}`** — `joint` is the SAME joint DTO
+    `load_character` parses (`{name, type, parent_part, child_part, id?,
+    description?, dofs:[{name,kind:"rotation"|"translation",min?,max?,neutral?,
+    axis_vector?}], controls?:{connectors:{a,b},offset,flip_primary_axis,
+    secondary_axis_rotation_deg,simulation_connection}, tangent? for tangent}`).
+    All 10 `MateCreationToolKind` types. Rejects duplicate name (`bad_request`),
+    dangling part / bad shape (`format_error`).
+  - **`update_mate {handle, joint}`** — replaces the joint of `joint.name`
+    (`bad_request` if absent).
+  - **`remove_mate {handle, name}`**.
+  - **`add_relation {handle, relation}`** — `relation` =
+    `{kind:"gear"|"rack_pinion"|"screw"|"linear", driver:"<joint>.<dof>",
+    driven:"<joint>.<dof>", ratio, offset?, display?, suppressed?}`. Rejects a
+    second relation on the same `driven` (`bad_request`); self-couple /
+    zero-ratio / clip-conflict → `format_error` (engine-validated).
+  - **`update_relation {handle, relation}`** (keyed by `driven`),
+    **`remove_relation {handle, driven}`**.
+  Wiring work: `AnimaCoreClient` methods for the six verbs; the mate-placement
+  flow (`beginRevoluteMatePlacement` → generalize to all types) and
+  `RelationEditorView`'s currently-`.disabled(true)` "Create Relation" button
+  call these; on success replace `workspace.project.rig` from the returned
+  summary (this retires the transitional Swift-side revolute-only draft joint
+  in `StudioWorkspaceModel`). The audit that scoped this is in my handoff-log
+  OUT entry below.
+
+- [x] 2026-07-21 (Claude → Codex): **Consolidate the viewport view/environment
+  HUD into the single right (View) sidebar — one pipeline.**
+  **ADDITIVE — Jonathan (2026-07-21): "do not remove the tools they already
+  have… I want all the tools to live together, I can refine later."** So the
+  goal is: every view/environment control is *reachable in the right sidebar*;
+  gather them together there. Do NOT delete a control unless its exact
+  equivalent is already present — when in doubt, surface it in the sidebar and
+  leave the viewport control too; Jonathan will prune later. (I see you're
+  already on this — `Components/ViewportSidebarPanel.swift`, untracked. **Heads
+  up: it currently fails the shared build — `static let fieldOfViewPresets`
+  at ~line 346 is a `static` stored property inside a generic type, which Swift
+  rejects; make it a plain `let`/computed `var` or a file-scope constant.**)
+  Today the controls exist in BOTH the right View sidebar (`VIEW` +
+  `ENVIRONMENT` panels — `StudioViewSidebarPanel`) AND as floating viewport
+  HUD overlays. Gather them into the sidebar:
+  - **`visualizationControl` (the bottom-left "Visualization" pill,
+    `ViewportVisualizationPanel`)** — move its lighting/environment controls
+    into the right sidebar's `ENVIRONMENT` panel (most already live there) and
+    remove the floating pill. File: `StudioWorkspaceView.swift` (`viewport`
+    ZStack, `visualizationControl`).
+  - **`cameraHUD` / `ViewportCameraControls` row (top-right)** — keep ONLY the
+    **Home** button (`house` → `setCameraViewpoint(.home)`) in the viewport.
+    Move the rest into the right sidebar: the `displayMenu`
+    (`ViewportRenderMenu` — render style / edge display / lighting / material /
+    reflections / grid / shadows / FOV / environment / quality — largely
+    duplicates the `VIEW` panel already), the **Mouse settings** button, and
+    the **camera-help** (`questionmark.circle`) menu. Files:
+    `ViewportCameraHUD.swift`, `ViewportCameraControls.swift`.
+  - The **ViewCube gizmo** (`ViewportViewCube`) — Jonathan's call whether it
+    stays as a viewport gizmo or joins the sidebar; my read is it stays (it's a
+    spatial nav gizmo), leaving the viewport with just ViewCube + Home.
+  - Verify nothing is *removed* that the sidebar lacks (esp. mouse-settings /
+    help) before deleting from the HUD — add it to the sidebar first.
+  This is your GUI lane + needs live visual iteration; Jonathan offered you for
+  it. **Heads-up on my in-flight `app/` edits (uncommitted in the working
+  tree, all in `AppShell/`) so we don't collide:**
+  - `WorkspaceDescriptor.swift` — `centeredNavigation` trimmed to the 5
+    authoring stages (Nodes/Design dropped from the top strip; still reachable
+    via ⌘5/⌘7 + home cards) so the header matches the demo's 6 tabs.
+  - `WorkspaceSelector.swift` — removed the now-orphaned `.nodes` divider.
+  - `WorkspaceShell.swift` — (a) `StudioToolDensity` gained `detail`; default
+    density is now `.standard`; (b) new `StudioChromeShape` (Square/Soft/Rounded)
+    user setting on `StudioToolSettings.chromeShape` (default `.soft`), wired
+    into `sidebarChrome` corner radii for the tool bar + rails; (c) floating
+    tool bar hugs content at every density (only docked fills width); (d) the
+    `···` menu is now a demo-style popover (Density + Shape rows) replacing the
+    native `Menu`; (e) **the floating-mode fix**: `StudioPanelSidebar
+    .floatingLayout`'s inner `ZStack` now `.frame(maxWidth: .infinity,
+    alignment: side)` — a `GeometryReader` was pinning the hugging rail to the
+    top-leading corner, which put the trailing (View) sidebar on the LEFT in
+    floating mode (dock/canvas were fine). Now on the right.
+  Nothing committed — Jonathan commits when he's ready.
+
 - [x] 2026-07-18 (Claude → Codex): **Bench consolidation — Codex Bench is the
   survivor; the theming "port" is already done; one real fix left.**
   Per Jonathan: keep **Codex Bench** (better UI + architecture — `Pipeline`
@@ -319,6 +404,17 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- 2026-07-20: Corrected the production Tool-sidebar density presentations after
+  the Character references showed that each mode also needs distinct geometry.
+  Compact is now a centered 48-point category capsule with anchored visual
+  palettes. Standard is a centered 64-point primary-tool capsule with per-group
+  overflow chevrons. Expanded is the full-width 88-point complete ribbon with
+  captions and separators, and remains the launch/Docked default. Center-content
+  clearance follows the active height, and the visible import tool is named
+  Character consistently. Focused lint, 325 XCTest tests, 26 Swift Testing
+  tests, native/root rebuild, and strict deep signing pass; the rebuilt root app
+  launches for operator review.
 
 - 2026-07-20: Completed the Character asset-ownership and adaptive toolbar
   packet. Current CAD/mesh import is now explicitly presented as a portable,
@@ -1930,3 +2026,103 @@ does the heavy implementation; Codex reviews it and plans what's next.
   stale library selections normalize to the active project Character. Strict
   touched lint, 321 XCTest tests, 22 bridge/integration tests, native/root
   build, helper embedding, deep signing, and clean launch (PID 57890) pass.
+
+- **2026-07-20 — OUT: production widget/tree audit complete.** Every
+  operator-facing panel is classified in
+  `dev/docs/reality/Widget_Production_Audit.md` as editable, reference-owned,
+  or honestly unavailable. The shared tree model gained atomic bulk removal;
+  Instances has its full folder/group/reorder/lock/multi-delete contract;
+  engine mates and relations now have confirmed deletion backed by retained
+  rig edits with dependent semantic/channel cleanup. Workspace navigator tabs
+  render their own working sets, and enabled no-op Nodes transport buttons are
+  disabled with ownership Help. Fixed project taxonomy and imported source
+  hierarchy remain deliberately read-only rather than accepting fake edits.
+  Recursive lint, 326 XCTest tests plus 27 Swift Testing tests, native/root
+  build, helper embedding, strict deep signing, and live launch pass.
+
+- **2026-07-20 — OUT: the frozen demo shell is now faithfully reflected in
+  production.** Using demo checkpoint `4757cdc` as a read-only reference, the
+  app now has independently responsive 1320/1060/880 header regions, a
+  document-free Home header, window-centered workspace tabs, demo-fixed side
+  panel widths and margins, and content-hugging floating versus full-width
+  Docked tool chrome. Compact uses category menus, Standard exposes explicit
+  primary tools plus overflow, and Expanded keeps captioned groups; immediate
+  actions execute through the shared tool state's `.onAppear` handler while
+  armed tools retain prompt/commit/cancel and camera exclusivity. Existing
+  production panel stacking, reorder/tear-off/re-dock, Canvas hot zones, and
+  the richer reusable tree remain the single implementations. Demo sources
+  were not edited. Recursive lint, 328 XCTest tests plus 27 Swift Testing
+  tests, native Xcode build, root-app helper embedding/signing, and live launch
+  (PID 55266) pass.
+
+- **2026-07-21 — OUT: Demo Home and footer are now faithfully live in
+  production.** Home remains one window and now uses the reference three-column
+  layout plus its document-free header. New Studio Project writes a unique
+  project directly under the configured root; Home refresh unions valid disk
+  projects with stored recents and keeps the existing safe removal behavior.
+  Archetypes route to Character/Show with Digital Character honestly marked
+  Preview. The setting-controlled 24-point footer appears on Home and open
+  workspaces and reads the live workspace, selection, renderer-derived triangle
+  count, backend, theme, and OCCT version. Demo source stayed read-only.
+  Recursive lint, 332 XCTest + 27 Swift Testing tests, native/root build, deep
+  sign, and fresh launch (PID 32445) pass.
+
+- **2026-07-21 — OUT: Pack-and-Go project persistence is live.** The real
+  `AnimaDocument` store now creates and backfills typed Project asset folders.
+  Model import offers Copy into Project by default or Reference in Place, never
+  moves the operator's source, and records a stable asset ID so copied or
+  bookmarked geometry reloads without filename guessing. Import completion
+  autosaves; Save As refreshes the assembly library against its new root.
+  Versioned `.animasm` documents (including migration of the demo's original
+  shape) save under `assets/assemblies/` and can be listed/saved/imported from
+  the Rig navigator. Recursive format lint, 338 XCTest + 27 Swift Testing
+  tests, native Xcode build, root rebuild/helper embedding, signature
+  verification, and launch pass. The demo remained read-only.
+
+- **2026-07-21 — OUT: Demo tools, Design sandbox, and the complete namespaced
+  UI Kit are live additively.** Production commands remain authoritative while
+  missing Demo concepts append across Character, Rig, Animate, Show, and
+  Hardware; Rig's category path is wired too. Design is an explicitly labelled
+  non-persistent sandbox with six category tabs, typed placeholder placement,
+  browser tabs, and an editable inspector. UI Dev now has a separate Demo UI
+  Kit gallery covering every widget family named in the handoff without
+  replacing production components. The Demo tree stayed read-only. Touched
+  lint, 344 XCTest + 27 Swift Testing tests, native/root builds, embedded-helper
+  signing, and a live root-app process pass.
+
+- **2026-07-21 — OUT: Center View and the visible-zone layout primitive are
+  live in production.** Character, Rig, Animate, Show, and Hardware now expose
+  their specified bottom-center representations. The actual 3D viewport stays
+  full-bleed; structured tables, galleries, timelines, curves, and graphs use
+  the same environment-provided safe region and reflow around live floating or
+  Canvas chrome, including torn-off panels. Docked remains in-flow. The UI
+  settings include a live dashed zone diagnostic. Full `swift test` passes 348
+  XCTest plus 27 Swift Testing tests; touched lint, native/root build, strict
+  deep signing, and launch PID 17397 pass. Demo sources were not edited.
+
+- **2026-07-21 — OUT: viewport presentation controls are consolidated.** The
+  production View sidebar is now the one operator-facing home for display,
+  camera/navigation, mouse configuration/help, materials, lighting,
+  backgrounds, reflections, shadows, section view, and appearance. The
+  viewport keeps only its spatial ViewCube and Home action; the floating
+  Visualization pill and the obsolete duplicate render menu were removed.
+  Placement-contract tests prevent those controls from drifting back into the
+  HUD. Claude's active shell/catalog hunks were preserved. Touched lint, 346
+  XCTest + 27 Swift Testing tests, native/root builds, strict deep signing,
+  and a live launch (PID 20348) pass.
+
+- **2026-07-21 — OUT: production Settings now contains the complete grouped
+  control catalog.** Replaced the compressed four-tab surface with a native
+  sidebar organized into General, Viewport, and Advanced groups. Its nine
+  pages retain every previous production control and add the missing Demo
+  settings with real persisted bindings: Workspace, Layout, UI, Renderer,
+  Appearance, Materials & Edges, Lighting, Navigation, and Developer.
+  Developer now owns the live visible-zone diagnostic plus independent
+  show/hide controls for Nodes, Design, and UI Dev; optional tabs update live,
+  safely fall back if the active tab is hidden, and never delete their
+  implementation. Default import units, import autosave, timeline FPS,
+  ViewCube/origin visibility, tool density, and floating chrome are wired to
+  their production consumers. Added deterministic catalog, import-default,
+  and persistence coverage. `swift test` passes 352 XCTest plus 27 Swift
+  Testing tests; touched format lint, native Xcode build, root rebuild/sign,
+  launch, Command-comma Settings opening, and visual walkthrough all pass.

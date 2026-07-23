@@ -28,6 +28,11 @@ struct UIDevRibbonView: View {
             title: "Nodes",
             systemImage: "point.3.connected.trianglepath.dotted"
           )
+          sectionButton(
+            .designSandbox,
+            title: "Design",
+            systemImage: "pencil.and.ruler"
+          )
           CreationToolButton(
             title: "Agent",
             systemImage: "sparkles",
@@ -127,7 +132,8 @@ struct UIDevRibbonView: View {
 
   private func tint(for section: UIDevSection) -> Color {
     switch section {
-    case .overview, .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .navigator,
+    case .overview, .templateMatrix, .variantBoard, .nodes, .designSandbox, .referenceWidgets,
+      .navigator,
       .inspector, .timeline, .panels, .dialogs, .popovers:
       StudioPalette.accent
     case .workspace3D: StudioPalette.semanticPart

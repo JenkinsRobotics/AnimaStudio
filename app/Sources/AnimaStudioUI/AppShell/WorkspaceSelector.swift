@@ -22,13 +22,16 @@ struct WorkspaceStageTabs: View {
 
   @Namespace private var activeTab
   @State private var hoveredID: String?
+  @AppStorage(StudioPreferenceKey.showsNodesWorkspaceTab) private var showsNodesWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsNodes
+  @AppStorage(StudioPreferenceKey.showsDesignWorkspaceTab) private var showsDesignWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsDesign
+  @AppStorage(StudioPreferenceKey.showsUIDevWorkspaceTab) private var showsUIDevWorkspaceTab =
+    StudioWorkspaceTabDefaults.showsUIDev
 
   var body: some View {
     HStack(spacing: 2) {
-      ForEach(StudioWorkspaceKind.centeredNavigation) { kind in
-        if kind == .nodes {
-          divider
-        }
+      ForEach(visibleStages) { kind in
         workspaceTab(
           id: kind.rawValue,
           title: kind.descriptor.title,
@@ -42,17 +45,19 @@ struct WorkspaceStageTabs: View {
         }
       }
 
-      divider
+      if showsUIDevWorkspaceTab {
+        divider
 
-      workspaceTab(
-        id: "ui-dev",
-        title: UIDevWorkspaceDescriptor.title,
-        purpose: UIDevWorkspaceDescriptor.purpose,
-        systemImage: UIDevWorkspaceDescriptor.systemImage,
-        shortcutNumber: UIDevWorkspaceDescriptor.shortcutNumber,
-        isActive: isUIDevWorkspace
-      ) {
-        isUIDevWorkspace = true
+        workspaceTab(
+          id: "ui-dev",
+          title: UIDevWorkspaceDescriptor.title,
+          purpose: UIDevWorkspaceDescriptor.purpose,
+          systemImage: UIDevWorkspaceDescriptor.systemImage,
+          shortcutNumber: UIDevWorkspaceDescriptor.shortcutNumber,
+          isActive: isUIDevWorkspace
+        ) {
+          isUIDevWorkspace = true
+        }
       }
     }
     .padding(4)
@@ -63,6 +68,21 @@ struct WorkspaceStageTabs: View {
     // "Ch…". The compact breakpoint (icon-only) is the only width control.
     .fixedSize()
     .animation(.spring(response: 0.30, dampingFraction: 0.86), value: activeID)
+    .onChange(of: showsUIDevWorkspaceTab) { _, isVisible in
+      if !isVisible { isUIDevWorkspace = false }
+    }
+    .onChange(of: visibleStages) { _, stages in
+      if !isUIDevWorkspace, !stages.contains(workspace.activeWorkspace) {
+        workspace.switchWorkspace(to: .assets)
+      }
+    }
+  }
+
+  private var visibleStages: [StudioWorkspaceKind] {
+    StudioWorkspaceNavigation.visibleStages(
+      showNodes: showsNodesWorkspaceTab,
+      showDesign: showsDesignWorkspaceTab
+    )
   }
 
   private var divider: some View {

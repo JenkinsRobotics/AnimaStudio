@@ -5,6 +5,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
   case templateMatrix
   case variantBoard
   case nodes
+  case designSandbox
   case referenceWidgets
   case designKit
   case demoUIKit
@@ -30,6 +31,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .templateMatrix: "Template Matrix"
     case .variantBoard: "Variant Board"
     case .nodes: "Node Workspace"
+    case .designSandbox: "Design Sandbox"
     case .referenceWidgets: "Reference Widgets"
     case .designKit: "Live UI Kit"
     case .demoUIKit: "Demo UI Kit"
@@ -55,6 +57,7 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     case .templateMatrix: "rectangle.3.group.fill"
     case .variantBoard: "rectangle.grid.3x2.fill"
     case .nodes: "point.3.connected.trianglepath.dotted"
+    case .designSandbox: "pencil.and.ruler"
     case .referenceWidgets: "square.stack.3d.up"
     case .designKit: "paintbrush.pointed.fill"
     case .demoUIKit: "shippingbox.and.arrow.backward"
@@ -83,6 +86,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
       "Compare related window families and their alternate states on one wide matrix board."
     case .nodes:
       "Refine the scene-logic node canvas, library, inspector, ports, edges, and timeline sync."
+    case .designSandbox:
+      "Prototype the in-app CAD design workspace and part-property tools."
     case .referenceWidgets:
       "Prototype incoming visual references before adopting them in production workspaces."
     case .designKit: "Edit the shared visual tokens and review every production UI family live."
@@ -108,7 +113,8 @@ enum UIDevSection: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .navigator, .inspector, .timeline, .workspace3D:
       true
-    case .overview, .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit,
+    case .overview, .templateMatrix, .variantBoard, .nodes, .designSandbox, .referenceWidgets,
+      .designKit,
       .demoUIKit,
       .buttons, .inputs, .menus, .panels, .mateEditor, .triadManipulator, .dialogs, .popovers,
       .tokens:

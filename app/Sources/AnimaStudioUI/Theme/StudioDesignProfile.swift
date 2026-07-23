@@ -128,6 +128,24 @@ struct StudioDesignProfile: Codable, Equatable, Sendable {
     return profile
   }()
 
+  /// The light-appearance structural palette (canvas → white panels, dark ink).
+  /// Metrics + semantic colors are shared with `standard`; only the surface
+  /// hierarchy and text/border opacities flip. Used by StudioPalette in light
+  /// mode; the dark profile stays the user-editable one.
+  static let standardLight: Self = {
+    var profile = standard
+    profile.canvas = .init(red: 233 / 255, green: 235 / 255, blue: 239 / 255)
+    profile.documentChrome = .init(red: 245 / 255, green: 246 / 255, blue: 249 / 255)
+    profile.chrome = .init(red: 245 / 255, green: 246 / 255, blue: 249 / 255)
+    profile.ribbonChrome = .init(red: 245 / 255, green: 246 / 255, blue: 249 / 255)
+    profile.panel = .init(red: 252 / 255, green: 253 / 255, blue: 255 / 255)
+    profile.panelInset = .init(red: 237 / 255, green: 239 / 255, blue: 243 / 255)
+    profile.field = .init(red: 1, green: 1, blue: 1)
+    profile.mutedOpacity = 0.55
+    profile.borderOpacity = 0.14
+    return profile
+  }()
+
   func clamped() -> Self {
     var profile = self
     profile.canvas = canvas.clamped()

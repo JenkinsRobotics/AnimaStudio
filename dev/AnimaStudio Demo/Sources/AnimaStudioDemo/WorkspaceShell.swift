@@ -347,6 +347,9 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
   var toolArmGroup = RibbonGroup("Tools", "wrench", .accentColor, [])
   let leftTabs: [SidebarTab]
   var leftPanels: PanelStackState
+  /// Optional center-view modes (3D · Gallery · Table …) shown in a bottom pill.
+  var centerTabs: [SidebarTab] = []
+  var centerSelection: Binding<String>? = nil
   @ViewBuilder var center: Center
   @ViewBuilder var left: (String) -> Left
   @ViewBuilder var inspector: Inspector
@@ -365,10 +368,26 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
 
   private var viewPanels: PanelStackState { ViewSidebarState.shared.panels }
 
+  private var hasCenterTabs: Bool { !centerTabs.isEmpty }
+
+  /// The visible-zone inset. Floating chrome (rails + open panels) pushes the
+  /// content edges in; docked panels are in-flow so only the tool bar / switcher
+  /// matter. Full-bleed layers ignore this; the content layer honours it.
+  private var contentInsets: EdgeInsets {
+    let bottom: CGFloat = hasCenterTabs ? 74 : 16
+    if layout.ribbonDocked {
+      return EdgeInsets(top: 10, leading: 10, bottom: bottom, trailing: 10)
+    }
+    let left = 72 + (leftPanels.isOpen ? 242.0 : 0)
+    let right = 72 + (viewPanels.isOpen ? 210.0 : 0)
+    return EdgeInsets(top: 74, leading: left, bottom: 12 + bottom, trailing: right)
+  }
+
   var body: some View {
     Group {
       if layout.ribbonDocked { dockedBody } else { floatingBody }
     }
+    .environment(\.contentInsets, contentInsets)
     // Torn-off panels float over the workspace but stay inside the visible
     // canvas — they can't cover the sidebars or leave the center.
     .overlay {
@@ -381,6 +400,54 @@ struct WorkspaceScaffold<Center: View, Left: View, Inspector: View>: View {
         }
       }
     }
+    // The center-view switcher (bottom pill) + the dev-mode zone overlay.
+    .overlay(alignment: .bottom) { if hasCenterTabs { centerSwitcher } }
+    .overlay { if layout.showZones { zoneOverlay } }
+  }
+
+  private var centerSwitcher: some View {
+    HStack(spacing: 3) {
+      Text("CENTER VIEW").font(.system(size: 9, weight: .semibold)).tracking(0.6)
+        .foregroundStyle(UI.text3).padding(.horizontal, 8).padding(.trailing, 2)
+      ForEach(centerTabs) { tab in
+        let on = centerSelection?.wrappedValue == tab.id
+        Button {
+          withAnimation(.easeOut(duration: 0.16)) { centerSelection?.wrappedValue = tab.id }
+        } label: {
+          HStack(spacing: 7) {
+            Image(systemName: tab.icon).font(.system(size: 13, weight: .medium))
+            Text(tab.id).font(.system(size: 12.5, weight: .medium))
+          }
+          .foregroundStyle(on ? .white : UI.text2)
+          .padding(.horizontal, 14).padding(.vertical, 7)
+          .background(on ? UI.accent : .clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }.buttonStyle(.plain)
+      }
+    }
+    .padding(5)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(UI.stroke, lineWidth: 1))
+    .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
+    .padding(.bottom, 18)
+  }
+
+  /// Dev overlay: draws the visible content zone + edge labels so the invisible
+  /// layout regions are legible while designing.
+  private var zoneOverlay: some View {
+    let i = contentInsets
+    return ZStack {
+      Rectangle()
+        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        .foregroundStyle(UI.accent.opacity(0.7))
+        .padding(EdgeInsets(top: i.top, leading: i.leading, bottom: i.bottom, trailing: i.trailing))
+        .overlay(alignment: .topLeading) {
+          Text("VISIBLE ZONE").font(.system(size: 8.5, weight: .bold)).tracking(0.6)
+            .foregroundStyle(UI.accent)
+            .padding(4).background(UI.panel, in: RoundedRectangle(cornerRadius: 4))
+            .offset(x: i.leading + 4, y: i.top - 8)
+        }
+    }
+    .allowsHitTesting(false)
   }
 
   // The center region a floating panel may occupy — reserves the sidebar rails,

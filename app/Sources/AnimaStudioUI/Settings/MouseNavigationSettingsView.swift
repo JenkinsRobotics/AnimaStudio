@@ -109,7 +109,7 @@ struct MouseNavigationSettingsView: View {
     }
     .frame(width: 620, height: 650)
     .background(StudioPalette.canvas)
-    .preferredColorScheme(.dark)
+    .preferredColorScheme(StudioAppearanceMode.current.colorScheme)
   }
 
   private var header: some View {

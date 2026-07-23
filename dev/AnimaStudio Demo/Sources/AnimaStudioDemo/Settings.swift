@@ -363,6 +363,7 @@ struct InterfaceSettings: View {
 
       SettingsSection(title: "Chrome", icon: "macwindow") {
         Toggle("Show status bar", isOn: $layout.showStatusBar).font(.system(size: 12))
+        Toggle("Dev: show layout zones", isOn: $layout.showZones).font(.system(size: 12))
       }
 
       SettingsSection(title: "Sidebars", icon: "sidebar.squares.left",

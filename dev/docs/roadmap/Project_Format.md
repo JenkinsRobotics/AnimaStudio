@@ -3,8 +3,9 @@
 > How Anima Studio creates, saves, and reopens a project (Jonathan,
 > 2026-07-16). A project is a **folder**, not one file: canonical engine
 > documents (`.character.anima` / `.scene.anima`) plus the app's
-> editor-only metadata and 3D assets, organized so a character is a
-> self-contained, shareable unit.
+> editor-only metadata and typed Project assets. Characters remain reusable
+> semantic documents; an explicit Character export materializes the assets
+> needed to make one independently shareable.
 
 ## Layout
 
@@ -15,21 +16,20 @@
       character-library.json      <- source identity + simple revision
       jp01.character.anima        <- canonical engine Character
       jp01.editor.json
-      assets/
+      assets/                         <- materialized by Character export
   MyRobot/                        ← the project folder (plain folder, browsable)
     project.json                  ← manifest (app-owned): name, revision, dates,
     │                               milestone, character/scene index, window/editor state
     characters/
-      jp01/                       ← one character — self-contained, drag-to-share
+      jp01/                       ← one project-local character document
         jp01.character.anima      ← canonical rig (ENGINE format): parts, mates,
         │                           DOF, limits, relations, output mappings
-        assets/                   ← this character's 3D models
-          head.stl
-          body.usdz
         jp01.editor.json          ← editor-only (APP): connector inference cache,
         │                           per-part display, layout — NEVER inside the .anima
     scenes/
       wave.scene.anima            ← animations / shows (ENGINE format)
+    assets/                        ← project Pack-and-Go source store
+      models/ assemblies/ audio/ video/ images/ scripts/ renders/
 ```
 
 Extensible: `project.json` indexes what's present, so future kinds
@@ -55,19 +55,17 @@ ship.
 
 ## Asset ingestion policy
 
-- **Copy into Character/Project is the default and the current model-import
-  behavior.** Studio copies the bytes into the owning `assets/` directory and
+- **Copy into Project is the default model-import behavior.** Studio copies
+  the bytes into the matching typed directory (`assets/models/` for CAD) and
   never changes or deletes the operator's original file. This makes Save As,
   backup, sharing, and offline robot playback deterministic.
-- **Link to Original is an advanced option for large media (planned UI).** The
-  document layer already models security-scoped bookmarks and missing-link
-  recovery, but a linked asset is intentionally non-portable. Link becomes a
-  live import choice when audio/video/media consumers can resolve the project
-  asset registry end to end.
-- **Rig-defining CAD is copied, not linked.** Canonical Character model paths
-  are relative (`assets/<file>`), so mates and Parts cannot silently break when
-  an external CAD file moves. Reimport/Replace copies a newer source over the
-  managed asset while retaining identity and incrementing the simple version.
+- **Reference in Place is the non-portable alternative.** The app stores the
+  original absolute path plus a security-scoped bookmark. The engine still
+  receives only a safe character-relative logical model token; editor metadata
+  maps that token to the project asset ID. Missing links require relinking.
+- **Rig-defining CAD defaults to copied.** Reimport/Replace copies a newer
+  source over the managed `assets/models/` file while retaining asset identity
+  and incrementing the simple part version.
 - **Move is never an import choice.** Import must not destructively reorganize
   an operator's source library. A separate explicit Finder/export operation can
   move files if the operator requests it.
@@ -144,12 +142,14 @@ canonical `.character.anima` file.
 The `.character.anima` / `.scene.anima` are the **engine's** canonical,
 portable documents — a character runs on the robot standalone. The
 app's view state (connector-inference cache, layout, thumbnails, the
-revision counter) lives in `project.json` / `*.editor.json`, **never in
-the `.anima`**. This is the "engine owns `.anima`, app owns editor
-metadata" policy (`Studio_Bridge.md`) made physical, and it keeps the
-format shareable. Asset references inside a `.character.anima` are
-**relative to the character folder** (`assets/head.stl`) so the
-character is portable.
+revision counter, and Project-asset identity mapping) lives in `project.json`
+/ `*.editor.json`, **never in the `.anima`**. This is the "engine owns
+`.anima`, app owns editor metadata" policy (`Studio_Bridge.md`) made physical.
+Asset references inside a Project Character's `.character.anima` are safe,
+relative logical tokens such as `assets/head.stl`; Studio resolves each token
+through editor metadata to the Project asset or external bookmark. Exporting a
+standalone Character copies its dependencies beside the canonical file so the
+export — rather than the editable Project internals — is self-contained.
 
 ## Save / Open / Save As flows
 
@@ -165,13 +165,14 @@ character is portable.
   app-scoped security bookmark; subsequent panels open there directly. Existing
   preferences for the former `Anima Studio` default are migrated to
   `AnimaStudio`; operator-selected custom roots are preserved.
-- **Import model** → copy the STEP/STP/STL/OBJ/USD into the active
-  character's `assets/`, and set the imported part's `model` to the
-  copied file's path **relative to the character folder**
+- **Import model** → copy the STEP/STP/STL/OBJ/USD into project
+  `assets/models/` by default (or keep a bookmarked Reference in Place), and
+  set the imported part's `model` to a safe character-relative logical token
   (`assets/<file>`), plus a `model_node` when the part is one node of a
-  multi-node file. Both resolve against `characters/<name>/assets/` and
-  are opaque to the engine — it round-trips the strings and never parses
-  the mesh (see the Parts section of `Character_Format.md`). A multi-file
+  multi-node file. The adjacent editor metadata maps that token to a stable
+  project asset ID; the app resolves the ID to the copied or external URL.
+  Tokens are opaque to the engine — it round-trips the strings and never
+  parses the mesh (see the Parts section of `Character_Format.md`). A multi-file
   assembly gives each part its own `model`; a single multi-node USD gives
   several parts a shared `model` with distinct `model_node`s. A multi-node STEP
   follows the same pattern: Open CASCADE/XDE supplies assembly-node names and
@@ -198,6 +199,11 @@ character is portable.
 - **Open** → read `project.json` → for each character, load its
   `.character.anima` through the engine (`load_character`, exists) and
   restore view state from `*.editor.json`.
+- **Save Assembly** → write a versioned, reusable
+  `assets/assemblies/<name>.animasm` document containing Part/sub-assembly
+  references. The Rig Asset Library discovers these files directly and can
+  import one into another assembly; the document layer migrates legacy demo
+  assembly JSON into the current format on read.
 - **Recents** → the gallery tracks project-folder paths (security-scoped
   bookmarks), reading name/revision/thumbnail from each `project.json`.
 

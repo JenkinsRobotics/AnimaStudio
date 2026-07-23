@@ -49,6 +49,8 @@ struct UIDevWorkspaceView: View {
       UIDevVariantBoardView()
     } else if selectedSection == .nodes {
       NodeWorkspaceView()
+    } else if selectedSection == .designSandbox {
+      StudioDesignSandboxCanvas()
     } else if selectedSection == .referenceWidgets {
       UIDevReferenceWidgetsView()
     } else if selectedSection == .designKit {
@@ -109,7 +111,8 @@ struct UIDevWorkspaceView: View {
   @ViewBuilder
   private var sectionContent: some View {
     switch selectedSection {
-    case .templateMatrix, .variantBoard, .nodes, .referenceWidgets, .designKit, .demoUIKit:
+    case .templateMatrix, .variantBoard, .nodes, .designSandbox, .referenceWidgets, .designKit,
+      .demoUIKit:
       EmptyView()
     case .navigator, .inspector, .timeline, .workspace3D: EmptyView()
     case .overview: overviewGallery

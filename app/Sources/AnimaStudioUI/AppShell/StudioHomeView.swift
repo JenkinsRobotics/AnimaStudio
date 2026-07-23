@@ -127,7 +127,7 @@ struct StudioHomeView: View {
       }
     }
     .background(StudioPalette.canvas)
-    .foregroundStyle(.white)
+    .foregroundStyle(StudioPalette.ink)
     .onAppear { visibleRecents = refreshProjects() }
     .onChange(of: recentProjects) { _, projects in visibleRecents = projects }
   }
@@ -161,7 +161,7 @@ struct StudioHomeView: View {
                 .font(.system(size: 12, weight: section == item ? .semibold : .regular))
               Spacer(minLength: 0)
             }
-            .foregroundStyle(section == item ? Color.white : StudioPalette.muted)
+            .foregroundStyle(section == item ? StudioPalette.ink : StudioPalette.muted)
             .padding(.horizontal, 9)
             .padding(.vertical, 7)
             .background(
@@ -459,7 +459,7 @@ struct StudioHomeView: View {
       Text(title).font(.system(size: 12, weight: .medium))
       Spacer(minLength: 0)
     }
-    .foregroundStyle(Color.white)
+    .foregroundStyle(StudioPalette.ink)
     .padding(.horizontal, 14)
     .frame(height: 42)
     .background(StudioPalette.panel, in: RoundedRectangle(cornerRadius: 10))

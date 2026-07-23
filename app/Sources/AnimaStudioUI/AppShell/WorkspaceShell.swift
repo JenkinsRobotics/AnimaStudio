@@ -24,6 +24,14 @@ enum StudioToolDensity: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
+  var detail: String {
+    switch self {
+    case .compact: "Icons only"
+    case .standard: "Icons and labels"
+    case .expanded: "Grouped, with headings"
+    }
+  }
+
   var usesGroupedMenus: Bool { self != .expanded }
   var usesVisualCategoryPalette: Bool { self == .compact }
 }
@@ -68,15 +76,81 @@ enum StudioSidebarSide: String, Sendable {
   case trailing
 }
 
+/// User-adjustable chrome shape. Squarer corners read more like a pro tool;
+/// fully-rounded pills read softer. Applied to floating rails, panels, and the
+/// tool bar. ponytail: three presets cover the taste range; add a raw slider
+/// only if someone actually asks.
+enum StudioChromeShape: String, CaseIterable, Identifiable, Sendable {
+  case square = "Square"
+  case soft = "Soft"
+  case rounded = "Rounded"
+
+  var id: Self { self }
+
+  var systemImage: String {
+    switch self {
+    case .square: "square"
+    case .soft: "app.dashed"
+    case .rounded: "app.fill"
+    }
+  }
+
+  var detail: String {
+    switch self {
+    case .square: "Crisp corners"
+    case .soft: "Lightly rounded"
+    case .rounded: "Full pill"
+    }
+  }
+
+  /// Corner radius for panels/rails.
+  var panelRadius: CGFloat {
+    switch self {
+    case .square: 5
+    case .soft: 10
+    case .rounded: 16
+    }
+  }
+
+  /// Whether the tool bar reads as a full-height pill.
+  var toolBarIsPill: Bool { self == .rounded }
+
+  /// Non-pill tool-bar corner radius.
+  var toolBarRadius: CGFloat {
+    switch self {
+    case .square: 7
+    case .soft: 12
+    case .rounded: 12
+    }
+  }
+}
+
 @MainActor
 @Observable
 final class StudioToolSettings {
   static let shared = StudioToolSettings()
-  static let defaultDensity = StudioToolDensity.expanded
+  static let defaultDensity = StudioToolDensity.standard
 
-  var density = defaultDensity
+  @ObservationIgnored private let defaults: UserDefaults
+
+  var density: StudioToolDensity {
+    didSet { defaults.set(density.rawValue, forKey: StudioPreferenceKey.toolDensity) }
+  }
+  var chromeShape: StudioChromeShape {
+    didSet { defaults.set(chromeShape.rawValue, forKey: StudioPreferenceKey.chromeShape) }
+  }
   var activeCategoryByWorkspace: [StudioWorkspaceKind: String] = [:]
   var openCompactGroupByWorkspace: [StudioWorkspaceKind: String] = [:]
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+    self.density =
+      StudioToolDensity(rawValue: defaults.string(forKey: StudioPreferenceKey.toolDensity) ?? "")
+      ?? Self.defaultDensity
+    self.chromeShape =
+      StudioChromeShape(rawValue: defaults.string(forKey: StudioPreferenceKey.chromeShape) ?? "")
+      ?? .soft
+  }
 
   func activeCategory(for workspace: StudioWorkspaceKind, fallback: String) -> String {
     activeCategoryByWorkspace[workspace] ?? fallback
@@ -286,6 +360,8 @@ enum StudioViewportDisplayMode: String, CaseIterable, Identifiable, Sendable {
 final class StudioViewSidebarState {
   static let shared = StudioViewSidebarState()
 
+  @ObservationIgnored private let defaults: UserDefaults
+
   let panels = StudioPanelStackState(
     order: StudioViewSidebarTab.allCases.map(\.rawValue),
     defaults: [],
@@ -294,9 +370,18 @@ final class StudioViewSidebarState {
   var navigationMode = StudioCameraNavigationMode.select
   var viewPreset = "Standard"
   var showsHiddenEdges = true
-  var showsOrigin = true
+  var showsOrigin: Bool {
+    didSet { defaults.set(showsOrigin, forKey: StudioPreferenceKey.viewportShowsOrigin) }
+  }
   var keepsImportedColors = true
   var opacity = 1.0
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+    self.showsOrigin =
+      defaults.object(forKey: StudioPreferenceKey.viewportShowsOrigin) as? Bool
+      ?? true
+  }
 
   var selectedTab: StudioViewSidebarTab {
     get { StudioViewSidebarTab(rawValue: panels.focusedID ?? "") ?? .view }
@@ -506,9 +591,11 @@ enum StudioWorkspaceSidebarCatalog {
   static func tabs(for workspace: StudioWorkspaceKind) -> [StudioWorkspaceSidebarTab] {
     switch workspace {
     case .assets:
-      [
-        tab("Characters", "person.2"), tab("Collections", "square.stack.3d.up"),
-      ]
+      // First tab is the full character profile; each following tab is one
+      // collection's own file list (Parts · Source Assets · Renders · Assemblies
+      // · Scripts · Animations). Each panel is bound to its own tab.
+      [tab("Characters", "person.2")]
+        + AssetBuilderCollection.allCases.map { tab($0.title, $0.systemImage) }
     case .rig:
       [
         tab("Components", "cube"), tab("Mates", "link"),
@@ -768,9 +855,12 @@ struct SidebarChrome: ViewModifier {
     if docked {
       content.background(StudioPalette.panel)
     } else {
+      // Adaptive panel fill (like the ViewCube backer) instead of a translucent
+      // material — a material floating over the dark 3D always reads dark and
+      // won't follow light/dark. This mirrors the app appearance.
       content
         .background(
-          .regularMaterial,
+          StudioPalette.panel.opacity(0.92),
           in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
         .overlay {
@@ -819,7 +909,7 @@ private struct StudioStackRail: View {
     }
     .padding(5)
     .frame(maxHeight: docked ? .infinity : nil, alignment: docked ? .top : .center)
-    .sidebarChrome(docked: docked)
+    .sidebarChrome(docked: docked, cornerRadius: StudioToolSettings.shared.chromeShape.panelRadius)
   }
 }
 
@@ -833,6 +923,7 @@ struct StudioToolSidebar: View {
 
   private var settings: StudioToolSettings { .shared }
   private var state: StudioToolState { .shared }
+  @State private var showSettings = false
 
   private var density: StudioToolDensity {
     StudioToolDensity.resolved(preference: settings.density, docked: docked)
@@ -867,10 +958,14 @@ struct StudioToolSidebar: View {
       alignment: .leading
     )
     .frame(height: StudioToolBarSizing.height(for: density))
-    .sidebarChrome(
-      docked: docked,
-      cornerRadius: StudioToolBarSizing.height(for: density) / 2
-    )
+    .sidebarChrome(docked: docked, cornerRadius: toolBarCornerRadius)
+  }
+
+  private var toolBarCornerRadius: CGFloat {
+    let shape = settings.chromeShape
+    return shape.toolBarIsPill
+      ? StudioToolBarSizing.height(for: density) / 2
+      : shape.toolBarRadius
   }
 
   private var categoryStrip: some View {
@@ -902,7 +997,10 @@ struct StudioToolSidebar: View {
 
   @ViewBuilder
   private var toolRow: some View {
-    if density == .expanded {
+    // Only the docked ribbon fills its container; a floating bar hugs its
+    // content at every density (matches the demo — expanded no longer stretches
+    // full-width with dead space).
+    if density == .expanded && docked {
       ScrollView(.horizontal) {
         toolGroupRow
       }
@@ -986,9 +1084,9 @@ struct StudioToolSidebar: View {
         Text(tool.title)
           .font(.system(size: 11, weight: .medium))
           .lineLimit(1)
-          .foregroundStyle(active ? Color.white : Color.white.opacity(0.62))
+          .foregroundStyle(active ? Color.white : StudioPalette.muted)
       }
-      .foregroundStyle(active ? Color.white : Color.white.opacity(0.9))
+      .foregroundStyle(active ? Color.white : StudioPalette.ink)
       .frame(width: 66, height: 50)
       .background(
         active ? StudioPalette.accent : Color.clear,
@@ -1077,7 +1175,7 @@ struct StudioToolSidebar: View {
             .font(.system(size: 10, weight: .bold))
         }
       }
-      .foregroundStyle(active ? StudioPalette.accent : Color.white.opacity(0.88))
+      .foregroundStyle(active ? StudioPalette.accent : StudioPalette.ink)
       .padding(.horizontal, 10)
       .padding(.vertical, 6)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -1105,10 +1203,10 @@ struct StudioToolSidebar: View {
           .font(.system(size: compact ? 14 : 16, weight: .medium))
         if !compact {
           Text(tool.title).font(.system(size: 9.5, weight: .medium)).lineLimit(1)
-            .foregroundStyle(active ? Color.white : Color.white.opacity(0.62))
+            .foregroundStyle(active ? Color.white : StudioPalette.muted)
         }
       }
-      .foregroundStyle(active ? Color.white : Color.white.opacity(0.9))
+      .foregroundStyle(active ? Color.white : StudioPalette.ink)
       .frame(width: compact ? 34 : 56, height: compact ? 34 : 48)
       .background(
         active ? StudioPalette.accent : Color.clear,
@@ -1129,27 +1227,91 @@ struct StudioToolSidebar: View {
     true
   }
 
+  // The ··· button — a styled popover carrying tool-bar density + chrome shape,
+  // matching the demo. Replaces the cramped native menu whose glyph read wrong.
   private var densityMenu: some View {
-    Menu {
-      Section("Tool density") {
-        ForEach(StudioToolDensity.allCases) { density in
-          Button {
-            settings.density = density
-          } label: {
-            Label(
-              density.rawValue,
-              systemImage: settings.density == density ? "checkmark" : density.systemImage
-            )
-          }
-        }
-      }
+    Button {
+      showSettings.toggle()
     } label: {
       Image(systemName: "ellipsis")
-        .frame(width: 30, height: density == .compact ? 34 : 48)
+        .font(.system(size: 14, weight: .medium))
+        .foregroundStyle(StudioPalette.muted)
+        .frame(width: 30, height: density == .compact ? 34 : 50)
+        .contentShape(Rectangle())
     }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.hidden)
-    .help("Tool sidebar density")
+    .buttonStyle(.plain)
+    .help("Tool bar density and shape")
+    .popover(isPresented: $showSettings, arrowEdge: .bottom) {
+      VStack(alignment: .leading, spacing: 2) {
+        settingsCaption("DENSITY")
+        ForEach(StudioToolDensity.allCases) { option in
+          settingsRow(
+            title: option.rawValue,
+            detail: option.detail,
+            systemImage: option.systemImage,
+            isOn: settings.density == option
+          ) { settings.density = option }
+        }
+        Divider().overlay(StudioPalette.border).padding(.vertical, 4)
+        settingsCaption("SHAPE")
+        ForEach(StudioChromeShape.allCases) { option in
+          settingsRow(
+            title: option.rawValue,
+            detail: option.detail,
+            systemImage: option.systemImage,
+            isOn: settings.chromeShape == option
+          ) { settings.chromeShape = option }
+        }
+      }
+      .padding(6)
+      .frame(width: 232)
+    }
+  }
+
+  private func settingsCaption(_ text: String) -> some View {
+    Text(text)
+      .font(.system(size: 9.5, weight: .semibold))
+      .tracking(0.6)
+      .foregroundStyle(StudioPalette.muted)
+      .padding(.horizontal, 10)
+      .padding(.top, 5)
+  }
+
+  private func settingsRow(
+    title: String,
+    detail: String,
+    systemImage: String,
+    isOn: Bool,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button {
+      withAnimation(.easeOut(duration: 0.18)) { action() }
+    } label: {
+      HStack(spacing: 10) {
+        Image(systemName: systemImage)
+          .font(.system(size: 12))
+          .frame(width: 20)
+          .foregroundStyle(isOn ? StudioPalette.accent : StudioPalette.muted)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(title).font(.system(size: 12.5)).foregroundStyle(StudioPalette.ink)
+          Text(detail).font(.system(size: 10)).foregroundStyle(StudioPalette.muted)
+        }
+        Spacer(minLength: 12)
+        if isOn {
+          Image(systemName: "checkmark")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(StudioPalette.accent)
+        }
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .background(
+        isOn ? StudioPalette.accent.opacity(0.10) : Color.clear,
+        in: RoundedRectangle(cornerRadius: 7)
+      )
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
   }
 
   private func activate(_ tool: StudioToolDescriptor) {
@@ -1163,7 +1325,7 @@ struct StudioToolPromptBar: View {
   var body: some View {
     HStack(spacing: 8) {
       Image(systemName: state.armedTool?.systemImage ?? "cursorarrow")
-        .foregroundStyle(Color.white)
+        .foregroundStyle(StudioPalette.ink)
         .frame(width: 22, height: 22)
         .background(StudioPalette.accent, in: RoundedRectangle(cornerRadius: 6))
       Text(state.prompt).font(.system(size: 11.5, weight: .medium))
@@ -1247,16 +1409,31 @@ private struct StudioPanelSidebar<Content: View>: View {
           // during both the opening and closing animation on either side.
           .zIndex(StudioSidebarMotion.railLayer)
         if !state.stacked.isEmpty {
-          stackColumn(docked: false, maxContentHeight: panelMax)
-            .frame(maxHeight: .infinity, alignment: .center)
-            .padding(
-              panelsOnOuterEdge ? [] : edgePadding,
-              StudioSidebarSizing.railWidth + 10
-            )
-            .transition(StudioSidebarMotion.panelTransition(for: state.side))
-            .zIndex(StudioSidebarMotion.stackLayer)
+          // Scroll when the open panels overflow the window; stay centered when
+          // they fit (minHeight = viewport, centered content → no scroll until
+          // the stack is taller than the canvas, then it scrolls).
+          ScrollView(.vertical) {
+            stackColumn(docked: false, maxContentHeight: panelMax)
+              .frame(minHeight: geo.size.height, alignment: .center)
+          }
+          .frame(maxHeight: .infinity)
+          .padding(
+            panelsOnOuterEdge ? [] : edgePadding,
+            StudioSidebarSizing.railWidth + 10
+          )
+          .transition(StudioSidebarMotion.panelTransition(for: state.side))
+          .zIndex(StudioSidebarMotion.stackLayer)
         }
       }
+      // A GeometryReader pins its child to the top-leading corner. With no panel
+      // open the ZStack hugs the ~44pt rail, so without this it would always land
+      // on the LEFT — putting the trailing (view) sidebar on the wrong edge in
+      // floating mode. Fill the width and pin to the sidebar's real edge.
+      .frame(
+        maxWidth: .infinity,
+        maxHeight: .infinity,
+        alignment: state.side == .leading ? .leading : .trailing
+      )
     }
     .frame(maxHeight: .infinity)
   }
@@ -1279,6 +1456,9 @@ private struct StudioPanelSidebar<Content: View>: View {
     .coordinateSpace(name: spaceName)
     .onPreferenceChange(StudioPanelCardMidpointKey.self) { cardMidpoints = $0 }
 
+    // Docked fills its in-flow column and top-aligns. Floating hugs its content
+    // so the caller can center the whole stack vertically (cards stay tight
+    // together — the maxContentHeight cap keeps a tall panel from ballooning).
     return Group {
       if docked {
         ScrollView { cards }
@@ -1297,11 +1477,16 @@ private struct StudioPanelSidebar<Content: View>: View {
       .transition(.opacity)
   }
 
-  private func panelCard(_ id: String, docked: Bool, maxContentHeight: CGFloat? = nil) -> some View {
+  private func panelCard(_ id: String, docked: Bool, maxContentHeight: CGFloat? = nil) -> some View
+  {
     let lifted = state.draggingID == id
     return content(id)
       .frame(width: panelWidth)
       .frame(maxHeight: docked ? nil : maxContentHeight, alignment: .top)
+      // Floating cards hug their content (up to the cap) instead of ballooning
+      // to the full maxContentHeight — otherwise a short panel leaves dead space
+      // that reads as a large gap in the stack. Matches the demo's StackCard.
+      .fixedSize(horizontal: false, vertical: !docked)
       .environment(\.studioPanelSurfaceMode, docked ? .docked : .floating)
       .background {
         GeometryReader { geometry in
@@ -1841,154 +2026,5 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
     case .leading: .leading
     case .trailing: .trailing
     }
-  }
-}
-
-// MARK: - Presentation cards used by the right sidebar
-
-struct StudioViewportSidebarBindings {
-  let renderStyle: Binding<ViewportRenderStyle>
-  let edgeDisplay: Binding<ViewportEdgeDisplay>
-  let showsGrid: Binding<Bool>
-  let showsShadows: Binding<Bool>
-  let lightingIntensity: Binding<Double>
-  let appearance: Binding<PreviewAppearance>
-}
-
-struct StudioViewSidebarPanel<Inspector: View>: View {
-  let tab: StudioViewSidebarTab
-  let viewport: StudioViewportSidebarBindings
-  @ViewBuilder let inspector: Inspector
-  @Environment(\.studioPanelSurfaceMode) private var surfaceMode
-  private var state: StudioViewSidebarState { .shared }
-
-  var body: some View {
-    if tab == .inspector {
-      inspector
-    } else {
-      VStack(alignment: .leading, spacing: 0) {
-        WorkspacePanelHeader(title: tab.rawValue, systemImage: tab.systemImage)
-        VStack(alignment: .leading, spacing: 11) {
-          switch tab {
-          case .view: viewControls
-          case .environment: environmentControls
-          case .appearance: appearanceControls
-          case .inspector: EmptyView()
-          }
-        }
-        .padding(12)
-        if surfaceMode == .docked { Spacer(minLength: 0) }
-      }
-      .studioPanelSurface()
-    }
-  }
-
-  private var viewControls: some View {
-    Group {
-      Picker("View", selection: Binding(get: { state.viewPreset }, set: { state.viewPreset = $0 }))
-      {
-        ForEach(["Standard", "Isometric", "Front", "Top", "Right"], id: \.self) { Text($0) }
-      }
-      .controlSize(.small)
-
-      Text("DISPLAY").studioSidebarCaption()
-      HStack(spacing: 5) {
-        ForEach(StudioViewportDisplayMode.allCases) { mode in
-          Button {
-            displayMode.wrappedValue = mode
-          } label: {
-            Image(systemName: mode.systemImage)
-              .frame(width: 34, height: 30)
-              .background(
-                displayMode.wrappedValue == mode
-                  ? StudioPalette.accent : StudioPalette.panelInset,
-                in: RoundedRectangle(cornerRadius: 7)
-              )
-          }
-          .buttonStyle(.plain)
-          .help(mode.rawValue)
-        }
-      }
-      Toggle(
-        "Show hidden edges",
-        isOn: Binding(get: { state.showsHiddenEdges }, set: { state.showsHiddenEdges = $0 })
-      )
-      .controlSize(.small)
-
-      Divider()
-      Text("CAMERA NAVIGATION").studioSidebarCaption()
-      HStack(spacing: 4) {
-        ForEach(StudioCameraNavigationMode.allCases) { mode in
-          Button {
-            state.selectNavigation(mode)
-          } label: {
-            Image(systemName: mode.systemImage)
-              .frame(width: 32, height: 28)
-              .background(
-                state.navigationMode == mode ? StudioPalette.accent : StudioPalette.panelInset,
-                in: RoundedRectangle(cornerRadius: 7)
-              )
-          }
-          .buttonStyle(.plain)
-          .help("\(mode.rawValue) camera")
-        }
-      }
-    }
-  }
-
-  private var environmentControls: some View {
-    Group {
-      Text("SCENE").studioSidebarCaption()
-      Toggle("Grid", isOn: viewport.showsGrid)
-      Toggle("Origin", isOn: Binding(get: { state.showsOrigin }, set: { state.showsOrigin = $0 }))
-      Toggle("Ground shadow", isOn: viewport.showsShadows)
-      Text("KEY LIGHT").studioSidebarCaption()
-      Slider(value: viewport.lightingIntensity, in: 0.1...3)
-    }
-    .controlSize(.small)
-  }
-
-  private var appearanceControls: some View {
-    Group {
-      Picker(
-        "Theme",
-        selection: viewport.appearance
-      ) {
-        ForEach(PreviewAppearance.allCases) { appearance in
-          Text(appearance.title).tag(appearance)
-        }
-      }
-      .controlSize(.small)
-      Toggle("Show edges", isOn: showsEdges)
-      Toggle(
-        "Keep imported colors",
-        isOn: Binding(get: { state.keepsImportedColors }, set: { state.keepsImportedColors = $0 })
-      )
-      Text("OPACITY").studioSidebarCaption()
-      Slider(value: Binding(get: { state.opacity }, set: { state.opacity = $0 }), in: 0.2...1)
-    }
-    .controlSize(.small)
-  }
-
-  private var displayMode: Binding<StudioViewportDisplayMode> {
-    Binding(
-      get: { StudioViewportDisplayMode.resolve(renderStyle: viewport.renderStyle.wrappedValue) },
-      set: { viewport.renderStyle.wrappedValue = $0.renderStyle }
-    )
-  }
-
-  private var showsEdges: Binding<Bool> {
-    Binding(
-      get: { viewport.edgeDisplay.wrappedValue != .hidden },
-      set: { viewport.edgeDisplay.wrappedValue = $0 ? .mesh : .hidden }
-    )
-  }
-}
-
-extension View {
-  fileprivate func studioSidebarCaption() -> some View {
-    font(.system(size: 9.5, weight: .semibold))
-      .tracking(0.6)
-      .foregroundStyle(StudioPalette.muted)
   }
 }

@@ -173,6 +173,10 @@ final class StudioWorkspaceModel {
   ) {
     self.project = project
     self.activeWorkspace = startupWorkspace
+    let preferredFrameRate = UserDefaults.standard.double(
+      forKey: StudioPreferenceKey.projectDefaultFrameRate
+    )
+    self.timelineDisplayFramesPerSecond = preferredFrameRate > 0 ? Int(preferredFrameRate) : 30
     self.animaCoreClient =
       animaCoreClient
       ?? (resolvesDefaultAnimaCoreClient ? (try? AnimaCoreClient()) : nil)

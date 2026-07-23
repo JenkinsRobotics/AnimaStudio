@@ -19,6 +19,24 @@ import SwiftUI
   /// Panel stacks sit on the OUTER edge (rail pushed inboard) instead of the
   /// default inboard position (rail on the edge, panels toward the centre).
   var panelsOnOuterEdge = false
+  /// Dev overlay: draw the layout regions (edges + the visible content zone).
+  var showZones = false
+}
+
+// MARK: - Content-safe zone
+
+/// The inset from the window edges to the "visible zone" — the region center
+/// CONTENT (tables, galleries, HUDs) must stay inside so nothing hides under the
+/// floating chrome. Full-bleed layers (the 3D viewport) ignore it. The scaffold
+/// computes this from the open rails/panels and injects it here.
+struct ContentInsetsKey: EnvironmentKey {
+  static let defaultValue = EdgeInsets()
+}
+extension EnvironmentValues {
+  var contentInsets: EdgeInsets {
+    get { self[ContentInsetsKey.self] }
+    set { self[ContentInsetsKey.self] = newValue }
+  }
 }
 
 // Whole-app layout presets — flip every panel + ribbon between floating / docked

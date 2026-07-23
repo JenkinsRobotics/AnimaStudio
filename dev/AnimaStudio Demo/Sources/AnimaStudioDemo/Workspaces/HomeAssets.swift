@@ -501,7 +501,10 @@ struct CharacterWorkspace: View {
       toolArmGroup: CharacterTools.armGroup,
       leftTabs: [SidebarTab("Characters", "person.crop.square")]
         + CharacterSection.allCases.map { SidebarTab($0.rawValue, $0.icon) },
-      leftPanels: model.characterPanels
+      leftPanels: model.characterPanels,
+      centerTabs: [SidebarTab("3D", "cube"), SidebarTab("Gallery", "square.grid.2x2"),
+                   SidebarTab("Table", "list.bullet")],
+      centerSelection: Binding(get: { model.centerView }, set: { model.centerView = $0 })
     ) {
       center
     } left: { tab in
@@ -761,13 +764,17 @@ struct CharacterWorkspace: View {
   // MARK: Center
 
   private var center: some View {
-    // Just the viewport now — the scaffold draws the tool sidebar; Display,
-    // Environment, Visualization, Performance and Fit live in the ViewSidebar.
+    // Two layers: the 3D viewport is FULL-BLEED (reads fine behind panels); the
+    // Gallery/Table content sits inside the visible zone (contentInsets) so it
+    // never hides under the floating chrome.
     ZStack {
       if let part = model.selected {
         EngineViewport(document: part.document, assetName: part.name)
       } else {
         EmptyStage(status: model.status, importAction: { model.importFiles() })
+      }
+      if model.centerView != "3D" {
+        PartsCenterView(mode: model.centerView)
       }
     }
   }
@@ -868,4 +875,124 @@ enum CharacterTools {
 
   static let overflow: [RibbonTool] = []
   static let armGroup = RibbonGroup("Character", "person.crop.square", .accentColor, [])
+}
+
+// MARK: - Center content: parts as a gallery or a table
+
+/// The Character center in Gallery/Table mode. Lives inside the visible zone —
+/// it reads `contentInsets` from the scaffold so it never slides under the
+/// floating rails, panels, tool bar, or the bottom switcher.
+struct PartsCenterView: View {
+  let mode: String
+  @Environment(\.contentInsets) private var insets
+  private var model: DemoModel { DemoModel.shared }
+
+  var body: some View {
+    Group {
+      if mode == "Gallery" { gallery } else { table }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(UI.stroke, lineWidth: 1))
+    .padding(insets)          // constrained to the visible zone
+  }
+
+  private var header: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
+      Text(model.projectName + " · Parts").font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(UI.text)
+      Text("\(model.parts.count) parts").font(.system(size: 11)).foregroundStyle(UI.text3)
+      Spacer()
+    }.padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+  }
+
+  private var gallery: some View {
+    VStack(spacing: 0) {
+      header
+      Divider().overlay(UI.stroke)
+      ScrollView {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 14)], spacing: 14) {
+          ForEach(model.parts) { part in
+            Button { model.selectedID = part.id } label: { tile(part) }.buttonStyle(.plain)
+          }
+        }.padding(16)
+      }
+    }
+  }
+
+  private func tile(_ part: ImportedPart) -> some View {
+    let sel = model.selectedID == part.id
+    return VStack(spacing: 0) {
+      ZStack {
+        RoundedRectangle(cornerRadius: 8).fill(UI.panelHi)
+        Image(systemName: "cube").font(.system(size: 30, weight: .light)).foregroundStyle(UI.text3)
+      }
+      .frame(height: 104)
+      .overlay(alignment: .topTrailing) {
+        Text("\(part.document.triangleCount) tris").font(.system(size: 9, design: .monospaced))
+          .foregroundStyle(UI.text3).padding(6)
+      }
+      VStack(alignment: .leading, spacing: 1) {
+        Text(part.name).font(.system(size: 12, weight: .medium)).foregroundStyle(UI.text).lineLimit(1)
+        Text("\(part.document.faces.count) faces").font(.system(size: 10)).foregroundStyle(UI.text3)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+    }
+    .background(UI.panel, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+      .stroke(sel ? UI.accent : UI.stroke, lineWidth: sel ? 2 : 1))
+  }
+
+  private var table: some View {
+    VStack(spacing: 0) {
+      header
+      Divider().overlay(UI.stroke)
+      // Column header.
+      tableRow(["PART", "TYPE", "MATERIAL", "FACES", "TRIS", "SIZE (mm)"], header: true, sel: false) { }
+      Divider().overlay(UI.stroke)
+      ScrollView {
+        LazyVStack(spacing: 0) {
+          ForEach(model.parts) { part in
+            tableRow([part.name, "Solid body", "—",
+                      "\(part.document.faces.count)", "\(part.document.triangleCount)", "—"],
+                     header: false, sel: model.selectedID == part.id) {
+              model.selectedID = part.id
+            }
+            Divider().overlay(UI.stroke.opacity(0.5))
+          }
+        }
+      }
+    }
+  }
+
+  private func tableRow(_ cols: [String], header: Bool, sel: Bool,
+    onTap: @escaping () -> Void) -> some View
+  {
+    HStack(spacing: 0) {
+      cell(cols[0], width: nil, header: header, strong: !header)
+      cell(cols[1], width: 120, header: header)
+      cell(cols[2], width: 120, header: header)
+      cell(cols[3], width: 80, header: header, mono: !header, trailing: true)
+      cell(cols[4], width: 96, header: header, mono: !header, trailing: true)
+      cell(cols[5], width: 130, header: header)
+    }
+    .padding(.horizontal, 16).padding(.vertical, header ? 8 : 9)
+    .background(sel ? UI.accent.opacity(0.16) : .clear)
+    .contentShape(Rectangle())
+    .onTapGesture { onTap() }
+  }
+
+  private func cell(_ text: String, width: CGFloat?, header: Bool,
+    strong: Bool = false, mono: Bool = false, trailing: Bool = false) -> some View
+  {
+    Text(text)
+      .font(.system(size: header ? 9.5 : 12,
+        weight: header ? .semibold : (strong ? .medium : .regular),
+        design: mono ? .monospaced : .default))
+      .tracking(header ? 0.5 : 0)
+      .foregroundStyle(header ? UI.text3 : (strong ? UI.text : UI.text2))
+      .lineLimit(1)
+      .frame(width: width, alignment: trailing ? .trailing : .leading)
+      .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+  }
 }

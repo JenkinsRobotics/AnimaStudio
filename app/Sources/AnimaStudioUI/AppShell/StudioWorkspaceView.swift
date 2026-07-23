@@ -46,6 +46,9 @@ struct StudioWorkspaceView: View {
   @AppStorage(StudioPreferenceKey.defaultLayoutPreset) private var defaultLayoutPresetRawValue =
     StudioLayoutPreset.floating.rawValue
   @AppStorage(StudioPreferenceKey.showsStatusBar) private var showsStatusBar = true
+  @AppStorage(StudioPreferenceKey.projectAutosavesAfterImport) private var autosavesAfterImport =
+    true
+  @AppStorage(StudioPreferenceKey.viewportShowsViewCube) private var showsViewCube = true
   @AppStorage(StudioPreferenceKey.viewportNavigationProfile)
   private var viewportNavigationProfileRawValue =
     PreviewNavigationProfile.default.rawValue
@@ -103,6 +106,15 @@ struct StudioWorkspaceView: View {
   @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity = 1_200.0
   @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity = 900.0
   @AppStorage(StudioPreferenceKey.cadShowsTelemetry) private var cadShowsTelemetry = false
+  @AppStorage(StudioPreferenceKey.cadEdgeColorHex) private var cadEdgeColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadSelectedEdgeColorHex) private var cadSelectedEdgeColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadBackgroundColorHex) private var cadBackgroundColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadFaceSelectionColorHex) private
+    var cadFaceSelectionColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadNeutralColorHex) private var cadNeutralColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadKeyLightColorHex) private var cadKeyLightColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadFillLightColorHex) private var cadFillLightColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadRimLightColorHex) private var cadRimLightColorHex = ""
 
   init(
     session: Binding<StudioProjectSession>,
@@ -189,7 +201,7 @@ struct StudioWorkspaceView: View {
       }
     }
     .background(StudioPalette.canvas)
-    .preferredColorScheme(.dark)
+    .preferredColorScheme(StudioAppearanceMode.current.colorScheme)
     .animation(.spring(response: 0.30, dampingFraction: 0.90), value: workspace.ribbonPlacement)
     .animation(.spring(response: 0.30, dampingFraction: 0.90), value: showsWorkspaceGuide)
     .onExitCommand {
@@ -352,18 +364,33 @@ struct StudioWorkspaceView: View {
         workspaceSidebarContent(tab: tab)
       },
       right: { tab in
-        StudioViewSidebarPanel(
+        ConsolidatedViewportSidebarPanel(
           tab: tab,
-          viewport: StudioViewportSidebarBindings(
+          viewport: ConsolidatedViewportSidebarBindings(
+            workspace: workspace,
+            projection: cameraProjectionBinding,
             renderStyle: viewportRenderStyleBinding,
             edgeDisplay: viewportEdgeDisplayBinding,
-            showsGrid: Binding(
-              get: { workspace.showsPreviewGrid },
-              set: { workspace.showsPreviewGrid = $0 }
-            ),
+            lightingPreset: viewportLightingPresetBinding,
+            materialFinish: viewportMaterialFinishBinding,
+            reflectionMode: viewportReflectionModeBinding,
             showsShadows: $viewportShowsShadows,
+            showsGrid: previewGridBinding,
+            appearance: viewportAppearanceBinding,
+            fieldOfViewDegrees: viewportFieldOfViewBinding,
             lightingIntensity: $viewportLightingIntensity,
-            appearance: viewportAppearanceBinding
+            environmentPreset: viewportEnvironmentPresetBinding,
+            environmentRotationDegrees: $viewportEnvironmentRotationDegrees,
+            renderQuality: viewportRenderQualityBinding,
+            navigationProfile: viewportNavigationProfileBinding,
+            customRotateDrag: viewportCustomRotateDragBinding,
+            customPanDrag: viewportCustomPanDragBinding,
+            customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
+            orbitSpeed: viewportOrbitSpeedBinding,
+            panSpeed: viewportPanSpeedBinding,
+            zoomSpeed: viewportZoomSpeedBinding,
+            reversesWheelZoom: $viewportReversesWheelZoom,
+            openMouseSettings: openMouseSettings
           )
         ) {
           workspaceInspectorContent
@@ -411,7 +438,7 @@ struct StudioWorkspaceView: View {
         importAssembly: { summary in Task { await importAssembly(summary) } }
       )
     } else if workspace.activeWorkspace == .assets {
-      assetsWorkspaceView(surface: .workspaceSidebar)
+      assetsWorkspaceView(surface: .workspaceSidebar, sidebarTab: tab)
     } else if workspace.activeWorkspace == .design {
       StudioDesignSandboxBrowser(tab: tab)
     } else {
@@ -459,7 +486,16 @@ struct StudioWorkspaceView: View {
         )
       }
     default:
-      break
+      // The demo section rail tabs (Parts, Source Assets, Renders, Assemblies,
+      // Scripts, Animations) focus the assets panel on that character collection.
+      if let collection = AssetBuilderCollection.allCases.first(where: { $0.title == tab }),
+        let characterID = session.document.activeCharacter?.id
+      {
+        workspace.assetBuilderSelection = .characterCollection(
+          characterID: characterID,
+          collection: collection
+        )
+      }
     }
   }
 
@@ -617,12 +653,14 @@ struct StudioWorkspaceView: View {
 
   private func assetsWorkspaceView(
     surface: AssetsWorkspaceSurface,
-    centerLayoutMode: AssetBuilderLayoutMode? = nil
+    centerLayoutMode: AssetBuilderLayoutMode? = nil,
+    sidebarTab: String? = nil
   ) -> some View {
     AssetsWorkspaceView(
       workspace: workspace,
       surface: surface,
       centerLayoutMode: centerLayoutMode,
+      sidebarTab: sidebarTab,
       projectName: session.document.displayName,
       projectRevision: session.document.metadata.revision,
       characters: session.document.characters,
@@ -783,10 +821,8 @@ struct StudioWorkspaceView: View {
       }
       .frame(minWidth: 520, minHeight: 420)
 
-      viewportTitle
       if !usesDedicatedCADPipeline {
         cameraHUD
-        visualizationControl
       }
 
       if let engineEvaluationTimeSeconds = workspace.engineEvaluationTimeSeconds {
@@ -832,19 +868,6 @@ struct StudioWorkspaceView: View {
     }
   }
 
-  private var viewportTitle: some View {
-    HStack(spacing: 6) {
-      Image(systemName: workspace.activeWorkspace.descriptor.systemImage)
-      Text(workspace.activeWorkspace.descriptor.viewportLabel)
-    }
-    .font(.caption2.weight(.bold))
-    .tracking(1)
-    .foregroundStyle(StudioPalette.muted)
-    .padding(.horizontal, 10)
-    .padding(.vertical, 6)
-    .background(.ultraThinMaterial, in: Capsule())
-    .padding(.top, 12)
-  }
 
   private var cadRenderBackend: CADRenderBackend {
     CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .realityKit
@@ -908,7 +931,16 @@ struct StudioWorkspaceView: View {
   }
 
   private var cadViewportTheme: CADViewportTheme {
-    var theme = CADViewportTheme.named(cadThemeName)
+    var theme = CADViewportTheme.named(cadThemeName).applyingOverrides(
+      edgeHex: cadEdgeColorHex,
+      selectedEdgeHex: cadSelectedEdgeColorHex,
+      backgroundHex: cadBackgroundColorHex,
+      faceSelectionHex: cadFaceSelectionColorHex,
+      neutralHex: cadNeutralColorHex,
+      keyColorHex: cadKeyLightColorHex,
+      fillColorHex: cadFillLightColorHex,
+      rimColorHex: cadRimLightColorHex
+    )
     theme.overrideColor = cadPreservesImportedColors ? nil : theme.neutralColor
     theme.edgeStrength = cadShowsFeatureEdges ? Float(cadEdgeStrength) : 0
     theme.roughness = Float(cadRoughness)
@@ -946,56 +978,18 @@ struct StudioWorkspaceView: View {
   private var cameraHUD: some View {
     HStack {
       Spacer()
-      ViewportCameraHUD(
-        workspace: workspace,
-        projection: cameraProjectionBinding,
-        renderStyle: viewportRenderStyleBinding,
-        edgeDisplay: viewportEdgeDisplayBinding,
-        lightingPreset: viewportLightingPresetBinding,
-        materialFinish: viewportMaterialFinishBinding,
-        reflectionMode: viewportReflectionModeBinding,
-        showsShadows: $viewportShowsShadows,
-        showsGrid: previewGridBinding,
-        appearance: viewportAppearanceBinding,
-        fieldOfViewDegrees: viewportFieldOfViewBinding,
-        lightingIntensity: $viewportLightingIntensity,
-        environmentPreset: viewportEnvironmentPresetBinding,
-        environmentRotationDegrees: $viewportEnvironmentRotationDegrees,
-        renderQuality: viewportRenderQualityBinding,
-        navigationProfile: viewportNavigationProfileBinding,
-        customRotateDrag: viewportCustomRotateDragBinding,
-        customPanDrag: viewportCustomPanDragBinding,
-        customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
-        orbitSpeed: viewportOrbitSpeedBinding,
-        panSpeed: viewportPanSpeedBinding,
-        zoomSpeed: viewportZoomSpeedBinding,
-        reversesWheelZoom: $viewportReversesWheelZoom,
-        showMouseSettings: {
-          UserDefaults.standard.set(
-            StudioSettingsTab.navigation.rawValue,
-            forKey: StudioPreferenceKey.settingsSelectedTab
-          )
-          openSettings()
-        }
-      )
-      .padding(.trailing, showsFloatingInspector ? StudioMetrics.inspectorWidth + 32 : 16)
+      ViewportCameraHUD(workspace: workspace, showsViewCube: showsViewCube)
+        .padding(.trailing, showsFloatingInspector ? StudioMetrics.inspectorWidth + 32 : 16)
     }
     .padding(.top, 10)
   }
 
-  private var visualizationControl: some View {
-    ViewportVisualizationControl(
-      workspace: workspace,
-      lightingIntensity: $viewportLightingIntensity,
-      environmentPreset: viewportEnvironmentPresetBinding,
-      environmentRotationDegrees: $viewportEnvironmentRotationDegrees
+  private func openMouseSettings() {
+    UserDefaults.standard.set(
+      StudioSettingsTab.navigation.rawValue,
+      forKey: StudioPreferenceKey.settingsSelectedTab
     )
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-    .padding(
-      .leading,
-      showsFloatingNavigator ? StudioMetrics.navigatorWidth + 30 : 16
-    )
-    .padding(.bottom, 16)
+    openSettings()
   }
 
   private var showsInspector: Bool {
@@ -1774,7 +1768,7 @@ struct StudioWorkspaceView: View {
       )
       guard succeeded else {
         characterImportProgress = nil
-        if session.isDirty { _ = await saveProject() }
+        if autosavesAfterImport, session.isDirty { _ = await saveProject() }
         return
       }
     }
@@ -1783,7 +1777,7 @@ struct StudioWorkspaceView: View {
       totalFiles: requests.count,
       currentFilename: "Finishing assembly"
     )
-    let saved = await saveProject()
+    let saved = autosavesAfterImport ? await saveProject() : true
     characterImportProgress = nil
     guard saved else { return }
     showsCharacterLoadingStage = false

@@ -19,8 +19,8 @@ from __future__ import annotations
 import json
 import math
 import sys
-from dataclasses import dataclass, field
-from typing import IO
+from dataclasses import dataclass, field, replace
+from typing import IO, Callable
 
 import yaml
 
@@ -78,6 +78,12 @@ CAPABILITIES = [
     "solve_ik",
     "mate_types",
     "relation_types",
+    "add_mate",
+    "update_mate",
+    "remove_mate",
+    "add_relation",
+    "update_relation",
+    "remove_relation",
     "serialize_character",
     "serialize_scene",
     "release",
@@ -106,6 +112,10 @@ class Session:
 
     def get(self, handle: str) -> Rig | None:
         return self._rigs.get(handle)
+
+    def set(self, handle: str, rig: Rig) -> None:
+        """Replace the rig behind an existing handle (in-place authoring)."""
+        self._rigs[handle] = rig
 
     def drop(self, handle: str) -> bool:
         return self._rigs.pop(handle, None) is not None
@@ -903,6 +913,176 @@ def _serialize_scene(
     return _ok(request_id, {"text": text})
 
 
+# Rig authoring — mates + relations mutate the canonical rig (Studio_Bridge).
+# The engine owns mate/relation *meaning*: Studio sends the same joint/relation
+# DTO shapes it already parses in ``load_character``, the engine rebuilds and
+# re-validates the whole ``Rig`` (frozen dataclass ``__post_init__``), and
+# returns the updated summary. Studio never mutates rig semantics itself.
+
+
+def _rig_or_error(
+    session: Session, params: dict, request_id: object
+) -> tuple[Rig | None, str, dict | None]:
+    handle = _require_str(params, "handle")
+    rig = session.get(handle)
+    if rig is None:
+        return None, handle, _error(
+            request_id, "unknown_handle", f"no rig loaded as {handle!r}"
+        )
+    return rig, handle, None
+
+
+def _commit_rig(
+    session: Session,
+    handle: str,
+    build: "Callable[[], Rig]",
+    request_id: object,
+) -> dict:
+    """Build + re-validate a mutated rig, store it, return the summary.
+
+    ``Rig.__post_init__`` raises ``ValueError`` for a dangling part
+    reference, a self/duplicate-driven relation, etc.; that surfaces as a
+    ``format_error`` rather than crashing the loop.
+    """
+    try:
+        rig = build()
+    except (KeyError, ValueError, TypeError) as error:
+        return _error(request_id, "format_error", str(error), None)
+    session.set(handle, rig)
+    return _ok(request_id, {"handle": handle, "rig": _rig_summary(rig)})
+
+
+def _relation_from_dto(dto: dict) -> Relation:
+    return Relation(
+        kind=RelationKind(dto["kind"]),
+        driver=dto["driver"],
+        driven=dto["driven"],
+        ratio=dto["ratio"],
+        offset=dto.get("offset", 0.0),
+        display=dict(dto.get("display", {})),
+        suppressed=dto.get("suppressed", False),
+    )
+
+
+def _add_mate(session: Session, params: dict, request_id: object) -> dict:
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    joint_dto = params.get("joint")
+    if not isinstance(joint_dto, dict):
+        raise _BadRequest("'joint' must be an object")
+    name = joint_dto.get("name")
+    if name in rig.joints:
+        return _error(request_id, "bad_request", f"mate {name!r} already exists")
+    return _commit_rig(
+        session,
+        handle,
+        lambda: replace(
+            rig, joints={**rig.joints, joint_dto["name"]: _joint_from_dto(joint_dto)}
+        ),
+        request_id,
+    )
+
+
+def _update_mate(session: Session, params: dict, request_id: object) -> dict:
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    joint_dto = params.get("joint")
+    if not isinstance(joint_dto, dict):
+        raise _BadRequest("'joint' must be an object")
+    name = joint_dto.get("name")
+    if name not in rig.joints:
+        return _error(request_id, "bad_request", f"no mate named {name!r}")
+    return _commit_rig(
+        session,
+        handle,
+        lambda: replace(
+            rig, joints={**rig.joints, name: _joint_from_dto(joint_dto)}
+        ),
+        request_id,
+    )
+
+
+def _remove_mate(session: Session, params: dict, request_id: object) -> dict:
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    name = _require_str(params, "name")
+    if name not in rig.joints:
+        return _error(request_id, "bad_request", f"no mate named {name!r}")
+    remaining = {key: joint for key, joint in rig.joints.items() if key != name}
+    return _commit_rig(
+        session, handle, lambda: replace(rig, joints=remaining), request_id
+    )
+
+
+def _add_relation(session: Session, params: dict, request_id: object) -> dict:
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    relation_dto = params.get("relation")
+    if not isinstance(relation_dto, dict):
+        raise _BadRequest("'relation' must be an object")
+    driven = relation_dto.get("driven")
+    if any(relation.driven == driven for relation in rig.relations):
+        return _error(
+            request_id, "bad_request", f"dof {driven!r} is already driven"
+        )
+    return _commit_rig(
+        session,
+        handle,
+        lambda: replace(
+            rig, relations=rig.relations + (_relation_from_dto(relation_dto),)
+        ),
+        request_id,
+    )
+
+
+def _update_relation(session: Session, params: dict, request_id: object) -> dict:
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    relation_dto = params.get("relation")
+    if not isinstance(relation_dto, dict):
+        raise _BadRequest("'relation' must be an object")
+    driven = relation_dto.get("driven")
+    if not any(relation.driven == driven for relation in rig.relations):
+        return _error(request_id, "bad_request", f"no relation drives {driven!r}")
+
+    def build() -> Rig:
+        replacement = _relation_from_dto(relation_dto)
+        return replace(
+            rig,
+            relations=tuple(
+                replacement if relation.driven == driven else relation
+                for relation in rig.relations
+            ),
+        )
+
+    return _commit_rig(session, handle, build, request_id)
+
+
+def _remove_relation(session: Session, params: dict, request_id: object) -> dict:
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    driven = _require_str(params, "driven")
+    if not any(relation.driven == driven for relation in rig.relations):
+        return _error(request_id, "bad_request", f"no relation drives {driven!r}")
+    return _commit_rig(
+        session,
+        handle,
+        lambda: replace(
+            rig,
+            relations=tuple(
+                relation for relation in rig.relations if relation.driven != driven
+            ),
+        ),
+        request_id,
+    )
+
+
 def _release(session: Session, params: dict, request_id: object) -> dict:
     # Idempotent: dropping an unknown handle is not an error, so a client
     # can release freely without tracking exactly what the engine holds.
@@ -925,6 +1105,12 @@ _VERBS = {
     "solve_ik": _solve_ik,
     "mate_types": _mate_types,
     "relation_types": _relation_types,
+    "add_mate": _add_mate,
+    "update_mate": _update_mate,
+    "remove_mate": _remove_mate,
+    "add_relation": _add_relation,
+    "update_relation": _update_relation,
+    "remove_relation": _remove_relation,
     "serialize_character": _serialize_character,
     "serialize_scene": _serialize_scene,
     "release": _release,

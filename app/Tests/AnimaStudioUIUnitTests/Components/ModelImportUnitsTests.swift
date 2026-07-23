@@ -55,13 +55,24 @@ final class ModelImportUnitsTests: XCTestCase {
     XCTAssertFalse(usd.isUnitless)
   }
 
-  func testStagingDefaultsSTLToMillimetersAndOtherFormatsToMeters() {
-    let stl = ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/head.stl"))
-    let obj = ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/arm.obj"))
-    let usd = ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/robot.usdz"))
+  func testStagingUsesPreferredUnitForUnitlessModelsAndMetersForEmbeddedUnits() {
+    let suiteName = "ModelImportUnitsTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(
+      ModelImportUnit.centimeters.rawValue,
+      forKey: StudioPreferenceKey.projectDefaultImportUnit
+    )
 
-    XCTAssertEqual(stl.unit, .millimeters)
-    XCTAssertEqual(obj.unit, .meters)
+    let stl = ModelImportRequest.staged(
+      url: URL(fileURLWithPath: "/tmp/head.stl"), defaults: defaults)
+    let obj = ModelImportRequest.staged(
+      url: URL(fileURLWithPath: "/tmp/arm.obj"), defaults: defaults)
+    let usd = ModelImportRequest.staged(
+      url: URL(fileURLWithPath: "/tmp/robot.usdz"), defaults: defaults)
+
+    XCTAssertEqual(stl.unit, .centimeters)
+    XCTAssertEqual(obj.unit, .centimeters)
     XCTAssertEqual(usd.unit, .meters)
   }
 

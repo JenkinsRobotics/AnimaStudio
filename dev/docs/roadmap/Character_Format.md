@@ -135,10 +135,13 @@ STEP, USD, and any other format are treated identically:
 
 The two combine freely: a **multi-file assembly** gives each part its
 own `model` and no `model_node`; a **single multi-node USD** gives
-several parts a shared `model` plus distinct `model_node`s. Asset paths
-resolve against `characters/<name>/assets/` (see `Project_Format.md`);
-the app copies an imported mesh there on import and sets the part's
-`model`. `parent` is optional assembly-tree metadata — kinematic
+several parts a shared `model` plus distinct `model_node`s. In a standalone
+Character package, asset paths resolve against `characters/<name>/assets/`.
+Inside a Studio Project, the same safe string is a logical token mapped by the
+adjacent editor metadata to a stable project asset ID in `assets/models/` (or
+to a bookmarked Reference in Place); exporting a standalone Character must
+materialize that source under its local `assets/` path. See
+`Project_Format.md`. `parent` is optional assembly-tree metadata — kinematic
 connectivity lives in `joints`, not here.
 
 A part also carries its **rest transform** — its location in

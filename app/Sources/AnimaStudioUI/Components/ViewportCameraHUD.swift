@@ -1,83 +1,26 @@
-import RealityKitViewport
 import SwiftUI
 
 struct ViewportCameraHUD: View {
   @Bindable var workspace: StudioWorkspaceModel
-  @Binding var projection: PreviewCameraProjection
-  @Binding var renderStyle: ViewportRenderStyle
-  @Binding var edgeDisplay: ViewportEdgeDisplay
-  @Binding var lightingPreset: ViewportLightingPreset
-  @Binding var materialFinish: ViewportMaterialFinish
-  @Binding var reflectionMode: ViewportReflectionMode
-  @Binding var showsShadows: Bool
-  @Binding var showsGrid: Bool
-  @Binding var appearance: PreviewAppearance
-  @Binding var fieldOfViewDegrees: Float
-  @Binding var lightingIntensity: Double
-  @Binding var environmentPreset: ViewportEnvironmentPreset
-  @Binding var environmentRotationDegrees: Double
-  @Binding var renderQuality: ViewportRenderQuality
-  @Binding var navigationProfile: PreviewNavigationProfile
-  @Binding var customRotateDrag: NavigationDragBinding
-  @Binding var customPanDrag: NavigationDragBinding
-  @Binding var customPreciseZoomDrag: NavigationDragBinding
-  @Binding var orbitSpeed: PreviewNavigationSpeed
-  @Binding var panSpeed: PreviewNavigationSpeed
-  @Binding var zoomSpeed: PreviewNavigationSpeed
-  @Binding var reversesWheelZoom: Bool
-  let showMouseSettings: () -> Void
+  var showsViewCube = true
 
   var body: some View {
     VStack(alignment: .trailing, spacing: 7) {
-      ViewportViewCube(
-        orientation: workspace.cameraState.orientation,
-        onSelectDirection: workspace.setCameraDirection,
-        onNudge: { horizontalRadians, verticalRadians in
-          workspace.nudgeCamera(
-            horizontalRadians: horizontalRadians,
-            verticalRadians: verticalRadians
-          )
-        },
-        onRoll: workspace.rollCamera
-      )
-
-      ViewportCameraControls(
-        workspace: workspace,
-        navigationProfile: navigationProfile,
-        customNavigationMapping: CustomNavigationMapping(
-          rotateDrag: customRotateDrag,
-          panDrag: customPanDrag,
-          preciseZoomDrag: customPreciseZoomDrag
-        ),
-        showMouseSettings: showMouseSettings,
-        displayMenu: ViewportRenderMenu(
-          workspace: workspace,
-          projection: $projection,
-          renderStyle: $renderStyle,
-          edgeDisplay: $edgeDisplay,
-          lightingPreset: $lightingPreset,
-          materialFinish: $materialFinish,
-          reflectionMode: $reflectionMode,
-          showsShadows: $showsShadows,
-          showsGrid: $showsGrid,
-          appearance: $appearance,
-          fieldOfViewDegrees: $fieldOfViewDegrees,
-          lightingIntensity: $lightingIntensity,
-          environmentPreset: $environmentPreset,
-          environmentRotationDegrees: $environmentRotationDegrees,
-          renderQuality: $renderQuality,
-          navigationProfile: $navigationProfile,
-          customRotateDrag: $customRotateDrag,
-          customPanDrag: $customPanDrag,
-          customPreciseZoomDrag: $customPreciseZoomDrag,
-          orbitSpeed: $orbitSpeed,
-          panSpeed: $panSpeed,
-          zoomSpeed: $zoomSpeed,
-          reversesWheelZoom: $reversesWheelZoom,
-          canFrameSelection: workspace.canFrameSelection,
-          frameSelection: workspace.frameSelection
+      if showsViewCube {
+        ViewportViewCube(
+          orientation: workspace.cameraState.orientation,
+          onSelectDirection: workspace.setCameraDirection,
+          onNudge: { horizontalRadians, verticalRadians in
+            workspace.nudgeCamera(
+              horizontalRadians: horizontalRadians,
+              verticalRadians: verticalRadians
+            )
+          },
+          onRoll: workspace.rollCamera
         )
-      )
+      }
+
+      ViewportCameraControls(workspace: workspace)
     }
   }
 }

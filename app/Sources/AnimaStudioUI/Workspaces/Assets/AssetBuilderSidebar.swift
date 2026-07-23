@@ -14,52 +14,18 @@ struct AssetBuilderSidebar: View {
   let selectCharacter: (ProjectCharacterReference) -> Void
 
   @State private var filterText = ""
+  @State private var showSearch = false
   @State private var expandedIDs: Set<AssetBuilderTreeNodeID> = [.characters]
   @State private var activeDragPayload: NavigatorDragPayload?
 
   var body: some View {
     VStack(spacing: 0) {
-      Button(action: newCharacter) {
-        Label("Create New Character", systemImage: "plus")
-          .font(.callout.weight(.semibold))
-          .frame(maxWidth: .infinity)
-      }
-      .buttonStyle(.borderedProminent)
-      .controlSize(.large)
-      .padding(12)
+      // Compact panel header: name + search toggle. Creating a character is a
+      // toolbar action; the project name/revision live in the document bar — so
+      // neither belongs here, and dropping them maximizes content area.
+      header
 
-      Divider()
-
-      HStack(spacing: 8) {
-        Text("PROJECT: \(projectName.uppercased())")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-        Spacer(minLength: 4)
-        Text("V\(revision)")
-          .font(.caption2.weight(.bold))
-          .foregroundStyle(.secondary)
-          .padding(.horizontal, 6)
-          .padding(.vertical, 2)
-          .background(StudioPalette.field, in: Capsule())
-      }
-      .padding(.horizontal, 12)
-      .frame(height: 32)
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel("Project \(projectName), revision \(revision)")
-
-      Divider()
-
-      HStack(spacing: 6) {
-        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-        TextField("Filter project contents", text: $filterText)
-          .textFieldStyle(.plain)
-      }
-      .padding(.horizontal, 8)
-      .frame(height: 29)
-      .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 6))
-      .overlay { RoundedRectangle(cornerRadius: 6).stroke(StudioPalette.border) }
-      .padding(10)
+      if showSearch { searchField }
 
       Divider()
 
@@ -83,6 +49,62 @@ struct AssetBuilderSidebar: View {
     .onAppear { expandActiveCharacter() }
     .onChange(of: activeCharacterID) { _, _ in expandActiveCharacter() }
   }
+
+  private var header: some View {
+    HStack(spacing: 7) {
+      Image(systemName: panelIcon)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(StudioPalette.accent)
+        .frame(width: 16)
+      Text(panelTitle.uppercased())
+        .font(.system(size: 10.5, weight: .semibold))
+        .tracking(0.6)
+        .lineLimit(1)
+      Spacer(minLength: 8)
+      Button {
+        withAnimation(.easeOut(duration: 0.15)) { showSearch.toggle() }
+        if !showSearch { filterText = "" }
+      } label: {
+        Image(systemName: "magnifyingglass")
+          .font(.caption.bold())
+          .foregroundStyle(showSearch ? StudioPalette.accent : StudioPalette.muted)
+          .frame(width: 24, height: 24)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .help("Search this panel")
+    }
+    .foregroundStyle(StudioPalette.ink.opacity(0.92))
+    .padding(.horizontal, StudioMetrics.panelPadding)
+    .frame(height: StudioMetrics.panelHeaderHeight)
+    .background(StudioPalette.panelInset.opacity(0.52))
+  }
+
+  private var searchField: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+      TextField("Search", text: $filterText)
+        .textFieldStyle(.plain)
+      if !filterText.isEmpty {
+        Button { filterText = "" } label: {
+          Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, 8)
+    .frame(height: 29)
+    .background(StudioPalette.field, in: RoundedRectangle(cornerRadius: 6))
+    .overlay { RoundedRectangle(cornerRadius: 6).stroke(StudioPalette.border) }
+    .padding(8)
+  }
+
+  // This view is the full character-profile panel (the "Characters" rail tab).
+  // Its header is fixed — collection panels are handled by
+  // AssetCollectionSidebarPanel, so the title must not follow the shared
+  // selection (which would mislabel the profile as e.g. "SOURCE ASSETS").
+  private let panelTitle = "Characters"
+  private let panelIcon = "person.2"
 
   private var nodes: [AssetBuilderTreeNode] {
     AssetBuilderTreeAdapter.nodes(

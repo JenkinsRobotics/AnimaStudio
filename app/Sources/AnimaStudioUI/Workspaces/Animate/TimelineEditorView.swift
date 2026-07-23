@@ -118,7 +118,7 @@ struct TimelineEditorView: View {
 
     return HStack(spacing: 5) {
       Text(current.displayString)
-        .foregroundStyle(.white)
+        .foregroundStyle(StudioPalette.ink)
       Text("/")
         .foregroundStyle(StudioPalette.muted)
       Text(duration.displayString)

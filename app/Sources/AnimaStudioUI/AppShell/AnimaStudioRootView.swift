@@ -48,6 +48,16 @@ public struct AnimaStudioRootView: View {
       // sandboxed process: without this a project STL is unreadable and the
       // viewport falls back to placeholders. Idempotent.
       WorkspaceLocationPreference().activatePersistentWorkspaceRootAccess()
+      StudioAppearanceMode.applyCurrent()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) {
+      _ in
+      // Live-apply the light/dark appearance when the setting changes.
+      StudioAppearanceMode.applyCurrent()
+      let storedProfile = StudioDesignPersistence.load()
+      guard storedProfile != designProfile else { return }
+      StudioDesignRuntime.shared.apply(storedProfile)
+      designProfile = storedProfile
     }
     .alert(
       "Project Could Not Be Opened or Saved",
