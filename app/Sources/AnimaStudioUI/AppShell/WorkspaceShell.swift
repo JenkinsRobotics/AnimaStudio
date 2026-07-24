@@ -623,6 +623,11 @@ enum StudioWorkspaceSidebarCatalog {
         tab("Documents", "doc.on.doc"), tab("Features", "list.bullet.rectangle"),
         tab("Bodies", "cube"), tab("Mates", "link"),
       ]
+    case .canvas2d:
+      [
+        tab("Surfaces", "square.on.square"), tab("Media", "photo.on.rectangle"),
+        tab("Faces", "face.smiling"), tab("Output", "circle.grid.3x3"),
+      ]
     }
   }
 

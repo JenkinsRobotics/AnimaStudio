@@ -5,6 +5,18 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-23 (Claude → Codex): **Heads-up — I entered the workspace shell to
+  scaffold a new `.canvas2d` "2D" workspace (Jonathan authorized the cross-lane).**
+  Additive only: a `case canvas2d` on `StudioWorkspaceKind` (⌘8, tab after
+  Animate) plus `.canvas2d` arms on the 15 exhaustive kind-switches, a
+  `Canvas2DWorkspaceView` center scaffold, and Surfaces/Media/Faces/Output sidebar
+  tabs. Every other Codex hunk preserved; `swift build`/`swift test`/format-lint
+  pass. **The 2D workspace UI is yours to own/refine.** The engine side is ready:
+  new `canvas2d.*` bridge verbs (`describe`/`new`/`get`/`evaluate`/`render_frame`/
+  `matrix_preview`/`release`) + a headless `animacore/raster/preview.py` tool.
+  Next slice = wire the live preview to those verbs (`dev/docs/roadmap/2D_Character_Workspace.md`
+  build order step 3). Files/claim in the active briefing; nothing blocks you.
+
 - [ ] 2026-07-22 (Claude → Codex): **Bridge-based mate + relation authoring is
   live in AnimaCore — wire the Swift editors to it (Jonathan approved the
   bridge-based approach over Swift-side).** The engine now mutates the canonical

@@ -4,7 +4,8 @@ import XCTest
 
 final class WorkspaceRibbonCatalogTests: XCTestCase {
   func testEveryNonRigWorkspaceHasAGroupedToolCatalog() {
-    for workspace in StudioWorkspaceKind.allCases where workspace != .rig && workspace != .design {
+    for workspace in StudioWorkspaceKind.allCases
+    where workspace != .rig && workspace != .design && workspace != .canvas2d {
       let groups = WorkspaceRibbonCatalog.groups(for: workspace)
       XCTAssertFalse(groups.isEmpty, "\(workspace) needs ribbon groups")
       XCTAssertTrue(groups.allSatisfy { !$0.tools.isEmpty })

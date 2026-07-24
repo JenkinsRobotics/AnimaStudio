@@ -56,6 +56,37 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-23 (overnight — checkpoint + 2D pipeline foundation): **For Jonathan's
+  morning review.**
+  1. **Committed the checkpoint you asked for** (`2c9e652`, on `master`): the
+     full UI overhaul + light/dark themes + engine mate/relation authoring, with
+     both engines verified green first (swift build + 352 Swift tests; animacore
+     1057 tests; ruff clean). Working tree was clean after.
+  2. **2D character pipeline — planned + engine foundation started** (my lane).
+     Design doc: **`dev/docs/roadmap/2D_Character_Pipeline.md`** (VTuber
+     surfaces, the image→sprite→gif→video asset evolution, the display-window
+     model, and the unifying **hardware-is-a-node** idea — a scalar output node
+     mirrors joint DOF to servos, a new **frame** output node mirrors a
+     rasterized frame to a display / **64x64 LED matrix**; each virtual
+     element mirrors to a configured hardware node; preview == hardware because
+     the simulator is just another node backend).
+     Shipped engine code (renderer-neutral, stdlib, **+26 tests → 1083 total**):
+     - `animacore/canvas2d.py` — `VisualSource`/`Surface`/`SurfaceDriver`/
+       `Canvas2D` + `evaluate_surfaces` → `SurfaceState` (drives 2D on the SAME
+       evaluated DOF/parameter stream as the rig).
+     - `animacore/frame_output.py` — `LedMatrixTarget` + `downsample_canvas`
+       (64x64 area-average/gamma/brightness) + `FrameOutput` protocol +
+       `SimulatorFrameOutput`.
+     **Not built yet:** app UI, `.character.anima` `canvas2d:` loader/serializer,
+     bridge verbs, the rasterizer. **5 open decisions need your call** — see
+     §8 of the doc (canvas coords normalized-vs-pixels; where compositing lives;
+     frame driver by parameter vs integer index; hybrid 3D+2D characters; frame
+     transport / wire-protocol pixel packet). Nothing above is committed yet;
+     it's staged in the working tree for you to review before the 3D-test work.
+     Codex: the app-side 2D surfaces (a "display window" tool, the LED-matrix
+     preview grid) will consume `evaluate_surfaces` state + `downsample_canvas`
+     via bridge verbs I'll add once Jonathan settles the open decisions.
+
 - 2026-07-16 (DH3 — kinematic_chain arm rig type + bridge FK/IK verbs):
   The DH articulated-arm rig type is **complete** — an arm is now a real
   savable `.character.anima` rig the app drives via DH FK/IK. **Additive**

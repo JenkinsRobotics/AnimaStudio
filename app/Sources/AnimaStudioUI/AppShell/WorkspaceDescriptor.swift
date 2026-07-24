@@ -4,6 +4,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
   case assets
   case rig
   case animate
+  case canvas2d
   case show
   case nodes
   case hardware
@@ -53,6 +54,19 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
         systemImage: "play.circle.fill",
         purpose: "Author clips, keyframes, and curves",
         viewportLabel: "ANIMATION PREVIEW",
+        defaultPresentation: WorkspacePresentation(
+          showsNavigator: true,
+          showsInspector: true,
+          showsBottomEditor: false
+        )
+      )
+    case .canvas2d:
+      StudioWorkspaceDescriptor(
+        id: self,
+        title: "2D",
+        systemImage: "face.smiling",
+        purpose: "Compose 2D surfaces, faces, and media; drive an LED panel",
+        viewportLabel: "2D PREVIEW",
         defaultPresentation: WorkspacePresentation(
           showsNavigator: true,
           showsInspector: true,
@@ -123,6 +137,7 @@ enum StudioWorkspaceKind: String, CaseIterable, Identifiable, Hashable, Sendable
     case .nodes: 5
     case .hardware: 6
     case .design: 7
+    case .canvas2d: 8
     }
   }
 }

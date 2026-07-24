@@ -7,7 +7,7 @@ final class WorkspacePresentationTests: XCTestCase {
   func testBuiltInWorkspaceOrderAndNamesAreStable() {
     XCTAssertEqual(
       StudioWorkspaceKind.allCases.map(\.descriptor.title),
-      ["Character", "Rig", "Animate", "Show", "Nodes", "Hardware", "Design"]
+      ["Character", "Rig", "Animate", "2D", "Show", "Nodes", "Hardware", "Design"]
     )
     XCTAssertEqual(StudioWorkspaceKind.rig.shortcutNumber, 2)
     XCTAssertEqual(StudioWorkspaceKind.nodes.shortcutNumber, 5)

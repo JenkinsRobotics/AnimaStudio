@@ -48,6 +48,11 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Claude | Import the full Mochi 2D media library into examples + in-app media picker (Jonathan-requested) | `examples/assets/2d/**` (mirror of Mochi's media tree — gifs/png/bmps/video/bitmaps/animations/math/mscripts/procedural/packs/skins + `CATALOG.json` + README), `examples/{pixel_pet_2d,dino_screen_2d}.character.anima`, `animacore/raster/faces/simple_face.py` (translucent breathing bg so faces composite over media), `animacore/tests/test_example_2d_media.py`, `app/Sources/AnimaStudioUI/Workspaces/Canvas2D/Canvas2DWorkspaceView.swift` (subject picker only), `dev/docs/reality/STATUS.md`, append-only coordination; preserve other Codex hunks | full Mochi media library (~149 renderable assets: image/gif/video/bitmap; ~37 MB, mostly `video/`) with sidecars + built catalog; two example 2D characters render imported media end-to-end; the procedural face composites over a media background; the app 2D preview switches Face/Pixel Pet/Dino live via the bridge; ruff + pytest + `swift build`/format-lint pass; media flagged as dev fixture (licensing) + gitignore/LFS note for `video/` | released 2026-07-24 — 1158 pytest (+3 skip), swift build + format-lint pass; imported-media characters verified rendering (ASCII + tests) |
+| Claude | 2D asset conventions — the create↔play interchange ported from Mochi (`.props.yaml` / catalog / packs / skins / Mscript runner) | new `animacore/{asset_props,asset_catalog,pack,skin}.py`, new `animacore/raster/{skin_compositor,mscript_runner}.py`, `animacore/bridge.py` (add incremental `canvas2d.add/update/remove_surface` + `add/remove_source` verbs only), new `animacore/tests/{test_asset_props,test_asset_catalog,test_pack,test_skin,test_mscript_runner}.py` + additions to `test_bridge_canvas2d.py`, `dev/docs/{roadmap/2D_Character_Pipeline.md,reality/STATUS.md}`, append-only coordination; touch no `app/**` | faithful ports (Apache-2.0): `asset-props/v1` sidecar (read + author) + `visual_source_from_asset`; `build_catalog` → JSON; `pack/v1` slots (str/list/dict resolution); `skin/v1` + `apply_skin` (paint into `screen_bbox`); `MscriptRunner`/`render_mscript` play the command stream into frames; bridge editor-CRUD verbs; stdlib+pyyaml (compositing/playback use the `media` extra); ruff + full `animacore` pytest pass | released 2026-07-23 — 6 new engine modules + 5 bridge verbs; 21 new tests; ruff clean; 1152 pytest (+1 skip). No `app/**` touched (these are the engine/format the app + middleware consume) |
+| Claude | 2D workspace groundwork II — persistence (`canvas2d:` in `.character.anima`) + live preview (Jonathan authorized cross-lane, 2026-07-23) | `animacore/canvas2d_io.py`, `animacore/loader.py` (allow the `canvas2d:` top-level block only), `examples/pixel_face_2d.character.anima`, `animacore/bridge.py` (`canvas2d.load`/`save` + refactor DTO helpers to `canvas2d_io`), `animacore/tests/{test_canvas2d_io,test_bridge_canvas2d,test_loader}.py`, additive `canvas2DNew`/`canvas2DRenderFrame` on `app/Sources/AnimaCoreClient/AnimaCoreClient.swift`, live-preview rewrite of `app/Sources/AnimaStudioUI/Workspaces/Canvas2D/Canvas2DWorkspaceView.swift`, `dev/docs/{roadmap/2D_Character_Workspace.md,reality/STATUS.md}`, append-only coordination; preserve all other Codex hunks | canvas2d serializes to/from a `.character.anima` `canvas2d:` block (one shape shared with the bridge DTO); a pure-2D character loads as an empty-mechanics Rig + canvas2d block; the 2D workspace renders a **live** procedural face from the engine (`canvas2d.new` → `render_frame`, decoded PNG) with mouth/curve/eye/time sliders; ruff + pytest + `swift build`/`swift test` pass | released 2026-07-23 — 1131 pytest (+1 skip: 2D char has no servo outputs) + 352 XCTest + 27 Swift Testing; real stdio bridge smoke (hello→canvas2d.new→render_frame→128x128 PNG) verified; native Xcode build + live GUI walkthrough deferred to operator (headless env) |
+| Claude | 2D character workspace groundwork — engine preview tool + `canvas2d.*` bridge verbs + Swift 2D workspace scaffold (Jonathan authorized cross-lane, 2026-07-23) | `animacore/raster/preview.py`, `animacore/bridge.py` (add `canvas2d.*` verbs + Session canvas storage only), `animacore/tests/{test_preview,test_bridge_canvas2d}.py`, `pyproject.toml`, new `app/Sources/AnimaStudioUI/Workspaces/Canvas2D/**`, and additive `.canvas2d` arms only in `app/Sources/AnimaStudioUI/AppShell/{WorkspaceDescriptor,StudioWorkspaceView,StudioWorkspaceModel,WorkspaceLayout,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,DemoWorkspaceToolCatalog}.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Settings/StudioSettingsCatalog.swift`, matching test updates under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/{roadmap/2D_Character_Workspace.md,reality/STATUS.md}`, append-only coordination; preserve all other Codex hunks | new `StudioWorkspaceKind.canvas2d` ("2D", ⌘8, tab after Animate) routes to a `Canvas2DWorkspaceView` scaffold; every exhaustive kind-switch handles it; `canvas2d.*` bridge verbs (describe/new/evaluate/render_frame/matrix_preview) + headless preview tool tested; ruff + full `animacore` pytest and `swift build`/`swift test` pass | released 2026-07-23 — `canvas2d.*` bridge verbs (7) + Session canvas storage; headless `preview.py` tool + CLI; new `.canvas2d` workspace across all 15 exhaustive switches + `Canvas2DWorkspaceView` scaffold + Surfaces/Media/Faces/Output tabs, ⌘8, tab after Animate; ruff clean + 1121 `animacore` tests; `swift build` + `swift test` (0 failures, incl. updated presentation/settings/ribbon assertions) + format-lint pass. Native Xcode build + GUI walkthrough deferred to operator (headless env). **Note for Codex:** entered the workspace shell with Jonathan's go-ahead; the new `.canvas2d` arms are additive placeholders — own/refine the 2D UI and wire the live preview (`2D_Character_Workspace.md` build order step 3) as you see fit |
+| Claude | 2D pipelines imported from Mochi — real media rendering + serial hardware + Mscript scripting | `animacore/raster/**`, `animacore/frame_serial.py`, `animacore/canvas2d.py` (add `PROCEDURAL`/`BITMAP` kinds only), `animacore/tests/{test_raster,test_frame_serial,test_mscript}.py`, `pyproject.toml` (`media` extra), `dev/docs/{reality/STATUS.md,roadmap/2D_Character_Pipeline.md}`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,claude}.md`; touch no `app/**` or other engine files | ported (not re-implemented, both repos Apache-2.0, provenance headers kept): RGBA8 `FrameBuffer` + Mochi `open`/`close`/`next_frame(t)` contract; working image/bitmap/sprite/gif/video decoders (Pillow/numpy/imageio) + `ProceduralAdapter`/`SimpleFace`; `CanvasPlayer` alpha-composites surfaces; `SerialFrameOutput` streams `MM`/`BM`/`FM` to a real matrix; `MscriptScript` parser + `update(t)` flow control; decoders tested against real generated media; media deps optional (`media` extra); ruff + full `animacore` pytest pass | released 2026-07-23 — real decode of generated PNG/GIF/sprite/bitmap/mp4 verified; serial output verified on pyserial loopback; Mscript WAIT/auto-duration verified; ruff clean; 1109 `animacore` tests pass; end-to-end GIF-bg + face + alpha-composite → matrix demoed. Backlog: `.props.yaml` sidecar, `canvas2d:` loader + bridge verbs, Mscript→CanvasPlayer runner |
 | Codex | Complete and reorganize production Settings from the Demo catalog, including a dedicated Developer page | `app/Sources/AnimaStudioUI/Settings/**`, narrow preference wiring in `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWorkspaceModel,StudioWorkspaceView,WorkspaceChrome,WorkspaceSelector,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Components/ModelImportUnitsSheet.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/{Settings,AppShell,Components}/**`, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; preserve all unrelated shared-tree hunks and treat `dev/AnimaStudio Demo/**` as read-only reference | every Demo Settings page exists in production alongside retained production controls; pages are grouped as Workspace, Renderer, Appearance, Materials & Edges, Lighting, Layout, Navigation, UI, Developer; Developer owns zones plus Nodes/Design/UI Dev tab visibility; imported controls have real persisted bindings; tests/lint/native/root build/sign/launch pass | released 2026-07-21 — nine grouped pages, real persisted bindings, optional workspace visibility, 352 XCTest + 27 Swift Testing, lint/native/root build/sign/live Settings walkthrough pass |
 
 | Codex | Consolidate viewport visualization, display, input help, and environment controls into the single production View sidebar | `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, `app/Sources/AnimaStudioUI/Components/{ViewportCameraHUD,ViewportCameraControls,ViewportVisualizationPanel,ViewportSidebarPanel}.swift`, removal of the unreferenced legacy sidebar block only at the end of `app/Sources/AnimaStudioUI/AppShell/WorkspaceShell.swift`, focused component/app-shell tests, `dev/docs/reality/STATUS.md`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; preserve every Claude-authored hunk in `WorkspaceDescriptor.swift`, `WorkspaceSelector.swift`, and the active shell implementation | viewport retains only the spatial ViewCube plus Home; display/camera/navigation/mouse help live under View; Visualization Material/Environment and render-environment settings live under Environment; no floating Visualization pill or duplicate Display menu; tests/lint/native/root build/sign/launch pass | released 2026-07-21 — one consolidated right-sidebar implementation is live; the viewport HUD contains only ViewCube + Home; the floating Visualization pill and obsolete duplicate render menu are gone; 346 XCTest + 27 Swift Testing tests, touched lint, native/root build, deep signing, and launch PID 20348 pass; Claude's concurrent shell edits were preserved |
@@ -358,6 +363,113 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+- **2026-07-24 (Claude, imported Mochi 2D test media + in-app picker):** Curated a
+  small set of Mochi's test media into `examples/assets/2d/` (3 images, 3 gifs, 1
+  mp4, 3 8×8 bitmaps, ~200 KB), authored `.props.yaml` sidecars + built
+  `CATALOG.json` by dogfooding `animacore.asset_props`/`asset_catalog`, and added
+  two example characters that use it — `pixel_pet_2d` (image + procedural face) and
+  `dino_screen_2d` (animated gif). Building them surfaced that `SimpleFace` filled
+  an opaque background (hiding a media layer under it); fixed it to draw over a
+  faint translucent breathing tint so faces composite as overlays (existing raster
+  tests unaffected — features stay opaque). Extended the app 2D preview with a
+  subject picker (Face / Pixel Pet / Dino GIF) rendering each live via
+  `canvas2d.new` + `render_frame`; the media/gif sources resolve from the bridge's
+  repo-root working dir in a dev build. `test_example_2d_media.py` renders both
+  example characters end-to-end. 1158 pytest (+3 skip), ruff, `swift build`,
+  format-lint pass. Media is a dev fixture — `examples/assets/2d/README.md` flags
+  provenance + licensing (review before distributing). No non-2D files touched.
+  **Follow-up (same day, per Jonathan — "copy the entire asset tree"):** replaced
+  the curated 10-asset subset with the **full Mochi media library** mirrored under
+  `examples/assets/2d/` (gifs/png/bmps/video/bitmaps/animations/math/mscripts/
+  procedural/packs/skins; ~37 MB, mostly `video/`); rebuilt `CATALOG.json` (149
+  renderable assets); fixed the `colorwheel` path (`images/` → `png/`) in the
+  example + app picker + test. README notes the `video/` size (gitignore/LFS
+  before committing if unwanted), the naive `.json`→bitmap catalog labelling, and
+  that Mochi's `packs/`/`skins/tv1` are incomplete. Suite still 1158 (+3 skip),
+  swift build green.
+
+- **2026-07-23 (Claude, 2D asset conventions — the create↔play interchange):**
+  Per Jonathan's reframing (AnimaStudio = the *create* method; Mochi becomes the
+  *middleware* that plays created media on hardware), ported Mochi's asset
+  conventions as the portable interchange format (Apache-2.0, faithful):
+  `animacore/asset_props.py` (`.props.yaml` `asset-props/v1` sidecar — read +
+  author + `visual_source_from_asset`, incl. sprite grids), `asset_catalog.py`
+  (`build_catalog` → JSON), `pack.py` (`pack/v1` emotion/action slots →
+  files), `skin.py` + `raster/skin_compositor.py` (`skin/v1` bezel + `screen_bbox`,
+  `apply_skin` paints the frame into the cutout), and `raster/mscript_runner.py`
+  (`MscriptRunner`/`render_mscript` play the Mscript command stream into real
+  frames). Bridge gained incremental editor-CRUD verbs
+  (`canvas2d.add/update/remove_surface`, `add/remove_source`). Stdlib + pyyaml;
+  compositing/playback use the optional `media` extra. 21 new tests, ruff clean,
+  full suite 1152 pass (+1 skip). No `app/**` touched. Docs: `2D_Character_Pipeline.md`
+  §11 + STATUS. This completes the "partially imported" + "genuinely worth doing"
+  Mochi items from the gap analysis; remaining Mochi pieces are deliberate skips
+  (ZMQ bus/node runtime = separate architectural decision; AI selection; Qt UIs =
+  rebuilt natively; personality/chat = different product).
+
+- **2026-07-23 (Claude, 2D workspace groundwork II — persistence + live preview):**
+  Engine: `animacore/canvas2d_io.py` serializes a `Canvas2D` to/from a
+  `.character.anima` `canvas2d:` block (one mapping shape shared by the file
+  format + the Swift bridge DTO); `loader.py` now allows the `canvas2d:` top-level
+  block (a pure-2D character loads as an empty-mechanics Rig, hybrid = rig +
+  canvas2d); `bridge.py` gains `canvas2d.load`/`canvas2d.save` and its DTO helpers
+  now delegate to `canvas2d_io` (single source of truth); example
+  `examples/pixel_face_2d.character.anima`. App: `AnimaCoreClient` gains additive
+  `canvas2DNew`/`canvas2DRenderFrame`; `Canvas2DWorkspaceView` is now a **live
+  preview** — it spawns an engine client, builds a procedural-face canvas, renders
+  it (`render_frame` → decoded PNG), and drives `mouth_open`/`mouth_curve`/
+  `eye_open`/time from sliders. Verified: 1131 pytest (+1 skip), 352 XCTest + 27
+  Swift Testing, `swift build`, and a real stdio bridge smoke (hello →
+  canvas2d.new → render_frame → 128x128 PNG). Deferred (no consumer yet, noted for
+  the roadmap): an Mscript media-runner that turns the command stream into rendered
+  frames, and incremental `add/update/remove_surface`/`add_source` bridge verbs
+  (land them when the editors need CRUD). Native Xcode build + live GUI walkthrough
+  deferred to operator.
+
+- **2026-07-23 (Claude, 2D character workspace groundwork — both lanes, Jonathan
+  authorized cross-lane):** Engine: `animacore/raster/preview.py` headless
+  preview/export (PNG / animated GIF / LED-matrix sim / ASCII + a
+  `python -m animacore.raster.preview` CLI); `animacore/bridge.py` gains a
+  `canvas2d.*` verb family (`describe`/`new`/`get`/`evaluate`/`render_frame`/
+  `matrix_preview`/`release`) + a parallel canvas handle space on `Session`.
+  Evaluation is stdlib; only `render_frame`/`matrix_preview` need the optional
+  `media` extra (lazy import → `media_unavailable`, never a crash). App: a new
+  `StudioWorkspaceKind.canvas2d` ("2D", ⌘8, tab after Animate) wired through all
+  15 exhaustive kind-switches (WorkspaceDescriptor, StudioWorkspaceView center
+  router + inspector gate, StudioWorkspaceModel, WorkspaceLayout, WorkspaceShell
+  sidebar, WorkspaceRibbonCatalog, DemoWorkspaceToolCatalog, InspectorView×3,
+  ProjectNavigatorView×3, StudioSettingsCatalog visibleStages) plus a
+  `Canvas2DWorkspaceView` center scaffold and Surfaces/Media/Faces/Output tabs;
+  updated the presentation/settings/ribbon test assertions. ruff clean + 1121
+  `animacore` tests; `swift build` + `swift test` (0 failures) + format-lint
+  pass. Native Xcode build + live GUI walkthrough deferred to operator (headless
+  env). Design specs: `dev/docs/roadmap/2D_Character_Workspace.md` (new) + the 2D
+  pipeline doc. **Codex:** the 2D workspace UI is yours to own/refine — build
+  order step 3 (wire the live preview to the bridge verbs) is the next slice.
+
+- **2026-07-23 (Claude, imported Mochi's real 2D pipelines):** Per Jonathan —
+  "import the real working pipelines, not a fake copy." Reviewed the `Mochi`
+  repo, then **ported its actual working code** (both repos Apache-2.0;
+  provenance headers on each file). Three real pipelines now in the engine:
+  (1) **media rendering** — `animacore/raster/` decoders `image_adapter`,
+  `bitmap_adapter`, `sprite_adapter`, `gif_adapter`, `video_adapter` on Mochi's
+  `open`/`close`/`next_frame(t)` contract + RGBA8 `FrameBuffer` (Pillow / numpy /
+  imageio+ffmpeg), plus `procedural.py`/`faces/simple_face.py` and a
+  `CanvasPlayer` that alpha-composites surfaces; (2) **hardware** —
+  `animacore/frame_serial.py` `SerialFrameOutput` streaming `MM`/`BM`/`FM` to a
+  real RGB matrix over pyserial; (3) **scripting** — `animacore/raster/mscript.py`,
+  the Mscript parser + `update(t)` WAIT/duration engine with GIF/video
+  auto-duration. Added `PROCEDURAL` + `BITMAP` source kinds to `canvas2d.py`;
+  media deps are the optional `media` extra (core engine never imports
+  `animacore.raster`). One deliberate change from Mochi: procedural faces are a
+  registry, not an `importlib` load of arbitrary Python (their own
+  `math_adapter` flags that risk). Tests decode **real** generated
+  PNG/GIF/sprite/bitmap/mp4, verify the serial output on a `loop://` loopback,
+  and verify Mscript flow control; ruff clean; full `animacore` suite 1109 pass;
+  demoed a real GIF background + procedural face alpha-composited down to a
+  matrix. This supersedes the earlier same-day procedural-only draft. STATUS +
+  2D doc (§9, §10) updated. No `app/**` touched.
 
 - **2026-07-18 (Codex, guarded CAD DEMO corpus import):** Installed Open
   CASCADE signal handling once per process and enclosed the shared STEP read,

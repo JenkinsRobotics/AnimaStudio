@@ -108,6 +108,36 @@ public actor AnimaCoreClient {
     )
   }
 
+  // Canvas2D (2D character): build a canvas and rasterize frames for the 2D
+  // workspace preview. `canvas` is the DTO shape from `animacore.canvas2d_io`;
+  // `render_frame` needs the engine's optional `media` extra (Pillow) and
+  // otherwise returns a `media_unavailable` remote error.
+  public func canvas2DNew(
+    canvas: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCanvasHandle {
+    _ = try await start()
+    return try request(
+      method: "canvas2d.new",
+      params: Canvas2DNewParameters(canvas: canvas)
+    )
+  }
+
+  public func canvas2DRenderFrame(
+    handle: String,
+    values: [String: Double] = [:],
+    timeSeconds: Double = 0
+  ) async throws -> AnimaCoreRenderedFrame {
+    _ = try await start()
+    return try request(
+      method: "canvas2d.render_frame",
+      params: Canvas2DRenderParameters(
+        handle: handle,
+        values: values,
+        timeSeconds: timeSeconds
+      )
+    )
+  }
+
   public func evaluate(
     handle: String,
     clip: String? = nil,
@@ -387,5 +417,35 @@ private struct InverseKinematicsParameters: Encodable {
   enum CodingKeys: String, CodingKey {
     case handle, seed
     case targetPose = "target_pose"
+  }
+}
+
+private struct Canvas2DNewParameters: Encodable {
+  let canvas: AnimaCoreJSONValue
+}
+
+private struct Canvas2DRenderParameters: Encodable {
+  let handle: String
+  let values: [String: Double]
+  let timeSeconds: Double
+
+  enum CodingKeys: String, CodingKey {
+    case handle, values
+    case timeSeconds = "time_seconds"
+  }
+}
+
+public struct AnimaCoreCanvasHandle: Decodable, Sendable {
+  public let handle: String
+}
+
+public struct AnimaCoreRenderedFrame: Decodable, Sendable {
+  public let width: Int
+  public let height: Int
+  public let pngBase64: String
+
+  enum CodingKeys: String, CodingKey {
+    case width, height
+    case pngBase64 = "png_base64"
   }
 }

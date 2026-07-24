@@ -93,6 +93,9 @@ struct ProjectNavigatorView: View {
     case .design:
       Text("Design uses its sandbox browser.")
         .foregroundStyle(.secondary)
+    case .canvas2d:
+      Text("2D surfaces & media — panels land here.")
+        .foregroundStyle(.secondary)
     }
   }
 
@@ -444,7 +447,7 @@ struct ProjectNavigatorView: View {
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
-    case .design:
+    case .design, .canvas2d:
       EmptyView()
     }
   }
@@ -493,6 +496,7 @@ struct ProjectNavigatorView: View {
     case .nodes: "Nodes"
     case .design: "Design"
     case .hardware: "Hardware"
+    case .canvas2d: "2D"
     }
   }
 

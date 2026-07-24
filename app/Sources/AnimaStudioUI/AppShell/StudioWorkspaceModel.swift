@@ -1346,7 +1346,7 @@ final class StudioWorkspaceModel {
       next = activeCenterView == .threeD ? .dopeSheet : .threeD
     case .show:
       next = activeCenterView == .threeD ? .nodeGraph : .threeD
-    case .assets, .rig, .nodes, .hardware, .design:
+    case .assets, .rig, .canvas2d, .nodes, .hardware, .design:
       return
     }
     selectCenterView(next)

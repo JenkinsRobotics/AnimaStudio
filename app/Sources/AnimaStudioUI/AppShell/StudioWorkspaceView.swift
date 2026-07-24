@@ -648,6 +648,8 @@ struct StudioWorkspaceView: View {
       NodeWorkspaceView()
     case .design:
       StudioDesignSandboxCanvas()
+    case .canvas2d:
+      Canvas2DWorkspaceView()
     }
   }
 
@@ -999,7 +1001,7 @@ struct StudioWorkspaceView: View {
 
   private var hasInspectorContent: Bool {
     return switch workspace.activeWorkspace {
-    case .assets, .animate, .show, .hardware, .design:
+    case .assets, .animate, .canvas2d, .show, .hardware, .design:
       true
     case .nodes:
       false

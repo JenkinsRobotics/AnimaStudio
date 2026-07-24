@@ -45,7 +45,7 @@ enum WorkspaceRibbonCatalog {
   static func groups(for workspace: StudioWorkspaceKind) -> [WorkspaceRibbonGroupDescriptor] {
     switch workspace {
     case .assets: assetGroups
-    case .rig: []
+    case .rig, .canvas2d: []
     case .animate: animationGroups
     case .show: showGroups
     case .nodes: nodeGroups

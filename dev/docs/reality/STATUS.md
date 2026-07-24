@@ -10,6 +10,84 @@
   system for AI robots (digital avatars + physical animatronics from
   one rig, one format, one authoring tool)
 - **Version:** 0.1.0 (see `animacore/__init__.py`)
+- **2D character pipeline (engine foundation, not yet wired to the app):**
+  `animacore/canvas2d.py` models VTuber-style 2D characters — `VisualSource`
+  (image/sprite/gif/video), `Surface` display windows, DOF/parameter-driven
+  `SurfaceDriver`s — and `evaluate_surfaces` resolves them to renderer-neutral
+  `SurfaceState` (source, frame index, transform, opacity, z-order) using the
+  same evaluated-value stream the 3D rig uses. `animacore/frame_output.py` adds
+  the frame hardware-node side: `LedMatrixTarget` + `downsample_canvas`
+  (the 64x64 area-average/gamma/brightness math) and a `FrameOutput` protocol
+  with a `SimulatorFrameOutput`. `animacore/raster/` is the host-side rasterizer:
+  it turns evaluated `SurfaceState`s into actual pixels for the hardware frame
+  path (and as a reference for the Swift preview renderer). The media decoders
+  are **ported from Mochi** (Apache-2.0) — real, not stubs: an RGBA8 `FrameBuffer`
+  and Mochi's `open`/`close`/`next_frame(t)` decoder contract, with working
+  `ImageAdapter` (Pillow), `BitmapAdapter` (numpy 1-bit), `SpriteAdapter`
+  (sheet-cell crop, grid-index or explicit rect), `GifAdapter` (Pillow
+  ImageSequence, per-frame durations, loop), `VideoAdapter` (imageio/ffmpeg
+  decode-by-index), and a `ProceduralAdapter` + parametric `SimpleFace` (eyes+mouth
+  driven by the same `eye_open`/`mouth_open`/`mouth_curve`/`look_*` value stream,
+  auto blink/breathing). `CanvasPlayer` opens one adapter per surface and
+  alpha-composites them back-to-front (Pillow) into a `FrameBuffer`, feedable to
+  `downsample_canvas`. Two more real pipelines ship beside it: `frame_serial.py`
+  `SerialFrameOutput` streams frames to a physical RGB matrix over serial
+  (`MM`/`BM`/`FM`, verified on a pyserial loopback), and `raster/mscript.py` is
+  the ported Mscript timeline language (parser + `update(t)` WAIT/duration flow
+  control + GIF/video auto-duration). Media deps are the optional `media` extra
+  (pillow/imageio); the core engine never imports `animacore.raster`. 30 raster
+  tests decode real generated PNG/GIF/sprite/bitmap/mp4. The `.character.anima`
+  `canvas2d:` loader is still pending — design in
+  `dev/docs/roadmap/2D_Character_Pipeline.md`.
+- **2D character workspace (groundwork — engine + app scaffold):**
+  `animacore/raster/preview.py` is a headless preview/export tool: render any
+  canvas to a PNG, an animated GIF, an LED-matrix simulator image, or ASCII, plus
+  a `python -m animacore.raster.preview` CLI. `animacore/bridge.py` gains a
+  `canvas2d.*` verb family (`describe`/`new`/`get`/`evaluate`/`render_frame`/
+  `matrix_preview`/`release`) so the app can build, evaluate, and rasterize a 2D
+  character over the Studio↔AnimaCore bridge; evaluation is stdlib and only
+  `render_frame`/`matrix_preview` need the optional `media` extra (returning
+  `media_unavailable` if absent). In the app, a new **2D** workspace
+  (`StudioWorkspaceKind.canvas2d`, ⌘8, tab after Animate), routed through every
+  workspace switch, with Surfaces/Media/Faces/Output sidebar tabs. Its center is a
+  **live preview**: `Canvas2DWorkspaceView` spawns an engine client, builds a
+  procedural-face canvas (`canvas2d.new`), renders it (`canvas2d.render_frame` →
+  decoded PNG), and drives `mouth_open`/`mouth_curve`/`eye_open`/time from sliders
+  — so the app shows exactly what the engine (and hardware) produce. Persistence:
+  `animacore/canvas2d_io.py` reads/writes a `canvas2d:` block in a
+  `.character.anima` (one shape shared with the bridge DTO), the loader accepts it
+  (a pure-2D character loads as an empty-mechanics Rig; hybrid = rig + canvas2d),
+  `bridge.py` has `canvas2d.load`/`save`, and `examples/pixel_face_2d.character.anima`
+  is a runnable pure-2D character. Still to come: the real surface/media/face
+  editors and load-into-preview UI. Design in
+  `dev/docs/roadmap/2D_Character_Workspace.md`.
+- **2D asset conventions (the create ↔ play interchange, ported from Mochi):**
+  AnimaStudio is the *create* method; the playback middleware consumes these.
+  `animacore/asset_props.py` — the `.props.yaml` sidecar (`asset-props/v1`:
+  name/mood/tags, `ideal_size`, `framing`, `playback_speed`, `loop`, `type_props`
+  sprite-grid/fps), read+authored, with `visual_source_from_asset`.
+  `animacore/asset_catalog.py` — `build_catalog` indexes a media folder to
+  JSON. `animacore/pack.py` — packs (`pack/v1`) mapping emotion/action **slots**
+  to asset files. `animacore/skin.py` + `animacore/raster/skin_compositor.py` —
+  skins (`skin/v1`): a `body.png` bezel + `screen_bbox`, and `apply_skin` paints a
+  frame into the cutout. `animacore/raster/mscript_runner.py` — `MscriptRunner`/
+  `render_mscript` play the Mscript command stream into real frames. Bridge gains
+  incremental `canvas2d.add_surface`/`update_surface`/`remove_surface`/`add_source`/
+  `remove_source` verbs for editor CRUD. Stdlib + pyyaml (skin compositing +
+  Mscript playback need the `media` extra). Design in
+  `dev/docs/roadmap/2D_Character_Pipeline.md` §11.
+- **2D media library + in-app picker:** `examples/assets/2d/` mirrors the Mochi
+  project's media asset tree (png/bmps images, ~70 gifs, ~31 videos, 8×8 bitmaps,
+  math/mscripts/procedural/packs/skins; ~37 MB, mostly `video/`), with `.props.yaml`
+  sidecars + a built `CATALOG.json` (149 renderable assets), plus two example
+  characters that use it: `examples/pixel_pet_2d.character.anima` (colorwheel image
+  + procedural face) and `examples/dino_screen_2d.character.anima` (animated gif
+  surface). Both render imported media end-to-end (tested). The 2D workspace
+  preview gained a subject picker (Face / Pixel Pet / Dino GIF) that renders each
+  live via the bridge. `SimpleFace` now draws over a faint translucent breathing
+  tint (was opaque) so a face composites *over* a media background instead of
+  hiding it. The media is a dev fixture — see `examples/assets/2d/README.md` on
+  provenance/licensing before distributing.
 - **Consolidated viewport controls:** the production right sidebar is now the
   single operator surface for camera/display controls, navigation profiles and
   help, materials, lighting, background, reflections, shadows, section view,

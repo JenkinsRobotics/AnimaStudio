@@ -25,6 +25,13 @@ from typing import IO, Callable
 import yaml
 
 from animacore import __version__ as ENGINE_VERSION
+from animacore.canvas2d import Canvas2D, SourceKind, evaluate_surfaces
+from animacore.canvas2d_io import (
+    canvas2d_from_mapping,
+    canvas2d_to_mapping,
+    canvas2d_to_yaml,
+    parse_canvas2d,
+)
 from animacore.dh import DHError, forward_kinematics, solve_ik
 from animacore.kinematics import Transform, resolve_pose, transform_to_json
 from animacore.loader import CharacterFormatError, parse_character
@@ -86,6 +93,20 @@ CAPABILITIES = [
     "remove_relation",
     "serialize_character",
     "serialize_scene",
+    "canvas2d.describe",
+    "canvas2d.new",
+    "canvas2d.load",
+    "canvas2d.save",
+    "canvas2d.get",
+    "canvas2d.add_surface",
+    "canvas2d.update_surface",
+    "canvas2d.remove_surface",
+    "canvas2d.add_source",
+    "canvas2d.remove_source",
+    "canvas2d.evaluate",
+    "canvas2d.render_frame",
+    "canvas2d.matrix_preview",
+    "canvas2d.release",
     "release",
     "shutdown",
 ]
@@ -102,6 +123,8 @@ class Session:
 
     _rigs: dict[str, Rig] = field(default_factory=dict)
     _counter: int = 0
+    _canvases: dict[str, Canvas2D] = field(default_factory=dict)
+    _canvas_counter: int = 0
     exit: bool = False
 
     def add(self, rig: Rig) -> str:
@@ -119,6 +142,22 @@ class Session:
 
     def drop(self, handle: str) -> bool:
         return self._rigs.pop(handle, None) is not None
+
+    # 2D characters — a parallel handle space ("canvas1", "canvas2", …).
+    def add_canvas(self, canvas: Canvas2D) -> str:
+        self._canvas_counter += 1
+        handle = f"canvas{self._canvas_counter}"
+        self._canvases[handle] = canvas
+        return handle
+
+    def get_canvas(self, handle: str) -> Canvas2D | None:
+        return self._canvases.get(handle)
+
+    def set_canvas(self, handle: str, canvas: Canvas2D) -> None:
+        self._canvases[handle] = canvas
+
+    def drop_canvas(self, handle: str) -> bool:
+        return self._canvases.pop(handle, None) is not None
 
 
 # Envelope helpers ------------------------------------------------------------
@@ -1095,6 +1134,285 @@ def _shutdown(session: Session, params: dict, request_id: object) -> dict:
     return _ok(request_id, {})
 
 
+# Canvas2D (2D character) verbs -----------------------------------------------
+# The engine side of the 2D workspace bridge
+# (dev/docs/roadmap/2D_Character_Workspace.md). ``canvas2d`` is stdlib, so
+# describe/new/evaluate work anywhere; only ``render_frame``/``matrix_preview``
+# need the optional ``media`` extra (Pillow), imported lazily so the core bridge
+# stays dependency-light — a missing extra returns ``media_unavailable``, never
+# an import crash.
+
+
+def _canvas2d_summary(canvas: Canvas2D) -> dict:
+    return canvas2d_to_mapping(canvas)
+
+
+def _canvas2d_from_dto(dto: dict) -> Canvas2D:
+    try:
+        return canvas2d_from_mapping(dto)
+    except (KeyError, ValueError, TypeError) as error:
+        raise _BadRequest(f"invalid canvas2d: {error}") from error
+
+
+def _values_param(params: dict) -> dict:
+    values = params.get("values", {})
+    if not isinstance(values, dict):
+        raise _BadRequest("'values' must be an object of name -> number")
+    resolved: dict[str, float] = {}
+    for key, value in values.items():
+        try:
+            resolved[str(key)] = float(value)
+        except (TypeError, ValueError):
+            raise _BadRequest(f"value {key!r} must be a number") from None
+    return resolved
+
+
+def _canvas_or_error(session, params, request_id):
+    handle = _require_str(params, "handle")
+    canvas = session.get_canvas(handle)
+    if canvas is None:
+        return None, handle, _error(request_id, "unknown_handle", f"no canvas {handle!r}")
+    return canvas, handle, None
+
+
+def _canvas2d_describe(session, params, request_id):
+    try:
+        from animacore.raster.procedural import default_faces
+
+        faces = list(default_faces().names())
+        media = True
+    except Exception:  # noqa: BLE001 — media extra not installed
+        faces = []
+        media = False
+    return _ok(
+        request_id,
+        {
+            "source_kinds": [kind.value for kind in SourceKind],
+            "faces": faces,
+            "media_available": media,
+            "matrix_default": {"width": 64, "height": 64, "gamma": 1.0, "brightness": 1.0},
+        },
+    )
+
+
+def _canvas2d_new(session, params, request_id):
+    dto = params.get("canvas", {})
+    if not isinstance(dto, dict):
+        return _error(request_id, "bad_request", "'canvas' must be an object")
+    canvas = _canvas2d_from_dto(dto)
+    handle = session.add_canvas(canvas)
+    return _ok(request_id, {"handle": handle, "canvas": _canvas2d_summary(canvas)})
+
+
+def _canvas2d_load(session, params, request_id):
+    """Load a canvas from ``.character.anima`` (or a bare block) YAML ``text``."""
+    text = _require_str(params, "text")
+    try:
+        canvas = parse_canvas2d(text)
+    except ValueError as error:
+        return _error(request_id, "bad_request", f"invalid canvas2d: {error}")
+    if canvas is None:
+        return _error(request_id, "no_canvas2d", "document has no canvas2d block")
+    handle = session.add_canvas(canvas)
+    return _ok(request_id, {"handle": handle, "canvas": _canvas2d_summary(canvas)})
+
+
+def _canvas2d_save(session, params, request_id):
+    """Serialize a canvas to its ``canvas2d:`` YAML block."""
+    canvas, handle, err = _canvas_or_error(session, params, request_id)
+    if err:
+        return err
+    return _ok(request_id, {"handle": handle, "yaml": canvas2d_to_yaml(canvas)})
+
+
+def _canvas2d_get(session, params, request_id):
+    canvas, handle, err = _canvas_or_error(session, params, request_id)
+    if err:
+        return err
+    return _ok(request_id, {"handle": handle, "canvas": _canvas2d_summary(canvas)})
+
+
+def _require_object(params: dict, key: str) -> dict:
+    value = params.get(key)
+    if not isinstance(value, dict):
+        raise _BadRequest(f"{key!r} must be an object")
+    return value
+
+
+def _commit_canvas(session, handle, mutate, request_id):
+    """Rebuild a session canvas after ``mutate`` edits its mapping; revalidates."""
+    canvas = session.get_canvas(handle)
+    if canvas is None:
+        return _error(request_id, "unknown_handle", f"no canvas {handle!r}")
+    data = canvas2d_to_mapping(canvas)
+    try:
+        mutate(data)
+        new_canvas = canvas2d_from_mapping(data)
+    except (KeyError, ValueError, TypeError) as error:
+        return _error(request_id, "bad_request", f"invalid canvas2d edit: {error}")
+    session.set_canvas(handle, new_canvas)
+    return _ok(request_id, {"handle": handle, "canvas": _canvas2d_summary(new_canvas)})
+
+
+def _canvas2d_add_surface(session, params, request_id):
+    handle = _require_str(params, "handle")
+    surface = _require_object(params, "surface")
+
+    def mutate(data):
+        if any(entry["id"] == surface.get("id") for entry in data["surfaces"]):
+            raise ValueError(f"duplicate surface id {surface.get('id')!r}")
+        data["surfaces"].append(surface)
+
+    return _commit_canvas(session, handle, mutate, request_id)
+
+
+def _canvas2d_update_surface(session, params, request_id):
+    handle = _require_str(params, "handle")
+    surface = _require_object(params, "surface")
+    surface_id = surface.get("id")
+
+    def mutate(data):
+        for index, existing in enumerate(data["surfaces"]):
+            if existing["id"] == surface_id:
+                data["surfaces"][index] = surface
+                return
+        raise ValueError(f"no surface {surface_id!r}")
+
+    return _commit_canvas(session, handle, mutate, request_id)
+
+
+def _canvas2d_remove_surface(session, params, request_id):
+    handle = _require_str(params, "handle")
+    surface_id = _require_str(params, "surface_id")
+
+    def mutate(data):
+        remaining = [entry for entry in data["surfaces"] if entry["id"] != surface_id]
+        if len(remaining) == len(data["surfaces"]):
+            raise ValueError(f"no surface {surface_id!r}")
+        data["surfaces"] = remaining
+
+    return _commit_canvas(session, handle, mutate, request_id)
+
+
+def _canvas2d_add_source(session, params, request_id):
+    handle = _require_str(params, "handle")
+    source = _require_object(params, "source")
+
+    def mutate(data):
+        if any(entry["id"] == source.get("id") for entry in data["sources"]):
+            raise ValueError(f"duplicate source id {source.get('id')!r}")
+        data["sources"].append(source)
+
+    return _commit_canvas(session, handle, mutate, request_id)
+
+
+def _canvas2d_remove_source(session, params, request_id):
+    handle = _require_str(params, "handle")
+    source_id = _require_str(params, "source_id")
+
+    def mutate(data):
+        remaining = [entry for entry in data["sources"] if entry["id"] != source_id]
+        if len(remaining) == len(data["sources"]):
+            raise ValueError(f"no source {source_id!r}")
+        data["sources"] = remaining  # Canvas2D rejects a surface left referencing it
+
+    return _commit_canvas(session, handle, mutate, request_id)
+
+
+def _canvas2d_evaluate(session, params, request_id):
+    canvas, handle, err = _canvas_or_error(session, params, request_id)
+    if err:
+        return err
+    states = evaluate_surfaces(
+        canvas, _values_param(params), float(params.get("time_seconds", 0.0))
+    )
+    return _ok(
+        request_id,
+        {
+            "states": [
+                {
+                    "id": state.id,
+                    "source": state.source,
+                    "frame_index": state.frame_index,
+                    "x": state.x,
+                    "y": state.y,
+                    "width": state.width,
+                    "height": state.height,
+                    "rotation_deg": state.rotation_deg,
+                    "opacity": state.opacity,
+                    "visible": state.visible,
+                    "z": state.z,
+                }
+                for state in states
+            ]
+        },
+    )
+
+
+def _canvas2d_render_frame(session, params, request_id):
+    canvas, handle, err = _canvas_or_error(session, params, request_id)
+    if err:
+        return err
+    values = _values_param(params)
+    time_seconds = float(params.get("time_seconds", 0.0))
+    try:
+        from animacore.raster.player import render_canvas
+    except Exception as error:  # noqa: BLE001 — media extra not installed
+        return _error(request_id, "media_unavailable", f"media extra required: {error}")
+    import base64
+    import io
+
+    frame = render_canvas(canvas, values, time_seconds)
+    buffer = io.BytesIO()
+    frame.to_pil().convert("RGB").save(buffer, format="PNG")
+    return _ok(
+        request_id,
+        {
+            "width": frame.width,
+            "height": frame.height,
+            "png_base64": base64.b64encode(buffer.getvalue()).decode("ascii"),
+        },
+    )
+
+
+def _canvas2d_matrix_preview(session, params, request_id):
+    canvas, handle, err = _canvas_or_error(session, params, request_id)
+    if err:
+        return err
+    values = _values_param(params)
+    time_seconds = float(params.get("time_seconds", 0.0))
+    target_dto = params.get("target", {}) or {}
+    try:
+        from animacore.frame_output import LedMatrixTarget, downsample_canvas
+        from animacore.raster.player import render_canvas
+    except Exception as error:  # noqa: BLE001 — media extra not installed
+        return _error(request_id, "media_unavailable", f"media extra required: {error}")
+    try:
+        target = LedMatrixTarget(
+            width=int(target_dto.get("width", 64)),
+            height=int(target_dto.get("height", 64)),
+            gamma=float(target_dto.get("gamma", 1.0)),
+            brightness=float(target_dto.get("brightness", 1.0)),
+        )
+    except (ValueError, TypeError) as error:
+        raise _BadRequest(f"invalid matrix target: {error}") from error
+    frame = render_canvas(canvas, values, time_seconds)
+    rows = downsample_canvas(frame.to_rgb_rows(), target)
+    return _ok(
+        request_id,
+        {
+            "width": target.width,
+            "height": target.height,
+            "rows": [[list(pixel) for pixel in row] for row in rows],
+        },
+    )
+
+
+def _canvas2d_release(session, params, request_id):
+    handle = _require_str(params, "handle")
+    return _ok(request_id, {"released": session.drop_canvas(handle)})
+
+
 _VERBS = {
     "hello": _hello,
     "load_character": _load_character,
@@ -1113,6 +1431,20 @@ _VERBS = {
     "remove_relation": _remove_relation,
     "serialize_character": _serialize_character,
     "serialize_scene": _serialize_scene,
+    "canvas2d.describe": _canvas2d_describe,
+    "canvas2d.new": _canvas2d_new,
+    "canvas2d.load": _canvas2d_load,
+    "canvas2d.save": _canvas2d_save,
+    "canvas2d.get": _canvas2d_get,
+    "canvas2d.add_surface": _canvas2d_add_surface,
+    "canvas2d.update_surface": _canvas2d_update_surface,
+    "canvas2d.remove_surface": _canvas2d_remove_surface,
+    "canvas2d.add_source": _canvas2d_add_source,
+    "canvas2d.remove_source": _canvas2d_remove_source,
+    "canvas2d.evaluate": _canvas2d_evaluate,
+    "canvas2d.render_frame": _canvas2d_render_frame,
+    "canvas2d.matrix_preview": _canvas2d_matrix_preview,
+    "canvas2d.release": _canvas2d_release,
     "release": _release,
     "shutdown": _shutdown,
 }

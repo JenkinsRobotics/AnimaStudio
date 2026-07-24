@@ -80,7 +80,7 @@ enum StudioWorkspaceTabDefaults {
 
 enum StudioWorkspaceNavigation {
   static func visibleStages(showNodes: Bool, showDesign: Bool) -> [StudioWorkspaceKind] {
-    var stages: [StudioWorkspaceKind] = [.assets, .rig, .animate, .show]
+    var stages: [StudioWorkspaceKind] = [.assets, .rig, .animate, .canvas2d, .show]
     if showNodes { stages.append(.nodes) }
     stages.append(.hardware)
     if showDesign { stages.append(.design) }

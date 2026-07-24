@@ -178,6 +178,9 @@ def _check_top_level_fields(document: dict) -> None:
         "outputs",
         "relations",
         "kinematic_chain",
+        # Optional 2D-character block (parsed by animacore.canvas2d_io); a
+        # character may be pure 2D (empty mechanics) or hybrid 3D + 2D.
+        "canvas2d",
     }
     for key in document:
         if key in _UNSUPPORTED_TOP_LEVEL:
