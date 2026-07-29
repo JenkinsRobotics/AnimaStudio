@@ -51,7 +51,7 @@ enum StudioCenterViewCatalog {
     case .animate: [.threeD, .dopeSheet, .curves]
     case .show: [.nodeGraph, .table, .threeD]
     case .hardware: [.servoTimeline, .table, .threeD]
-    case .nodes, .design, .canvas2d: []
+    case .nodes, .design, .canvas2d, .vr: []
     }
   }
 

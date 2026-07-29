@@ -4,6 +4,7 @@ import SwiftUI
 enum ModelImportUnit: String, CaseIterable, Identifiable, Sendable {
   case millimeters
   case centimeters
+  case inches
   case meters
 
   var id: Self { self }
@@ -12,6 +13,7 @@ enum ModelImportUnit: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .millimeters: "Millimeters (mm)"
     case .centimeters: "Centimeters (cm)"
+    case .inches: "Inches (in)"
     case .meters: "Meters (m)"
     }
   }
@@ -20,8 +22,28 @@ enum ModelImportUnit: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .millimeters: 0.001
     case .centimeters: 0.01
+    case .inches: 0.0254
     case .meters: 1
     }
+  }
+
+  /// Best-effort length unit read from a STEP file's `LENGTH_UNIT` declaration.
+  /// ponytail: scans the first 256 KB of text; compressed/binary STEP returns
+  /// nil and the caller defaults to millimeters.
+  static func detectedSTEPUnit(at url: URL) -> ModelImportUnit? {
+    guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+    defer { try? handle.close() }
+    guard let data = try? handle.read(upToCount: 262_144) else { return nil }
+    let text = (String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1))?
+      .uppercased()
+    guard let text else { return nil }
+    // Conversion-based inch units are unambiguous; check before the SI base
+    // (an inch STEP also declares .MILLI. .METRE. as the conversion base).
+    if text.contains("'INCH'") || text.contains(".INCH.") { return .inches }
+    if text.contains(".CENTI."), text.contains(".METRE.") { return .centimeters }
+    if text.contains(".MILLI."), text.contains(".METRE.") { return .millimeters }
+    if text.contains(".METRE.") { return .meters }
+    return nil
   }
 }
 
@@ -33,16 +55,41 @@ struct ModelImportRequest: Identifiable, Equatable, Sendable {
   var isUnitless: Bool {
     ["stl", "obj"].contains(url.pathExtension.lowercased())
   }
+  var isCAD: Bool {
+    ["step", "stp"].contains(url.pathExtension.lowercased())
+  }
+  var allowsUnitSelection: Bool { isUnitless || isCAD }
+
+  /// Units offered for this file. CAD parts are mm/cm/inch — no real CAD part
+  /// is authored in meters — while a unitless mesh offers the full set.
+  var availableUnits: [ModelImportUnit] {
+    isCAD ? [.millimeters, .centimeters, .inches] : ModelImportUnit.allCases
+  }
+
+  var unitDescription: String {
+    if isCAD { return "Units read from STEP (adjustable)" }
+    if isUnitless { return "Unitless mesh" }
+    return "Units embedded in file"
+  }
 
   static func staged(url: URL, defaults: UserDefaults = .standard) -> Self {
     let preferredUnit =
       ModelImportUnit(
         rawValue: defaults.string(forKey: StudioPreferenceKey.projectDefaultImportUnit) ?? ""
       ) ?? .millimeters
-    return Self(
-      url: url,
-      unit: ["stl", "obj"].contains(url.pathExtension.lowercased()) ? preferredUnit : .meters
-    )
+    let ext = url.pathExtension.lowercased()
+    let unit: ModelImportUnit
+    if ["stl", "obj"].contains(ext) {
+      unit = preferredUnit
+    } else if ["step", "stp"].contains(ext) {
+      // Auto-select from the file; meters is not offered for CAD, so fall back
+      // to millimeters (the STEP default) when detection is ambiguous.
+      let detected = ModelImportUnit.detectedSTEPUnit(at: url) ?? .millimeters
+      unit = detected == .meters ? .millimeters : detected
+    } else {
+      unit = .meters
+    }
+    return Self(url: url, unit: unit)
   }
 
   var partCreationDetail: String {
@@ -126,8 +173,8 @@ struct ModelImportUnitsSheet: View {
         VStack(spacing: 8) {
           ForEach($requests) { $request in
             HStack(spacing: 12) {
-              Image(systemName: request.isUnitless ? "ruler" : "cube.transparent")
-                .foregroundStyle(request.isUnitless ? .orange : StudioPalette.sourceModel)
+              Image(systemName: request.allowsUnitSelection ? "ruler" : "cube.transparent")
+                .foregroundStyle(request.allowsUnitSelection ? .orange : StudioPalette.sourceModel)
                 .frame(width: 20)
               VStack(alignment: .leading, spacing: 2) {
                 Text(request.url.lastPathComponent)
@@ -136,14 +183,14 @@ struct ModelImportUnitsSheet: View {
                 Text(request.partCreationDetail)
                   .font(.caption)
                   .foregroundStyle(.secondary)
-                Text(request.isUnitless ? "Unitless mesh" : "Units embedded in file")
+                Text(request.unitDescription)
                   .font(.caption2)
                   .foregroundStyle(StudioPalette.muted)
               }
               Spacer()
-              if request.isUnitless {
+              if request.allowsUnitSelection {
                 Picker("Source units", selection: $request.unit) {
-                  ForEach(ModelImportUnit.allCases) { unit in
+                  ForEach(request.availableUnits) { unit in
                     Text(unit.label).tag(unit)
                   }
                 }

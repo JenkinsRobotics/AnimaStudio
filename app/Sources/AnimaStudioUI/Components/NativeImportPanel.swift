@@ -25,6 +25,30 @@ struct NativeImportPanelConfiguration: Equatable {
     allowsMultipleSelection: false
   )
 
+  static let images = NativeImportPanelConfiguration(
+    title: "Import Images",
+    message: "Choose image files (PNG, JPEG, GIF, WebP, etc.).",
+    prompt: "Import",
+    allowedFileExtensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "heic"],
+    allowsMultipleSelection: true
+  )
+
+  static let audio = NativeImportPanelConfiguration(
+    title: "Import Audio",
+    message: "Choose audio files (WAV, AIFF, MP3, M4A, etc.).",
+    prompt: "Import",
+    allowedFileExtensions: ["wav", "aiff", "aif", "mp3", "m4a", "aac", "caf", "flac"],
+    allowsMultipleSelection: true
+  )
+
+  static let video = NativeImportPanelConfiguration(
+    title: "Import Video",
+    message: "Choose video files (MP4, MOV, M4V, etc.).",
+    prompt: "Import",
+    allowedFileExtensions: ["mp4", "mov", "m4v", "avi", "mkv", "webm"],
+    allowsMultipleSelection: true
+  )
+
   var allowedContentTypes: [UTType] {
     allowedFileExtensions.map { fileExtension in
       UTType(filenameExtension: fileExtension)

@@ -28,12 +28,54 @@ final class ModelImportUnitsTests: XCTestCase {
   func testUnitlessModelScalesAreExplicitSIConversions() {
     XCTAssertEqual(ModelImportUnit.millimeters.scaleToMeters, 0.001)
     XCTAssertEqual(ModelImportUnit.centimeters.scaleToMeters, 0.01)
+    XCTAssertEqual(ModelImportUnit.inches.scaleToMeters, 0.0254)
     XCTAssertEqual(ModelImportUnit.meters.scaleToMeters, 1)
   }
 
   func testEveryUnitHasReadableUniquePresentation() {
-    XCTAssertEqual(Set(ModelImportUnit.allCases.map(\.label)).count, 3)
+    XCTAssertEqual(Set(ModelImportUnit.allCases.map(\.label)).count, 4)
     XCTAssertTrue(ModelImportUnit.millimeters.label.contains("mm"))
+    XCTAssertTrue(ModelImportUnit.inches.label.contains("in"))
+  }
+
+  func testCADFilesOfferMillimetersCentimetersAndInchesButNotMeters() {
+    let step = ModelImportRequest(url: URL(fileURLWithPath: "/tmp/gear.step"), unit: .millimeters)
+    XCTAssertTrue(step.isCAD)
+    XCTAssertTrue(step.allowsUnitSelection)
+    XCTAssertEqual(step.availableUnits, [.millimeters, .centimeters, .inches])
+    XCTAssertFalse(step.availableUnits.contains(.meters))
+  }
+
+  func testDetectsSTEPLengthUnitFromHeaderDeclaration() throws {
+    func detect(_ body: String) throws -> ModelImportUnit? {
+      let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("anima-unit-\(UUID().uuidString).step")
+      try body.write(to: url, atomically: true, encoding: .utf8)
+      defer { try? FileManager.default.removeItem(at: url) }
+      return ModelImportUnit.detectedSTEPUnit(at: url)
+    }
+    XCTAssertEqual(try detect("#11 = ( LENGTH_UNIT() SI_UNIT(.MILLI.,.METRE.) );"), .millimeters)
+    XCTAssertEqual(try detect("#11 = ( LENGTH_UNIT() SI_UNIT(.CENTI.,.METRE.) );"), .centimeters)
+    XCTAssertEqual(try detect("#11 = ( LENGTH_UNIT() SI_UNIT($,.METRE.) );"), .meters)
+    // Inch files declare .MILLI. .METRE. as the conversion base — inch wins.
+    XCTAssertEqual(
+      try detect("#9 = ( CONVERSION_BASED_UNIT('INCH',#10) LENGTH_UNIT() );\n"
+        + "#11 = SI_UNIT(.MILLI.,.METRE.);"),
+      .inches
+    )
+  }
+
+  func testStagingAutoSelectsInchesForInchSTEPAndMillimetersWhenUnreadable() throws {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("anima-inch-\(UUID().uuidString).step")
+    try "( CONVERSION_BASED_UNIT('INCH',#10) LENGTH_UNIT() )".write(
+      to: url, atomically: true, encoding: .utf8)
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    XCTAssertEqual(ModelImportRequest.staged(url: url).unit, .inches)
+    // A path with no readable file falls back to millimeters, never meters.
+    XCTAssertEqual(
+      ModelImportRequest.staged(url: URL(fileURLWithPath: "/tmp/missing.step")).unit, .millimeters)
   }
 
   func testBatchRequestsOnlyAskForUnitsOnSTLAndOBJ() {

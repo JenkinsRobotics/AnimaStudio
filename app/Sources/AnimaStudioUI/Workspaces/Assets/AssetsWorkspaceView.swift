@@ -188,7 +188,13 @@ struct AssetsWorkspaceView: View {
     if let collection = sidebarCollection {
       let items = collectionItems(collection)
       sizedPanel(
-        AssetCollectionSidebarPanel(collection: collection, items: items),
+        AssetCollectionSidebarPanel(
+          collection: collection,
+          items: items,
+          selectedIDs: collectionSelectedIDs(collection),
+          interaction: collectionInteraction(collection),
+          onSelect: { selectCollectionItem($0, in: collection) }
+        ),
         floatingHeight: AssetsWorkspacePanelSizing.collectionHeight(itemCount: items.count)
       )
     } else {
@@ -209,6 +215,44 @@ struct AssetsWorkspaceView: View {
     } else {
       panel.frame(height: floatingHeight, alignment: .top)
     }
+  }
+
+  /// Maps a collection row's item id back to its PartID. Parts collection
+  /// items encode the PartID's UUID string as their id (see collectionItems).
+  private var partIDsByItemID: [String: PartID] {
+    Dictionary(uniqueKeysWithValues: partRows.map { ($0.id.rawValue.uuidString, $0.id) })
+  }
+
+  /// The shared tree control layer for a collection. Parts wire straight onto
+  /// the existing engine mutations; other collections stay read-only for now.
+  private func collectionInteraction(
+    _ collection: AssetBuilderCollection
+  ) -> TreeInteraction<AssetBuilderListItem>? {
+    guard collection == .parts else { return nil }
+    let lookup = partIDsByItemID
+    return TreeInteraction(
+      editableName: { $0.title },
+      commitRename: { item, name in
+        if let id = lookup[item.id] { workspace.renamePart(id: id, to: name) }
+      },
+      delete: { ids in
+        let partIDs = Set(ids.compactMap { lookup[$0] })
+        if !partIDs.isEmpty { deleteParts(partIDs) }
+      },
+      canDelete: { _ in true },
+      selectedIDs: { Set(workspace.selectedComponentIDs.map(\.rawValue.uuidString)) },
+      extraActions: { _ in [] }
+    )
+  }
+
+  private func collectionSelectedIDs(_ collection: AssetBuilderCollection) -> Set<String> {
+    guard collection == .parts else { return [] }
+    return Set(workspace.selectedComponentIDs.map(\.rawValue.uuidString))
+  }
+
+  private func selectCollectionItem(_ id: String, in collection: AssetBuilderCollection) {
+    guard collection == .parts, let partID = partIDsByItemID[id] else { return }
+    workspace.selectPart(id: partID, extendingSelection: false)
   }
 
   private func collectionItems(_ collection: AssetBuilderCollection) -> [AssetBuilderListItem] {
@@ -306,10 +350,15 @@ struct AssetsWorkspaceView: View {
   }
 
   private var collectionCounts: [AssetBuilderCollection: Int] {
-    [
+    // Each distinct source file counts once: a copied part model is also a
+    // document asset, so exclude assets that back a part model.
+    let modelFilenames = Set(
+      partRows.map(\.model).filter { !$0.isEmpty }
+        .map { URL(fileURLWithPath: $0).lastPathComponent })
+    let extraAssets = activeCharacterAssets.filter { !modelFilenames.contains($0.originalFilename) }
+    return [
       .parts: partRows.count,
-      .sourceAssets: Set(partRows.map(\.model).filter { !$0.isEmpty }).count
-        + activeCharacterAssets.count,
+      .sourceAssets: modelFilenames.count + extraAssets.count,
       .animations: workspace.project.clips.count,
       .renders: renderItems.count,
       .assemblies: assemblyItems.count,

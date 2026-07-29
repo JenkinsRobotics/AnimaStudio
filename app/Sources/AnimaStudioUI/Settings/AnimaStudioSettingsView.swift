@@ -61,7 +61,7 @@ public struct AnimaStudioSettingsView: View {
   @AppStorage(StudioPreferenceKey.viewportRenderQuality) private var renderQualityRawValue =
     ViewportRenderQuality.standard.rawValue
   @AppStorage(StudioPreferenceKey.cadRenderBackend) private var cadRenderBackendRawValue =
-    CADRenderBackend.realityKit.rawValue
+    CADRenderBackend.defaultBackend.rawValue
   @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName =
     CADViewportTheme.studioBlue.name
   @AppStorage(StudioPreferenceKey.cadPreservesImportedColors) private
@@ -316,7 +316,7 @@ public struct AnimaStudioSettingsView: View {
         )
         VStack(alignment: .leading, spacing: 12) {
           Picker("Render engine", selection: cadRenderBackendBinding) {
-            ForEach(CADRenderBackend.allCases) { backend in
+            ForEach(CADRenderBackend.selectable) { backend in
               Text(backend.title).tag(backend)
             }
           }
@@ -560,7 +560,9 @@ public struct AnimaStudioSettingsView: View {
 
   private var cadRenderBackendBinding: Binding<CADRenderBackend> {
     Binding(
-      get: { CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .realityKit },
+      get: {
+        (CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .defaultBackend).selectableOrDefault
+      },
       set: { cadRenderBackendRawValue = $0.rawValue }
     )
   }

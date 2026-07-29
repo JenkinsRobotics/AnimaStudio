@@ -65,13 +65,16 @@ public struct CADGeometryDocument: Sendable {
 
   public static func loadSTEP(
     _ url: URL,
+    unitScaleToMeters: Double = 0.001,
     linearDeflectionMeters: Double = 0.0002,
     angularDeflectionRadians: Double = 0.35
   ) throws -> Self {
     let raw = anima_cad_load_step(
       url.path, linearDeflectionMeters, angularDeflectionRadians)
     defer { anima_cad_free_document(raw) }
-    return try decode(raw, sourceURL: url)
+    // The kernel emits meters assuming a millimeter source (× 0.001). Re-scale
+    // to the real source unit: mm → 1.0 (unchanged), cm → 10, inch → 25.4.
+    return try decode(raw, sourceURL: url, extraScale: unitScaleToMeters / 0.001)
   }
 
   public static func makeTestDocument(
@@ -146,13 +149,17 @@ public struct CADGeometryDocument: Sendable {
     )
   }
 
-  private static func decode(_ raw: ACDocument, sourceURL: URL?) throws -> Self {
+  private static func decode(_ raw: ACDocument, sourceURL: URL?, extraScale: Double = 1) throws
+    -> Self
+  {
     if let error = raw.error_message {
       throw CADGeometryImportError.kernel(String(cString: error))
     }
     guard raw.vertex_count > 0, let positions = raw.positions, let normals = raw.normals,
       let indices = raw.indices
     else { throw CADGeometryImportError.emptyGeometry }
+
+    let scale = Float(extraScale)
 
     var faces: [CADFace] = []
     if let ranges = raw.faces {
@@ -164,7 +171,7 @@ public struct CADGeometryDocument: Sendable {
         let indexCount = Int(range.index_count)
         let localPositions = (0..<vertexCount).map { vertex in
           let base = (vertexOffset + vertex) * 3
-          return SIMD3(positions[base], positions[base + 1], positions[base + 2])
+          return SIMD3(positions[base], positions[base + 1], positions[base + 2]) * scale
         }
         let localNormals = (0..<vertexCount).map { vertex in
           let base = (vertexOffset + vertex) * 3
@@ -194,7 +201,7 @@ public struct CADGeometryDocument: Sendable {
             id: Int(range.topology_index),
             points: (0..<Int(range.point_count)).map { item in
               let base = (Int(range.point_offset) + item) * 3
-              return SIMD3(points[base], points[base + 1], points[base + 2])
+              return SIMD3(points[base], points[base + 1], points[base + 2]) * scale
             },
             assemblyNode: Int(range.assembly_node)
           ))
@@ -210,7 +217,9 @@ public struct CADGeometryDocument: Sendable {
         SIMD4(values[0], values[1], values[2], values[3]),
         SIMD4(values[4], values[5], values[6], values[7]),
         SIMD4(values[8], values[9], values[10], values[11]),
-        SIMD4(values[12] * 0.001, values[13] * 0.001, values[14] * 0.001, values[15])
+        SIMD4(
+          values[12] * 0.001 * extraScale, values[13] * 0.001 * extraScale,
+          values[14] * 0.001 * extraScale, values[15])
       )
       return CADAssemblyNode(
         id: index,

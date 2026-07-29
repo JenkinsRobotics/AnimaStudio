@@ -4,6 +4,7 @@ public enum ProjectAssetKind: String, Codable, Sendable {
   case model3D
   case audio
   case image
+  case video
 }
 
 public struct ProjectAsset: Identifiable, Equatable, Codable, Sendable {

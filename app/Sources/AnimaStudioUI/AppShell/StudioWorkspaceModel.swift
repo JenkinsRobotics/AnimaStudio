@@ -1,3 +1,4 @@
+import AnimaCADViewport
 import AnimaCoreClient
 import AnimaDocument
 import AnimaEvaluation
@@ -5,6 +6,7 @@ import AnimaModel
 import Foundation
 import Observation
 import RealityKitViewport
+import simd
 
 enum NavigatorItem: Hashable {
   case project
@@ -38,6 +40,14 @@ final class StudioWorkspaceModel {
   }
 
   var activeWorkspace: StudioWorkspaceKind
+
+  /// The active character's type. The second workspace tab *routes* to its
+  /// authoring workspace (3D -> Rig, 2D -> 2D, VR -> VR), but setting the type
+  /// never switches the workspace on its own — you only change workspace by
+  /// clicking a tab. (Creating a character sets the type, then stays on the
+  /// Character workspace so you can set it up before authoring.)
+  var characterType: StudioCharacterType = .threeD
+
   var workspacePresentations = Dictionary(
     uniqueKeysWithValues: StudioWorkspaceKind.allCases.map {
       ($0, $0.descriptor.defaultPresentation)
@@ -106,6 +116,7 @@ final class StudioWorkspaceModel {
   var viewportBackground = ViewportBackgroundSettings()
   var viewportSectionPlane = ViewportSectionPlane()
   var rigGuideVisibility = RigGuideVisibility()
+  var cadReferenceGeometryVisibility = CADReferenceGeometryVisibility()
   var showsCreationPalette = true
   var importedModelURL: URL?
   var importedModelHierarchy: ModelHierarchyNode?
@@ -662,6 +673,20 @@ final class StudioWorkspaceModel {
     return engineParts.first { $0.name == name }
   }
 
+  /// Renderer input for the part origin expressed in the assembly frame.
+  /// Values are the editable AnimaCore rest transform already projected into
+  /// `project.rig`; no pose or mate semantics are reconstructed here.
+  func cadPartRestTransform(for id: PartID) -> CADPartRestTransform? {
+    guard let part = project.rig.parts.first(where: { $0.id == id }) else { return nil }
+    return CADPartRestTransform(
+      positionMeters: [part.positionMeters.x, part.positionMeters.y, part.positionMeters.z],
+      rotationEulerRadians: [
+        part.rotationEulerRadians.x,
+        part.rotationEulerRadians.y,
+        part.rotationEulerRadians.z,
+      ])
+  }
+
   func enginePartName(for id: PartID) -> String? {
     enginePartIDsByName.first { $0.value == id }?.key
   }
@@ -710,9 +735,13 @@ final class StudioWorkspaceModel {
         id: group.id,
         displayName: group.displayName,
         componentIDs: group.partNames.compactMap { enginePartIDsByName[$0] },
-        isLocked: group.isLocked
+        isLocked: group.isLocked,
+        parentGroupID: group.parentGroupID,
+        positionMeters: Self.rigVector(group.positionMeters),
+        rotationEulerRadians: Self.rigVector(group.rotationEulerRadians)
       )
-    }.filter { !$0.componentIDs.isEmpty }
+    }
+    normalizeComponentGroupHierarchy()
     navigatorExpandedNodeKeys = Set(metadata.tree.expandedNodeKeys)
     componentAppearances = Dictionary(
       uniqueKeysWithValues: metadata.partAppearances.compactMap { name, value in
@@ -782,7 +811,18 @@ final class StudioWorkspaceModel {
           id: group.id,
           displayName: group.displayName,
           partNames: group.componentIDs.compactMap(enginePartName(for:)),
-          isLocked: group.isLocked
+          isLocked: group.isLocked,
+          parentGroupID: group.parentGroupID,
+          positionMeters: [
+            group.positionMeters.x,
+            group.positionMeters.y,
+            group.positionMeters.z,
+          ],
+          rotationEulerRadians: [
+            group.rotationEulerRadians.x,
+            group.rotationEulerRadians.y,
+            group.rotationEulerRadians.z,
+          ]
         )
       },
       lockedPartNames: lockedComponentIDs.compactMap(enginePartName(for:)).sorted(),
@@ -1179,6 +1219,17 @@ final class StudioWorkspaceModel {
     selection = [.modelNode(hierarchy.id)]
   }
 
+  /// Import source media (images / audio / video) into the project's assets so
+  /// they appear in the Source Assets collection. Referenced by path (the
+  /// project's Copy/Reference policy applies on save), one asset per file.
+  func importSourceAssets(from urls: [URL], kind: ProjectAssetKind) {
+    for url in urls {
+      let asset = ProjectAsset(name: url.lastPathComponent, kind: kind, sourcePath: url.path)
+      project.assets.removeAll { $0.sourcePath == asset.sourcePath }
+      project.assets.append(asset)
+    }
+  }
+
   func clearSelection() {
     storedSelectedFeature = nil
     selection.removeAll()
@@ -1346,7 +1397,7 @@ final class StudioWorkspaceModel {
       next = activeCenterView == .threeD ? .dopeSheet : .threeD
     case .show:
       next = activeCenterView == .threeD ? .nodeGraph : .threeD
-    case .assets, .rig, .canvas2d, .nodes, .hardware, .design:
+    case .assets, .rig, .canvas2d, .vr, .nodes, .hardware, .design:
       return
     }
     selectCenterView(next)
@@ -1423,6 +1474,10 @@ final class StudioWorkspaceModel {
     rigGuideVisibility.showsLimits.toggle()
   }
 
+  func toggleCADReferenceGeometry(_ geometry: CADReferenceGeometry) {
+    cadReferenceGeometryVisibility.toggle(geometry)
+  }
+
   func selectModelNode(at path: ModelEntityPath, extendingSelection: Bool) {
     let item = NavigatorItem.modelNode(path)
     if extendingSelection {
@@ -1491,7 +1546,7 @@ final class StudioWorkspaceModel {
 
   func isPartRestTransformEditable(_ id: PartID) -> Bool {
     guard let part = enginePart(for: id) else { return true }
-    if part.isGrounded { return true }
+    if part.isGrounded { return false }
     return !engineMates.contains { !$0.isSuppressed && $0.childPart == part.name }
   }
 
@@ -1666,9 +1721,11 @@ final class StudioWorkspaceModel {
     }
 
     let sequence = componentGroups.count + 1
+    let origin = componentGroupOrigin(for: selectedIDs)
     let group = NavigatorComponentGroup(
       displayName: name ?? "Group \(sequence)",
-      componentIDs: selectedIDs
+      componentIDs: selectedIDs,
+      positionMeters: origin
     )
     componentGroups.append(group)
     selection = [.componentGroup(group.id)]
@@ -1690,6 +1747,11 @@ final class StudioWorkspaceModel {
     guard let index = componentGroups.firstIndex(where: { $0.id == id }),
       !componentGroups[index].isLocked
     else { return }
+    let parentID = componentGroups[index].parentGroupID
+    for childIndex in componentGroups.indices
+    where componentGroups[childIndex].parentGroupID == id {
+      componentGroups[childIndex].parentGroupID = parentID
+    }
     componentGroups.remove(at: index)
     selection.remove(.componentGroup(id))
     documentEditRevision += 1
@@ -1889,7 +1951,8 @@ final class StudioWorkspaceModel {
 
     let group = NavigatorComponentGroup(
       displayName: "Group \(componentGroups.count + 1)",
-      componentIDs: memberIDs
+      componentIDs: memberIDs,
+      positionMeters: componentGroupOrigin(for: memberIDs)
     )
     componentGroups.append(group)
     selection = [.componentGroup(group.id)]
@@ -1950,7 +2013,8 @@ final class StudioWorkspaceModel {
   }
 
   func isComponentLocked(_ id: PartID) -> Bool {
-    lockedComponentIDs.contains(id) || componentGroup(containing: id)?.isLocked == true
+    lockedComponentIDs.contains(id)
+      || componentGroup(containing: id).map { isComponentGroupLocked($0.id) } == true
   }
 
   func isComponentIndividuallyLocked(_ id: PartID) -> Bool {
@@ -1958,7 +2022,7 @@ final class StudioWorkspaceModel {
   }
 
   func isComponentLockedByGroup(_ id: PartID) -> Bool {
-    componentGroup(containing: id)?.isLocked == true
+    componentGroup(containing: id).map { isComponentGroupLocked($0.id) } == true
   }
 
   func isMateLocked(_ id: JointID) -> Bool {
@@ -1967,6 +2031,199 @@ final class StudioWorkspaceModel {
 
   func componentGroup(containing id: PartID) -> NavigatorComponentGroup? {
     componentGroups.first { $0.componentIDs.contains(id) }
+  }
+
+  func componentGroup(id: UUID) -> NavigatorComponentGroup? {
+    componentGroups.first { $0.id == id }
+  }
+
+  var rootComponentGroups: [NavigatorComponentGroup] {
+    componentGroups.filter { group in
+      guard let parentID = group.parentGroupID else { return true }
+      return !componentGroups.contains { $0.id == parentID }
+    }
+  }
+
+  func childComponentGroups(of id: UUID) -> [NavigatorComponentGroup] {
+    componentGroups.filter { $0.parentGroupID == id }
+  }
+
+  func componentIDs(inGroupIncludingDescendants id: UUID) -> [PartID] {
+    var result: [PartID] = []
+    var visited: Set<UUID> = []
+    func appendMembers(of groupID: UUID) {
+      guard visited.insert(groupID).inserted,
+        let group = componentGroups.first(where: { $0.id == groupID })
+      else { return }
+      result.append(contentsOf: group.componentIDs)
+      for child in childComponentGroups(of: groupID) {
+        appendMembers(of: child.id)
+      }
+    }
+    appendMembers(of: id)
+    var unique: Set<PartID> = []
+    return result.filter { unique.insert($0).inserted }
+  }
+
+  func isComponentGroupLocked(_ id: UUID) -> Bool {
+    var currentID: UUID? = id
+    var visited: Set<UUID> = []
+    while let groupID = currentID, visited.insert(groupID).inserted,
+      let group = componentGroups.first(where: { $0.id == groupID })
+    {
+      if group.isLocked { return true }
+      currentID = group.parentGroupID
+    }
+    return false
+  }
+
+  func isComponentGroupGrounded(_ id: UUID) -> Bool {
+    let partIDs = componentIDs(inGroupIncludingDescendants: id)
+    return !partIDs.isEmpty
+      && partIDs.allSatisfy { enginePart(for: $0)?.isGrounded == true }
+  }
+
+  func isComponentGroupHidden(_ id: UUID) -> Bool {
+    let partIDs = componentIDs(inGroupIncludingDescendants: id)
+    return !partIDs.isEmpty && partIDs.allSatisfy(isComponentHidden)
+  }
+
+  func isComponentGroupTransformEditable(_ id: UUID) -> Bool {
+    guard !isComponentGroupLocked(id) else { return false }
+    let groupIDs = descendantComponentGroupIDs(of: id)
+    guard groupIDs.allSatisfy({ !isComponentGroupLocked($0) }) else { return false }
+    let partIDs = componentIDs(inGroupIncludingDescendants: id)
+    return !partIDs.isEmpty
+      && partIDs.allSatisfy {
+        !isComponentLocked($0) && isPartRestTransformEditable($0)
+      }
+  }
+
+  func cadComponentGroupTransform(_ id: UUID) -> CADPartRestTransform? {
+    guard let group = componentGroup(id: id) else { return nil }
+    return CADPartRestTransform(
+      positionMeters: [
+        group.positionMeters.x,
+        group.positionMeters.y,
+        group.positionMeters.z,
+      ],
+      rotationEulerRadians: [
+        group.rotationEulerRadians.x,
+        group.rotationEulerRadians.y,
+        group.rotationEulerRadians.z,
+      ])
+  }
+
+  @discardableResult
+  func nestComponentGroup(_ childID: UUID, in parentID: UUID?) -> Bool {
+    guard childID != parentID,
+      let childIndex = componentGroups.firstIndex(where: { $0.id == childID }),
+      !isComponentGroupLocked(childID)
+    else { return false }
+    if let parentID {
+      guard componentGroups.contains(where: { $0.id == parentID }),
+        !isComponentGroupLocked(parentID),
+        !descendantComponentGroupIDs(of: childID).contains(parentID)
+      else { return false }
+    }
+    guard componentGroups[childIndex].parentGroupID != parentID else { return false }
+    componentGroups[childIndex].parentGroupID = parentID
+    documentEditRevision += 1
+    return true
+  }
+
+  func setComponentGroupPosition(id: UUID, to positionMeters: RigVector3) {
+    guard positionMeters.x.isFinite, positionMeters.y.isFinite, positionMeters.z.isFinite,
+      var transform = cadComponentGroupTransform(id)
+    else { return }
+    transform.positionMeters = [positionMeters.x, positionMeters.y, positionMeters.z]
+    setComponentGroupTransform(id: id, to: transform)
+  }
+
+  func setComponentGroupRotation(id: UUID, to rotationEulerRadians: RigVector3) {
+    guard rotationEulerRadians.x.isFinite, rotationEulerRadians.y.isFinite,
+      rotationEulerRadians.z.isFinite,
+      var transform = cadComponentGroupTransform(id)
+    else { return }
+    transform.rotationEulerRadians = [
+      rotationEulerRadians.x,
+      rotationEulerRadians.y,
+      rotationEulerRadians.z,
+    ]
+    setComponentGroupTransform(id: id, to: transform)
+  }
+
+  func setComponentGroupTransform(id: UUID, to transform: CADPartRestTransform) {
+    guard isComponentGroupTransformEditable(id),
+      let groupIndex = componentGroups.firstIndex(where: { $0.id == id }),
+      let current = cadComponentGroupTransform(id)
+    else { return }
+    let delta = transform.matrix * simd_inverse(current.matrix)
+    let childGroupIDs = descendantComponentGroupIDs(of: id).subtracting([id])
+    let updatedChildTransforms = Dictionary(
+      uniqueKeysWithValues: childGroupIDs.compactMap { childID in
+        cadComponentGroupTransform(childID).map {
+          (childID, $0.applyingAssemblyDelta(delta))
+        }
+      })
+    let updatedPartTransforms = Dictionary(
+      uniqueKeysWithValues: componentIDs(inGroupIncludingDescendants: id).compactMap { partID in
+        cadPartRestTransform(for: partID).map {
+          (partID, $0.applyingAssemblyDelta(delta))
+        }
+      })
+
+    componentGroups[groupIndex].positionMeters = Self.rigVector(transform.positionMeters)
+    componentGroups[groupIndex].rotationEulerRadians =
+      Self.rigVector(transform.rotationEulerRadians)
+    for (childID, childTransform) in updatedChildTransforms {
+      guard let childIndex = componentGroups.firstIndex(where: { $0.id == childID }) else {
+        continue
+      }
+      componentGroups[childIndex].positionMeters = Self.rigVector(childTransform.positionMeters)
+      componentGroups[childIndex].rotationEulerRadians =
+        Self.rigVector(childTransform.rotationEulerRadians)
+    }
+    for (partID, partTransform) in updatedPartTransforms {
+      setPartPosition(id: partID, to: Self.rigVector(partTransform.positionMeters))
+      setPartRotation(id: partID, to: Self.rigVector(partTransform.rotationEulerRadians))
+    }
+    documentEditRevision += 1
+  }
+
+  func setComponentGroupHidden(_ id: UUID, hidden: Bool) {
+    guard !isComponentGroupLocked(id) else { return }
+    var didChange = false
+    for partID in componentIDs(inGroupIncludingDescendants: id) {
+      guard var appearance = componentAppearance(for: partID),
+        appearance.isVisible == hidden
+      else { continue }
+      appearance.isVisible = !hidden
+      componentAppearances[partID] = appearance
+      didChange = true
+    }
+    if didChange { documentEditRevision += 1 }
+  }
+
+  func toggleComponentGroupGrounded(_ id: UUID) async {
+    guard !isComponentGroupLocked(id), var document = engineRigDocument else { return }
+    let shouldGround = !isComponentGroupGrounded(id)
+    let names = componentIDs(inGroupIncludingDescendants: id).compactMap(enginePartName(for:))
+    guard !names.isEmpty else { return }
+    do {
+      for name in names {
+        document = try AnimaCoreRigDocumentEditor.settingPartState(
+          named: name,
+          grounded: shouldGround,
+          in: document)
+      }
+      engineRigDocument = document
+      documentEditRevision += 1
+      try await reloadEditedEngineRig()
+      selection = [.componentGroup(id)]
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
   }
 
   private func removeComponentFromGroups(_ id: PartID) {
@@ -1979,6 +2236,52 @@ final class StudioWorkspaceModel {
     guard !isComponentLocked(id) else { return [] }
     guard selection.contains(.part(id)) else { return [id] }
     return selectedUnlockedComponentIDs.contains(id) ? selectedUnlockedComponentIDs : [id]
+  }
+
+  private func componentGroupOrigin(for ids: [PartID]) -> RigVector3 {
+    let positions = ids.compactMap { id in
+      project.rig.parts.first(where: { $0.id == id })?.positionMeters
+    }
+    guard !positions.isEmpty else { return RigVector3() }
+    let count = Double(positions.count)
+    return RigVector3(
+      x: positions.reduce(0) { $0 + $1.x } / count,
+      y: positions.reduce(0) { $0 + $1.y } / count,
+      z: positions.reduce(0) { $0 + $1.z } / count)
+  }
+
+  private func descendantComponentGroupIDs(of id: UUID) -> Set<UUID> {
+    var result: Set<UUID> = []
+    func append(_ groupID: UUID) {
+      guard result.insert(groupID).inserted else { return }
+      for child in childComponentGroups(of: groupID) {
+        append(child.id)
+      }
+    }
+    append(id)
+    return result
+  }
+
+  private func normalizeComponentGroupHierarchy() {
+    let validIDs = Set(componentGroups.map(\.id))
+    for index in componentGroups.indices {
+      guard let parentID = componentGroups[index].parentGroupID else { continue }
+      if parentID == componentGroups[index].id || !validIDs.contains(parentID) {
+        componentGroups[index].parentGroupID = nil
+        continue
+      }
+      var visited: Set<UUID> = [componentGroups[index].id]
+      var cursor: UUID? = parentID
+      while let groupID = cursor,
+        let group = componentGroups.first(where: { $0.id == groupID })
+      {
+        if !visited.insert(groupID).inserted {
+          componentGroups[index].parentGroupID = nil
+          break
+        }
+        cursor = group.parentGroupID
+      }
+    }
   }
 
   func setCameraViewpoint(_ viewpoint: PreviewCameraViewpoint) {
@@ -1997,6 +2300,17 @@ final class StudioWorkspaceModel {
     cameraState.orientation = PreviewCameraOrientation(direction: direction)
     cameraViewpoint = .custom
     cameraCommandRevision += 1
+  }
+
+  /// Lightweight direction sync from a live CAD-pipeline orbit: keeps the
+  /// ViewCube in step without an undo checkpoint or command-revision bump
+  /// (which would flood undo and re-issue camera commands every frame).
+  func reportCameraDirection(_ direction: PreviewCameraDirection) {
+    guard cameraState.orientation.direction != direction else { return }
+    cameraState.orientation = PreviewCameraOrientation(
+      direction: direction,
+      rollRadians: cameraState.orientation.rollRadians
+    )
   }
 
   func nudgeCamera(horizontalRadians: Float = 0, verticalRadians: Float = 0) {

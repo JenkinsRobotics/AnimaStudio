@@ -93,7 +93,7 @@ struct StudioWorkspaceView: View {
   @AppStorage(StudioPreferenceKey.viewportRenderQuality)
   private var viewportRenderQualityRawValue = ViewportRenderQuality.standard.rawValue
   @AppStorage(StudioPreferenceKey.cadRenderBackend) private var cadRenderBackendRawValue =
-    CADRenderBackend.realityKit.rawValue
+    CADRenderBackend.defaultBackend.rawValue
   @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName =
     CADViewportTheme.studioBlue.name
   @AppStorage(StudioPreferenceKey.cadPreservesImportedColors) private
@@ -364,36 +364,42 @@ struct StudioWorkspaceView: View {
         workspaceSidebarContent(tab: tab)
       },
       right: { tab in
-        ConsolidatedViewportSidebarPanel(
-          tab: tab,
-          viewport: ConsolidatedViewportSidebarBindings(
-            workspace: workspace,
-            projection: cameraProjectionBinding,
-            renderStyle: viewportRenderStyleBinding,
-            edgeDisplay: viewportEdgeDisplayBinding,
-            lightingPreset: viewportLightingPresetBinding,
-            materialFinish: viewportMaterialFinishBinding,
-            reflectionMode: viewportReflectionModeBinding,
-            showsShadows: $viewportShowsShadows,
-            showsGrid: previewGridBinding,
-            appearance: viewportAppearanceBinding,
-            fieldOfViewDegrees: viewportFieldOfViewBinding,
-            lightingIntensity: $viewportLightingIntensity,
-            environmentPreset: viewportEnvironmentPresetBinding,
-            environmentRotationDegrees: $viewportEnvironmentRotationDegrees,
-            renderQuality: viewportRenderQualityBinding,
-            navigationProfile: viewportNavigationProfileBinding,
-            customRotateDrag: viewportCustomRotateDragBinding,
-            customPanDrag: viewportCustomPanDragBinding,
-            customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
-            orbitSpeed: viewportOrbitSpeedBinding,
-            panSpeed: viewportPanSpeedBinding,
-            zoomSpeed: viewportZoomSpeedBinding,
-            reversesWheelZoom: $viewportReversesWheelZoom,
-            openMouseSettings: openMouseSettings
-          )
-        ) {
-          workspaceInspectorContent
+        if usesDedicatedCADPipeline {
+          // CAD pipeline uses its own theme; show the appearance panel that
+          // actually drives it (background, colors, material, lighting, grid).
+          CADAppearancePanel(workspace: workspace)
+        } else {
+          ConsolidatedViewportSidebarPanel(
+            tab: tab,
+            viewport: ConsolidatedViewportSidebarBindings(
+              workspace: workspace,
+              projection: cameraProjectionBinding,
+              renderStyle: viewportRenderStyleBinding,
+              edgeDisplay: viewportEdgeDisplayBinding,
+              lightingPreset: viewportLightingPresetBinding,
+              materialFinish: viewportMaterialFinishBinding,
+              reflectionMode: viewportReflectionModeBinding,
+              showsShadows: $viewportShowsShadows,
+              showsGrid: previewGridBinding,
+              appearance: viewportAppearanceBinding,
+              fieldOfViewDegrees: viewportFieldOfViewBinding,
+              lightingIntensity: $viewportLightingIntensity,
+              environmentPreset: viewportEnvironmentPresetBinding,
+              environmentRotationDegrees: $viewportEnvironmentRotationDegrees,
+              renderQuality: viewportRenderQualityBinding,
+              navigationProfile: viewportNavigationProfileBinding,
+              customRotateDrag: viewportCustomRotateDragBinding,
+              customPanDrag: viewportCustomPanDragBinding,
+              customPreciseZoomDrag: viewportCustomPreciseZoomDragBinding,
+              orbitSpeed: viewportOrbitSpeedBinding,
+              panSpeed: viewportPanSpeedBinding,
+              zoomSpeed: viewportZoomSpeedBinding,
+              reversesWheelZoom: $viewportReversesWheelZoom,
+              openMouseSettings: openMouseSettings
+            )
+          ) {
+            workspaceInspectorContent
+          }
         }
       }
     )
@@ -441,6 +447,13 @@ struct StudioWorkspaceView: View {
       assetsWorkspaceView(surface: .workspaceSidebar, sidebarTab: tab)
     } else if workspace.activeWorkspace == .design {
       StudioDesignSandboxBrowser(tab: tab)
+    } else if workspace.activeWorkspace == .rig {
+      // The 3D Modeling tab gets the CAD-style assembly tree, sourced from the
+      // engine so it always shows the loaded parts.
+      AssemblyTreeView(
+        workspace: workspace,
+        deleteParts: { ids in Task { await deleteParts(ids) } }
+      )
     } else {
       ProjectNavigatorView(
         workspace: workspace,
@@ -504,7 +517,9 @@ struct StudioWorkspaceView: View {
       action,
       workspace: workspace,
       importModel: presentModelImportPanel,
-      importAnimaCharacter: presentAnimaCharacterImportPanel
+      importAnimaCharacter: presentAnimaCharacterImportPanel,
+      newCharacter: { showsNewCharacterSheet = true },
+      importSourceMedia: { presentSourceMediaImportPanel(kind: $0) }
     )
   }
 
@@ -650,6 +665,8 @@ struct StudioWorkspaceView: View {
       StudioDesignSandboxCanvas()
     case .canvas2d:
       Canvas2DWorkspaceView()
+    case .vr:
+      VRCharacterWorkspaceView()
     }
   }
 
@@ -715,13 +732,44 @@ struct StudioWorkspaceView: View {
             theme: cadViewportTheme,
             showsTelemetry: cadShowsTelemetry,
             isSelected: workspace.selectionCount > 0,
+            viewDirection: cadViewCubeDirection,
+            cameraCommandRevision: workspace.cameraCommandRevision,
+            hiddenSourceURLs: cadHiddenSourceURLs,
+            selectedSourceURLs: cadSelectedSourceURLs,
+            groundedSourceURLs: cadGroundedSourceURLs,
+            primarySelectedSourceURL: cadPrimarySelectedSourceURL,
+            partRestTransformsBySourceURL: cadPartRestTransformsBySourceURL,
+            primarySelectionTransformOverride: cadPrimarySelectionTransformOverride,
+            primarySelectionTransformLabel: cadPrimarySelectionTransformLabel,
+            primaryPartTransformIsEditable: cadPrimaryPartTransformIsEditable,
+            referenceGeometryVisibility: workspace.cadReferenceGeometryVisibility,
             onSourceTriangleCountsChange: { counts in
               cadSourceTriangleCounts = Dictionary(
                 uniqueKeysWithValues: counts.map {
                   ($0.key.standardizedFileURL.path, $0.value)
                 }
               )
-            }
+            },
+            onCameraDirection: { direction in
+              guard direction.count == 3 else { return }
+              workspace.reportCameraDirection(
+                PreviewCameraDirection(
+                  x: Float(direction[0]), y: Float(direction[1]), z: Float(direction[2])))
+            },
+            onPickPart: { url, extend in
+              guard let url else {
+                workspace.clearSelection()
+                return
+              }
+              let standardized = url.standardizedFileURL
+              guard
+                let partID = workspace.enginePartModelSources.first(where: {
+                  $0.value.fileURL.standardizedFileURL == standardized
+                })?.key
+              else { return }
+              workspace.selectPart(id: partID, extendingSelection: extend)
+            },
+            onSetPrimaryPartRestTransform: setCADPrimaryPartRestTransform
           )
         } else {
           RobotPreviewView(
@@ -823,9 +871,9 @@ struct StudioWorkspaceView: View {
       }
       .frame(minWidth: 520, minHeight: 420)
 
-      if !usesDedicatedCADPipeline {
-        cameraHUD
-      }
+      // The ViewCube is tied to the 3D environment, not one engine: it drives
+      // RealityKit and the CAD pipeline (Metal/WebGPU) alike.
+      cameraHUD
 
       if let engineEvaluationTimeSeconds = workspace.engineEvaluationTimeSeconds {
         engineFrameBadge(timeSeconds: engineEvaluationTimeSeconds)
@@ -870,9 +918,108 @@ struct StudioWorkspaceView: View {
     }
   }
 
-
   private var cadRenderBackend: CADRenderBackend {
-    CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .realityKit
+    (CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .defaultBackend).selectableOrDefault
+  }
+
+  /// The ViewCube's current direction, handed to the CAD pipeline so the shared
+  /// cube drives the Metal/WebGPU camera the same way it drives RealityKit.
+  private var cadViewCubeDirection: [Double] {
+    let direction = workspace.cameraState.orientation.direction
+    return [Double(direction.x), Double(direction.y), Double(direction.z)]
+  }
+
+  /// STEP files whose parts are hidden in the assembly tree — the CAD pipeline
+  /// maps these to per-part visibility so hiding a part hides it in the viewport.
+  private var cadHiddenSourceURLs: Set<URL> {
+    Set(
+      workspace.enginePartModelSources.compactMap { partID, source in
+        workspace.isComponentHidden(partID) ? source.fileURL.standardizedFileURL : nil
+      })
+  }
+
+  private var cadSelectedSourceURLs: Set<URL> {
+    var selected = Set(workspace.selectedComponentIDs)
+    if let groupID = selectedComponentGroupID {
+      selected.formUnion(workspace.componentIDs(inGroupIncludingDescendants: groupID))
+    }
+    return Set(
+      workspace.enginePartModelSources.compactMap { partID, source in
+        selected.contains(partID) ? source.fileURL.standardizedFileURL : nil
+      })
+  }
+
+  private var cadGroundedSourceURLs: Set<URL> {
+    Set(
+      workspace.enginePartModelSources.compactMap { partID, source in
+        workspace.enginePart(for: partID)?.isGrounded == true
+          ? source.fileURL.standardizedFileURL
+          : nil
+      })
+  }
+
+  private var cadPrimarySelectedSourceURL: URL? {
+    guard let partID = workspace.selectedPartID,
+      let source = workspace.enginePartModelSources[partID]
+    else { return nil }
+    return source.fileURL.standardizedFileURL
+  }
+
+  private var selectedComponentGroupID: UUID? {
+    guard case .componentGroup(let id) = workspace.primarySelection else { return nil }
+    return id
+  }
+
+  private var cadPrimarySelectionTransformOverride: CADPartRestTransform? {
+    selectedComponentGroupID.flatMap(workspace.cadComponentGroupTransform)
+  }
+
+  private var cadPrimarySelectionTransformLabel: String {
+    selectedComponentGroupID == nil ? "Part origin" : "Sub-assembly origin"
+  }
+
+  private var cadPartRestTransformsBySourceURL: [URL: CADPartRestTransform] {
+    var result: [URL: CADPartRestTransform] = [:]
+    for (partID, source) in workspace.enginePartModelSources {
+      guard let transform = workspace.cadPartRestTransform(for: partID) else { continue }
+      result[source.fileURL.standardizedFileURL] = transform
+    }
+    return result
+  }
+
+  private var cadPrimaryPartTransformIsEditable: Bool {
+    if let groupID = selectedComponentGroupID {
+      return workspace.isComponentGroupTransformEditable(groupID)
+    }
+    guard let partID = workspace.selectedPartID else { return false }
+    return !workspace.isComponentLocked(partID)
+      && workspace.isPartRestTransformEditable(partID)
+  }
+
+  private func setCADPrimaryPartRestTransform(_ transform: CADPartRestTransform) {
+    if let groupID = selectedComponentGroupID {
+      workspace.setComponentGroupTransform(id: groupID, to: transform)
+      return
+    }
+    guard let partID = workspace.selectedPartID,
+      transform.positionMeters.count == 3,
+      transform.rotationEulerRadians.count == 3,
+      let current = workspace.project.rig.parts.first(where: { $0.id == partID })
+    else { return }
+    let position = RigVector3(
+      x: transform.positionMeters[0],
+      y: transform.positionMeters[1],
+      z: transform.positionMeters[2])
+    let rotation = RigVector3(
+      x: transform.rotationEulerRadians[0],
+      y: transform.rotationEulerRadians[1],
+      z: transform.rotationEulerRadians[2])
+    if current.positionMeters != position {
+      workspace.setPartPosition(id: partID, to: position)
+    }
+    if current.rotationEulerRadians != rotation {
+      workspace.setPartRotation(id: partID, to: rotation)
+    }
   }
 
   private var selectedPartStatusName: String? {
@@ -1001,7 +1148,7 @@ struct StudioWorkspaceView: View {
 
   private var hasInspectorContent: Bool {
     return switch workspace.activeWorkspace {
-    case .assets, .animate, .canvas2d, .show, .hardware, .design:
+    case .assets, .animate, .canvas2d, .vr, .show, .hardware, .design:
       true
     case .nodes:
       false
@@ -1707,6 +1854,18 @@ struct StudioWorkspaceView: View {
       await workspace.importAnimaCharacter(from: url)
       registerLoadedCharacter(markDirty: true)
     }
+  }
+
+  private func presentSourceMediaImportPanel(kind: ProjectAssetKind) {
+    let configuration: NativeImportPanelConfiguration =
+      switch kind {
+      case .image: .images
+      case .audio: .audio
+      case .video: .video
+      case .model3D: .models
+      }
+    guard let urls = NativeImportPanel.chooseFiles(configuration: configuration) else { return }
+    workspace.importSourceAssets(from: urls, kind: kind)
   }
 
   @MainActor

@@ -48,6 +48,13 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Origin-anchor the 3D Modeling transform gizmo for selected Parts and sub-assemblies | shared screen-projection contract in `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport,CADTransformGizmoOverlay}.swift`, Three.js projection reporting in `dev/Codex Bench/web/threejs/src/app.js` + regenerated resources, focused CAD tests, STATUS + append-only coordination; preserve all concurrent hunks | common gizmo center follows the selected Part/group frame under camera orbit/pan/zoom and transform edits; Metal uses the exact render view-projection, Three.js reports its projected helper origin; offscreen/behind-camera gizmo hides; no viewport-center fallback; build/tests/JS/native/root verification pass | released 2026-07-28 — exact shared Metal projection + Three.js projected-helper bridge; 357 XCTest + 39 Swift Testing, recursive lint (existing/concurrent warnings only), JS check/build/copy, native/root builds, strict signing, packaged-resource identity, and launch pass |
+| Codex | 3D Modeling buildout Task 6 — nested sub-assembly nodes with origin/transform and unit hide/ground/move | `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/AppShell/{NavigatorOrganization,StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{AssemblyTreeView,InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADTransformGizmoOverlay}.swift`, focused tests under `app/Tests/{AnimaCADTests,AnimaDocumentTests,AnimaStudioUIUnitTests}/**`, STATUS + append-only coordination; preserve all existing/concurrent dirty hunks | backward-compatible editor metadata retains group parent + world origin; acyclic nesting renders in both assembly trees; group transform applies one shared rigid delta to descendant canonical Part rest transforms and both renderers consume the resulting existing map; group hide/ground batch descendants; tests/build/native/root verification pass | released 2026-07-28 — nested persistent frames + shared rigid descendant edits + unit hide/engine ground; 357 XCTest + 38 Swift Testing, recursive lint (existing/concurrent warnings only), native/root builds, strict signing, embedded string, and launch pass |
+| Codex | 3D Modeling buildout Task 4 — grounded/fixed viewport cue + immovable rest transform | grounded Part projection/wiring in `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift` and `Components/InspectorView.swift`, shared state plumbing in `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, `dev/Codex Bench/web/threejs/src/app.js`, regenerated resources, focused tests, STATUS + append-only coordination; preserve existing/concurrent dirty hunks | grounded engine state expands through the shared source→node mapping; Metal part-state bit 2 and Three.js material cue visibly distinguish fixed Parts; gizmo and numeric transform edits are blocked while rest pose remains pinned; build/tests/JS/native/root verification pass | released 2026-07-28 — fixed-state projection/cue + guarded transform path; 355 XCTest + 37 Swift Testing, JS build/check/copy, native/root builds, strict signing, packaged-resource identity, and launch pass |
+| Codex | 3D Modeling buildout Task 3 — shared per-Part rest transforms + direct translate/rotate gizmo on Metal and Three.js | `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport,CADTransformGizmoOverlay}.swift`, narrow transform callback/projection wiring in `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `dev/Codex Bench/web/threejs/src/app.js`, regenerated Bench/production Three.js resources, focused tests under `app/Tests/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve existing/concurrent dirty hunks | one shared partID→column-major transform presentation drives Metal's existing partTransformBuffer and Three.js mesh.matrix; selected-part overlay provides translate/rotate handles and writes guarded rest transforms through workspace setters; both engines update without geometry rebuild; build/tests/JS/native/root verification pass | released 2026-07-28 — shared transform buffer/matrix updates + common translate/rotate overlay; 355 XCTest + 36 Swift Testing, JS build/check/copy, native/root builds, strict signing, embedded hook, and packaged launch pass; 40-Part/60-FPS remains an operator benchmark |
+| Codex | 3D Modeling buildout Task 2 — selected Part origin display + explicit assembly-relative transform inspector | shared part-origin/transform presentation in `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, narrow selection/transform wiring in `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `dev/Codex Bench/web/threejs/src/app.js`, regenerated Bench/production Three.js resources, focused tests under `app/Tests/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve all existing/concurrent dirty hunks | selecting an engine Part shows one local RGB triad at its rest placement on Metal and Three.js WebGPU; Inspector labels and edits position/rotation as “Part origin (in assembly)”; shared transform math is computed once; build/tests/JS/native/root verification pass | released 2026-07-28 — shared AnimaCore-order matrix + selected local origin on Metal/Three.js; explicit editable Inspector section; 355 XCTest + 34 Swift Testing, JS build/check/copy, native/root builds, strict signing, embedded hook, and packaged launch pass; live WKWebView visual comparison deferred to operator |
+| Codex | 3D Modeling buildout Task 1 — real workspace Origin + independently toggleable Front/Top/Right reference planes on Metal and Three.js WebGPU | `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, `app/Sources/AnimaStudioUI/Components/AssemblyTreeView.swift`, narrow shared visibility state/wiring in `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `dev/Codex Bench/web/threejs/src/app.js`, generated `dev/Codex Bench/Resources/ThreeJSWeb/app.js` + `app/App/Resources/CADWeb/ThreeJSWeb/app.js`, focused tests under `app/Tests/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve all existing dirty hunks | tree eye controls drive one shared reference-geometry visibility value; workspace triad plus Front/Top/Right planes render on Metal and WebGPU with independent toggles; `swift build`, focused/full `swift test`, JS rebuild/copy, native/root app build and live walkthrough where available | released 2026-07-28 — shared bounds-scaled presentation feeds Metal and Three.js WebGPU; independent tree toggles tested; `swift build`, 355 XCTest + 31 Swift Testing, JS build/check, native/root builds, deep signing, packaged-resource check, and launch pass; real STEP load pass, final visual toggle comparison deferred to operator |
+| Claude | VR character type + character-type-routed authoring tab + toolbar float-width fix (Jonathan-requested, cross-lane) | `animacore/tracking.py` + `animacore/tests/test_tracking.py`, new `app/Sources/AnimaStudioUI/Workspaces/VR/VRCharacterWorkspaceView.swift`, additive `.vr` arms + character-type routing in `app/Sources/AnimaStudioUI/AppShell/{WorkspaceDescriptor,StudioWorkspaceView,StudioWorkspaceModel,WorkspaceLayout,WorkspaceShell,WorkspaceSelector,WorkspaceChrome}.swift`, `app/Sources/AnimaStudioUI/Workspaces/{WorkspaceRibbonCatalog,DemoWorkspaceToolCatalog}.swift`, `app/Sources/AnimaStudioUI/Components/{InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaStudioUI/Settings/StudioSettingsCatalog.swift`, the `categoryStrip` float fix in `WorkspaceShell.swift`, matching test updates under `app/Tests/**`, `dev/docs/{roadmap/VR_Character.md,reality/STATUS.md}`; preserve other Codex hunks | `StudioCharacterType` (3D/2D/VR) on the model + a picker beside the tabs; `visibleStages` routes one authoring tab per type (Rig/2D/VR, replacing the fixed Rig tab); new `.vr` workspace + `VRCharacterWorkspaceView` live avatar preview driven by blendshape sliders through the bridge; `tracking.py` ARKit-blendshape contract proven to drive an avatar via existing evaluation; floating expanded ribbon no longer full-width; ruff + pytest + `swift build`/`swift test`/format-lint pass | released 2026-07-24 — 1162 pytest (+3 skip), 352 XCTest + 27 Swift Testing, swift build + format-lint pass. Deferred (needs on-device testing): the Vision webcam capture pipeline that replaces the sliders |
 | Claude | Import the full Mochi 2D media library into examples + in-app media picker (Jonathan-requested) | `examples/assets/2d/**` (mirror of Mochi's media tree — gifs/png/bmps/video/bitmaps/animations/math/mscripts/procedural/packs/skins + `CATALOG.json` + README), `examples/{pixel_pet_2d,dino_screen_2d}.character.anima`, `animacore/raster/faces/simple_face.py` (translucent breathing bg so faces composite over media), `animacore/tests/test_example_2d_media.py`, `app/Sources/AnimaStudioUI/Workspaces/Canvas2D/Canvas2DWorkspaceView.swift` (subject picker only), `dev/docs/reality/STATUS.md`, append-only coordination; preserve other Codex hunks | full Mochi media library (~149 renderable assets: image/gif/video/bitmap; ~37 MB, mostly `video/`) with sidecars + built catalog; two example 2D characters render imported media end-to-end; the procedural face composites over a media background; the app 2D preview switches Face/Pixel Pet/Dino live via the bridge; ruff + pytest + `swift build`/format-lint pass; media flagged as dev fixture (licensing) + gitignore/LFS note for `video/` | released 2026-07-24 — 1158 pytest (+3 skip), swift build + format-lint pass; imported-media characters verified rendering (ASCII + tests) |
 | Claude | 2D asset conventions — the create↔play interchange ported from Mochi (`.props.yaml` / catalog / packs / skins / Mscript runner) | new `animacore/{asset_props,asset_catalog,pack,skin}.py`, new `animacore/raster/{skin_compositor,mscript_runner}.py`, `animacore/bridge.py` (add incremental `canvas2d.add/update/remove_surface` + `add/remove_source` verbs only), new `animacore/tests/{test_asset_props,test_asset_catalog,test_pack,test_skin,test_mscript_runner}.py` + additions to `test_bridge_canvas2d.py`, `dev/docs/{roadmap/2D_Character_Pipeline.md,reality/STATUS.md}`, append-only coordination; touch no `app/**` | faithful ports (Apache-2.0): `asset-props/v1` sidecar (read + author) + `visual_source_from_asset`; `build_catalog` → JSON; `pack/v1` slots (str/list/dict resolution); `skin/v1` + `apply_skin` (paint into `screen_bbox`); `MscriptRunner`/`render_mscript` play the command stream into frames; bridge editor-CRUD verbs; stdlib+pyyaml (compositing/playback use the `media` extra); ruff + full `animacore` pytest pass | released 2026-07-23 — 6 new engine modules + 5 bridge verbs; 21 new tests; ruff clean; 1152 pytest (+1 skip). No `app/**` touched (these are the engine/format the app + middleware consume) |
 | Claude | 2D workspace groundwork II — persistence (`canvas2d:` in `.character.anima`) + live preview (Jonathan authorized cross-lane, 2026-07-23) | `animacore/canvas2d_io.py`, `animacore/loader.py` (allow the `canvas2d:` top-level block only), `examples/pixel_face_2d.character.anima`, `animacore/bridge.py` (`canvas2d.load`/`save` + refactor DTO helpers to `canvas2d_io`), `animacore/tests/{test_canvas2d_io,test_bridge_canvas2d,test_loader}.py`, additive `canvas2DNew`/`canvas2DRenderFrame` on `app/Sources/AnimaCoreClient/AnimaCoreClient.swift`, live-preview rewrite of `app/Sources/AnimaStudioUI/Workspaces/Canvas2D/Canvas2DWorkspaceView.swift`, `dev/docs/{roadmap/2D_Character_Workspace.md,reality/STATUS.md}`, append-only coordination; preserve all other Codex hunks | canvas2d serializes to/from a `.character.anima` `canvas2d:` block (one shape shared with the bridge DTO); a pure-2D character loads as an empty-mechanics Rig + canvas2d block; the 2D workspace renders a **live** procedural face from the engine (`canvas2d.new` → `render_frame`, decoded PNG) with mouth/curve/eye/time sliders; ruff + pytest + `swift build`/`swift test` pass | released 2026-07-23 — 1131 pytest (+1 skip: 2D char has no servo outputs) + 352 XCTest + 27 Swift Testing; real stdio bridge smoke (hello→canvas2d.new→render_frame→128x128 PNG) verified; native Xcode build + live GUI walkthrough deferred to operator (headless env) |
@@ -300,6 +307,14 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Requests
 
+- **Codex → Claude (2026-07-28, blocking 3D Workspace Task 5):** Python
+  `add_mate`/`update_mate`/`remove_mate` already exist, but the Swift
+  `AnimaCoreClient` surface is absent and incremental `add_part`/
+  `add_connector` verbs do not exist on either side. Please own this
+  end-to-end bridge packet per the task assignment, returning a refreshed rig
+  projection with subprocess and `.character.anima` round-trip coverage.
+  Codex will not add connector/mate meaning or a fallback solver in Swift; UI
+  integration waits for the released callable contract.
 - **Codex → Claude:** When Lane B is ready, release the claim with the exact
   Python test paths and any Wire Protocol deviations. Do not commit or format
   Swift files as part of the runtime packet.
@@ -363,6 +378,144 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+- **2026-07-28 (Codex, selected-origin transform-gizmo anchoring):** Removed
+  the transform overlay's viewport-centered layout. The shared pipeline now
+  positions it at the selected Part or sub-assembly frame's projected origin.
+  Metal and the Swift projection contract use the same view/projection matrix,
+  while Three.js projects the selected origin helper after rendering and
+  reports its normalized screen position through the web bridge. Camera orbit,
+  pan, zoom, and rest-transform changes therefore move the control with the
+  selected frame; behind-camera and offscreen frames hide it instead of
+  snapping back to center. A focused regression covers centered, offscreen,
+  and behind-camera projection. Verification: `swift build`; full `swift test`
+  (357 XCTest + 39 Swift Testing); recursive lint exits zero with existing/
+  concurrent warnings only; Three.js syntax/build/copy plus identical source,
+  app-resource, and packaged-resource hashes; native `xcodebuild -jobs 2`;
+  root-app rebuild; strict signing; packaged message check; clean launch.
+
+- **2026-07-28 (Codex, 3D Workspace Buildout Task 6 —
+  sub-assemblies):** Sub-assemblies now have a persistent assembly-space
+  origin/rotation and optional parent in backward-compatible editor metadata
+  v6. Both the 3D Modeling assembly tree and production Instances tree render
+  the acyclic nested hierarchy; drag-to-center and the assembly context menu
+  establish parentage, and dissolving a group promotes its children. Selecting
+  a group highlights every descendant Part and reuses the common origin triad
+  and transform overlay. One shared matrix delta moves/rotates descendant
+  groups and canonical Part rest transforms; Metal and Three.js therefore
+  consume the unchanged shared Part-transform presentation instead of gaining
+  group math. Hide batches editor presentation, while ground batches the
+  engine-owned Part state into one AnimaCore document reload. Inspector exposes
+  the group frame plus hide/ground/lock/dissolve actions. Tests prove
+  translation, rotation, cycle rejection, legacy metadata defaults, nested
+  round-trip, and real-bridge grounding. Verification: `swift build`; full
+  `swift test` (357 XCTest + 38 Swift Testing); recursive lint exits zero with
+  existing/concurrent warnings only; native `xcodebuild -jobs 2`; root-app
+  rebuild; strict signing; packaged sub-assembly string; clean launch. Task 5
+  remains blocked on the separately recorded backend bridge packet.
+
+- **2026-07-28 (Codex, 3D Workspace Buildout Task 4 — grounded/fixed
+  Parts):** The workspace now expands AnimaCore `Part.isGrounded` through the
+  existing source-to-node map. Metal consumes a third retained Part-state bit
+  and Three.js consumes the same grounded Part IDs; both render a blue fixed
+  cue while preserving selection precedence. The shared transform overlay
+  identifies the selected Part as fixed and disables its controls, the
+  Inspector labels the pinned rest transform and disables numeric fields, and
+  every workspace rest-transform setter rejects grounded edits. A real bridge
+  integration regression loads a grounded `.character.anima`, verifies the
+  edit guard, and proves the original rest transform remains unchanged.
+  Verification: `swift build`; full `swift test` (355 XCTest + 37 Swift
+  Testing); recursive lint exits zero with existing/concurrent warnings only;
+  Three.js syntax/build/copy plus byte-identical packaged resource; native
+  `xcodebuild -jobs 2`; root-app rebuild; strict signing; clean packaged
+  launch. A final operator visual comparison on both renderer settings remains
+  unclaimed.
+
+- **2026-07-28 (Codex, 3D Workspace Buildout Task 3 — move Parts):** The
+  shared pipeline now expands AnimaCore rest transforms into sorted
+  `CADPartTransformPresentation` entries keyed by the retained
+  `assemblyNode + 1` Part ID. Metal writes them into its existing shared
+  `partTransformBuffer`; Three.js stores the same column-major arrays and sets
+  `mesh.matrixAutoUpdate = false`. Both update in place without geometry
+  reloads. Added a renderer-independent `CADTransformGizmoOverlay` with local
+  X/Y/Z translate and rotate handles; drag math starts from a stable rest
+  transform and writes through the selected Part's guarded
+  `setPartPosition`/`setPartRotation` path. Tests cover payload identity and
+  rotated-local-axis deltas. Verification: `swift build`; full `swift test`
+  (355 XCTest + 36 Swift Testing); recursive lint exits zero with existing/
+  concurrent warnings only; Three.js syntax/build/copy check; native/root
+  builds; strict signing; packaged `setPartTransforms` resource check. The
+  first native build was OS-killed (137) during parallel compilation; a
+  `-jobs 2` retry succeeded and the incremental root package completed. No
+  geometry-rebuild path remains for transform edits. The requested 40-Part/
+  60-FPS result is deliberately unclaimed until an operator runs that workload
+  on the packaged app.
+
+- **2026-07-28 (Codex, 3D Workspace Buildout Task 2 — selected Part
+  origin):** Added a renderer-neutral `CADPartRestTransform` matching
+  AnimaCore's intrinsic XYZ `R = Rx · Ry · Rz` convention and a
+  `CADPartOriginPresentation` that stores one column-major matrix. The shared
+  pipeline expands that transform through the retained STEP source→assembly
+  node mapping and resolves the primary selected origin once. Metal CPU-
+  transforms a bright local RGB triad into its existing reference-line
+  pipeline; Three.js creates an `AxesHelper` and applies the same matrix with
+  `matrixAutoUpdate = false`. The Inspector's six existing numeric controls
+  are now grouped and labeled as **Part origin (in assembly)**, still writing
+  through `setPartPosition`/`setPartRotation`. Tests prove canonical matrix
+  order, JSON/column-major fidelity, and projection from the editable
+  workspace model. Verification: `swift build`; full `swift test` (355 XCTest
+  + 34 Swift Testing); recursive lint exits zero with existing/concurrent
+  warnings only; `node --check` + `node build.mjs`; both generated resource
+  copies compare equal; native/root build; strict signing; packaged
+  `setSelectedPartOrigin` resource check; and packaged launch. WKWebView visual
+  capture remains an operator check because scripted macOS focus switched
+  away from the app. Correct production copy destination from the Three.js
+  working directory is
+  `../../../../app/App/Resources/CADWeb/ThreeJSWeb/app.js`.
+
+- **2026-07-28 (Codex, 3D Workspace Buildout Task 1 — Origin + reference
+  planes):** Replaced the four cosmetic Assembly rows with shared view-only
+  state and renderer geometry. `CADPipelineViewport` now computes one
+  document-bounds-scaled `CADWorkspaceReferenceGeometry`;
+  `CADMetalViewport` draws a classic RGB origin triad plus independently
+  visible Front/Top/Right wire grids, and `CADWebGPUViewport` sends the same
+  value to Three.js WebGPU, where `AxesHelper`/`GridHelper` render it. The
+  workspace model owns visibility, so tree eye controls update either retained
+  renderer without persisting to `.anima`. Added focused CAD and UI tests;
+  rebuilt and copied the Three.js bundle into both Bench and production
+  resources. Verification: `swift build`; focused tests; full `swift test`
+  (355 XCTest + 31 Swift Testing, zero failures); recursive format lint exits
+  zero with only existing/concurrent warnings outside this packet;
+  `node build.mjs`
+  and `node --check`; native Xcode build; root-app rebuild; strict deep
+  signing; embedded `setReferenceGeometry` resource check; packaged launch;
+  and a real STEP project load. The task prompt's production-resource `cp`
+  destination is one directory short when run from
+  `dev/Codex Bench/web/threejs`; the repo-relative destination is
+  `../../../../app/App/Resources/CADWeb/ThreeJSWeb/app.js`. Scripted macOS
+  focus switching did not yield a reliable final plane-toggle screenshot, so
+  the before/after operator visual remains explicitly unclaimed.
+
+- **2026-07-24 (Claude, VR character type + type-routed authoring tab):** Per
+  Jonathan — characters get a **type** (3D/2D/VR) and the second tab is
+  type-specific. Added `StudioCharacterType` (→ `authoringWorkspace`:
+  3D→rig, 2D→canvas2d, VR→vr), `characterType` on `StudioWorkspaceModel` (didSet
+  follows to the new authoring workspace), a type picker beside the tab strip in
+  `WorkspaceSelector`, and routed `visibleStages` so one authoring tab replaces the
+  fixed Rig tab. Registered `StudioWorkspaceKind.vr` across every exhaustive switch
+  (mirroring canvas2d) + `VRCharacterWorkspaceView` (live avatar preview: blendshape
+  sliders → face params → bridge `render_frame`). Engine: `animacore/tracking.py`
+  — Apple's 52 ARKit blendshapes + head pose as the tracker-neutral param contract;
+  `test_tracking.py` proves a tracked `jawOpen` drives an avatar via the existing
+  `evaluate_surfaces` (the avatar half of VR already works; only the tracker input
+  is new). Also fixed the floating **expanded** tool ribbon spanning the full
+  window — `categoryStrip` now hugs content when floating (matches `toolRow`).
+  Face-tracking decision (Jonathan): **Mac webcam via Vision** — that capture
+  pipeline is the next piece (needs on-device testing; the sliders stand in). 1162
+  pytest (+3 skip), 352 XCTest + 27 Swift Testing, swift build + format-lint pass.
+  Design: `dev/docs/roadmap/VR_Character.md`. **Codex:** went deep into the shell
+  (WorkspaceDescriptor/Selector/Chrome/Model + visibleStages) with Jonathan's
+  go-ahead — the character-type routing + VR workspace are yours to own/refine.
 
 - **2026-07-24 (Claude, imported Mochi 2D test media + in-app picker):** Curated a
   small set of Mochi's test media into `examples/assets/2d/` (3 images, 3 gifs, 1
@@ -3790,3 +3943,16 @@ change needed in the Handoff log instead of inventing commands.
   one owner. Claude's concurrent shell changes were retained. Touched lint,
   346 XCTest + 27 Swift Testing tests, native/root builds, strict deep signing,
   and live launch PID 20348 pass.
+- **2026-07-29 (Claude, integration checkpoint):** Committed the shared
+  working tree — 60 files spanning both lanes' released claims (all Live
+  claims marked released 2026-07-28 or earlier; no active locks): Codex's
+  CAD render pipeline (shared `CADPipelineViewport`, Metal/WebGPU adapters,
+  transform gizmo, reference geometry, appearance panel, assembly tree,
+  nested sub-assemblies), Claude's VR character type + `tracking.py`, and the
+  2D emotes pack. `reference_ui/` (46MB AI-gen design scratch, unwired) was
+  gitignored, not committed. Build clean; 355 XCTest + 36 Swift Testing green.
+  No behavior change in this commit — pure de-risking backup of released work.
+  **Open coordination item (unchanged by this commit):** the Codex/Claude
+  file-division for the next CAD-viewport round (move/origin vs
+  appearance-unification/video) still needs locking in Live claims before
+  either agent re-enters `app/Sources/AnimaCADViewport/**`.

@@ -30,6 +30,41 @@ struct WorkspaceStageTabs: View {
     StudioWorkspaceTabDefaults.showsUIDev
 
   var body: some View {
+    HStack(spacing: 8) {
+      characterTypePicker
+      tabCapsule
+    }
+  }
+
+  private var characterTypePicker: some View {
+    Menu {
+      ForEach(StudioCharacterType.allCases) { type in
+        Button {
+          isUIDevWorkspace = false
+          workspace.characterType = type
+        } label: {
+          Label(type.title, systemImage: type.systemImage)
+        }
+      }
+    } label: {
+      HStack(spacing: 4) {
+        Image(systemName: workspace.characterType.systemImage)
+        Text(workspace.characterType.title)
+        Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+      }
+      .font(.system(size: 11, weight: .semibold))
+      .foregroundStyle(StudioPalette.ink)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 7)
+      .background(StudioPalette.panelInset, in: Capsule())
+      .overlay(Capsule().stroke(StudioPalette.border, lineWidth: 1))
+    }
+    .menuStyle(.borderlessButton)
+    .fixedSize()
+    .help("Character type — routes the authoring tab (3D / 2D / VR)")
+  }
+
+  private var tabCapsule: some View {
     HStack(spacing: 2) {
       ForEach(visibleStages) { kind in
         workspaceTab(
@@ -80,6 +115,7 @@ struct WorkspaceStageTabs: View {
 
   private var visibleStages: [StudioWorkspaceKind] {
     StudioWorkspaceNavigation.visibleStages(
+      characterType: workspace.characterType,
       showNodes: showsNodesWorkspaceTab,
       showDesign: showsDesignWorkspaceTab
     )

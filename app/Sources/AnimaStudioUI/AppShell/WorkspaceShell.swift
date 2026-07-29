@@ -628,6 +628,11 @@ enum StudioWorkspaceSidebarCatalog {
         tab("Surfaces", "square.on.square"), tab("Media", "photo.on.rectangle"),
         tab("Faces", "face.smiling"), tab("Output", "circle.grid.3x3"),
       ]
+    case .vr:
+      [
+        tab("Avatar", "person.crop.square"), tab("Tracking", "faceid"),
+        tab("Bindings", "slider.horizontal.3"), tab("Expressions", "face.smiling"),
+      ]
     }
   }
 
@@ -805,11 +810,29 @@ enum WorkspaceRibbonActionDispatcher {
     _ action: WorkspaceRibbonAction,
     workspace: StudioWorkspaceModel,
     importModel: () -> Void,
-    importAnimaCharacter: () -> Void
+    importAnimaCharacter: () -> Void,
+    newCharacter: () -> Void = {},
+    importSourceMedia: (ProjectAssetKind) -> Void = { _ in }
   ) {
     switch action {
+    // Creating a character sets its type (so the authoring tab routes to
+    // Rig/2D/VR) and opens the New Character flow, which adds it to the project
+    // list on the Character workspace — the user stays here to import assets and
+    // set up before rigging.
+    case .createCharacter3D:
+      workspace.characterType = .threeD
+      newCharacter()
+    case .createCharacter2D:
+      workspace.characterType = .twoD
+      newCharacter()
+    case .createCharacterVR:
+      workspace.characterType = .vr
+      newCharacter()
     case .importAnimaCharacter: importAnimaCharacter()
     case .importModel: importModel()
+    case .importImage: importSourceMedia(.image)
+    case .importAudio: importSourceMedia(.audio)
+    case .importVideo: importSourceMedia(.video)
     case .stopPlayback: workspace.stopPlayback()
     case .togglePlayback: workspace.togglePlayback()
     case .toggleLoop: workspace.loopsPreviewPlayback.toggle()
@@ -830,7 +853,8 @@ enum WorkspaceRibbonActionDispatcher {
     case .importModel: !workspace.isLoadingModelHierarchy
     case .frameSelection: workspace.canFrameSelection
     case .stopPlayback, .togglePlayback, .toggleLoop, .previousKeyframe, .nextKeyframe,
-      .toggleGrid, .toggleBottomEditor:
+      .toggleGrid, .toggleBottomEditor, .createCharacter3D, .createCharacter2D,
+      .createCharacterVR, .importImage, .importAudio, .importVideo:
       true
     }
   }
@@ -962,6 +986,10 @@ struct StudioToolSidebar: View {
       maxWidth: docked || StudioToolBarSizing.fillsAvailableWidth(density) ? .infinity : nil,
       alignment: .leading
     )
+    // A floating bar hugs its content: force the whole toolbar to ignore the
+    // parent's full-width proposal, so the chrome never stretches across the
+    // window (docked still fills its column).
+    .fixedSize(horizontal: !docked, vertical: false)
     .frame(height: StudioToolBarSizing.height(for: density))
     .sidebarChrome(docked: docked, cornerRadius: toolBarCornerRadius)
   }
@@ -973,31 +1001,42 @@ struct StudioToolSidebar: View {
       : shape.toolBarRadius
   }
 
+  @ViewBuilder
   private var categoryStrip: some View {
-    ScrollView(.horizontal) {
-      HStack(spacing: 2) {
-        ForEach(categories) { category in
-          let active = activeCategory?.id == category.id
-          Button {
-            settings.setActiveCategory(category.id, for: workspaceKind)
-          } label: {
-            Text(category.title.uppercased())
-              .font(.system(size: 9.5, weight: .semibold))
-              .tracking(0.4)
-              .foregroundStyle(active ? StudioPalette.accent : StudioPalette.muted)
-              .padding(.horizontal, 8)
-              .padding(.vertical, 3)
-              .background(
-                active ? StudioPalette.accent.opacity(0.14) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 6)
-              )
-          }
-          .buttonStyle(.plain)
+    // Docked fills its row; a floating bar hugs its content (matches toolRow so
+    // the expanded category strip no longer stretches full-width when floating).
+    if docked {
+      ScrollView(.horizontal) { categoryButtons }
+        .scrollIndicators(.hidden)
+        .padding(.bottom, 2)
+    } else {
+      categoryButtons
+        .fixedSize(horizontal: true, vertical: true)
+        .padding(.bottom, 2)
+    }
+  }
+
+  private var categoryButtons: some View {
+    HStack(spacing: 2) {
+      ForEach(categories) { category in
+        let active = activeCategory?.id == category.id
+        Button {
+          settings.setActiveCategory(category.id, for: workspaceKind)
+        } label: {
+          Text(category.title.uppercased())
+            .font(.system(size: 9.5, weight: .semibold))
+            .tracking(0.4)
+            .foregroundStyle(active ? StudioPalette.accent : StudioPalette.muted)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+              active ? StudioPalette.accent.opacity(0.14) : Color.clear,
+              in: RoundedRectangle(cornerRadius: 6)
+            )
         }
+        .buttonStyle(.plain)
       }
     }
-    .scrollIndicators(.hidden)
-    .padding(.bottom, 2)
   }
 
   @ViewBuilder

@@ -261,6 +261,58 @@ final class NavigatorOrganizationTests: XCTestCase {
   }
 
   @MainActor
+  func testNestedSubassemblyMovesDescendantsAndRejectsCycles() throws {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .sphere)
+    model.addPart(kind: .cylinder)
+    let ids = model.project.rig.parts.map(\.id)
+    model.setPartPosition(id: ids[0], to: RigVector3(x: 0, y: 0, z: 0))
+    model.setPartPosition(id: ids[1], to: RigVector3(x: 2, y: 0, z: 0))
+    model.setPartPosition(id: ids[2], to: RigVector3(x: 4, y: 0, z: 0))
+
+    model.selection = [.part(ids[0]), .part(ids[1])]
+    let parentID = model.createComponentGroup(named: "Parent")
+    model.selection = [.part(ids[2])]
+    let childID = model.createComponentGroup(named: "Child")
+
+    XCTAssertTrue(model.nestComponentGroup(childID, in: parentID))
+    XCTAssertFalse(model.nestComponentGroup(parentID, in: childID))
+    XCTAssertEqual(model.rootComponentGroups.map(\.id), [parentID])
+    XCTAssertEqual(model.childComponentGroups(of: parentID).map(\.id), [childID])
+    XCTAssertEqual(
+      model.componentIDs(inGroupIncludingDescendants: parentID),
+      ids)
+
+    model.setComponentGroupPosition(
+      id: parentID,
+      to: RigVector3(x: 2, y: 0, z: 0))
+
+    XCTAssertEqual(model.project.rig.parts[0].positionMeters, RigVector3(x: 1, y: 0, z: 0))
+    XCTAssertEqual(model.project.rig.parts[1].positionMeters, RigVector3(x: 3, y: 0, z: 0))
+    XCTAssertEqual(model.project.rig.parts[2].positionMeters, RigVector3(x: 5, y: 0, z: 0))
+    XCTAssertEqual(model.componentGroup(id: childID)?.positionMeters, RigVector3(x: 5, y: 0, z: 0))
+
+    model.setComponentGroupRotation(
+      id: parentID,
+      to: RigVector3(x: 0, y: 0, z: .pi / 2))
+    let rotatedPositions = model.project.rig.parts.map(\.positionMeters)
+    XCTAssertEqual(rotatedPositions[0].x, 2, accuracy: 0.000_01)
+    XCTAssertEqual(rotatedPositions[0].y, -1, accuracy: 0.000_01)
+    XCTAssertEqual(rotatedPositions[1].x, 2, accuracy: 0.000_01)
+    XCTAssertEqual(rotatedPositions[1].y, 1, accuracy: 0.000_01)
+    XCTAssertEqual(rotatedPositions[2].x, 2, accuracy: 0.000_01)
+    XCTAssertEqual(rotatedPositions[2].y, 3, accuracy: 0.000_01)
+    XCTAssertEqual(
+      model.componentGroup(id: childID)?.rotationEulerRadians.z ?? 0,
+      .pi / 2,
+      accuracy: 0.000_01)
+
+    model.setComponentGroupHidden(parentID, hidden: true)
+    XCTAssertTrue(ids.allSatisfy(model.isComponentHidden))
+  }
+
+  @MainActor
   func testMateLocksGuardRenameAxisAndLimits() throws {
     let model = StudioWorkspaceModel()
     model.addPart(kind: .box)

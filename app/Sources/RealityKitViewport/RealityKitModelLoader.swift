@@ -68,8 +68,13 @@ public enum RealityKitModelLoader {
     let root: Entity
     let importedMeshes: [ImportedMesh]
     if cadFileExtensions.contains(fileExtension) {
+      // STEP geometry is millimeter-based in the kernel. A stored meters unit
+      // (1.0) is the legacy forced default, never a real CAD unit — treat it as
+      // millimeters. ponytail: heuristic; real CAD is mm/cm/inch, and the unit
+      // is auto-detected from the STEP header at import (ModelImportUnit).
+      let cadUnitScaleToMeters = unitScaleToMeters == 1 ? 0.001 : unitScaleToMeters
       let document = try await Task.detached(priority: .userInitiated) {
-        try CADGeometryDocument.loadSTEP(url)
+        try CADGeometryDocument.loadSTEP(url, unitScaleToMeters: cadUnitScaleToMeters)
       }.value
       root = try makeEntity(from: document, name: url.deletingPathExtension().lastPathComponent)
       importedMeshes = document.faces.map { face in

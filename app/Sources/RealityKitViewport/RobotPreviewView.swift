@@ -1080,7 +1080,11 @@ public struct RobotPreviewView: View {
     catcher.position = SIMD3<Float>(0, 0, -250)
     catcher.components.set(InputTargetComponent(allowedInputTypes: .indirect))
     catcher.components.set(
-      CollisionComponent(shapes: [.generateBox(width: 1600, height: 1600, depth: 0.1)])
+      CollisionComponent(
+        shapes: [.generateBox(width: 1600, height: 1600, depth: 0.1)],
+        mode: .default,
+        filter: CollisionFilter(group: .default, mask: [])
+      )
     )
     return catcher
   }
@@ -1322,8 +1326,12 @@ public struct RobotPreviewView: View {
     var target = defaultTarget
     var distance: Float = 4.5
 
-    if viewpoint == .selection {
-      let focusedEntity: Entity? = {
+    // Frame the focused entity (.selection) or all character content (.home) so
+    // parts of any scale fill the view. Without this, .home is a fixed 4.5 m and
+    // a small imported part (e.g. a 50 mm CAD part) renders as a distant pixel.
+    let framedEntity: Entity? = {
+      switch viewpoint {
+      case .selection:
         if let focusedPartID {
           return root.findEntity(named: partEntityName(focusedPartID))
         }
@@ -1331,12 +1339,25 @@ public struct RobotPreviewView: View {
           let importedModel = root.findEntity(named: "importedModel")
         else { return nil }
         return entity(at: focusedModelPath, below: importedModel)
-      }()
-      if let focusedEntity {
-        let bounds = focusedEntity.visualBounds(relativeTo: root)
+      case .home:
+        if let characterRoot = root.findEntity(named: "animaCharacterRoot"),
+          !characterRoot.children.isEmpty
+        {
+          return characterRoot
+        }
+        return root.findEntity(named: "importedModel")
+      default:
+        return nil
+      }
+    }()
+    if let framedEntity {
+      let bounds = framedEntity.visualBounds(relativeTo: root)
+      // Fit the bounding sphere to a ~60° view with margin. Guard empty/NaN
+      // bounds (no content yet) so the default framing is kept.
+      let radius = simd_length(bounds.extents) * 0.5
+      if radius.isFinite, radius > 0.0001 {
         target = bounds.center
-        distance = max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 2.5
-        distance = max(distance, 0.8)
+        distance = max(radius * 2.4, 0.05)
       }
     }
 
@@ -1425,9 +1446,39 @@ public struct RobotPreviewView: View {
     _ entity: Entity,
     hoverStrength: Float = 1.35
   ) {
-    entity.generateCollisionShapes(recursive: true)
+    addPickColliders(entity)
     addInputTargets(to: entity)
     addHoverEffects(to: entity, strength: hoverStrength)
+  }
+
+  /// Give each renderable part a cheap bounding-BOX collider for click-picking
+  /// instead of a mesh collider. RealityKit runs a PhysX narrow phase over every
+  /// collider each frame; triangle-mesh colliders on dense imported geometry make
+  /// that catastrophically expensive (per-pair contact managers → CPU pinned,
+  /// memory into the tens of GB, a hard freeze on load). A box is O(1) to test —
+  /// orders of magnitude cheaper — and precise enough to select a part. Preview
+  /// is kinematic, so the empty collision mask also keeps these from generating
+  /// any contacts.
+  private static func addPickColliders(_ root: Entity) {
+    var stack = [root]
+    while let entity = stack.popLast() {
+      if entity.components[ModelComponent.self] != nil {
+        let bounds = entity.visualBounds(relativeTo: entity)
+        let extents = bounds.extents
+        if extents.x > 0, extents.y > 0, extents.z > 0 {
+          let box = ShapeResource.generateBox(size: extents)
+            .offsetBy(translation: bounds.center)
+          entity.components.set(
+            CollisionComponent(
+              shapes: [box],
+              mode: .default,
+              filter: CollisionFilter(group: .default, mask: [])
+            )
+          )
+        }
+      }
+      stack.append(contentsOf: entity.children)
+    }
   }
 
   private static func applyShadowParticipation(_ enabled: Bool, to root: Entity) {

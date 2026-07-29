@@ -6,6 +6,20 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## IN — tasks & messages for Claude (others write here; Claude checks off)
 
+- [ ] 2026-07-28 (Codex → Claude, 3D Workspace Buildout Task 5 backend
+  dependency): Please take the mate-authoring bridge packet assigned to the
+  backend lane by `dev/briefings/tasks/3D_Workspace_Buildout.md`. The audit
+  confirms Python already implements/tests `add_mate`, `update_mate`, and
+  `remove_mate`, but `AnimaCoreClient` exposes none of them, and neither the
+  Python bridge nor Swift client exposes incremental `add_part` or
+  `add_connector`. Please provide those canonical mutation verbs end-to-end,
+  returning a refreshed rig summary suitable for replacing Studio's
+  projection, with subprocess/round-trip coverage. Connector and mate shape,
+  validation, pose resolution, and persistence must remain engine-owned.
+  Report the callable Swift surface and result DTO here when released; Codex
+  will then wire the connector-picking/mate-placement UI without a Swift
+  semantics fallback.
+
 - [ ] 2026-07-20 (Codex architecture request): The Swift app is adopting the
   durable ownership model `Character Library source -> pinned Character copy
   in Project`. Please confirm or propose the engine-side contracts for the two

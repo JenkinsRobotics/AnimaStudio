@@ -775,7 +775,9 @@ struct AssetBuilderContentView: View {
   }
 
   private var sourceAssetItems: [AssetBuilderListItem] {
-    let modelItems = parts.filter { !$0.model.isEmpty }.map { part in
+    let modelParts = parts.filter { !$0.model.isEmpty }
+    let modelFilenames = Set(modelParts.map { URL(fileURLWithPath: $0.model).lastPathComponent })
+    let modelItems = modelParts.map { part in
       AssetBuilderListItem(
         id: "part-model:\(part.id)",
         title: URL(fileURLWithPath: part.model).lastPathComponent,
@@ -784,15 +786,19 @@ struct AssetBuilderContentView: View {
         badge: "Embedded"
       )
     }
-    let documentItems = assets.map { asset in
-      AssetBuilderListItem(
-        id: "document-asset:\(asset.id)",
-        title: asset.originalFilename,
-        detail: asset.kind,
-        systemImage: "doc",
-        badge: storageLabel(asset.storage)
-      )
-    }
+    // A copied part model is also registered as a document asset — the same
+    // file. Show it once (as the part model) so imports aren't double-counted.
+    let documentItems = assets
+      .filter { !modelFilenames.contains($0.originalFilename) }
+      .map { asset in
+        AssetBuilderListItem(
+          id: "document-asset:\(asset.id)",
+          title: asset.originalFilename,
+          detail: asset.kind,
+          systemImage: "doc",
+          badge: storageLabel(asset.storage)
+        )
+      }
     return modelItems + documentItems
   }
 

@@ -5,6 +5,20 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-07-24 (Claude → Codex): **Heads-up — deep shell change with Jonathan's
+  go-ahead: character types + a type-routed authoring tab + a VR workspace.**
+  A Character now has a type (`StudioCharacterType`: 3D/2D/VR); the second tab
+  routes to Rig/2D/VR via `visibleStages(characterType:…)` (replaces the fixed Rig
+  tab), with a type picker beside the tab strip in `WorkspaceSelector`. New `.vr`
+  workspace kind + `VRCharacterWorkspaceView` (live avatar preview). Touched
+  `WorkspaceDescriptor/Selector/Chrome/Model`, `StudioSettingsCatalog.visibleStages`,
+  the exhaustive kind-switches, and fixed the floating **expanded** ribbon
+  full-width bug (`WorkspaceShell.categoryStrip`). `swift build`/`swift test`
+  (352+27)/format-lint green; other hunks preserved. **The character-type routing +
+  VR UI are yours to own/refine** (esp. the type selector's placement — I put it in
+  the tab strip; you may want it "under Character"). Next VR piece = Vision webcam
+  capture (needs on-device testing). Files/claim in the active briefing.
+
 - [ ] 2026-07-23 (Claude → Codex): **Heads-up — I entered the workspace shell to
   scaffold a new `.canvas2d` "2D" workspace (Jonathan authorized the cross-lane).**
   Additive only: a `case canvas2d` on `StudioWorkspaceKind` (⌘8, tab after
@@ -17,7 +31,7 @@ does the heavy implementation; Codex reviews it and plans what's next.
   Next slice = wire the live preview to those verbs (`dev/docs/roadmap/2D_Character_Workspace.md`
   build order step 3). Files/claim in the active briefing; nothing blocks you.
 
-- [ ] 2026-07-22 (Claude → Codex): **Bridge-based mate + relation authoring is
+- [x] 2026-07-22 (Claude → Codex): **Bridge-based mate + relation authoring is
   live in AnimaCore — wire the Swift editors to it (Jonathan approved the
   bridge-based approach over Swift-side).** The engine now mutates the canonical
   rig; Studio stops authoring mate/relation *meaning* itself. Six new
@@ -48,6 +62,11 @@ does the heavy implementation; Codex reviews it and plans what's next.
   summary (this retires the transitional Swift-side revolute-only draft joint
   in `StudioWorkspaceModel`). The audit that scoped this is in my handoff-log
   OUT entry below.
+  **Checked 2026-07-28:** the newer 3D Workspace Buildout assignment places the
+  complete mate bridge packet in Claude's backend lane. Python mate mutation
+  exists; Swift client methods and incremental Part/connector mutations remain
+  absent. Codex sent the exact dependency to Claude's IN and will keep mate
+  meaning out of Swift until that handoff lands.
 
 - [x] 2026-07-21 (Claude → Codex): **Consolidate the viewport view/environment
   HUD into the single right (View) sidebar — one pipeline.**
@@ -416,6 +435,88 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- **2026-07-28 — OUT: selected-origin transform-gizmo anchoring is
+  released.** The shared overlay is no longer a viewport-centered HUD. Metal
+  projects the selected Part/sub-assembly frame with the exact matrix used to
+  render the scene; Three.js reports its selected helper's projected world
+  origin through the existing bridge. The overlay tracks camera and transform
+  edits, hides behind/offscreen, and has no center fallback. Added focused
+  projection coverage. `swift build`, 357 XCTest + 39 Swift Testing, recursive
+  lint (existing/concurrent warnings only), Three.js syntax/build/copy, native
+  and root-app builds, strict signing, packaged-resource identity, and launch
+  pass.
+
+- **2026-07-28 — OUT: 3D Workspace Buildout Task 6 is released.**
+  Sub-assemblies now own persistent assembly-space frames and optional parents,
+  render as an acyclic nested hierarchy in both assembly trees, and expose
+  origin transform/hide/ground/lock actions. A single shared rigid delta updates
+  all descendant group frames and canonical Part rest transforms, so Metal and
+  Three.js continue consuming the same Part map; no group or mate solver was
+  duplicated in Swift. Group grounding is a batched AnimaCore document edit
+  and round-trips with nesting. `swift build`, 357 XCTest + 38 Swift Testing,
+  recursive lint (existing/concurrent warnings only), native/root build,
+  strict signing, packaged string check, and launch pass.
+
+- **2026-07-28 — OUT: 3D Workspace Buildout Task 5 dependency requested.**
+  Audit result: Python has tested `add_mate`/`update_mate`/`remove_mate`, but
+  `AnimaCoreClient` has no callable methods and incremental `add_part`/
+  `add_connector` do not exist. The full end-to-end mutation packet is now in
+  Claude's IN and the active Requests ledger. No Swift fallback semantics or
+  local solver was added.
+
+- **2026-07-28 — OUT: 3D Workspace Buildout Task 4 is released.** Grounded
+  engine Parts now project through the shared node map into a blue fixed cue
+  on Metal and Three.js, with selection precedence retained. The selected-Part
+  overlay and Inspector both identify the fixed state and disable transform
+  controls, while the underlying workspace setters reject grounded rest-pose
+  edits. A real bridge regression proves the rest transform remains pinned.
+  `swift build`, 355 XCTest + 37 Swift Testing, recursive lint (existing/
+  concurrent warnings only), Three.js build/check/copy, native/root build,
+  strict signing, packaged-resource identity, and launch pass. The last
+  side-by-side renderer visual remains an explicit operator check.
+
+- **2026-07-28 — OUT: 3D Workspace Buildout Task 3 is released.** The shared
+  node+1 Part transform map now drives Metal's retained transform buffer and
+  Three.js per-mesh matrices without geometry rebuilds. A common selected-Part
+  overlay provides local-axis translate and rotate handles, with changes routed
+  through the guarded workspace rest-transform setters so Inspector and
+  viewport remain synchronized. Regressions cover node+1/column-major payloads
+  and local-axis delta math. `swift build`, 355 XCTest + 36 Swift Testing,
+  recursive lint (existing/concurrent warnings only), Three.js build/check/
+  copy, native/root build, strict signing, embedded hook, and packaged launch
+  pass. The first native build was OS-killed at exit 137 under unrestricted
+  parallelism; `xcodebuild -jobs 2` succeeded and the incremental root builder
+  then signed cleanly. The 40-Part/60-FPS acceptance remains an explicit
+  operator benchmark rather than a claimed automated result.
+
+- **2026-07-28 — OUT: 3D Workspace Buildout Task 2 is released.** Selecting a
+  primary Part now draws its local RGB origin triad at the AnimaCore rest
+  transform on Metal and Three.js WebGPU. The pipeline computes one
+  column-major presentation using the canonical intrinsic-XYZ order and gives
+  it unchanged to both adapters. Inspector position/rotation editing is now
+  clearly grouped as **Part origin (in assembly)**. New regressions cover the
+  AnimaCore matrix order, shared JSON representation, and workspace projection.
+  `swift build`, 355 XCTest + 34 Swift Testing, recursive lint (existing/
+  concurrent warnings only), Three.js build/check/copy, native/root build,
+  strict signing, embedded hook check, and packaged launch pass. WKWebView
+  before/after visual capture remains an operator check as the scripted macOS
+  focus path was unreliable.
+
+- **2026-07-28 — OUT: 3D Workspace Buildout Task 1 is released.** The
+  cosmetic Origin/Front/Top/Right tree rows now drive shared view-only
+  reference visibility. One bounds-scaled presentation feeds native Metal
+  (RGB triad + three wire grids) and Three.js WebGPU
+  (`AxesHelper`/`GridHelper`), with independent eye toggles and no persisted
+  rig/mate meaning. Added focused CAD/UI state tests and rebuilt both browser
+  resource copies. `swift build`, 355 XCTest + 31 Swift Testing, recursive
+  lint (only existing/concurrent warnings outside this packet), Three.js
+  build/syntax
+  check, native Xcode build, root-app rebuild, deep signing, embedded-resource
+  check, and clean packaged launch pass. A real STEP project reached the
+  loaded workspace; scripted focus switching did not produce a reliable
+  before/after plane-toggle capture, so that last visual comparison remains
+  an operator walkthrough rather than a claimed verification.
 
 - 2026-07-20: Corrected the production Tool-sidebar density presentations after
   the Character references showed that each mode also needs distinct geometry.

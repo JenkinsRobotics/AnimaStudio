@@ -96,6 +96,9 @@ struct ProjectNavigatorView: View {
     case .canvas2d:
       Text("2D surfaces & media — panels land here.")
         .foregroundStyle(.secondary)
+    case .vr:
+      Text("VR avatar & face-tracking bindings — panels land here.")
+        .foregroundStyle(.secondary)
     }
   }
 
@@ -105,8 +108,12 @@ struct ProjectNavigatorView: View {
     case "Mates": mateSection
     case "Relations": relationSection
     default:
+      // The default 3D Modeling tree is the full assembly, CAD-style: the
+      // character (Project), its parts + sub-assembly groups (Instances), and
+      // its mates — all in one tree.
       projectSection
       semanticRigSection
+      mateSection
       assemblyLibrarySection
       sourceHierarchySection
     }
@@ -447,7 +454,7 @@ struct ProjectNavigatorView: View {
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
         .padding(12)
-    case .design, .canvas2d:
+    case .design, .canvas2d, .vr:
       EmptyView()
     }
   }
@@ -497,6 +504,7 @@ struct ProjectNavigatorView: View {
     case .design: "Design"
     case .hardware: "Hardware"
     case .canvas2d: "2D"
+    case .vr: "VR"
     }
   }
 
@@ -537,30 +545,88 @@ struct ProjectNavigatorView: View {
       ?? relation.kind.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
   }
 
+  /// All parts of the loaded character, by PartID, as ordered pairs. The
+  /// engine part list is the authoritative loaded set (it is what the Assets
+  /// panel shows); `project.rig.parts` mirrors it but can lag behind an import,
+  /// which used to leave this "Instances" panel empty. Prefer the local rig
+  /// (it carries display kind) but fall back to the engine parts so a loaded
+  /// assembly is never shown empty.
+  private var assemblyPartIDs: [PartID] {
+    if !workspace.project.rig.parts.isEmpty {
+      return workspace.project.rig.parts.map(\.id)
+    }
+    return workspace.engineParts.compactMap { workspace.partID(forEngineName: $0.name) }
+  }
+
+  private func partNode(for id: PartID) -> NavigatorTreeNode? {
+    if let part = workspace.project.rig.parts.first(where: { $0.id == id }) {
+      return partTreeNode(part)
+    }
+    if let enginePart = workspace.enginePart(for: id) {
+      return partTreeNodeFromEngine(enginePart, id: id)
+    }
+    return nil
+  }
+
+  private func partTreeNodeFromEngine(
+    _ enginePart: AnimaCorePartSummary,
+    id: PartID
+  ) -> NavigatorTreeNode {
+    let appearance = workspace.componentAppearance(for: id)
+    let states = navigatorStates(
+      locked: workspace.isComponentLocked(id),
+      hidden: appearance?.isVisible == false,
+      suppressed: enginePart.isSuppressed,
+      grounded: enginePart.isGrounded
+    )
+    return NavigatorTreeNode(
+      id: .component(id),
+      selectionValue: .part(id),
+      title: enginePart.name,
+      role: .semanticPart,
+      detail: enginePart.model.isEmpty ? "Part" : "Imported part",
+      states: states,
+      children: [],
+      filterTokens: treeTokens(type: .part, states: states),
+      isLocked: workspace.isComponentLocked(id),
+      acceptsChildren: false,
+      payload: .component(id),
+      behavior: .component
+    )
+  }
+
   private var instanceTreeNodes: [NavigatorTreeNode] {
     let groupedIDs = Set(workspace.componentGroups.flatMap(\.componentIDs))
-    let groups = workspace.componentGroups.map { group in
-      NavigatorTreeNode(
-        id: .group(group.id),
-        selectionValue: .componentGroup(group.id),
-        title: group.displayName,
-        role: .componentGroup,
-        detail: "\(group.componentIDs.count)",
-        states: group.isLocked ? [.locked] : [],
-        children: group.componentIDs.compactMap { id in
-          workspace.project.rig.parts.first(where: { $0.id == id }).map(partTreeNode)
-        },
-        filterTokens: group.isLocked ? [.part, .locked] : [.part],
-        isLocked: group.isLocked,
-        acceptsChildren: true,
-        payload: .componentGroup(group.id),
-        behavior: .componentGroup
-      )
-    }
-    let ungrouped = workspace.project.rig.parts
-      .filter { !groupedIDs.contains($0.id) }
-      .map(partTreeNode)
+    let groups = workspace.rootComponentGroups.map(componentGroupNode)
+    let ungrouped =
+      assemblyPartIDs
+      .filter { !groupedIDs.contains($0) }
+      .compactMap(partNode(for:))
     return groups + ungrouped
+  }
+
+  private func componentGroupNode(_ group: NavigatorComponentGroup) -> NavigatorTreeNode {
+    let descendantCount = workspace.componentIDs(inGroupIncludingDescendants: group.id).count
+    let childGroups = workspace.childComponentGroups(of: group.id).map(componentGroupNode)
+    let childParts = group.componentIDs.compactMap(partNode(for:))
+    let isLocked = workspace.isComponentGroupLocked(group.id)
+    let states = navigatorStates(
+      locked: isLocked,
+      hidden: workspace.isComponentGroupHidden(group.id),
+      grounded: workspace.isComponentGroupGrounded(group.id))
+    return NavigatorTreeNode(
+      id: .group(group.id),
+      selectionValue: .componentGroup(group.id),
+      title: group.displayName,
+      role: .componentGroup,
+      detail: "\(descendantCount)",
+      states: states,
+      children: childGroups + childParts,
+      filterTokens: treeTokens(type: .part, states: states),
+      isLocked: isLocked,
+      acceptsChildren: true,
+      payload: .componentGroup(group.id),
+      behavior: .componentGroup)
   }
 
   private var mateNodes: [NavigatorTreeNode] {
@@ -815,7 +881,7 @@ struct ProjectNavigatorView: View {
     case (.component(let source), .group):
       return intent == .group && !workspace.isComponentLocked(source)
     case (.componentGroup(let source), .group(let destinationID)):
-      return source != destinationID && intent != .group
+      return source != destinationID
     case (.mate(let source), .mate(let destinationID)):
       return source.rawValue != destinationID
         && intent != .group
@@ -901,7 +967,9 @@ struct ProjectNavigatorView: View {
       if didMove { expandGroup(group.id) }
       return didMove
     case .componentGroup(let sourceID):
-      guard intent != .group else { return false }
+      if intent == .group {
+        return workspace.nestComponentGroup(sourceID, in: group.id)
+      }
       return workspace.moveComponentGroup(
         sourceID,
         relativeTo: group.id,
@@ -977,6 +1045,29 @@ struct ProjectNavigatorView: View {
       }
     }
     .disabled(workspace.isComponentLocked(part.id) || workspace.componentGroups.isEmpty)
+
+    Divider()
+    if let appearance = workspace.componentAppearance(for: part.id) {
+      Button(
+        appearance.isVisible ? "Hide" : "Show",
+        systemImage: appearance.isVisible ? "eye.slash" : "eye"
+      ) {
+        var updated = appearance
+        updated.isVisible.toggle()
+        workspace.setComponentAppearance(id: part.id, to: updated)
+      }
+      .disabled(workspace.isComponentLocked(part.id))
+    }
+    Button(
+      workspace.isolatedComponentID == part.id ? "Exit Isolation" : "Isolate",
+      systemImage: workspace.isolatedComponentID == part.id ? "cube.transparent" : "cube"
+    ) {
+      workspace.isolatedComponentID =
+        workspace.isolatedComponentID == part.id ? nil : part.id
+    }
+    if workspace.isolatedComponentID != nil || workspace.hasHiddenComponents {
+      Button("Show All", systemImage: "eye") { workspace.showAllComponents() }
+    }
 
     if let enginePart = workspace.enginePart(for: part.id) {
       Divider()

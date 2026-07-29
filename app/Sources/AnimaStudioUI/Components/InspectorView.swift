@@ -80,7 +80,7 @@ struct InspectorView: View {
       }
     case .nodes:
       EmptyView()
-    case .design, .canvas2d:
+    case .design, .canvas2d, .vr:
       EmptyView()
     }
   }
@@ -186,7 +186,7 @@ struct InspectorView: View {
         .disabled(true)
         .help("Scene documents are not wired yet")
         .padding(12)
-    case .assets, .rig, .canvas2d, .nodes, .hardware, .design:
+    case .assets, .rig, .canvas2d, .vr, .nodes, .hardware, .design:
       EmptyView()
     }
   }
@@ -283,6 +283,10 @@ struct InspectorView: View {
         Label("Project-owned rig proxy", systemImage: "pencil.and.outline")
           .foregroundStyle(StudioPalette.semanticPart)
       }
+      if workspace.enginePart(for: part.id)?.isGrounded == true {
+        Label("Grounded at this rest transform", systemImage: "lock.fill")
+          .foregroundStyle(.blue)
+      }
     }
 
     if part.primitiveKind == .box {
@@ -302,41 +306,44 @@ struct InspectorView: View {
       }
     }
 
-    Section("Position") {
+    Section("Part origin (in assembly)") {
+      Text(
+        "This rest transform expresses the part's local origin in the fixed assembly coordinate frame."
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
       StudioNumberFieldRow(
-        title: "X",
+        title: "Position X",
         value: partPositionBinding(part.id, keyPath: \.x),
         unit: "m"
       )
       StudioNumberFieldRow(
-        title: "Y",
+        title: "Position Y",
         value: partPositionBinding(part.id, keyPath: \.y),
         unit: "m"
       )
       StudioNumberFieldRow(
-        title: "Z",
+        title: "Position Z",
         value: partPositionBinding(part.id, keyPath: \.z),
         unit: "m"
       )
-    }
-
-    Section("Rest Rotation") {
       StudioNumberFieldRow(
-        title: "X",
+        title: "Rotation X",
         value: partRotationDegreesBinding(part.id, keyPath: \.x),
         unit: "°"
       )
       StudioNumberFieldRow(
-        title: "Y",
+        title: "Rotation Y",
         value: partRotationDegreesBinding(part.id, keyPath: \.y),
         unit: "°"
       )
       StudioNumberFieldRow(
-        title: "Z",
+        title: "Rotation Z",
         value: partRotationDegreesBinding(part.id, keyPath: \.z),
         unit: "°"
       )
     }
+    .disabled(!workspace.isPartRestTransformEditable(part.id))
 
     Section("Workflow") {
       Text(
@@ -515,14 +522,72 @@ struct InspectorView: View {
           set: { workspace.renameComponentGroup(id: group.id, to: $0) }
         ),
         placeholder: "Group name",
-        help: "A navigator group organizes related components without changing mate behavior."
+        help:
+          "A sub-assembly owns an editor origin and moves its descendant engine Parts as a rigid unit without defining mate behavior."
       )
       .disabled(group.isLocked)
-      LabeledContent("Components", value: "\(group.componentIDs.count)")
-      LabeledContent("State", value: group.isLocked ? "Locked" : "Editable")
+      LabeledContent(
+        "Components",
+        value: "\(workspace.componentIDs(inGroupIncludingDescendants: group.id).count)")
+      LabeledContent(
+        "Parent",
+        value: group.parentGroupID.flatMap { workspace.componentGroup(id: $0)?.displayName }
+          ?? "Assembly")
+      LabeledContent(
+        "State",
+        value: workspace.isComponentGroupGrounded(group.id)
+          ? "Grounded" : (workspace.isComponentGroupLocked(group.id) ? "Locked" : "Editable"))
     }
 
+    Section("Sub-assembly origin (in assembly)") {
+      Text(
+        "Moving this frame applies one rigid assembly-space delta to every descendant Part and nested sub-assembly."
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      StudioNumberFieldRow(
+        title: "Position X",
+        value: componentGroupPositionBinding(group.id, keyPath: \.x),
+        unit: "m")
+      StudioNumberFieldRow(
+        title: "Position Y",
+        value: componentGroupPositionBinding(group.id, keyPath: \.y),
+        unit: "m")
+      StudioNumberFieldRow(
+        title: "Position Z",
+        value: componentGroupPositionBinding(group.id, keyPath: \.z),
+        unit: "m")
+      StudioNumberFieldRow(
+        title: "Rotation X",
+        value: componentGroupRotationDegreesBinding(group.id, keyPath: \.x),
+        unit: "°")
+      StudioNumberFieldRow(
+        title: "Rotation Y",
+        value: componentGroupRotationDegreesBinding(group.id, keyPath: \.y),
+        unit: "°")
+      StudioNumberFieldRow(
+        title: "Rotation Z",
+        value: componentGroupRotationDegreesBinding(group.id, keyPath: \.z),
+        unit: "°")
+    }
+    .disabled(!workspace.isComponentGroupTransformEditable(group.id))
+
     Section("Group Actions") {
+      Button(
+        workspace.isComponentGroupHidden(group.id) ? "Show Sub-assembly" : "Hide Sub-assembly",
+        systemImage: workspace.isComponentGroupHidden(group.id) ? "eye" : "eye.slash"
+      ) {
+        workspace.setComponentGroupHidden(
+          group.id,
+          hidden: !workspace.isComponentGroupHidden(group.id))
+      }
+      Button(
+        workspace.isComponentGroupGrounded(group.id)
+          ? "Unground Sub-assembly" : "Ground Sub-assembly",
+        systemImage: workspace.isComponentGroupGrounded(group.id) ? "pin.slash" : "pin"
+      ) {
+        Task { await workspace.toggleComponentGroupGrounded(group.id) }
+      }
       Button(
         group.isLocked ? "Unlock Group" : "Lock Group",
         systemImage: group.isLocked ? "lock.open" : "lock"
@@ -602,6 +667,7 @@ struct InspectorView: View {
     case .design: "Design Inspector"
     case .hardware: "Hardware Status"
     case .canvas2d: "2D Inspector"
+    case .vr: "VR Inspector"
     }
   }
 
@@ -654,6 +720,37 @@ struct InspectorView: View {
         workspace.setPartRotation(id: id, to: rotation)
       }
     )
+  }
+
+  private func componentGroupPositionBinding(
+    _ id: UUID,
+    keyPath: WritableKeyPath<RigVector3, Double>
+  ) -> Binding<Double> {
+    Binding(
+      get: { workspace.componentGroup(id: id)?.positionMeters[keyPath: keyPath] ?? 0 },
+      set: { value in
+        guard var position = workspace.componentGroup(id: id)?.positionMeters else { return }
+        position[keyPath: keyPath] = value
+        workspace.setComponentGroupPosition(id: id, to: position)
+      })
+  }
+
+  private func componentGroupRotationDegreesBinding(
+    _ id: UUID,
+    keyPath: WritableKeyPath<RigVector3, Double>
+  ) -> Binding<Double> {
+    Binding(
+      get: {
+        (workspace.componentGroup(id: id)?.rotationEulerRadians[keyPath: keyPath] ?? 0)
+          * 180 / .pi
+      },
+      set: { degrees in
+        guard var rotation = workspace.componentGroup(id: id)?.rotationEulerRadians else {
+          return
+        }
+        rotation[keyPath: keyPath] = degrees * .pi / 180
+        workspace.setComponentGroupRotation(id: id, to: rotation)
+      })
   }
 
   private func jointMinimumDegreesBinding(_ id: JointID) -> Binding<Double> {

@@ -143,6 +143,23 @@ extension StudioWorkspaceModel {
     setCameraViewpoint(.home)
   }
 
+  var hasHiddenComponents: Bool {
+    componentAppearances.values.contains { !$0.isVisible }
+  }
+
+  func isComponentHidden(_ id: PartID) -> Bool {
+    componentAppearance(for: id)?.isVisible == false
+  }
+
+  /// Toggle a single part's visibility, keeping the PreviewPartAppearance detail
+  /// out of the assembly tree (which stays renderer-agnostic).
+  func toggleComponentVisibility(_ id: PartID) {
+    var appearance =
+      componentAppearance(for: id) ?? PreviewPartAppearance(red: 0.62, green: 0.64, blue: 0.68)
+    appearance.isVisible.toggle()
+    setComponentAppearance(id: id, to: appearance)
+  }
+
   func showAllComponents() {
     isolatedComponentID = nil
     for part in project.rig.parts where !isComponentLocked(part.id) {

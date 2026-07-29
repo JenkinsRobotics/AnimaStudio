@@ -118,7 +118,7 @@ enum DemoWorkspaceToolCatalog {
       ]
     case .design:
       designGroups
-    case .nodes, .canvas2d:
+    case .nodes, .canvas2d, .vr:
       []
     }
   }

@@ -4,7 +4,7 @@ import Foundation
 /// Mesh unit interpretation is deliberately absent from `.character.anima`;
 /// the engine treats model references as opaque paths.
 public struct CharacterEditorMetadata: Codable, Equatable, Sendable {
-  public static let currentFormatVersion = "5"
+  public static let currentFormatVersion = "6"
 
   public var formatVersion: String
   public var modelImports: [String: ModelImportMetadata]
@@ -259,17 +259,27 @@ public struct CharacterTreeGroupMetadata: Codable, Equatable, Sendable {
   public var displayName: String
   public var partNames: [String]
   public var isLocked: Bool
+  public var parentGroupID: UUID?
+  public var positionMeters: [Double]
+  public var rotationEulerRadians: [Double]
 
   public init(
     id: UUID = UUID(),
     displayName: String,
     partNames: [String],
-    isLocked: Bool = false
+    isLocked: Bool = false,
+    parentGroupID: UUID? = nil,
+    positionMeters: [Double] = [0, 0, 0],
+    rotationEulerRadians: [Double] = [0, 0, 0]
   ) {
     self.id = id
     self.displayName = displayName
     self.partNames = partNames
     self.isLocked = isLocked
+    self.parentGroupID = parentGroupID
+    self.positionMeters = positionMeters.count == 3 ? positionMeters : [0, 0, 0]
+    self.rotationEulerRadians =
+      rotationEulerRadians.count == 3 ? rotationEulerRadians : [0, 0, 0]
   }
 
   enum CodingKeys: String, CodingKey {
@@ -277,6 +287,24 @@ public struct CharacterTreeGroupMetadata: Codable, Equatable, Sendable {
     case displayName = "display_name"
     case partNames = "parts"
     case isLocked = "locked"
+    case parentGroupID = "parent_group_id"
+    case positionMeters = "position_m"
+    case rotationEulerRadians = "rotation_euler_rad"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(UUID.self, forKey: .id)
+    displayName = try container.decode(String.self, forKey: .displayName)
+    partNames = try container.decodeIfPresent([String].self, forKey: .partNames) ?? []
+    isLocked = try container.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
+    parentGroupID = try container.decodeIfPresent(UUID.self, forKey: .parentGroupID)
+    let decodedPosition =
+      try container.decodeIfPresent([Double].self, forKey: .positionMeters) ?? [0, 0, 0]
+    positionMeters = decodedPosition.count == 3 ? decodedPosition : [0, 0, 0]
+    let decodedRotation =
+      try container.decodeIfPresent([Double].self, forKey: .rotationEulerRadians) ?? [0, 0, 0]
+    rotationEulerRadians = decodedRotation.count == 3 ? decodedRotation : [0, 0, 0]
   }
 }
 

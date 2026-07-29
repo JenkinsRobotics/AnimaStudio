@@ -88,6 +88,22 @@
   tint (was opaque) so a face composites *over* a media background instead of
   hiding it. The media is a dev fixture — see `examples/assets/2d/README.md` on
   provenance/licensing before distributing.
+- **Character types (3D / 2D / VR) + VR character workspace:** a Character now has
+  a **type** (`StudioCharacterType`), chosen from a picker beside the workspace
+  tabs. The second tab is **character-specific** — it routes to Rig (3D), 2D
+  (`canvas2d`), or VR based on the type (replacing the fixed Rig tab):
+  `visibleStages` returns one authoring tab per type. New `StudioWorkspaceKind.vr`
+  "VR" workspace with a `VRCharacterWorkspaceView` — a live avatar preview
+  rendered by the engine, driven by ARKit-style blendshape sliders (jaw/smile/
+  blink/head) mapped to the face. Engine: `animacore/tracking.py` is the
+  tracker-neutral contract — Apple's 52 ARKit blendshapes + head pose, and a
+  `FaceTrackingFrame` → evaluated `values`; a tracked `jawOpen` drives an avatar
+  through the *existing* `evaluate_surfaces` (so the avatar half of VR already
+  works — only the tracker input is new). Face tracking on the Mac will use the
+  webcam via Apple's Vision framework (the capture pipeline is the next piece).
+  Also: fixed the floating expanded tool ribbon spanning full window width (its
+  category strip now hugs content when floating). Design: `2026-07-24`, roadmap
+  `VR_Character.md`.
 - **Consolidated viewport controls:** the production right sidebar is now the
   single operator surface for camera/display controls, navigation profiles and
   help, materials, lighting, background, reflections, shadows, section view,
@@ -204,6 +220,56 @@
   exact-edge visibility/strength, roughness, metallic response, key/fill/rim
   intensity, and optional live telemetry. Browser-renderer assets live in
   `App/Resources/CADWeb`, so archiving Codex Bench cannot break production.
+  The 3D Modeling assembly tree's Origin, Front, Top, and Right rows now own
+  view-only workspace-reference visibility. `CADPipelineViewport` derives one
+  bounds-scaled reference presentation from the imported document: Metal draws
+  an RGB origin triad plus independent wire grids, while Three.js WebGPU draws
+  the same presentation with `AxesHelper`/`GridHelper`. Each tree eye toggles
+  only its matching reference on both renderers. This state is editor
+  presentation only and never enters `.anima` or changes mate semantics.
+  Selecting a primary Part now adds a second, part-local RGB origin triad on
+  Metal and Three.js WebGPU. The shared pipeline expands the existing
+  source-to-node mapping into one column-major rest-transform map using
+  AnimaCore's intrinsic XYZ convention (`R = Rx · Ry · Rz`), then hands the
+  same selected-origin presentation to both thin draw adapters. The Inspector
+  exposes the corresponding editable values under **Part origin (in
+  assembly)** with metre position and degree rotation fields; edits continue
+  through the existing AnimaCore-backed rest-transform path.
+  CAD Parts now also consume that shared transform map: Metal updates the
+  already-bound `partTransformBuffer`, while Three.js sets each node mesh's
+  column-major `matrix` with `matrixAutoUpdate = false`. Neither path rebuilds
+  imported geometry for a transform edit. A renderer-independent selected-Part
+  overlay supplies local X/Y/Z translation and rotation handles; its pointer
+  deltas produce rest-transform edits through the existing guarded workspace
+  setters, so the mesh, local origin, and numeric Inspector stay synchronized.
+  The overlay is anchored to the selected Part or sub-assembly frame rather
+  than the viewport center. Metal projects that frame with the exact shared
+  render view-projection matrix, while Three.js reports its helper's projected
+  world origin through the existing web bridge. The control follows camera and
+  transform edits and hides when its origin is behind the camera or offscreen;
+  there is no cosmetic center-screen fallback.
+  Grounded Parts now remain visibly fixed throughout that same flow. The
+  pipeline expands `Part.isGrounded` through the shared source-to-node map;
+  Metal consumes a retained Part-state bit and Three.js consumes the same
+  grounded Part IDs to draw a blue fixed cue, with active selection still
+  taking precedence. The transform overlay and Inspector identify the pinned
+  state and disable editing, and the workspace rest-transform setters reject
+  grounded edits so the engine-owned placement cannot be moved indirectly.
+  Sub-assemblies are now first-class editor hierarchy nodes with their own
+  assembly-space origin/rotation and optional parent. Both assembly trees show
+  acyclic nesting. Selecting a sub-assembly highlights every descendant Part
+  and displays the shared origin/transform overlay; Inspector exposes the same
+  frame numerically. A group move computes one rigid assembly-space delta and
+  applies it to descendant group frames and canonical Part rest transforms, so
+  Metal and Three.js continue drawing the existing common Part-transform map.
+  Hide acts on all descendant presentation states, and Ground batches the
+  descendant engine Part states through AnimaCore before one reload. Metadata
+  v6 persists the hierarchy/frame and decodes older flat groups at the identity
+  frame. Group metadata does not define mate semantics or introduce a Swift
+  assembly solver.
+  The 40-Part/60-FPS target still needs an operator benchmark on production
+  hardware; automated coverage proves transform identity/order and edit math,
+  not a display-link frame rate.
   The root-app builder follows the linked Homebrew OCCT Mach-O dependency
   graph, copies the required dylibs into `Contents/Frameworks`, rewrites them
   to `@rpath`, and signs them with the app. The local Homebrew bottle targets

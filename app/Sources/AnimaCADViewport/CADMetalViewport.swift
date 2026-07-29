@@ -7,6 +7,12 @@ public struct CADMetalViewport: View {
   @Bindable public var camera: CADCameraState
   public let theme: CADViewportTheme
   public let isSelected: Bool
+  public let hiddenPartIDs: Set<Int>
+  public let selectedPartIDs: Set<Int>
+  public let groundedPartIDs: Set<Int>
+  public let referenceGeometry: CADWorkspaceReferenceGeometry
+  public let partTransforms: [CADPartTransformPresentation]
+  public let selectedPartOrigin: CADPartOriginPresentation?
   public let onFrame: @MainActor @Sendable () -> Void
   public let onError: @MainActor @Sendable (String) -> Void
 
@@ -15,6 +21,13 @@ public struct CADMetalViewport: View {
     camera: CADCameraState,
     theme: CADViewportTheme,
     isSelected: Bool = false,
+    hiddenPartIDs: Set<Int> = [],
+    selectedPartIDs: Set<Int> = [],
+    groundedPartIDs: Set<Int> = [],
+    referenceGeometry: CADWorkspaceReferenceGeometry = .init(
+      visibility: .init(), modelDiagonalMeters: 1),
+    partTransforms: [CADPartTransformPresentation] = [],
+    selectedPartOrigin: CADPartOriginPresentation? = nil,
     onFrame: @escaping @MainActor @Sendable () -> Void = {},
     onError: @escaping @MainActor @Sendable (String) -> Void = { _ in }
   ) {
@@ -22,6 +35,12 @@ public struct CADMetalViewport: View {
     self.camera = camera
     self.theme = theme
     self.isSelected = isSelected
+    self.hiddenPartIDs = hiddenPartIDs
+    self.selectedPartIDs = selectedPartIDs
+    self.groundedPartIDs = groundedPartIDs
+    self.referenceGeometry = referenceGeometry
+    self.partTransforms = partTransforms
+    self.selectedPartOrigin = selectedPartOrigin
     self.onFrame = onFrame
     self.onError = onError
   }
@@ -30,7 +49,12 @@ public struct CADMetalViewport: View {
     ZStack {
       MetalCanvas(
         document: document, camera: camera, theme: theme,
-        isSelected: isSelected, onFrame: onFrame, onError: onError)
+        isSelected: isSelected, hiddenPartIDs: hiddenPartIDs, selectedPartIDs: selectedPartIDs,
+        groundedPartIDs: groundedPartIDs,
+        referenceGeometry: referenceGeometry,
+        partTransforms: partTransforms,
+        selectedPartOrigin: selectedPartOrigin,
+        onFrame: onFrame, onError: onError)
       CADMouseInputOverlay(
         orbit: camera.orbit,
         pan: camera.pan,
@@ -46,6 +70,12 @@ private struct MetalCanvas: NSViewRepresentable {
   let camera: CADCameraState
   let theme: CADViewportTheme
   let isSelected: Bool
+  let hiddenPartIDs: Set<Int>
+  let selectedPartIDs: Set<Int>
+  let groundedPartIDs: Set<Int>
+  let referenceGeometry: CADWorkspaceReferenceGeometry
+  let partTransforms: [CADPartTransformPresentation]
+  let selectedPartOrigin: CADPartOriginPresentation?
   let onFrame: @MainActor @Sendable () -> Void
   let onError: @MainActor @Sendable (String) -> Void
 
@@ -74,6 +104,11 @@ private struct MetalCanvas: NSViewRepresentable {
     coordinator.renderer?.theme = theme
     coordinator.renderer?.isSelected = isSelected
     coordinator.renderer?.set(document: document)
+    coordinator.renderer?.setPartState(
+      hidden: hiddenPartIDs, selected: selectedPartIDs, grounded: groundedPartIDs)
+    coordinator.renderer?.set(referenceGeometry: referenceGeometry)
+    coordinator.renderer?.set(partTransforms: partTransforms)
+    coordinator.renderer?.set(selectedPartOrigin: selectedPartOrigin)
   }
 
   @MainActor final class Coordinator {
@@ -145,10 +180,16 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     var overrideColor: SIMD4<Float>
   }
 
+  struct ReferenceVertex {
+    var position: SIMD4<Float>
+    var color: SIMD4<Float>
+  }
+
   let device: MTLDevice
   let commandQueue: MTLCommandQueue
   let pipeline: MTLRenderPipelineState
   let edgePipeline: MTLRenderPipelineState
+  let referencePipeline: MTLRenderPipelineState
   let depthState: MTLDepthStencilState
   let edgeDepthState: MTLDepthStencilState
   let onFrame: @MainActor @Sendable () -> Void
@@ -160,6 +201,16 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   private var indexBuffer: MTLBuffer?
   private var edgeVertexBuffer: MTLBuffer?
   private var partTransformBuffer: MTLBuffer?
+  private var partTransforms: [CADPartTransformPresentation] = []
+  private var partStateBuffer: MTLBuffer?
+  private var referenceBuffers: [CADReferenceGeometry: MTLBuffer] = [:]
+  private var referenceVertexCounts: [CADReferenceGeometry: Int] = [:]
+  private var selectedPartOriginBuffer: MTLBuffer?
+  private var selectedPartOriginVertexCount = 0
+  private var selectedPartOrigin: CADPartOriginPresentation?
+  private var referenceGeometry = CADWorkspaceReferenceGeometry(
+    visibility: .init(), modelDiagonalMeters: 1)
+  private var partSlotCount = 0
   private var indexCount = 0
   private var edgeVertexCount = 0
   private var documentIdentity: UUID?
@@ -193,6 +244,19 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     edgeDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
     edgeDescriptor.depthAttachmentPixelFormat = .depth32Float
     edgePipeline = try device.makeRenderPipelineState(descriptor: edgeDescriptor)
+    let referenceDescriptor = MTLRenderPipelineDescriptor()
+    referenceDescriptor.vertexFunction = library.makeFunction(name: "referenceVertex")
+    referenceDescriptor.fragmentFunction = library.makeFunction(name: "referenceFragment")
+    referenceDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+    referenceDescriptor.depthAttachmentPixelFormat = .depth32Float
+    referenceDescriptor.colorAttachments[0].isBlendingEnabled = true
+    referenceDescriptor.colorAttachments[0].rgbBlendOperation = .add
+    referenceDescriptor.colorAttachments[0].alphaBlendOperation = .add
+    referenceDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+    referenceDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+    referenceDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+    referenceDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+    referencePipeline = try device.makeRenderPipelineState(descriptor: referenceDescriptor)
     let depth = MTLDepthStencilDescriptor()
     depth.depthCompareFunction = .less
     depth.isDepthWriteEnabled = true
@@ -217,6 +281,12 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       indexBuffer = nil
       edgeVertexBuffer = nil
       partTransformBuffer = nil
+      partStateBuffer = nil
+      referenceBuffers.removeAll()
+      referenceVertexCounts.removeAll()
+      selectedPartOriginBuffer = nil
+      selectedPartOriginVertexCount = 0
+      partSlotCount = 0
       indexCount = 0
       edgeVertexCount = 0
       return
@@ -231,8 +301,15 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     indexBuffer = makePrivateBuffer(geometry.indices)
     indexCount = geometry.indices.count
     geometryDiagonal = max(geometry.bounds.diagonal, 0.001)
-    partTransformBuffer = makePrivateBuffer(
-      Array(repeating: matrix_identity_float4x4, count: max(document.nodes.count + 1, 1)))
+    partSlotCount = max(document.nodes.count + 1, 1)
+    partTransformBuffer = device.makeBuffer(
+      length: partSlotCount * MemoryLayout<simd_float4x4>.stride,
+      options: .storageModeShared)
+    writePartTransforms()
+    // Shared (CPU-writable) so per-part hide/select updates without a rebuild.
+    // Default all-zero = every part visible and unselected.
+    partStateBuffer = device.makeBuffer(
+      length: partSlotCount * MemoryLayout<UInt32>.stride, options: .storageModeShared)
     edgeVertexBuffer = makePrivateBuffer(
       geometry.edgePositions.map {
         Vertex(
@@ -240,6 +317,55 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
           partID: 0, faceID: .max)
       })
     edgeVertexCount = geometry.edgePositions.count
+    rebuildReferenceBuffers()
+    rebuildSelectedPartOriginBuffer()
+  }
+
+  /// Update per-part hide/select flags (CAD partIDs = assemblyNode + 1). Writes
+  /// the shared buffer in place; no geometry rebuild. ponytail: single shared
+  /// buffer (not triple-buffered) — a rare write/read overlap costs one stale
+  /// frame, acceptable for click-driven state.
+  func setPartState(hidden: Set<Int>, selected: Set<Int>, grounded: Set<Int>) {
+    guard let partStateBuffer, partSlotCount > 0 else { return }
+    let pointer = partStateBuffer.contents().bindMemory(to: UInt32.self, capacity: partSlotCount)
+    for slot in 0..<partSlotCount {
+      var flags: UInt32 = 0
+      if hidden.contains(slot) { flags |= 1 }
+      if selected.contains(slot) { flags |= 2 }
+      if grounded.contains(slot) { flags |= 4 }
+      pointer[slot] = flags
+    }
+  }
+
+  func set(partTransforms: [CADPartTransformPresentation]) {
+    guard self.partTransforms != partTransforms else { return }
+    self.partTransforms = partTransforms
+    writePartTransforms()
+  }
+
+  private func writePartTransforms() {
+    guard let partTransformBuffer, partSlotCount > 0 else { return }
+    let pointer = partTransformBuffer.contents().bindMemory(
+      to: simd_float4x4.self, capacity: partSlotCount)
+    for slot in 0..<partSlotCount {
+      pointer[slot] = matrix_identity_float4x4
+    }
+    for presentation in partTransforms
+    where presentation.partID >= 0 && presentation.partID < partSlotCount {
+      pointer[presentation.partID] = presentation.matrix
+    }
+  }
+
+  func set(referenceGeometry: CADWorkspaceReferenceGeometry) {
+    guard self.referenceGeometry != referenceGeometry else { return }
+    self.referenceGeometry = referenceGeometry
+    rebuildReferenceBuffers()
+  }
+
+  func set(selectedPartOrigin: CADPartOriginPresentation?) {
+    guard self.selectedPartOrigin != selectedPartOrigin else { return }
+    self.selectedPartOrigin = selectedPartOrigin
+    rebuildSelectedPartOriginBuffer()
   }
 
   func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
@@ -255,15 +381,18 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       return
     }
     commandBuffer.addCompletedHandler { [inFlightSemaphore] _ in inFlightSemaphore.signal() }
-    if let vertexBuffer, let indexBuffer, let partTransformBuffer, indexCount > 0 {
+    if let vertexBuffer, let indexBuffer, let partTransformBuffer, let partStateBuffer,
+      indexCount > 0
+    {
       let aspect = Float(max(view.drawableSize.width, 1) / max(view.drawableSize.height, 1))
-      let radius = max(geometryDiagonal * 0.5, 0.001)
       var uniforms = Uniforms(
-        viewProjection: perspective(
-          fovY: 45 * .pi / 180, aspect: aspect,
-          near: max(radius * 0.0001, 0.000_01),
-          far: max(camera.distance + radius * 4, radius * 8))
-          * lookAt(eye: camera.position, center: camera.target, up: camera.upVector),
+        viewProjection: CADViewportProjection.viewProjection(
+          cameraPosition: camera.position,
+          cameraTarget: camera.target,
+          cameraUp: camera.upVector,
+          cameraDistance: camera.distance,
+          modelDiagonalMeters: geometryDiagonal,
+          aspect: aspect),
         cameraPosition: SIMD4(camera.position, 1),
         keyDirection: lightDirection(theme.key), keyColor: SIMD4(theme.key.color, 1),
         fillDirection: lightDirection(theme.fill), fillColor: SIMD4(theme.fill.color, 1),
@@ -284,6 +413,7 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
       encoder.setVertexBuffer(uniformBuffer, offset: uniformOffset, index: 1)
       encoder.setVertexBuffer(partTransformBuffer, offset: 0, index: 2)
+      encoder.setVertexBuffer(partStateBuffer, offset: 0, index: 3)
       encoder.drawIndexedPrimitives(
         type: .triangle, indexCount: indexCount, indexType: .uint32,
         indexBuffer: indexBuffer, indexBufferOffset: 0)
@@ -293,6 +423,24 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
         encoder.setDepthBias(-1, slopeScale: -1, clamp: 0)
         encoder.setVertexBuffer(edgeVertexBuffer, offset: 0, index: 0)
         encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: edgeVertexCount)
+      }
+      encoder.setRenderPipelineState(referencePipeline)
+      encoder.setDepthStencilState(edgeDepthState)
+      encoder.setDepthBias(0, slopeScale: 0, clamp: 0)
+      encoder.setVertexBuffer(uniformBuffer, offset: uniformOffset, index: 1)
+      for geometry in CADReferenceGeometry.allCases
+      where referenceGeometry.visibility.contains(geometry) {
+        guard let buffer = referenceBuffers[geometry],
+          let count = referenceVertexCounts[geometry],
+          count > 0
+        else { continue }
+        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: count)
+      }
+      if let selectedPartOriginBuffer, selectedPartOriginVertexCount > 0 {
+        encoder.setVertexBuffer(selectedPartOriginBuffer, offset: 0, index: 0)
+        encoder.drawPrimitives(
+          type: .line, vertexStart: 0, vertexCount: selectedPartOriginVertexCount)
       }
     }
     encoder.endEncoding()
@@ -321,22 +469,101 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     }
   }
 
-  private func lookAt(eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) -> simd_float4x4 {
-    let z = simd_normalize(eye - center)
-    let x = simd_normalize(simd_cross(up, z))
-    let y = simd_cross(z, x)
-    return simd_float4x4(
-      SIMD4(x.x, y.x, z.x, 0), SIMD4(x.y, y.y, z.y, 0),
-      SIMD4(x.z, y.z, z.z, 0), SIMD4(-simd_dot(x, eye), -simd_dot(y, eye), -simd_dot(z, eye), 1))
+  private func rebuildReferenceBuffers() {
+    guard documentIdentity != nil else {
+      referenceBuffers.removeAll()
+      referenceVertexCounts.removeAll()
+      return
+    }
+    var buffers: [CADReferenceGeometry: MTLBuffer] = [:]
+    var counts: [CADReferenceGeometry: Int] = [:]
+    for geometry in CADReferenceGeometry.allCases {
+      let vertices = referenceVertices(for: geometry)
+      if let buffer = makePrivateBuffer(vertices) {
+        buffers[geometry] = buffer
+        counts[geometry] = vertices.count
+      }
+    }
+    referenceBuffers = buffers
+    referenceVertexCounts = counts
   }
 
-  private func perspective(fovY: Float, aspect: Float, near: Float, far: Float) -> simd_float4x4 {
-    let y = 1 / tan(fovY * 0.5)
-    let x = y / aspect
-    let z = far / (near - far)
-    return simd_float4x4(
-      SIMD4(x, 0, 0, 0), SIMD4(0, y, 0, 0),
-      SIMD4(0, 0, z, -1), SIMD4(0, 0, z * near, 0))
+  private func rebuildSelectedPartOriginBuffer() {
+    guard documentIdentity != nil, let selectedPartOrigin else {
+      selectedPartOriginBuffer = nil
+      selectedPartOriginVertexCount = 0
+      return
+    }
+    let transform = selectedPartOrigin.matrix
+    let length = selectedPartOrigin.axisLengthMeters
+    let origin = transform * SIMD4<Float>(0, 0, 0, 1)
+    let axes: [(SIMD4<Float>, SIMD4<Float>)] = [
+      (transform * SIMD4<Float>(length, 0, 0, 1), SIMD4(1, 0.22, 0.24, 1)),
+      (transform * SIMD4<Float>(0, length, 0, 1), SIMD4(0.2, 1, 0.36, 1)),
+      (transform * SIMD4<Float>(0, 0, length, 1), SIMD4(0.2, 0.52, 1, 1)),
+    ]
+    let vertices = axes.flatMap { endpoint, color in
+      [
+        ReferenceVertex(position: origin, color: color),
+        ReferenceVertex(position: endpoint, color: color),
+      ]
+    }
+    selectedPartOriginBuffer = makePrivateBuffer(vertices)
+    selectedPartOriginVertexCount = vertices.count
+  }
+
+  private func referenceVertices(for geometry: CADReferenceGeometry) -> [ReferenceVertex] {
+    let red = SIMD4<Float>(0.95, 0.24, 0.28, 1)
+    let green = SIMD4<Float>(0.22, 0.80, 0.38, 1)
+    let blue = SIMD4<Float>(0.24, 0.50, 1, 1)
+    if geometry == .origin {
+      let length = referenceGeometry.axisLengthMeters
+      return [
+        ReferenceVertex(position: SIMD4(0, 0, 0, 1), color: red),
+        ReferenceVertex(position: SIMD4(length, 0, 0, 1), color: red),
+        ReferenceVertex(position: SIMD4(0, 0, 0, 1), color: green),
+        ReferenceVertex(position: SIMD4(0, length, 0, 1), color: green),
+        ReferenceVertex(position: SIMD4(0, 0, 0, 1), color: blue),
+        ReferenceVertex(position: SIMD4(0, 0, length, 1), color: blue),
+      ]
+    }
+
+    let basis: (SIMD3<Float>, SIMD3<Float>, SIMD4<Float>) =
+      switch geometry {
+      case .frontPlane: (SIMD3(1, 0, 0), SIMD3(0, 1, 0), blue)
+      case .topPlane: (SIMD3(1, 0, 0), SIMD3(0, 0, 1), green)
+      case .rightPlane: (SIMD3(0, 1, 0), SIMD3(0, 0, 1), red)
+      case .origin: fatalError("Origin handled above")
+      }
+    let half = referenceGeometry.planeSizeMeters * 0.5
+    let divisions = referenceGeometry.gridDivisions
+    let color = SIMD4(basis.2.x, basis.2.y, basis.2.z, 0.24)
+    var vertices: [ReferenceVertex] = []
+    vertices.reserveCapacity((divisions + 1) * 4)
+    for index in 0...divisions {
+      let coordinate = -half + (Float(index) / Float(divisions)) * half * 2
+      appendReferenceLine(
+        from: basis.0 * coordinate - basis.1 * half,
+        to: basis.0 * coordinate + basis.1 * half,
+        color: color,
+        into: &vertices)
+      appendReferenceLine(
+        from: basis.1 * coordinate - basis.0 * half,
+        to: basis.1 * coordinate + basis.0 * half,
+        color: color,
+        into: &vertices)
+    }
+    return vertices
+  }
+
+  private func appendReferenceLine(
+    from start: SIMD3<Float>,
+    to end: SIMD3<Float>,
+    color: SIMD4<Float>,
+    into vertices: inout [ReferenceVertex]
+  ) {
+    vertices.append(ReferenceVertex(position: SIMD4(start, 1), color: color))
+    vertices.append(ReferenceVertex(position: SIMD4(end, 1), color: color))
   }
 
   private func lightDirection(_ light: CADViewportTheme.Light) -> SIMD4<Float> {
@@ -350,13 +577,18 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     struct Uniforms { float4x4 viewProjection; float4 cameraPosition; float4 keyDirection;
       float4 keyColor; float4 fillDirection; float4 fillColor; float4 rimDirection; float4 rimColor;
       float4 material; float4 edgeColor; float4 selectionColor; float4 overrideColor; };
-    struct Varying { float4 position [[position]]; float3 normal; float3 world; float4 color; };
-    vertex Varying cadVertex(uint id [[vertex_id]], device const Vertex *vertices [[buffer(0)]], constant Uniforms &u [[buffer(1)]], device const float4x4 *partTransforms [[buffer(2)]]) {
+    struct Varying { float4 position [[position]]; float3 normal; float3 world; float4 color; float selected; float grounded; };
+    // Per-part state, indexed by partID: bit 0 = hidden, bit 1 = selected, bit 2 = grounded.
+    vertex Varying cadVertex(uint id [[vertex_id]], device const Vertex *vertices [[buffer(0)]], constant Uniforms &u [[buffer(1)]], device const float4x4 *partTransforms [[buffer(2)]], device const uint *partState [[buffer(3)]]) {
       Vertex v = vertices[id]; float4x4 transform = partTransforms[v.partID];
+      uint state = partState[v.partID];
+      Varying o;
+      if (state & 1u) { o.position = float4(2.0, 2.0, 2.0, 1.0); o.normal = float3(0); o.world = float3(0); o.color = float4(0); o.selected = 0.0; o.grounded = 0.0; return o; }
       float4 world = transform * float4(float3(v.position), 1.0);
       float3x3 normalTransform = float3x3(transform[0].xyz, transform[1].xyz, transform[2].xyz);
-      Varying o; o.world = world.xyz; o.position = u.viewProjection * world;
-      o.normal = normalize(normalTransform * float3(v.normal)); o.color = float4(v.color) / 255.0; return o;
+      o.world = world.xyz; o.position = u.viewProjection * world;
+      o.normal = normalize(normalTransform * float3(v.normal)); o.color = float4(v.color) / 255.0;
+      o.selected = (state & 2u) ? 1.0 : 0.0; o.grounded = (state & 4u) ? 1.0 : 0.0; return o;
     }
     fragment float4 cadFragment(Varying in [[stage_in]], constant Uniforms &u [[buffer(1)]]) {
       float3 n = normalize(in.normal); float3 view = normalize(u.cameraPosition.xyz - in.world);
@@ -367,11 +599,20 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       float3 halfVector = normalize(normalize(u.keyDirection.xyz) + view);
       float highlight = pow(max(dot(n, halfVector), 0.0), mix(96.0, 8.0, clamp(u.material.x, 0.0, 1.0))) * (0.12 + (1.0-u.material.x)*0.42);
       float4 source = u.material.w > 0.5 ? u.overrideColor : in.color;
-      float3 base = mix(source.rgb, u.selectionColor.rgb, u.material.z * 0.38);
+      float sel = max(u.material.z, in.selected);
+      float3 base = mix(source.rgb, u.selectionColor.rgb, sel * 0.42);
+      base = mix(base, float3(0.20, 0.62, 0.94), in.grounded * 0.36);
       float3 specular = mix(float3(1.0), source.rgb, clamp(u.material.y, 0.0, 1.0));
       return float4(base * lighting + specular * highlight + u.rimColor.rgb * rim * 0.22, source.a);
     }
     fragment float4 cadEdgeFragment(Varying in [[stage_in]], constant Uniforms &u [[buffer(1)]]) { return u.edgeColor; }
+    struct ReferenceVertex { float4 position; float4 color; };
+    struct ReferenceVarying { float4 position [[position]]; float4 color; };
+    vertex ReferenceVarying referenceVertex(uint id [[vertex_id]], device const ReferenceVertex *vertices [[buffer(0)]], constant Uniforms &u [[buffer(1)]]) {
+      ReferenceVarying o; ReferenceVertex v = vertices[id];
+      o.position = u.viewProjection * v.position; o.color = v.color; return o;
+    }
+    fragment float4 referenceFragment(ReferenceVarying in [[stage_in]]) { return in.color; }
     """
 }
 

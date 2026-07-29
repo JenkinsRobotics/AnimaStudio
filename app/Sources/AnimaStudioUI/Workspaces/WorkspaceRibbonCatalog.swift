@@ -1,8 +1,14 @@
 import Foundation
 
 enum WorkspaceRibbonAction: String, Sendable {
+  case createCharacter3D
+  case createCharacter2D
+  case createCharacterVR
   case importAnimaCharacter
   case importModel
+  case importImage
+  case importAudio
+  case importVideo
   case stopPlayback
   case togglePlayback
   case toggleLoop
@@ -45,7 +51,7 @@ enum WorkspaceRibbonCatalog {
   static func groups(for workspace: StudioWorkspaceKind) -> [WorkspaceRibbonGroupDescriptor] {
     switch workspace {
     case .assets: assetGroups
-    case .rig, .canvas2d: []
+    case .rig, .canvas2d, .vr: []
     case .animate: animationGroups
     case .show: showGroups
     case .nodes: nodeGroups
@@ -56,6 +62,22 @@ enum WorkspaceRibbonCatalog {
 
   private static let assetGroups = [
     group(
+      "Create", "plus.square", .accent,
+      [
+        tool(
+          "3D Character", "cube",
+          "Start a new 3D character — build its rig, mates, DOF, and limits.",
+          .createCharacter3D),
+        tool(
+          "2D Character", "square.on.square",
+          "Start a new 2D character — surfaces, media, and procedural faces.",
+          .createCharacter2D),
+        tool(
+          "VR Character", "faceid",
+          "Start a new VR character — a face-tracked live avatar.",
+          .createCharacterVR),
+      ]),
+    group(
       "Import", "square.and.arrow.down", .assets,
       [
         tool(
@@ -65,9 +87,9 @@ enum WorkspaceRibbonCatalog {
         tool(
           "3D Model", "cube.transparent", "Import a USD-family, STL, or OBJ model.",
           .importModel),
-        tool("Audio", "waveform", "Import reference or show audio."),
-        tool("Video", "play.rectangle", "Import video for screens or reference."),
-        tool("Image", "photo", "Import an image or texture."),
+        tool("Audio", "waveform", "Import reference or show audio.", .importAudio),
+        tool("Video", "play.rectangle", "Import video for screens or reference.", .importVideo),
+        tool("Image", "photo", "Import an image or texture.", .importImage),
         tool("LED Layout", "circle.grid.3x3", "Import an LED or pixel layout."),
         tool("Batch", "square.stack.3d.up", "Import several compatible assets together."),
       ]),

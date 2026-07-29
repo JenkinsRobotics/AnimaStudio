@@ -7,17 +7,26 @@ struct NavigatorComponentGroup: Identifiable, Equatable {
   var displayName: String
   var componentIDs: [PartID]
   var isLocked: Bool
+  var parentGroupID: UUID?
+  var positionMeters: RigVector3
+  var rotationEulerRadians: RigVector3
 
   init(
     id: UUID = UUID(),
     displayName: String,
     componentIDs: [PartID] = [],
-    isLocked: Bool = false
+    isLocked: Bool = false,
+    parentGroupID: UUID? = nil,
+    positionMeters: RigVector3 = RigVector3(),
+    rotationEulerRadians: RigVector3 = RigVector3()
   ) {
     self.id = id
     self.displayName = displayName
     self.componentIDs = componentIDs
     self.isLocked = isLocked
+    self.parentGroupID = parentGroupID
+    self.positionMeters = positionMeters
+    self.rotationEulerRadians = rotationEulerRadians
   }
 }
 

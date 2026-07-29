@@ -19,18 +19,20 @@ struct AssetBuilderInspector: View {
   var body: some View {
     inspectorContent
       .frame(
-        minHeight: panelSurfaceMode == .floating ? 500 : nil,
-        maxHeight: panelSurfaceMode == .docked ? .infinity : 560
+        minHeight: panelSurfaceMode == .floating ? 620 : nil,
+        maxHeight: panelSurfaceMode == .docked ? .infinity : 820
       )
   }
 
   private var inspectorContent: some View {
     VStack(spacing: 0) {
+      // The import section is a header + one button (+ transient progress), so
+      // keep it compact and give the reclaimed height to the 3D preview.
       importPanel
-        .frame(minHeight: 248, idealHeight: 286)
+        .frame(minHeight: 150, idealHeight: 168)
       Divider()
       previewPanel
-        .frame(maxHeight: .infinity)
+        .frame(minHeight: 340, maxHeight: .infinity)
     }
     .background(StudioPalette.panel)
   }
@@ -127,8 +129,10 @@ struct AssetBuilderInspector: View {
           engineResolvedPartPoses: workspace.engineResolvedPartPoses,
           partModelSources: workspace.enginePartModelSources,
           showsGrid: true,
+          viewpoint: previewViewpoint,
+          cameraCommandRevision: previewCameraCommandRevision,
           cameraState: previewCameraState,
-          focusedPartID: nil,
+          focusedPartID: selectedPart?.id,
           highlightedPartIDs: selectedPartIDs,
           selectionCount: selectedPartIDs.count,
           partAppearances: previewAppearances,
@@ -177,10 +181,9 @@ struct AssetBuilderInspector: View {
     Dictionary(
       uniqueKeysWithValues: workspace.project.rig.parts.compactMap { part in
         guard var appearance = workspace.componentAppearance(for: part.id) else { return nil }
-        if !selectedPartIDs.isEmpty, !selectedPartIDs.contains(part.id) {
-          appearance.opacity = min(appearance.opacity, 0.12)
-        }
-        appearance.isVisible = true
+        // Isolate the selection: when something is selected the preview shows
+        // only those parts; with nothing selected it shows the whole character.
+        appearance.isVisible = selectedPartIDs.isEmpty || selectedPartIDs.contains(part.id)
         return (part.id, appearance)
       }
     )
@@ -196,6 +199,22 @@ struct AssetBuilderInspector: View {
       distance: 2.2,
       orthographicScale: 1.6
     )
+  }
+
+  /// Auto-zoom the preview to the selected part/assembly, or frame the whole
+  /// character when nothing is selected. Both viewpoints fit the subject's
+  /// bounding sphere (see RobotPreviewView), so any-scale parts fill the panel.
+  private var previewViewpoint: PreviewCameraViewpoint {
+    selectedPart == nil ? .home : .selection
+  }
+
+  /// Re-issues the framing command whenever the previewed subject changes; the
+  /// command applies once per revision, so it must vary with the selection.
+  private var previewCameraCommandRevision: Int {
+    var hasher = Hasher()
+    hasher.combine(selectedPart?.id)
+    hasher.combine(selectedPartIDs.count)
+    return hasher.finalize()
   }
 
   private func statusIcon(_ state: AssetBuilderPartState) -> String {

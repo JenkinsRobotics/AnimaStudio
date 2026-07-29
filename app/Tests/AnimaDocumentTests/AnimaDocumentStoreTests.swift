@@ -391,7 +391,10 @@ final class AnimaDocumentStoreTests: XCTestCase {
             id: groupID,
             displayName: "Head Assembly",
             partNames: ["head"],
-            isLocked: true
+            isLocked: true,
+            parentGroupID: UUID(uuidString: "00000000-0000-0000-0000-000000000001"),
+            positionMeters: [0.1, 0.2, 0.3],
+            rotationEulerRadians: [0, 0.25, 0]
           )
         ],
         lockedPartNames: ["head"],
@@ -425,10 +428,28 @@ final class AnimaDocumentStoreTests: XCTestCase {
     let decoded = try CharacterEditorMetadata.decode(metadata.encodedData())
 
     XCTAssertEqual(decoded, metadata)
-    XCTAssertEqual(decoded.formatVersion, "5")
+    XCTAssertEqual(decoded.formatVersion, "6")
     XCTAssertEqual(decoded.partAssetVersions["head"], 3)
     XCTAssertEqual(decoded.modelImports["assets/head.stl"]?.assetID, modelAssetID)
     XCTAssertEqual(decoded.partAppearances["head"]?.proxyFilletRadiusMeters, 0.012)
+  }
+
+  func testLegacyTreeGroupDefaultsToTopLevelIdentityOrigin() throws {
+    let data = Data(
+      """
+      {
+        "id": "00000000-0000-0000-0000-000000000010",
+        "display_name": "Legacy",
+        "parts": ["base"],
+        "locked": false
+      }
+      """.utf8)
+
+    let decoded = try JSONDecoder().decode(CharacterTreeGroupMetadata.self, from: data)
+
+    XCTAssertNil(decoded.parentGroupID)
+    XCTAssertEqual(decoded.positionMeters, [0, 0, 0])
+    XCTAssertEqual(decoded.rotationEulerRadians, [0, 0, 0])
   }
 
   func testLegacyAppearanceMetadataDefaultsProxyFilletToSharp() throws {

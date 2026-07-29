@@ -7,13 +7,18 @@ import SwiftUI
 struct AssetCollectionSidebarPanel: View {
   let collection: AssetBuilderCollection
   let items: [AssetBuilderListItem]
+  var selectedIDs: Set<String> = []
+  var interaction: TreeInteraction<AssetBuilderListItem>? = nil
+  var onSelect: (String) -> Void = { _ in }
 
   @State private var filterText = ""
   @State private var showSearch = false
+  @State private var expandedIDs: Set<String> = []
+  @State private var activeDragPayload: NavigatorDragPayload?
 
-  private var filtered: [AssetBuilderListItem] {
-    guard !filterText.isEmpty else { return items }
-    return items.filter {
+  private var isEmptyAfterFilter: Bool {
+    guard !filterText.isEmpty else { return items.isEmpty }
+    return !items.contains {
       $0.title.localizedCaseInsensitiveContains(filterText)
         || $0.detail.localizedCaseInsensitiveContains(filterText)
     }
@@ -24,13 +29,21 @@ struct AssetCollectionSidebarPanel: View {
       header
       if showSearch { searchField }
       Divider()
-      if filtered.isEmpty {
+      if isEmptyAfterFilter {
         emptyState
       } else {
         ScrollView {
-          LazyVStack(spacing: 2) {
-            ForEach(filtered) { item in row(item) }
-          }
+          TreeView(
+            nodes: items,
+            filterText: filterText,
+            expandedIDs: $expandedIDs,
+            activeDragPayload: $activeDragPayload,
+            interaction: interaction,
+            rowContent: { item in row(item) },
+            dragPayload: { _ in nil },
+            dropBehavior: { _ in nil },
+            onDrop: { _, _, _ in false }
+          )
           .padding(8)
         }
       }
@@ -96,30 +109,40 @@ struct AssetCollectionSidebarPanel: View {
   }
 
   private func row(_ item: AssetBuilderListItem) -> some View {
-    HStack(spacing: 8) {
-      Image(systemName: item.systemImage)
-        .font(.caption)
-        .frame(width: 16)
-        .foregroundStyle(.secondary)
-      VStack(alignment: .leading, spacing: 1) {
-        Text(item.title).font(.callout).lineLimit(1)
-        if !item.detail.isEmpty {
-          Text(item.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+    let isSelected = selectedIDs.contains(item.id)
+    return Button {
+      onSelect(item.id)
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: item.systemImage)
+          .font(.caption)
+          .frame(width: 16)
+          .foregroundStyle(isSelected ? StudioPalette.accent : .secondary)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(item.title).font(.callout.weight(isSelected ? .semibold : .regular)).lineLimit(1)
+          if !item.detail.isEmpty {
+            Text(item.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+          }
+        }
+        Spacer(minLength: 6)
+        if !item.badge.isEmpty {
+          Text(item.badge)
+            .font(.system(size: 8.5, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(StudioPalette.field, in: Capsule())
         }
       }
-      Spacer(minLength: 6)
-      if !item.badge.isEmpty {
-        Text(item.badge)
-          .font(.system(size: 8.5, weight: .semibold))
-          .foregroundStyle(.secondary)
-          .padding(.horizontal, 5)
-          .padding(.vertical, 1)
-          .background(StudioPalette.field, in: Capsule())
-      }
+      .padding(.horizontal, 8)
+      .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+      .background(
+        isSelected ? StudioPalette.accent.opacity(0.22) : Color.clear,
+        in: RoundedRectangle(cornerRadius: 6)
+      )
+      .contentShape(Rectangle())
     }
-    .padding(.horizontal, 8)
-    .frame(minHeight: 30, alignment: .leading)
-    .contentShape(Rectangle())
+    .buttonStyle(.plain)
   }
 
   private var emptyState: some View {

@@ -101,6 +101,47 @@ struct AnimaCoreWorkspaceIntegrationTests {
   }
 
   @Test
+  func groundedPartRejectsRestTransformEdits() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    let characterURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "grounded-\(UUID().uuidString).character.anima")
+    try """
+    anima_version: "2.0"
+    type: character
+    identity:
+      name: grounded_test
+      display_name: Grounded Test
+    parts:
+      base:
+        grounded: true
+        position_m: [0.1, 0.2, 0.3]
+    """.write(to: characterURL, atomically: true, encoding: .utf8)
+    defer {
+      try? FileManager.default.removeItem(at: characterURL)
+      Task { await workspace.shutdownAnimaCore() }
+    }
+
+    await workspace.importAnimaCharacter(from: characterURL)
+    let partID = try #require(workspace.partID(forEngineName: "base"))
+    #expect(!workspace.isPartRestTransformEditable(partID))
+
+    workspace.setPartPosition(id: partID, to: RigVector3(x: 9, y: 9, z: 9))
+
+    let projected = try #require(workspace.project.rig.parts.first { $0.id == partID })
+    #expect(projected.positionMeters == RigVector3(x: 0.1, y: 0.2, z: 0.3))
+  }
+
+  @Test
   func deletingPartsRoundTripsThroughTheCanonicalEngine() async throws {
     let repositoryRoot = try repositoryRootURL()
     let client = AnimaCoreClient(
@@ -193,6 +234,7 @@ struct AnimaCoreWorkspaceIntegrationTests {
     await first.importAnimaCharacter(from: sourceURL)
     let baseID = try #require(first.partID(forEngineName: "base"))
     let shoulderID = try #require(first.partID(forEngineName: "shoulder"))
+    let upperArmID = try #require(first.partID(forEngineName: "upper_arm"))
     first.setPartPosition(id: baseID, to: RigVector3(x: 0.125, y: -0.25, z: 0.5))
     first.setComponentAppearance(
       id: baseID,
@@ -208,6 +250,13 @@ struct AnimaCoreWorkspaceIntegrationTests {
     )
     first.selection = [.part(baseID), .part(shoulderID)]
     let groupID = first.createComponentGroup(named: "Base Assembly")
+    first.selection = [.part(upperArmID)]
+    let childGroupID = first.createComponentGroup(named: "Arm Assembly")
+    #expect(first.nestComponentGroup(childGroupID, in: groupID))
+    await first.toggleComponentGroupGrounded(groupID)
+    #expect(
+      first.componentIDs(inGroupIncludingDescendants: groupID)
+        .allSatisfy { first.enginePart(for: $0)?.isGrounded == true })
     first.toggleComponentGroupLock(groupID)
     let character = try #require(first.currentCharacterReference)
     let canonicalText = try await first.serializedCharacterText()
@@ -259,8 +308,17 @@ struct AnimaCoreWorkspaceIntegrationTests {
     #expect(appearance.finish == .metallic)
     #expect(!appearance.isVisible)
     #expect(appearance.proxyFilletRadiusMeters == 0.014)
-    #expect(reopened.componentGroups.first?.displayName == "Base Assembly")
-    #expect(reopened.componentGroups.first?.isLocked == true)
+    let reopenedParent = try #require(
+      reopened.componentGroups.first { $0.displayName == "Base Assembly" })
+    let reopenedChild = try #require(
+      reopened.componentGroups.first { $0.displayName == "Arm Assembly" })
+    #expect(reopenedParent.isLocked)
+    #expect(reopenedChild.parentGroupID == reopenedParent.id)
+    #expect(reopened.rootComponentGroups.map(\.id) == [reopenedParent.id])
+    let reopenedGroupID = reopenedParent.id
+    #expect(
+      reopened.componentIDs(inGroupIncludingDescendants: reopenedGroupID)
+        .allSatisfy { reopened.enginePart(for: $0)?.isGrounded == true })
 
     await reopened.shutdownAnimaCore()
   }

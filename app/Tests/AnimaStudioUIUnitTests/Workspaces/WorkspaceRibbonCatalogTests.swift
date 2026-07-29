@@ -5,7 +5,7 @@ import XCTest
 final class WorkspaceRibbonCatalogTests: XCTestCase {
   func testEveryNonRigWorkspaceHasAGroupedToolCatalog() {
     for workspace in StudioWorkspaceKind.allCases
-    where workspace != .rig && workspace != .design && workspace != .canvas2d {
+    where workspace != .rig && workspace != .design && workspace != .canvas2d && workspace != .vr {
       let groups = WorkspaceRibbonCatalog.groups(for: workspace)
       XCTAssertFalse(groups.isEmpty, "\(workspace) needs ribbon groups")
       XCTAssertTrue(groups.allSatisfy { !$0.tools.isEmpty })
@@ -16,11 +16,11 @@ final class WorkspaceRibbonCatalogTests: XCTestCase {
 
   func testAssetCatalogCoversImportManagementAndPreparation() {
     let groups = WorkspaceRibbonCatalog.groups(for: .assets)
-    XCTAssertEqual(groups.map(\.title), ["Import", "Manage", "Prepare"])
+    XCTAssertEqual(groups.map(\.title), ["Create", "Import", "Manage", "Prepare"])
     XCTAssertTrue(groups.flatMap(\.tools).contains { $0.title == "Map Nodes" })
     XCTAssertEqual(
       groups.flatMap(\.tools).filter(\.isImplemented).map(\.title),
-      ["Character", "3D Model"]
+      ["3D Character", "2D Character", "VR Character", "Character", "3D Model", "Audio", "Video", "Image"]
     )
   }
 

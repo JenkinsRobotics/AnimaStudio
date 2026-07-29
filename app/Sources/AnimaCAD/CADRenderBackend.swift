@@ -45,6 +45,23 @@ public enum CADRenderBackend: String, CaseIterable, Codable, Identifiable, Senda
 
   public var isPreferredSTEPVisualization: Bool { self == .metalKit }
   public var supportsNativeStudioInteraction: Bool { self == .realityKit }
+
+  /// Default CAD render engine. Three.js WebGPU is the modern web path and
+  /// falls back to WebGL 2 automatically where WebGPU is unavailable.
+  public static let defaultBackend: CADRenderBackend = .threeJSWebGPU
+
+  /// Engines offered in the picker. RealityKit is retired as a *CAD* backend
+  /// (it fails large STEP assemblies — see Codex Bench 2026-07-19); it is kept
+  /// internally only for non-CAD mesh/spatial preview, not selected here.
+  public static var selectable: [CADRenderBackend] {
+    allCases.filter { $0 != .realityKit }
+  }
+
+  /// Coerces a stored/retired backend onto a selectable one, migrating users
+  /// off the old RealityKit CAD default.
+  public var selectableOrDefault: CADRenderBackend {
+    Self.selectable.contains(self) ? self : Self.defaultBackend
+  }
 }
 
 public enum CADGeometryKernel {

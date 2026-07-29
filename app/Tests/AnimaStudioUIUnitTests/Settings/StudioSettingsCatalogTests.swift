@@ -32,14 +32,14 @@ final class StudioSettingsCatalogTests: XCTestCase {
         showNodes: StudioWorkspaceTabDefaults.showsNodes,
         showDesign: StudioWorkspaceTabDefaults.showsDesign
       ),
-      [.assets, .rig, .animate, .canvas2d, .show, .hardware]
+      [.assets, .rig, .animate, .show, .hardware]
     )
   }
 
   func testDeveloperCanEnableNodesAndDesignWithoutReorderingThePipeline() {
     XCTAssertEqual(
       StudioWorkspaceNavigation.visibleStages(showNodes: true, showDesign: true),
-      [.assets, .rig, .animate, .canvas2d, .show, .nodes, .hardware, .design]
+      [.assets, .rig, .animate, .show, .nodes, .hardware, .design]
     )
   }
 }

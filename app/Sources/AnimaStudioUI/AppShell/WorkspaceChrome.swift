@@ -931,6 +931,7 @@ struct WorkspaceGuideCard: View {
 
   private var visibleStages: [StudioWorkspaceKind] {
     StudioWorkspaceNavigation.visibleStages(
+      characterType: workspace.characterType,
       showNodes: showsNodesWorkspaceTab,
       showDesign: showsDesignWorkspaceTab
     )

@@ -79,8 +79,15 @@ enum StudioWorkspaceTabDefaults {
 }
 
 enum StudioWorkspaceNavigation {
-  static func visibleStages(showNodes: Bool, showDesign: Bool) -> [StudioWorkspaceKind] {
-    var stages: [StudioWorkspaceKind] = [.assets, .rig, .animate, .canvas2d, .show]
+  static func visibleStages(
+    characterType: StudioCharacterType = .threeD,
+    showNodes: Bool,
+    showDesign: Bool
+  ) -> [StudioWorkspaceKind] {
+    // One character-type-specific authoring tab replaces the fixed Rig tab.
+    var stages: [StudioWorkspaceKind] = [
+      .assets, characterType.authoringWorkspace, .animate, .show,
+    ]
     if showNodes { stages.append(.nodes) }
     stages.append(.hardware)
     if showDesign { stages.append(.design) }

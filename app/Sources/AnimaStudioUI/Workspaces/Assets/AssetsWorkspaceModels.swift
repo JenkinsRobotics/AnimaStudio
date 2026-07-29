@@ -377,12 +377,21 @@ struct AssetBuilderPartRow: Identifiable, Equatable, Sendable {
   }
 }
 
-struct AssetBuilderListItem: Identifiable, Equatable, Sendable {
+struct AssetBuilderListItem: Identifiable, Equatable, Sendable, TreeNode {
   let id: String
   let title: String
   let detail: String
   let systemImage: String
   let badge: String
+  // Collection lists are flat today; conforming to TreeNode lets every panel
+  // render through the shared TreeView and inherit its rename/delete/menu.
+  var children: [AssetBuilderListItem] = []
+
+  var selectionValue: String { id }
+  var filterText: String { "\(title) \(detail) \(badge)" }
+  var filterTokens: Set<TreeFilterToken> { [] }
+  var isLocked: Bool { false }
+  var acceptsChildren: Bool { false }
 }
 
 enum AssetBuilderCatalog {
