@@ -4521,3 +4521,12 @@ change needed in the Handoff log instead of inventing commands.
   drag-to-tear-off and Split View. Verification: focused AppShell tests (9),
   full `swift test` (368 XCTest + 67 Swift Testing), touched lint, native Xcode
   build, signed root-app rebuild, and packaged launch PID 95568. Claim released.
+- **2026-07-31 (Claude, CAD Metal render fix):** Root-caused the black/unlit
+  (and intermittently invisible) Metal viewport: `draw(in:)` bound the
+  `Uniforms` buffer to the vertex stage only, but `cadFragment`/
+  `cadEdgeFragment` also read it at fragment `buffer(1)` — the fragment stage
+  read undefined memory (lighting/colors arrived as garbage or zeros; Metal
+  API validation aborted at first draw). Fix: one `setFragmentBuffer` bind in
+  the main pass (CADMetalViewport.swift:1110). Verified: 369 XCTest + 28
+  Swift Testing green, root app rebuilt, relaunched with MTL_DEBUG_LAYER=1
+  strict validation — no abort, operator confirmed correctly lit parts.

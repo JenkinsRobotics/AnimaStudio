@@ -1107,6 +1107,11 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       encoder.setVertexBuffer(partTransformBuffer, offset: 0, index: 2)
       encoder.setVertexBuffer(partStateBuffer, offset: 0, index: 3)
       encoder.setVertexBuffer(partAppearanceBuffer, offset: 0, index: 4)
+      // `cadFragment`/`cadEdgeFragment` read Uniforms at buffer(1) in the
+      // FRAGMENT stage too (lighting, shadow, selection). Without this bind the
+      // fragment stage reads undefined memory: lighting intermittently arrives
+      // as zeros (solid-black parts) and Metal API validation aborts the app.
+      encoder.setFragmentBuffer(uniformBuffer, offset: uniformOffset, index: 1)
       encoder.setFragmentTexture(shadowTexture, index: 0)
       encoder.setFragmentSamplerState(shadowSampler, index: 0)
       encoder.drawIndexedPrimitives(
