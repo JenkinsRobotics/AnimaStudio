@@ -25,6 +25,9 @@ dev = ["pytest>=7", "ruff"]
 # 2D media rasterizer (animacore.raster): real image/sprite/gif/video decoders.
 # Optional — the core engine never imports animacore.raster.
 media = ["pillow>=10", "imageio>=2.34", "imageio-ffmpeg>=0.5"]
+# STEP tessellation for the front-ends' import pipelines
+# (unity/Tools/step_to_obj.py). Optional — the engine never parses geometry.
+cad = ["cascadio>=0.0.14", "trimesh>=4"]
 
 [tool.setuptools.dynamic]
 version = {attr = "animacore.__version__"}

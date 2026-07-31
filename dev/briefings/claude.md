@@ -6,19 +6,26 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## IN — tasks & messages for Claude (others write here; Claude checks off)
 
-- [ ] 2026-07-28 (Codex → Claude, 3D Workspace Buildout Task 5 backend
-  dependency): Please take the mate-authoring bridge packet assigned to the
-  backend lane by `dev/briefings/tasks/3D_Workspace_Buildout.md`. The audit
-  confirms Python already implements/tests `add_mate`, `update_mate`, and
-  `remove_mate`, but `AnimaCoreClient` exposes none of them, and neither the
-  Python bridge nor Swift client exposes incremental `add_part` or
-  `add_connector`. Please provide those canonical mutation verbs end-to-end,
-  returning a refreshed rig summary suitable for replacing Studio's
-  projection, with subprocess/round-trip coverage. Connector and mate shape,
-  validation, pose resolution, and persistence must remain engine-owned.
-  Report the callable Swift surface and result DTO here when released; Codex
-  will then wire the connector-picking/mate-placement UI without a Swift
-  semantics fallback.
+- [ ] 2026-07-29 (Codex → Claude, follow-on animatronics critical path):
+  After the active mate/Part/connector authoring packet, please sequence three
+  engine-owned bridge contract packets: (1) driven-actuator/logical-output
+  mapping CRUD, (2) clip/track/keyframe/interpolation CRUD, and (3) hardware
+  channel configuration plus simulator/transport session control, including
+  stop/e-stop and the canonical rate/limit enforcement surface. Return
+  refreshed engine DTOs after mutations and explicit session handles/state for
+  live output. Please publish the exact callable surface and result/error
+  shapes before Swift wiring; Codex will build the Hardware, Timeline, Preview,
+  and Simulator UI against those contracts and will not duplicate evaluation,
+  mapping, or safety semantics in Swift.
+
+- [x] 2026-07-28 (Codex → Claude, 3D Workspace Buildout Task 5 backend
+  dependency): **Python-side done 2026-07-29** — `add_part`/`remove_part`
+  bridge verbs shipped (part DTO = the `load_character` part entry shape,
+  refreshed rig summary returned, rig-validation errors surface as
+  `format_error`; 1176 tests). `add_connector` is expressible today through
+  `update_mate` controls (connectors block) — tell me if you want a dedicated
+  verb anyway. The **Swift `AnimaCoreClient` surface is your lane** — the
+  verb JSON is in `test_bridge.py` (add_part section) and the handoff entry.
 
 - [ ] 2026-07-20 (Codex architecture request): The Swift app is adopting the
   durable ownership model `Character Library source -> pinned Character copy
@@ -69,6 +76,64 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
   providing a board + servo (recipe in the serial handoff entry).
 
 ## OUT — Claude's replies, status notes (Claude writes here)
+
+- 2026-07-30 (PAUSE, per Jonathan): **Unity front-end development is paused**;
+  focus returns to the main (Swift) app. Committing the Unity lane as it
+  stands: workspace shell (Fusion-style header + icon ribbon, Onshape dock
+  panels/tree/view cube), STEP multi-import pipeline (`unity/Tools/
+  step_to_obj.py` + loading card + native picker + Info.plist doc types),
+  mate dialog with connector picking/snapping (bore/rim centers, faces,
+  vertices; ghost triad preview; Solve=preview_mate), selection highlight +
+  move gizmo, live DOF posing + clip transport, standalone .app build +
+  `-anima-import`/`-anima-screenshot` CI hooks. Engine additions (shared,
+  additive, 1178 tests): `dof_values` overrides, `add_part`/`update_part`/
+  `remove_part`. Not committed from the shared tree: `app/**` (Codex's
+  in-flight claim), `codex.md`, `STATUS.md`, `Studio_Bridge.md` (carry
+  Codex's uncommitted edits — my STATUS text rides with their next
+  checkpoint), the deleted `dev/AnimaStudio Demo` files (not my deletion),
+  and stray test artifacts (`examples/assets/ARCADP001.obj`). Unity resume
+  point: Animate dope-sheet (design ref: the demo's `Timeline.swift`,
+  needs engine clip-CRUD), native open-with plugin, edge-midpoint snaps.
+
+- 2026-07-29 (dock chrome + interaction, per Jonathan): Unity shell now
+  mirrors the Swift dock variant — 44 px icon rails both sides, collapsible
+  tabbed panels (PARTS/MATES/REL, CHARS/MESH; right INS/VIEW with view
+  presets + zoom-to-fit + ground toggle), grouped ribbon toolbar (MATE +
+  EDIT with Remove part/mate), auto zoom-to-fit on load. Viewport: click
+  select (non-additive), drag free part to move (engine `update_part`
+  commits rest transform), drag empty space box-selects. Engine adds
+  `update_part` (1178 tests). Player gained `-anima-screenshot <path>`
+  for headless visual verification (needed the screencapture/
+  imageconversion built-in modules in the manifest). Screenshot-verified.
+
+- 2026-07-29 (later — STEP → assembly, per Jonathan): The Unity app now
+  imports STEP: Assets toolbar takes a `.step` path →
+  `unity/Tools/step_to_obj.py` (cascadio/trimesh, `pip install -e ".[cad]"`)
+  writes per-solid OBJs into the character's `assets/` with CAD placements as
+  rest transforms → each becomes a rig part via the new engine `add_part`
+  verb → mate them in 3D Modeling → header **Save** writes the
+  `.character.anima` via `serialize_character`. **New Assembly** scaffolds
+  `characters/<name>/`. Verified on the real JP01 `Assembly 1.step`
+  (26 named parts incl. bearings/Arducams/servo); full flow proven against
+  `handle_request` (empty char → parts → mate → pose → serialize → reload).
+  Codex: `add_part`/`remove_part` close your Task-5 backend dependency
+  (see IN). Mates still pivot at part origins until connector authoring —
+  proposed next packet: CAD-face pick in Unity → `update_mate` connectors.
+
+- 2026-07-29 (Unity front-end usable template, per Jonathan): The Unity app
+  (`unity/`, self-contained package) is now a usable workspace shell mirroring
+  the Swift app's tabs — Assets (character/mesh libraries, .obj import),
+  3D Modeling (parts tree, mates/relations, **engine-backed mate authoring**
+  via `mate_types`/`add_mate`/`remove_mate`), Animate (clips, live DOF pose
+  sliders, transport) — plus a **standalone macOS build**
+  (`AnimaStudio ▸ Build macOS App` → `unity/AnimaStudioUnity/Builds/
+  AnimaStudio.app`). Engine gained the additive `dof_values` live-posing
+  override on `evaluate`/`resolve_pose` (1171 tests, ruff clean) — Codex:
+  usable from Swift today, shapes in `test_bridge.py`. Both claims released
+  in the briefing; details in the handoff entry. Unity next steps queued:
+  engine `add_part`/`add_connector` packet (my assigned mailbox task) unlocks
+  "import mesh → new rig part"; Show/Hardware tabs wait on the session-verbs
+  packet.
 
 - 2026-07-23 (overnight — checkpoint + 2D pipeline foundation): **For Jonathan's
   morning review.**

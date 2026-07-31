@@ -517,6 +517,101 @@ def test_evaluate_bad_time_is_bad_request():
     assert response["error"]["code"] == "bad_request"
 
 
+# dof_values overrides (live posing) ------------------------------------------
+
+
+def _evaluate_with(session, handle, dof_values):
+    return handle_request(
+        session,
+        {
+            "id": 9,
+            "method": "evaluate",
+            "params": {"handle": handle, "dof_values": dof_values},
+        },
+    )
+
+
+def test_evaluate_override_drives_relations():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    response = _evaluate_with(session, handle, {"drive.rotation": 0.2})
+    assert response["ok"], response
+    result = response["result"]
+    assert result["dof_values"]["drive.rotation"] == pytest.approx(0.2)
+    # The gear relation (ratio 3) still runs over the overridden driver.
+    assert result["dof_values"]["driven.rotation"] == pytest.approx(0.6)
+
+
+def test_evaluate_override_of_driven_dof_is_overwritten_by_relation():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    response = _evaluate_with(session, handle, {"driven.rotation": 1.0})
+    assert response["ok"], response
+    # Driven DOF stay driven: the relation recomputes it from the driver.
+    assert response["result"]["dof_values"]["driven.rotation"] == pytest.approx(0.0)
+
+
+def test_evaluate_override_outside_limits_reports_violation():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    response = _evaluate_with(session, handle, {"drive.rotation": math.pi * 2})
+    assert response["ok"], response
+    violations = response["result"]["limit_violations"]
+    assert {v["dof_path"] for v in violations} == {
+        "drive.rotation",
+        "driven.rotation",
+    }
+
+
+def test_evaluate_override_unknown_path_is_bad_request():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    response = _evaluate_with(session, handle, {"nope.rotation": 0.5})
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_evaluate_override_non_number_is_bad_request():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    response = _evaluate_with(session, handle, {"drive.rotation": True})
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_resolve_pose_override_moves_parts():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    neutral = handle_request(
+        session,
+        {"id": 1, "method": "resolve_pose", "params": {"handle": handle}},
+    )
+    posed = handle_request(
+        session,
+        {
+            "id": 2,
+            "method": "resolve_pose",
+            "params": {
+                "handle": handle,
+                "dof_values": {"drive.rotation": math.pi / 4},
+            },
+        },
+    )
+    assert neutral["ok"] and posed["ok"]
+    assert (
+        posed["result"]["parts"]["link"]["orientation"]
+        != neutral["result"]["parts"]["link"]["orientation"]
+    )
+
+
+def test_evaluate_override_matches_direct_engine_call():
+    session = Session()
+    handle = _load(session, VIOLATOR)
+    response = _evaluate_with(session, handle, {"drive.rotation": 0.3})
+    expected = evaluate_pose(
+        parse_character(VIOLATOR), dof_overrides={"drive.rotation": 0.3}
+    )
+    assert response["result"]["dof_values"] == dict(expected.dof_values)
+
+
 # serialize_character / serialize_scene --------------------------------------
 
 
@@ -842,6 +937,116 @@ def _joint_names(rig: dict) -> list:
     return [joint["name"] for joint in rig["joints"]]
 
 
+def _part_names(rig: dict) -> list:
+    return [part["name"] for part in rig["parts"]]
+
+
+def test_add_part_appends_and_persists():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "add_part",
+        part={"name": "bearing", "parent": "base", "model": "assets/bearing.obj"},
+    )
+    assert response["ok"], response
+    added = [p for p in response["result"]["rig"]["parts"]
+             if p["name"] == "bearing"][0]
+    assert added["parent"] == "base"
+    assert added["model"] == "assets/bearing.obj"
+    # Persisted behind the handle: a mate can attach to it next.
+    mated = _author(
+        session,
+        handle,
+        "add_mate",
+        joint={
+            "name": "spin",
+            "type": "revolute",
+            "parent_part": "base",
+            "child_part": "bearing",
+            "dofs": [{"name": "rotation", "kind": "rotation"}],
+        },
+    )
+    assert mated["ok"], mated
+    pose = handle_request(
+        session,
+        {
+            "id": 5,
+            "method": "resolve_pose",
+            "params": {"handle": handle, "dof_values": {"spin.rotation": 0.4}},
+        },
+    )
+    assert pose["ok"] and "bearing" in pose["result"]["parts"]
+
+
+def test_update_part_moves_rest_transform_and_persists():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session,
+        handle,
+        "update_part",
+        part={"name": "tool", "position_m": [0.1, 0.2, 0.3]},
+    )
+    assert response["ok"], response
+    moved = [p for p in response["result"]["rig"]["parts"]
+             if p["name"] == "tool"][0]
+    assert moved["position_m"] == [0.1, 0.2, 0.3]
+    pose = handle_request(
+        session, {"id": 9, "method": "resolve_pose", "params": {"handle": handle}}
+    )
+    assert pose["result"]["parts"]["tool"]["position"] == [0.1, 0.2, 0.3]
+
+
+def test_update_part_unknown_name_is_bad_request():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session, handle, "update_part", part={"name": "nope"}
+    )
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_add_part_duplicate_name_is_bad_request():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(session, handle, "add_part", part={"name": "base"})
+    assert response["error"]["code"] == "bad_request"
+
+
+def test_add_part_unknown_parent_is_format_error():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session, handle, "add_part", part={"name": "x", "parent": "nope"}
+    )
+    assert response["error"]["code"] == "format_error"
+
+
+def test_add_part_unsafe_model_path_is_format_error():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    response = _author(
+        session, handle, "add_part",
+        part={"name": "x", "model": "../outside.obj"},
+    )
+    assert response["error"]["code"] == "format_error"
+
+
+def test_remove_part_free_part_works_mated_part_refuses():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    removed = _author(session, handle, "remove_part", name="tool")
+    assert removed["ok"], removed
+    assert "tool" not in _part_names(removed["result"]["rig"])
+    # 'arm' is held by the shoulder/elbow mates: nothing must be deleted.
+    refused = _author(session, handle, "remove_part", name="arm")
+    assert refused["error"]["code"] == "format_error"
+    still = _author(session, handle, "remove_part", name="missing")
+    assert still["error"]["code"] == "bad_request"
+
+
 def test_add_mate_appends_joint_and_persists():
     session = Session()
     handle = _load(session, AUTHORING)
@@ -862,6 +1067,64 @@ def test_add_mate_appends_joint_and_persists():
     again = _author(session, handle, "remove_mate", name="weld")
     assert again["ok"]
     assert "weld" not in _joint_names(again["result"]["rig"])
+
+
+def test_preview_mate_resolves_candidate_without_mutating_handle():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    joint = {
+        "name": "weld",
+        "type": "fastened",
+        "parent_part": "hand",
+        "child_part": "tool",
+        "controls": {
+            "connectors": {
+                "a": {
+                    "part": "hand",
+                    "origin_m": [0.25, 0.0, 0.0],
+                    "primary_axis": [0.0, 0.0, 1.0],
+                    "secondary_axis": [1.0, 0.0, 0.0],
+                },
+                "b": {
+                    "part": "tool",
+                    "origin_m": [0.0, 0.0, 0.0],
+                    "primary_axis": [0.0, 0.0, 1.0],
+                    "secondary_axis": [1.0, 0.0, 0.0],
+                },
+            }
+        },
+    }
+
+    preview = _author(session, handle, "preview_mate", joint=joint)
+    assert preview["ok"], preview
+    assert preview["result"]["parts"]["tool"]["position"] == [0.25, 0.0, 0.0]
+
+    # Preview is intentionally non-destructive: the same mate can still be
+    # committed once, and the handle did not acquire it early.
+    committed = _author(session, handle, "add_mate", joint=joint)
+    assert committed["ok"], committed
+    assert _joint_names(committed["result"]["rig"])[-1] == "weld"
+
+
+def test_preview_and_add_mate_reject_part_graph_cycles():
+    session = Session()
+    handle = _load(session, AUTHORING)
+    cycle = {
+        "name": "cycle",
+        "type": "fastened",
+        "parent_part": "hand",
+        "child_part": "base",
+    }
+
+    preview = _author(session, handle, "preview_mate", joint=cycle)
+    assert not preview["ok"]
+    assert preview["error"]["code"] == "format_error"
+    assert "cycle" in preview["error"]["message"]
+
+    committed = _author(session, handle, "add_mate", joint=cycle)
+    assert not committed["ok"]
+    assert committed["error"]["code"] == "format_error"
+    assert "cycle" in committed["error"]["message"]
 
 
 def test_add_mate_duplicate_name_rejected():

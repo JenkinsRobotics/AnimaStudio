@@ -85,9 +85,13 @@ CAPABILITIES = [
     "solve_ik",
     "mate_types",
     "relation_types",
+    "preview_mate",
     "add_mate",
     "update_mate",
     "remove_mate",
+    "add_part",
+    "update_part",
+    "remove_part",
     "add_relation",
     "update_relation",
     "remove_relation",
@@ -396,24 +400,27 @@ def _projectable_channels(rig: Rig, pose) -> dict[int, float]:
 # TypeError), which the verb reports as a ``format_error``.
 
 
+def _part_from_dto(entry: dict) -> Part:
+    return Part(
+        name=entry["name"],
+        parent=entry.get("parent"),
+        model_node=entry.get("model_node"),
+        description=entry.get("description", ""),
+        model=entry.get("model", ""),
+        suppressed=entry.get("suppressed", False),
+        grounded=entry.get("grounded", False),
+        position_m=tuple(entry.get("position_m", (0.0, 0.0, 0.0))),
+        rotation_euler_rad=tuple(
+            entry.get("rotation_euler_rad", (0.0, 0.0, 0.0))
+        ),
+    )
+
+
 def rig_from_dict(dto: dict) -> Rig:
     """Reconstruct a validated ``Rig`` from a ``load_character`` rig DTO."""
     identity = _identity_from_dto(dto["identity"])
     parts = {
-        entry["name"]: Part(
-            name=entry["name"],
-            parent=entry.get("parent"),
-            model_node=entry.get("model_node"),
-            description=entry.get("description", ""),
-            model=entry.get("model", ""),
-            suppressed=entry.get("suppressed", False),
-            grounded=entry.get("grounded", False),
-            position_m=tuple(entry.get("position_m", (0.0, 0.0, 0.0))),
-            rotation_euler_rad=tuple(
-                entry.get("rotation_euler_rad", (0.0, 0.0, 0.0))
-            ),
-        )
-        for entry in dto.get("parts", [])
+        entry["name"]: _part_from_dto(entry) for entry in dto.get("parts", [])
     }
     joints = {
         entry["name"]: _joint_from_dto(entry) for entry in dto.get("joints", [])
@@ -697,6 +704,21 @@ def _validate_character(
     return _ok(request_id, {"diagnostics": []})
 
 
+def _dof_overrides(params: dict) -> dict[str, float] | None:
+    """Optional ``dof_values`` object: live posing overrides by DOF path."""
+    raw = params.get("dof_values")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise _BadRequest("'dof_values' must be an object")
+    overrides: dict[str, float] = {}
+    for path, value in raw.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise _BadRequest(f"dof_values[{path!r}] must be a number")
+        overrides[path] = float(value)
+    return overrides
+
+
 def _evaluate(session: Session, params: dict, request_id: object) -> dict:
     handle = _require_str(params, "handle")
     rig = session.get(handle)
@@ -711,9 +733,11 @@ def _evaluate(session: Session, params: dict, request_id: object) -> dict:
     if isinstance(time_s, bool) or not isinstance(time_s, (int, float)):
         raise _BadRequest("'time_s' must be a number")
     try:
-        pose = evaluate_pose(rig, clip, float(time_s))
-    except KeyError:
-        raise _BadRequest(f"rig {handle!r} has no clip named {clip!r}")
+        pose = evaluate_pose(
+            rig, clip, float(time_s), dof_overrides=_dof_overrides(params)
+        )
+    except KeyError as error:
+        raise _BadRequest(str(error.args[0] if error.args else error))
     channels = _projectable_channels(rig, pose)
     return _ok(
         request_id,
@@ -753,9 +777,11 @@ def _resolve_pose(session: Session, params: dict, request_id: object) -> dict:
     if isinstance(time_s, bool) or not isinstance(time_s, (int, float)):
         raise _BadRequest("'time_s' must be a number")
     try:
-        pose = evaluate_pose(rig, clip, float(time_s))
-    except KeyError:
-        raise _BadRequest(f"rig {handle!r} has no clip named {clip!r}")
+        pose = evaluate_pose(
+            rig, clip, float(time_s), dof_overrides=_dof_overrides(params)
+        )
+    except KeyError as error:
+        raise _BadRequest(str(error.args[0] if error.args else error))
     transforms = resolve_pose(rig, pose)
     return _ok(
         request_id,
@@ -1003,6 +1029,88 @@ def _relation_from_dto(dto: dict) -> Relation:
     )
 
 
+def _validate_mate_graph(joints: dict[str, Joint]) -> None:
+    """Reject a parent→child cycle before it can enter an authoring handle.
+
+    The kinematic resolver is a forward walk, so a newly-authored mate must
+    keep the Part graph acyclic. Loaded legacy characters remain compatible;
+    every bridge-authored add/update and every non-destructive preview uses
+    this validation.
+    """
+    children_by_parent: dict[str, list[str]] = {}
+    for joint in joints.values():
+        children_by_parent.setdefault(joint.parent_part, []).append(
+            joint.child_part
+        )
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(part: str, path: list[str]) -> None:
+        if part in visiting:
+            cycle_start = path.index(part)
+            cycle = path[cycle_start:] + [part]
+            raise ValueError(
+                f"mate graph has a cycle ({' -> '.join(cycle)})"
+            )
+        if part in visited:
+            return
+        visiting.add(part)
+        for child in children_by_parent.get(part, []):
+            visit(child, path + [part])
+        visiting.remove(part)
+        visited.add(part)
+
+    for part in children_by_parent:
+        visit(part, [])
+
+
+def _rig_adding_mate(rig: Rig, joint_dto: dict) -> Rig:
+    joint = _joint_from_dto(joint_dto)
+    joints = {**rig.joints, joint.name: joint}
+    _validate_mate_graph(joints)
+    return replace(rig, joints=joints)
+
+
+def _preview_mate(session: Session, params: dict, request_id: object) -> dict:
+    """Resolve a candidate mate without mutating the rig behind ``handle``."""
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    joint_dto = params.get("joint")
+    if not isinstance(joint_dto, dict):
+        raise _BadRequest("'joint' must be an object")
+    name = joint_dto.get("name")
+    if name in rig.joints:
+        return _error(request_id, "bad_request", f"mate {name!r} already exists")
+    clip = params.get("clip")
+    if clip is not None and not isinstance(clip, str):
+        raise _BadRequest("'clip' must be a string or null")
+    time_s = params.get("time_s", 0.0)
+    if isinstance(time_s, bool) or not isinstance(time_s, (int, float)):
+        raise _BadRequest("'time_s' must be a number")
+    try:
+        preview_rig = _rig_adding_mate(rig, joint_dto)
+    except (KeyError, ValueError, TypeError) as error:
+        return _error(request_id, "format_error", str(error), None)
+    try:
+        pose = evaluate_pose(preview_rig, clip, float(time_s))
+        transforms = resolve_pose(preview_rig, pose)
+    except KeyError:
+        raise _BadRequest(f"rig {handle!r} has no clip named {clip!r}")
+    except (ValueError, TypeError) as error:
+        return _error(request_id, "format_error", str(error), None)
+    return _ok(
+        request_id,
+        {
+            "parts": {
+                part_name: transform_to_json(transform)
+                for part_name, transform in transforms.items()
+            }
+        },
+    )
+
+
 def _add_mate(session: Session, params: dict, request_id: object) -> dict:
     rig, handle, err = _rig_or_error(session, params, request_id)
     if err is not None:
@@ -1016,9 +1124,7 @@ def _add_mate(session: Session, params: dict, request_id: object) -> dict:
     return _commit_rig(
         session,
         handle,
-        lambda: replace(
-            rig, joints={**rig.joints, joint_dto["name"]: _joint_from_dto(joint_dto)}
-        ),
+        lambda: _rig_adding_mate(rig, joint_dto),
         request_id,
     )
 
@@ -1036,8 +1142,16 @@ def _update_mate(session: Session, params: dict, request_id: object) -> dict:
     return _commit_rig(
         session,
         handle,
-        lambda: replace(
-            rig, joints={**rig.joints, name: _joint_from_dto(joint_dto)}
+        lambda: _rig_adding_mate(
+            replace(
+                rig,
+                joints={
+                    key: joint
+                    for key, joint in rig.joints.items()
+                    if key != name
+                },
+            ),
+            joint_dto,
         ),
         request_id,
     )
@@ -1053,6 +1167,71 @@ def _remove_mate(session: Session, params: dict, request_id: object) -> dict:
     remaining = {key: joint for key, joint in rig.joints.items() if key != name}
     return _commit_rig(
         session, handle, lambda: replace(rig, joints=remaining), request_id
+    )
+
+
+def _add_part(session: Session, params: dict, request_id: object) -> dict:
+    """Incremental part authoring: append one part to the rig graph.
+
+    The part DTO is exactly the ``load_character`` part entry shape
+    (``name`` required; ``parent``/``model``/``model_node``/rest
+    transform/``grounded``/``suppressed`` optional). An unknown parent or
+    unsafe ``model`` path fails rig validation → ``format_error``.
+    """
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    part_dto = params.get("part")
+    if not isinstance(part_dto, dict):
+        raise _BadRequest("'part' must be an object")
+    name = part_dto.get("name")
+    if not isinstance(name, str) or not name:
+        raise _BadRequest("part 'name' must be a non-empty string")
+    if name in rig.parts:
+        return _error(request_id, "bad_request", f"part {name!r} already exists")
+
+    def build() -> Rig:
+        parts = {**rig.parts, name: _part_from_dto(part_dto)}
+        return replace(rig, parts=parts)
+
+    return _commit_rig(session, handle, build, request_id)
+
+
+def _update_part(session: Session, params: dict, request_id: object) -> dict:
+    """Replace one part's fields (same full-entry DTO as ``add_part``).
+
+    The name is the key and cannot change here; moving a FREE part's rest
+    transform is the primary use (viewport drag → ``position_m``).
+    """
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    part_dto = params.get("part")
+    if not isinstance(part_dto, dict):
+        raise _BadRequest("'part' must be an object")
+    name = part_dto.get("name")
+    if not isinstance(name, str) or name not in rig.parts:
+        return _error(request_id, "bad_request", f"no part named {name!r}")
+
+    def build() -> Rig:
+        parts = {**rig.parts, name: _part_from_dto(part_dto)}
+        return replace(rig, parts=parts)
+
+    return _commit_rig(session, handle, build, request_id)
+
+
+def _remove_part(session: Session, params: dict, request_id: object) -> dict:
+    """Remove a part; a part still referenced by a joint/child part fails
+    rig validation and reports ``format_error`` (nothing is deleted)."""
+    rig, handle, err = _rig_or_error(session, params, request_id)
+    if err is not None:
+        return err
+    name = _require_str(params, "name")
+    if name not in rig.parts:
+        return _error(request_id, "bad_request", f"no part named {name!r}")
+    remaining = {key: part for key, part in rig.parts.items() if key != name}
+    return _commit_rig(
+        session, handle, lambda: replace(rig, parts=remaining), request_id
     )
 
 
@@ -1423,7 +1602,11 @@ _VERBS = {
     "solve_ik": _solve_ik,
     "mate_types": _mate_types,
     "relation_types": _relation_types,
+    "preview_mate": _preview_mate,
     "add_mate": _add_mate,
+    "add_part": _add_part,
+    "update_part": _update_part,
+    "remove_part": _remove_part,
     "update_mate": _update_mate,
     "remove_mate": _remove_mate,
     "add_relation": _add_relation,

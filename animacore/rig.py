@@ -1055,7 +1055,11 @@ class Pose:
 
 
 def evaluate_pose(
-    rig: Rig, clip_name: str | None = None, time_seconds: float = 0.0
+    rig: Rig,
+    clip_name: str | None = None,
+    time_seconds: float = 0.0,
+    *,
+    dof_overrides: Mapping[str, float] | None = None,
 ) -> Pose:
     """Evaluate the rig at ``time_seconds``, deterministically.
 
@@ -1063,6 +1067,14 @@ def evaluate_pose(
     neutral pose. Every DOF or parameter the clip does not animate
     falls back to its neutral. Looping clips wrap time modulo the
     duration; non-looping clips clamp.
+
+    ``dof_overrides`` (live posing: UI sliders, puppeteering) replaces
+    individual driver values after the clip/neutral pass and before
+    relations, so an overridden driver still propagates to its driven
+    DOF — and an override of a relation-driven DOF is overwritten by
+    its relation (driven DOF stay driven). An override outside enabled
+    limits is reported in ``Pose.limit_violations``, never clamped. An
+    unknown or inactive (suppressed) path raises ``KeyError``.
 
     Order per Kinematics.md §5: driver DOF resolve from the clip (or
     neutral), relations apply in dependency order, then limits — a
@@ -1101,6 +1113,21 @@ def evaluate_pose(
     dof_values = {
         path: animated.get(path, dof.neutral) for path, dof in paths.items()
     }
+    violations: list[LimitViolation] = []
+    for path, value in (dof_overrides or {}).items():
+        if path not in dof_values:
+            raise KeyError(f"rig has no active dof {path!r}")
+        dof_values[path] = value
+        dof = paths[path]
+        if dof.has_limits and not dof.minimum <= value <= dof.maximum:
+            violations.append(
+                LimitViolation(
+                    dof_path=path,
+                    value=value,
+                    min_value=dof.minimum,
+                    max_value=dof.maximum,
+                )
+            )
     # Skip a suppressed relation, and one whose driver/driven DOF is not
     # in the active solve (belongs to a suppressed joint).
     # ponytail: suppression is strictly per-element — there is no cascade
@@ -1113,7 +1140,6 @@ def evaluate_pose(
         and relation.driver in dof_values
         and relation.driven in dof_values
     )
-    violations: list[LimitViolation] = []
     for relation in relations_in_dependency_order(active_relations):
         driven_value = (
             relation.ratio * dof_values[relation.driver] + relation.offset

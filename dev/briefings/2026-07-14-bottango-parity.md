@@ -48,6 +48,32 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Fix Home navigation crash during shared-session teardown | `app/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, focused AppShell regression in `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, STATUS + append-only coordination; preserve all concurrent dirty hunks | clearing the shared project session never force-unwraps nil while SwiftUI tears down the workspace; stale outgoing bindings cannot resurrect a closed project; focused/full tests, lint, native/root build/sign/launch pass | active 2026-07-30 |
+| Codex | Add native macOS workspace windows, tabs, and detach/merge controls beside Studio mode | `app/App/AnimaStudioApp.swift`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWindowBehavior,WorkspaceChrome,StudioWorkspaceModel}.swift`, focused AppShell tests, STATUS + append-only coordination; preserve all concurrent dirty hunks | one shared project application session backs every native window; header window menu opens any applicable workspace as a new native tab or independent window, detaches the current tab, merges windows, toggles the tab bar, and selects adjacent tabs; each window keeps its own workspace presentation while project/session state is shared; tests/lint/native/root/sign/launch pass | released 2026-07-30 — focused 9 + full 368 XCTest/67 Swift Testing; lint; native build; signed root rebuild; launch PID 95568 |
+| Codex | Replace the misleading engine-time performance card with real renderer FPS and stabilize the interactive CAD render loop at 60 Hz | `app/Sources/AnimaCADViewport/{CADLiveTelemetry,CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceView,Components/{ViewportPerformanceHUD,CADAppearancePanel,ViewportSidebarPanel}}.swift`, narrowly required Three.js/raw-WebGPU frame-report source/generated resources, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | compact and detailed performance surfaces consume one live presented-frame telemetry contract; WebGPU batches carry their measured interval; sampling remains live during pointer tracking; Metal reports completed GPU frames and targets a stable 60 Hz; the HUD distinguishes renderer FPS/frame time from AnimaCore playhead time; focused/full tests, lint, JS checks, native/root build/sign/launch pass | released 2026-07-30 — real GPU/browser frame telemetry, 60 Hz Metal policy, cached state/shadows; 366 XCTest + 67 Swift Testing, lint/JS/native/root/sign/launch pass |
+| Codex | Make CAD environment lighting controls authoritative, immediately live, and recoverable from an all-black rig | `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceView,Components/CADAppearancePanel}.swift`, narrowly required Metal lighting helpers/shader under `app/Sources/AnimaCADViewport/CADMetalViewport.swift`, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | the Environment panel binds directly to the values consumed by the active viewport instead of maintaining duplicate property wrappers; changing ambient/key/fill/rim redraws immediately; reset restores the selected preset; an all-disabled warning is explicit; very dark imported materials retain CAD-readable dielectric response when lighting is enabled while all-zero lighting remains honestly black; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-30 — direct live bindings and preset reset; explicit all-lights-off warning; Metal/raw-WebGPU dark-material response and raw ambient uniform repaired; 366 XCTest + 66 Swift Testing, touched lint, runtime Metal construction, native/root build, signing, and packaged launch pass |
+| Codex | Verify and complete selected Part/sub-assembly highlighting with a bounds-centered transform gizmo | `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADTransformGizmoOverlay}.swift`, narrowly required geometry helpers under `app/Sources/AnimaCADViewport/**`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | selecting one Part highlights that Part and places the existing axis/plane/rotation gizmo at the rendered Part center; selecting a component group highlights every descendant Part and places one gizmo at the combined rendered selection center; group manipulation moves the whole group through existing rest-transform callbacks; locked/grounded constraints remain honored; tests/lint/build/sign/launch pass | released 2026-07-30 — shared Part/group highlight expansion; cached rendered-bounds center; canonical transform remapping; 366 XCTest + 66 Swift Testing, touched lint, native/root build and signing pass |
+| Codex | Keep the CAD workspace operational with missing or unreadable Part sources and provide per-Part relink recovery | `app/Sources/AnimaCADViewport/CADPipelineViewport.swift`, narrowly required load/result contracts under `app/Sources/AnimaCADViewport/**`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, Assets and 3D Modeling tree/table rows under `app/Sources/AnimaStudioUI/{Components,Workspaces/Assets}/**`, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | one failed/missing STEP source cannot replace the viewport; successfully resolved Parts continue rendering and an all-failed assembly still shows the usable empty CAD environment; failures map back to affected Part IDs; 3D Modeling shows a disconnected state icon and Assets shows connection status plus an operator relink action; relink uses the existing canonical import/replacement path; deterministic/full tests and touched lint pass | released 2026-07-30 — partial STEP loading, per-Part disconnected projection, Assets/3D Modeling relink actions, 366 XCTest + 64 Swift Testing, touched lint, native Xcode build, signed root-app rebuild |
+| Codex | Repair live CAD lighting disable behavior and imported STEP/XDE color precedence | `app/Sources/AnimaCADViewport/{CADMetalViewport,CADViewportTheme,CADWebGPUViewport,CADWebPayload}.swift`, `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceView,Components/CADAppearancePanel,Settings/CADThemeOverrides}.swift`, Three.js source/generated resources only if its live theme adapter is faulty, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | disabling key/fill/rim/ambient produces an honestly unlit/dark result rather than a fixed green surface; Preserve STEP/XDE colors displays available imported colors per face/part and uses the importer fallback only where the source has none; per-Part appearance remains the highest-priority explicit override; Metal and WebGPU agree; tests/lint/build/sign/launch pass | released 2026-07-30 |
+| Codex | Eliminate the RealityKit-to-CAD startup flash and promote the shared 3D floor grid into configurable CAD presentation | `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceView,Components/CADAppearancePanel,Settings/{StudioPreferenceKeys,AnimaStudioSettingsView}}.swift`, Three.js/raw-WebGPU source and generated resources, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | a STEP Character enters a theme-matched loading surface instead of briefly mounting RobotPreview/RealityKit; the perspective floor grid used by the Assets preview is available in Metal, Three.js/WebGPU, and raw WebGPU, independently toggleable from Camera & Display and configurable for spacing/major lines/extent/opacity; settings persist; preview remains a deliberate consumer | released 2026-07-30 — implementation, JS builds/checks, touched lint, and corrected focused regression pass; first full run compiled and passed 365 XCTest before finding the now-fixed exact-float assertion; external approval usage limiter blocked only the redundant full rerun/native packaging |
+| Codex | Correct production CAD mouse routing and source-faithful navigation presets | `app/Sources/RealityKitViewport/{PreviewNavigationSettings,CADNavigationCapture}.swift`, `app/Sources/AnimaCADViewport/{CADMouseInputOverlay,CADMetalViewport,CADPipelineViewport,CADWebGPUViewport,CADWebPayload}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, mouse-settings copy only where mappings change, focused navigation/CAD tests, regenerated Three.js resources only if its input adapter changes, STATUS + append-only coordination; preserve every concurrent dirty hunk | plain left click replaces selection; dragging a selected editable Part moves it; empty left drag never pans; Onshape/default right-orbit + middle/Ctrl-right pan, SolidWorks middle-orbit + Ctrl-middle pan + Shift-middle zoom, and Fusion middle-pan + Shift-middle orbit match source references; wheel zoom and right click-vs-drag stay separated; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-30 — shared resolved mappings drive native + WebGPU; left drag is Part placement or directional box selection only; clean-right/context and right-drag navigation are separated; 365 XCTest + 61 Swift Testing, touched lint, JS rebuild/copy, native/root build/sign, and packaged launch PID 34387 pass |
+| Codex | Improve production CAD edge definition and depth-rich Onshape lighting | `app/Sources/AnimaCADViewport/{CADMetalViewport,CADViewportTheme,CADWebGPUViewport,CADWebPayload}.swift`, `app/Sources/AnimaStudioUI/Components/CADAppearancePanel.swift`, `app/Sources/AnimaStudioUI/Settings/StudioPreferenceKeys.swift`, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift` and narrowly required UI tests, generated Three.js resources only if the retained browser path changes, `dev/docs/reality/STATUS.md`, append-only coordination; preserve every concurrent dirty hunk | edge strength produces visibly stronger screen-space CAD feature edges instead of acting as an on/off threshold; Onshape lighting gains clear underside/contact depth without flattening light-facing surfaces; controls accurately describe the implemented interactive technique and remain live; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-30 |
+| Codex | Separate viewport performance status from the center-view switcher and route it through the right rail | `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceView,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Components/{CADAppearancePanel,ViewportSidebarPanel,ViewportPerformanceHUD}.swift`, `app/Sources/AnimaStudioUI/Settings/StudioPreferenceKeys.swift`, narrowly required telemetry inset support in `app/Sources/AnimaCADViewport/CADPipelineViewport.swift`, focused AppShell/component tests under `app/Tests/AnimaStudioUIUnitTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve all concurrent dirty hunks | engine-frame/performance status renders in a bottom-right ViewCube-style HUD with clearance from the bottom center switcher and floating right panels; a dedicated Performance right-rail panel controls HUD visibility and reports live status; no overlap in floating/docked/canvas modes; tests/lint/native/root build/sign/launch pass | released 2026-07-30 — bottom-right compact HUD, Performance rail panel, and stacked detailed CAD telemetry shipped; 365 XCTest + 59 Swift Testing, lint/build/sign/launch pass |
+| Codex | Restore the ViewCube as a live mirror of the shared CAD world-camera frame | `app/Sources/AnimaCADViewport/{CADCameraState,CADPipelineViewport,CADWebGPUViewport}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, focused camera/ViewCube tests under `app/Tests/{AnimaCADTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve all concurrent dirty hunks | Metal and WebGPU free orbit/roll continuously update the cube's projected world axes; cube face/edge/corner/nudge/roll commands update the active renderer once; no command echo/jitter, camera reset, or viewport rebuild; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — live direction+roll reporting and revision-gated commands shipped; tests/build/sign pass |
+| Codex | Make the CAD right sidebar operational and split it into camera/display, selected-Part appearance, environment/lighting, and contextual settings panels | `app/Sources/AnimaStudioUI/{AppShell/{StudioWorkspaceView,WorkspaceShell},Components/CADAppearancePanel}.swift`, `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport,CADWebPayload}.swift`, `dev/Codex Bench/web/threejs/src/app.js` plus generated production/demo bundles, focused tests under `app/Tests/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve every concurrent dirty hunk | each right-rail icon opens only its own working panel; theme/background/edge/light controls update the active CAD renderer live; selected-Part color/finish/opacity use existing editor metadata and render in Metal + Three.js; contextual settings/inspector remains selection-aware; no enabled inert controls; full tests/lint/JS/native/root build/sign/launch pass | released 2026-07-29 — separate rail routing, live Metal/Three.js Part appearance, honest raw-WebGPU limitation; 364 XCTest + 57 Swift Testing, focused regression, JS syntax/build/copy, Xcode/root builds, signed packaged launch PID 46171 |
+| Codex | Replace the selected-Part overlay with a true projected local-frame CAD manipulator | `app/Sources/AnimaCADViewport/{CADTransformGizmoOverlay,CADPipelineViewport,CADWebGPUViewport}.swift`, `dev/Codex Bench/web/threejs/src/app.js` plus generated production/demo bundles only if needed, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve every existing/concurrent dirty hunk | gizmo arrows follow the Part's orthogonal local X/Y/Z axes under camera and Part rotation; arrow drags translate only on that axis; XY/YZ/ZX plane handles translate only in that local plane; three rotation rings rotate only about their perpendicular local axes; grounded/locked guards and camera controls remain intact; deterministic/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — Metal and Three.js project the selected Part's real local frame; axis arrows, plane patches, and perpendicular rotation rings share one constrained drag model; local rotation is an exact matrix delta; 364 XCTest + 57 Swift Testing, touched lint, JS syntax/build/copy, and native Xcode build pass; packaged root build/sign/launch recorded below |
+| Codex | Repair production Metal CAD part lighting for the coordinated Onshape environment | `app/Sources/AnimaCADViewport/{CADMetalViewport,CADViewportTheme}.swift`, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve all current/concurrent dirty hunks | imported STEP surfaces remain brightly readable under the white Onshape environment from every visible orientation; invalid/reversed mesh normals cannot collapse the lighting to black; key/fill/rim controls remain effective and share explicit normalized semantics; selection/edges are unchanged; deterministic/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — Metal now renders CAD color through an sRGB target, raises coordinated hemisphere fill, repairs reversed/degenerate visible normals, and composes orange selection after lighting; WebGPU's existing sRGB/double-sided/emissive path remains unchanged; 364 XCTest + 56 Swift Testing, focused regressions, touched lint/diff check, native/root builds, strict signing, and packaged launch pass |
+| Codex | Add selected-Part direct body dragging to the native CAD viewport | `app/Sources/AnimaCADViewport/{CADMouseInputOverlay,CADMetalViewport,CADPipelineViewport,CADRealityKitViewport,CADTransformGizmoOverlay}.swift`, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve all existing/concurrent dirty hunks | clicking a Part retains the existing orange selected-state highlight and origin-anchored move/rotate gizmo; dragging the already-selected editable body moves it in the camera-facing plane through the existing canonical rest-transform callback; grounded/locked Parts cannot move; right orbit and middle pan remain unchanged; deterministic/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — selected Metal CAD Parts use a stronger orange surface/edge cue and retain the origin gizmo; a second unmodified left drag moves an editable selected Part in the camera-facing plane with depth-stable scaling through the existing rest-transform callback; modifier multi-select, empty-click deselection, right orbit, middle pan, and grounded/locked guards remain intact; 364 XCTest + 55 Swift Testing, focused regression rerun, touched format lint, native/root builds, strict signing, and packaged launch pass |
+| Codex | Make the coordinated Onshape CAD viewport preset the default visual environment | `app/Sources/AnimaCADViewport/{CADViewportTheme,CADMetalViewport,CADWebGPUViewport}.swift`, CAD theme preference/default surfaces under `app/Sources/AnimaStudioUI/{AppShell,Components,Settings}/**`, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift` and narrowly required UI preference tests, `dev/docs/reality/STATUS.md`, append-only coordination; preserve every current/concurrent dirty hunk | Onshape is a complete bright-white preset (not a background-only swap): pale blue CAD material, high-key balanced lighting, crisp dark B-Rep edges, and readable selection colors; fresh installs and renderer fallbacks use it while existing saved operator choices remain intact; selecting a coordinated preset applies its material/light/edge values instead of stale sliders overriding it; tests/lint/native/root build/sign/launch pass | released 2026-07-29 — 364 XCTest + 53 Swift Testing, focused format lint/diff checks, native/root builds, strict signing, live launch PID 50076 |
+| Codex | Complete Onshape-style non-destructive live mate preview | `animacore/bridge.py`, focused `animacore/tests/test_bridge.py`, `app/Sources/AnimaCoreClient/{AnimaCoreClient,AnimaCoreBridgeModels}.swift`, `app/Sources/AnimaCADViewport/{CADMetalFeaturePicker,CADMetalViewport}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateAuthoring,MatePlacementOverlay}.swift`, focused tests under `app/Tests/{AnimaCADTests,AnimaCoreClientTests,AnimaStudioUIUnitTests}/**`, `dev/docs/{roadmap/Studio_Bridge.md,reality/STATUS.md}`, append-only coordination; preserve every current/concurrent dirty hunk | after the second connector pick, AnimaCore validates a temporary mate and returns canonical resolved transforms without mutating the loaded rig; option edits update the preview live; cancel restores the committed pose; exact feature markers show the inferred RGB connector frame; confirm remains the only mutation; deterministic Python/Swift tests plus full verification pass | released 2026-07-29 — `preview_mate` uses canonical connector/pose math without session mutation; live flips/reorientation/offsets update the moving Part; cancel restores committed transforms; cycle validation runs on preview/commit; exact feature markers render RGB local frames; 1171 Python passed + 3 skipped, 364 XCTest + 52 Swift Testing, focused lint/diff checks, native/root builds, strict signing, and packaged launch PID 30276 pass |
+| Codex | Preserve one live 3D render session while switching workspace tabs | `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceView,WorkspaceShell,WorkspaceLayout}.swift`, narrowly required lifecycle support in `app/Sources/AnimaCADViewport/CADPipelineViewport.swift`, focused tests under `app/Tests/AnimaStudioUIUnitTests/AppShell/**` and/or `app/Tests/AnimaCADTests/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve every current dirty hunk | workspace-tab selection changes surrounding tools/panels without destroying/reimporting the shared CAD viewport; camera, GPU resources, geometry, selection, and renderer session survive compatible 3D workspace transitions; non-3D centers remain lazy; deterministic lifecycle coverage plus full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — one persistent center-layer viewport is covered/revealed by workspace and center-representation content rather than reconstructed; camera, imported geometry, GPU resources, selection, and telemetry survive tab changes; 364 XCTest + 52 Swift Testing, touched lint/diff check, native/root builds, strict signing, and packaged launch PID 83146 |
+| Codex | Repair production CAD movement rendering and complete Onshape-style mate activation/connector picking | `app/Sources/AnimaCAD/CADRenderGeometry.swift`, `app/Sources/AnimaCADViewport/{CADMetalViewport,CADMetalFeaturePicker,CADMouseInputOverlay,CADPipelineViewport,CADRealityKitViewport,CADWebPayload}.swift`, `dev/Codex Bench/web/threejs/src/app.js` plus generated `dev/Codex Bench/Resources/ThreeJSWeb/app.js` and production `app/App/Resources/CADWeb/ThreeJSWeb/app.js`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateAuthoring,MatePlacementOverlay}.swift`, focused tests under `app/Tests/{AnimaCADTests,AnimaStudioUIUnitTests}/**`, `dev/docs/reality/STATUS.md`, append-only coordination; preserve every existing/concurrent dirty hunk and do not change canonical mate semantics | exact feature-edge vertices inherit their owning Part transform so movement leaves no stale wireframe in Metal or the default Three.js/WebGPU path; choosing a kinematic mate immediately opens a nonmodal placement panel; CAD hover/click infers face/edge/vertex connector frames with visible feedback, two distinct Parts can be selected, and confirmation commits through the existing AnimaCore mate verb; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — per-Part edge ownership/transforms fixed in Metal and Three.js/WebGPU; all kinematic tools immediately open the nonmodal mate panel; Metal authoring mode infers and highlights STEP faces, B-Rep edges, vertices, and closed-loop axes, then confirms through AnimaCore and refreshes canonical pose; 362 XCTest + 52 Swift Testing, touched lint, native/root builds, strict signing, and live launch pass |
+| Codex | Turn canonical AnimaCore output mappings into a production Hardware editor | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Components/ProjectNavigatorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/{Hardware/**,WorkspaceRibbonCatalog.swift}`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests/Workspaces/Hardware,AnimaStudioUIUnitTests/AppShell}/**`, `dev/docs/reality/STATUS.md`, append-only coordination; explicitly exclude dirty `app/Sources/AnimaCADViewport/**`, `app/Tests/AnimaCADTests/**`, `dev/briefings/claude.md`, and `unity/**` | Swift retains native `value_at_zero`/`value_at_one`; eligible bounded mate/chain DOFs and parameters become unit-aware targets; add/edit/delete mutates the full-fidelity rig DTO then round-trips through AnimaCore validation; Hardware shows real mappings/counts and an honest offline safety state; save/reload proof plus focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — unit-aware bounded mate/chain DOF and parameter targets; add/edit/reverse/delete through full-fidelity DTO serialize/reload; real Hardware table, navigator, and ribbon entry points with honest offline safety; 361 XCTest + 50 Swift Testing, touched lint, native/root builds, strict signing, launch PID 51850 |
+| Codex | Close canonical advanced-relation authoring for Gear, Rack and pinion, Screw, and Linear | `app/Sources/AnimaCoreClient/{AnimaCoreClient,AnimaCoreRigDocumentEditor}.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{CreationPaletteView,EngineRelationInspectorView,RelationEditorPresentation,RelationEditorView}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests/Workspaces/Rig,AnimaStudioUIUnitTests/AppShell}/**`, `dev/docs/{roadmap/Studio_Bridge.md,reality/STATUS.md}`, append-only coordination; explicitly exclude dirty `app/Sources/AnimaCADViewport/**`, `app/Tests/AnimaCADTests/**`, and `unity/**` | Swift client exposes `add_relation`/`update_relation`/`remove_relation`; Create validates compatible distinct DOFs and positive display magnitude, converts mm/rev to native m/rad, calls the engine, retains the returned full-fidelity rig, selects/highlights the relation, refreshes canonical pose, and survives save/reload; selected relations expose editable magnitude/reverse/offset with Apply/Revert through `update_relation`; suppress/delete use engine verbs instead of serialize/reload document surgery; deterministic/live-helper/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — all four relations create/edit/suppress/delete through AnimaCore with display/native-unit conversion, occupied-driven filtering, full-fidelity DTO preservation, pose refresh, and serialize/reload proof; 358 XCTest + 48 Swift Testing, touched lint, native/root builds, strict signing, launch PID 69739 |
+| Codex | Make the production mate inspector edit canonical AnimaCore controls and limits, then enable all kinematic connector-pair mates | `app/Sources/AnimaCoreClient/AnimaCoreRigDocumentEditor.swift`, `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceModel.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{CreationPaletteView,EngineMateAuthoring,EngineMateInspectorView}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests/Workspaces/Rig,AnimaStudioUIUnitTests/AppShell}/**`, `dev/docs/reality/STATUS.md`, append-only coordination; explicitly exclude dirty `app/Sources/AnimaCADViewport/**`, `app/Tests/AnimaCADTests/**`, and `unity/**` | selected engine mates expose editable connector flips, offset enable/XYZ/axis/angle, primary flip, secondary-axis rotation, simulation connection, and per-DOF min/max/neutral; Apply sends a full-fidelity preserved joint DTO through `update_mate`, refreshes canonical pose, retains selection/stable ID, and reports validation errors without losing the draft; Revert restores the engine snapshot; all eight kinematic mate types use the catalog-driven connector-pair flow while Width/Tangent stay disabled for geometry-specific selection; deterministic/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — full-fidelity engine-backed Apply/Revert inspector, SI/display-unit conversion, canonical pose refresh, and all 8 kinematic connector-pair creation actions; 357 XCTest + 47 Swift Testing, touched lint, native/root builds, strict signing, launch PID 29405 |
+| Codex | Close the canonical mate-authoring seam for Fastened, Revolute, and Slider | `app/Sources/AnimaCoreClient/{AnimaCoreClient,AnimaCoreBridgeModels}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView,WorkspaceShell}.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/{EngineMateAuthoring,MateCreationToolCatalog,MatePlacementOverlay,CreationPaletteView}.swift`, focused tests under `app/Tests/{AnimaCoreClientTests,AnimaStudioUIUnitTests/Workspaces/Rig,AnimaStudioUIUnitTests/AppShell}/**`, `dev/docs/reality/STATUS.md`, append-only coordination; explicitly exclude the currently dirty `app/Sources/AnimaCADViewport/**` and `app/Tests/AnimaCADTests/**` | Swift client exposes engine `add_mate`/`update_mate`/`remove_mate`; connector picks build catalog-driven DTOs; Fastened/Revolute/Slider create against the live AnimaCore handle, update the retained full-fidelity rig, refresh canonical pose, select the new mate, save/reload losslessly; legacy no-engine test path remains isolated; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-29 — engine-backed two-click authoring and canonical pose/save round trip proven; 357 XCTest + 45 Swift Testing, touched lint, native/root build, strict signing, and launch PID 71880 pass |
+| Codex | Critical-path animatronics pass 1 — real Metal CAD Part picking | `app/Sources/AnimaCADViewport/{CADMouseInputOverlay,CADMetalViewport,CADPipelineViewport}.swift`, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift`, STATUS + append-only coordination; preserve the released gizmo hunks and all concurrent work | click (without navigation drag) ray-picks the nearest visible transformed Metal triangle, reports the existing node+1 Part ID through the shared URL mapping, supports extend-selection modifiers, and empty space clears selection; Three.js behavior remains unchanged; focused/full tests, lint, native/root verification pass | released 2026-07-29 — CPU nearest-triangle hit test uses shared camera/Part transforms and ignores hidden Parts; 357 XCTest + 41 Swift Testing, recursive lint (existing/concurrent warnings only), native/root builds, strict signing, and launch pass |
+| Codex | Correct vertical transform-gizmo drag direction and stabilize direct manipulation | `app/Sources/AnimaCADViewport/{CADTransformGizmoOverlay,CADPipelineViewport}.swift`, focused `app/Tests/AnimaCADTests/AnimaCADTests.swift`, STATUS + append-only coordination; preserve all concurrent hunks | screen-up drag moves along the displayed upward handle; drag deltas use a stationary viewport coordinate space so a moving projected origin cannot feed back into the gesture; gizmo remains smooth while the selected Part/group origin follows; focused/full tests, lint, native/root verification pass | released 2026-07-29 — stable viewport-coordinate drag + retained browser anchor; 357 XCTest + 40 Swift Testing, recursive lint (existing/concurrent warnings only), native/root builds, strict signing, and launch pass |
 | Codex | Origin-anchor the 3D Modeling transform gizmo for selected Parts and sub-assemblies | shared screen-projection contract in `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport,CADTransformGizmoOverlay}.swift`, Three.js projection reporting in `dev/Codex Bench/web/threejs/src/app.js` + regenerated resources, focused CAD tests, STATUS + append-only coordination; preserve all concurrent hunks | common gizmo center follows the selected Part/group frame under camera orbit/pan/zoom and transform edits; Metal uses the exact render view-projection, Three.js reports its projected helper origin; offscreen/behind-camera gizmo hides; no viewport-center fallback; build/tests/JS/native/root verification pass | released 2026-07-28 — exact shared Metal projection + Three.js projected-helper bridge; 357 XCTest + 39 Swift Testing, recursive lint (existing/concurrent warnings only), JS check/build/copy, native/root builds, strict signing, packaged-resource identity, and launch pass |
 | Codex | 3D Modeling buildout Task 6 — nested sub-assembly nodes with origin/transform and unit hide/ground/move | `app/Sources/AnimaDocument/CharacterEditorMetadata.swift`, `app/Sources/AnimaStudioUI/AppShell/{NavigatorOrganization,StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/{AssemblyTreeView,InspectorView,ProjectNavigatorView}.swift`, `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADTransformGizmoOverlay}.swift`, focused tests under `app/Tests/{AnimaCADTests,AnimaDocumentTests,AnimaStudioUIUnitTests}/**`, STATUS + append-only coordination; preserve all existing/concurrent dirty hunks | backward-compatible editor metadata retains group parent + world origin; acyclic nesting renders in both assembly trees; group transform applies one shared rigid delta to descendant canonical Part rest transforms and both renderers consume the resulting existing map; group hide/ground batch descendants; tests/build/native/root verification pass | released 2026-07-28 — nested persistent frames + shared rigid descendant edits + unit hide/engine ground; 357 XCTest + 38 Swift Testing, recursive lint (existing/concurrent warnings only), native/root builds, strict signing, embedded string, and launch pass |
 | Codex | 3D Modeling buildout Task 4 — grounded/fixed viewport cue + immovable rest transform | grounded Part projection/wiring in `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift` and `Components/InspectorView.swift`, shared state plumbing in `app/Sources/AnimaCADViewport/{CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, `dev/Codex Bench/web/threejs/src/app.js`, regenerated resources, focused tests, STATUS + append-only coordination; preserve existing/concurrent dirty hunks | grounded engine state expands through the shared source→node mapping; Metal part-state bit 2 and Three.js material cue visibly distinguish fixed Parts; gizmo and numeric transform edits are blocked while rest pose remains pinned; build/tests/JS/native/root verification pass | released 2026-07-28 — fixed-state projection/cue + guarded transform path; 355 XCTest + 37 Swift Testing, JS build/check/copy, native/root builds, strict signing, packaged-resource identity, and launch pass |
@@ -303,10 +329,21 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | DH2: inverse kinematics (damped least-squares, numpy) for articulated-arm rigs | `animacore/dh.py`, `animacore/tests/test_dh.py`, `pyproject.toml` (add numpy) | `.venv/bin/ruff check .` + `.venv/bin/pytest animacore/tests -q`; IK reaches reachable targets, FK(IK(pose))==pose | released 2026-07-16 (1005 → 1013, +8 IK tests; numpy>=1.26 added; FK→IK→FK round-trip proven for 2R and 6R) |
 
 | Claude | DH3: kinematic_chain character-format block + arm rig type + bridge forward_kinematics/solve_ik verbs | `animacore/rig.py`, `animacore/kinematics.py`, `animacore/loader.py`, `animacore/serialize.py`, `animacore/bridge.py`, `animacore/tests/test_kinematic_chain.py` (new), `dev/docs/roadmap/{Character_Format,DH_Kinematics}.md`, `dev/docs/reality/STATUS.md`, `examples/six_axis_arm_dh.character.anima` (new) | `.venv/bin/ruff check .` (clean) + `.venv/bin/pytest animacore/tests -q` (1043 passed); arm example round-trips, resolve_pose drives it via DH FK, bridge FK→IK→FK reaches target | released 2026-07-16 (1013 → 1043, +28 chain tests + 2 example-discovered; the DH articulated-arm rig type is complete) |
+| Claude | Engine live-posing overrides: `dof_overrides` in `evaluate_pose`, `dof_values` param on bridge `evaluate`/`resolve_pose` (additive) | `animacore/rig.py`, `animacore/bridge.py`, `animacore/tests/test_bridge.py` | `.venv/bin/ruff check animacore` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-29 (1171 passed +7 new; overrides merge over clip/neutral, relations still run, driven DOF stay driven, out-of-limit overrides reported never clamped, unknown path → bad_request) |
+| Claude | Unity front-end package (per Jonathan: self-contained in `unity/`, racing the Swift app): workspace shell (Assets · 3D Modeling · Animate · Show · Hardware), engine-backed mate authoring, clip playback + live DOF posing, standalone macOS build | `unity/**` | batchmode `BuildAll` compiles + builds `Builds/AnimaStudio.app`; player launch loads `pan_tilt_head` through the engine (Player.log marker); add_mate→pose→remove_mate flow proven against `handle_request` | released 2026-07-29 |
 | Codex | DH articulated-arm Swift UI: engine-backed joint jog/FK, end-effector IK target, arm inspector | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/ArticulatedArmControlsView.swift` (new), `app/Sources/RealityKitViewport/{RobotPreviewView,ArmIKTarget}.swift`, `app/Scripts/embed-animacore-helper.sh`, corresponding Swift tests, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | no Swift kinematics; decode `kinematic_chain`; FK/IK bridge integration; native-unit conversion; reachable/unreachable UI; bundled NumPy dependency; recursive lint + Swift tests + native build/root app launch | released 2026-07-16 (240 XCTest + 20 Swift Testing; Xcode/root app build + deep sign; bundled bridge hello includes FK/IK and NumPy 2.4.6 imports) |
 
 ## Requests
 
+- **Codex → Claude (2026-07-29, animatronics critical-path follow-on):**
+  After releasing the mate/Part/connector authoring packet below, please
+  sequence engine-owned bridge contracts for driven actuator/logical-output
+  mapping CRUD, clip/track/keyframe/interpolation CRUD, and hardware-channel
+  configuration plus simulator/transport session control (including stop,
+  e-stop, and canonical rate/limit enforcement). Each mutation should return
+  refreshed engine DTOs; live output should expose explicit session
+  handles/state. Publish the callable and result/error shapes before Swift UI
+  integration so evaluation, mapping, and safety meaning stay in AnimaCore.
 - **Codex → Claude (2026-07-28, blocking 3D Workspace Task 5):** Python
   `add_mate`/`update_mate`/`remove_mate` already exist, but the Swift
   `AnimaCoreClient` surface is absent and incremental `add_part`/
@@ -378,6 +415,104 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+- **2026-07-29 (Codex, projected local-frame CAD manipulator):** Replaced the
+  fixed screen-space triad and three circular icon buttons with a real
+  camera-projected local-frame manipulator. Metal derives the projected origin
+  and X/Y/Z endpoints from the selected Part transform and current camera;
+  Three.js reports the same four points through the web bridge. Arrow drags
+  translate on one local axis, XY/YZ/ZX patches solve movement in the projected
+  local plane basis, and each ring is built from the two orthogonal axes so it
+  rotates about the perpendicular local axis. Local rotation now post-multiplies
+  an exact matrix delta before converting back to the persisted rest transform.
+  Grounded/locked guards and existing camera controls remain unchanged.
+  Verification: focused manipulator tests; full `swift test` (364 XCTest + 57
+  Swift Testing); touched Swift format lint; JavaScript syntax/build/copy; and
+  native Xcode build; root-app rebuild; strict signing; and packaged launch PID
+  13987.
+
+- **2026-07-29 (Codex, canonical advanced-relation authoring):** Gear,
+  Rack and pinion, Screw, and Linear are now real production authoring actions,
+  not presentation-only drafts. The Swift client exposes AnimaCore's
+  `add_relation`, `update_relation`, and `remove_relation` verbs. The shared
+  Create dialog filters driver/driven choices from the engine catalog, excludes
+  already-driven DOFs, validates compatible distinct selections and positive
+  magnitude, and converts rack/screw mm-per-revolution to native
+  metres-per-radian. The selected-relation inspector edits magnitude, direction,
+  and driven offset with Apply/Revert while preserving unknown engine fields;
+  suppression and deletion also use direct engine mutations. Each successful
+  operation adopts the returned full-fidelity rig, retains meaningful
+  selection, and refreshes canonical evaluation/pose. Live bridge and workspace
+  integration coverage proves create → motion → edit → serialize/reload →
+  suppress → delete. Verification: touched format/lint; full `swift test`
+  (358 XCTest + 48 Swift Testing); native Xcode build; root-app rebuild and
+  strict signing; launch PID 69739. Dirty CAD viewport files and `unity/` were
+  not edited.
+
+- **2026-07-29 (Codex, production mate inspector + full kinematic
+  catalog):** Selected engine mates now edit the canonical AnimaCore joint
+  document instead of Swift-only controls. The inspector exposes both connector
+  flips; offset enable, XYZ, rotation axis, and angle; primary-axis flip;
+  secondary-axis rotation; simulation connection; and every catalog-reported
+  DOF's neutral/min/max. Display values use millimeters/degrees and are
+  validated and converted back to meters/radians before `update_mate`; unknown
+  current/future engine fields remain intact. Apply retains the stable mate ID
+  and selection and refreshes `resolve_pose`; Revert restores the engine
+  snapshot. Fastened, Parallel, Slider, Revolute, Cylindrical, Pin Slot,
+  Planar, and Ball now share the real two-connector engine flow. Width and
+  Tangent remain honestly disabled until mesh-surface selection can provide
+  their geometry-specific inputs. Verification: touched format/lint; full
+  `swift test` (357 XCTest + 47 Swift Testing); native Xcode build; packaged
+  root-app rebuild and strict signing; launch PID 29405. Dirty CAD viewport
+  files and `unity/` were not edited.
+
+- **2026-07-29 (Codex, canonical mate-authoring seam):** Closed the first
+  production assembly-authoring vertical slice without entering the concurrently
+  dirty CAD renderer files. The Swift bridge now exposes AnimaCore's
+  `add_mate`, `update_mate`, and `remove_mate` verbs. Fastened, Revolute, and
+  Slider tools use a shared catalog-driven DTO builder; two connector picks
+  create the mate against the live engine handle, retain the returned
+  full-fidelity rig, refresh the canonical pose, and select the new mate.
+  Slider maps to the engine's `prismatic` type and all DOFs come from
+  `mate_types`, rather than Swift-authored semantics. A live-helper regression
+  covers add/update/evaluate/remove, and a workspace integration test proves
+  two-click Fastened creation moves the child through AnimaCore and survives
+  serialize/reload with its stable ID. Verification: touched format lint; full
+  `swift test` (357 XCTest + 45 Swift Testing); native Xcode build; root-app
+  rebuild and strict signing; packaged launch PID 71880. Next GUI slices are
+  editing connector/offset/flip/limits through `update_mate`, then specialized
+  placement for the remaining kinematic types and distinct Width/Tangent
+  geometry workflows.
+
+- **2026-07-29 (Codex, animatronics critical-path pass 1 — Metal Part
+  picking):** Auditing the attached honest roadmap against the shared checkout
+  found the 3D workspace origin, transform, grounding, and sub-assembly slices
+  already present, but Metal's production mouse-selection callback was still
+  empty. A click without a navigation drag now unprojects through the same
+  Metal view-projection used for drawing, intersects the nearest visible
+  transformed triangle, and returns the existing node-plus-one Part ID through
+  the shared source map. Empty space clears; Shift/Command extends; hidden
+  Parts do not hit. A real imported-kernel regression also proves that hiding
+  or translating the hit Part removes it from the center ray. Verification:
+  full `swift test` (357 XCTest + 41 Swift Testing); recursive lint exits zero
+  with existing/concurrent warnings only; native `xcodebuild -jobs 2`;
+  root-app rebuild; strict signing; clean packaged launch. The follow-on
+  engine bridge sequence for mates, actuators/outputs, timeline mutation, and
+  hardware/simulator sessions is recorded in Requests and Claude's IN.
+
+- **2026-07-29 (Codex, transform-gizmo direction and drag stability):** The
+  rotated Y handle had been reading its own transformed local gesture
+  coordinates, while the Three.js projection path cleared its anchor on every
+  rest-transform mutation. The former made screen direction unreliable; the
+  latter removed and recreated the overlay mid-drag. All handles now project a
+  stationary named viewport-space delta onto their displayed screen direction:
+  right is positive X, up is positive Y, and down-left is positive Z. The web
+  path keeps the last projected anchor until the renderer reports its next
+  position and clears only when selection disappears or the backend changes.
+  Focused tests lock both vertical signs and the displayed X/Z directions.
+  Verification: full `swift test` (357 XCTest + 40 Swift Testing); recursive
+  lint exits zero with existing/concurrent warnings only; native
+  `xcodebuild -jobs 2`; root-app rebuild; strict signing; clean packaged launch.
 
 - **2026-07-28 (Codex, selected-origin transform-gizmo anchoring):** Removed
   the transform overlay's viewport-centered layout. The shared pipeline now
@@ -3956,3 +4091,433 @@ change needed in the Handoff log instead of inventing commands.
   file-division for the next CAD-viewport round (move/origin vs
   appearance-unification/video) still needs locking in Live claims before
   either agent re-enters `app/Sources/AnimaCADViewport/**`.
+- **2026-07-29 (Codex, canonical Hardware output mapping):** Replaced the
+  Hardware workspace's mapping placeholder with a real AnimaCore-backed
+  authoring surface. Swift now retains both native output endpoints, derives
+  eligible bounded mate/chain DOFs and parameters, displays rotation in
+  degrees and translation in millimetres, and can add, edit, reverse, or
+  remove mappings while preserving the full rig DTO and validating every
+  mutation through `serialize_character` plus reload. The Hardware navigator
+  and ribbon open the same table; connection, arming, and live transport remain
+  explicitly offline. Full verification passes 361 XCTest + 50 Swift Testing,
+  touched format lint, native/root builds, strict deep signing, and packaged
+  launch PID 51850. Concurrent CAD viewport, Claude-mailbox, and Unity work
+  remained untouched.
+- **2026-07-29 (Codex, STEP feature mates + moving-edge repair):** Assigned
+  every CAD edge vertex to its owning Part so the edge pass follows the same
+  rest transform and visibility as faces in Metal and Three.js/WebGPU. Mate
+  tools now activate immediately and open a nonmodal Onshape-style placement
+  panel. During placement, the native Metal authoring path raycasts exact STEP
+  triangles and prioritizes nearby B-Rep edges, endpoints/vertices, and closed
+  loops to produce stable part-local connector frames with hover/selection
+  markers. The operator chooses moving then fixed Parts, edits flips,
+  reorientation, offset, and simulation controls, and explicitly confirms;
+  creation still goes through the existing AnimaCore mate verb and canonical
+  pose refresh. Full verification passes 362 XCTest + 52 Swift Testing,
+  touched format lint, Three.js rebuild/copy, native/root builds, strict deep
+  signing, and a live packaged app.
+- **2026-07-29 (Codex, persistent cross-workspace 3D session):** Removed the
+  viewport from the per-workspace `switch` branches and gave the open project
+  one stable spatial center layer. Assets, 3D Modeling, Animate, Show,
+  Hardware, Nodes, Design, 2D, and VR now cover or reveal that layer while
+  changing their tools and structured center content, so returning to 3D keeps
+  the imported document, Metal/WebGPU resources, camera, selection, and
+  telemetry instead of rerunning the STEP loading task. Two policy tests lock
+  the mount/visibility contract. Full verification passes 364 XCTest + 52
+  Swift Testing, touched format lint/diff check, native/root builds, strict
+  signing, and packaged launch PID 83146.
+- **2026-07-29 (Codex, non-destructive engine mate preview):** Added
+  AnimaCore's `preview_mate` bridge verb over the existing canonical
+  connector-alignment and pose resolver. The two-click UI now moves the first
+  Part immediately after the fixed connector is picked, re-previews flip,
+  90-degree secondary reorientation, and offset changes, restores the
+  committed pose on Cancel, and calls `add_mate` only on green confirmation.
+  Preview and commit reject mate-graph cycles. Exact STEP feature markers now
+  draw the inferred connector as an RGB local-frame triad. Verification passes
+  1171 Python tests + 3 skipped, 364 XCTest + 52 Swift Testing, focused
+  Python/Swift lint and diff checks, native/root builds, strict signing, and
+  packaged launch PID 30276.
+- **2026-07-29 (Claude, Unity front-end + live-posing engine verb):** Two
+  released claims (rows above). **Engine (additive, both front-ends can use
+  it):** `evaluate_pose(..., dof_overrides=)` + optional `dof_values` object
+  on bridge `evaluate`/`resolve_pose` — overrides merge over the clip/neutral
+  pass **before relations**, so an overridden driver still propagates, an
+  override of a relation-driven DOF is overwritten (driven stays driven), an
+  out-of-limit override lands in `limit_violations` (never clamped), an
+  unknown/suppressed path is `bad_request`. 7 new bridge tests; suite 1171
+  passed + 3 skipped, ruff clean. **Unity (`unity/**` only, per Jonathan a
+  self-contained package racing the Swift app):** `StudioShell.cs` workspace
+  shell mirroring the Swift tabs (Assets · 3D Modeling · Animate · Show ·
+  Hardware): Assets = character/mesh libraries + .obj import; 3D Modeling =
+  parts tree + mates/relations + **mate authoring via `mate_types`/
+  `add_mate`/`remove_mate`** (pick type → parent → child, refreshed summary
+  re-renders, slider overrides preserved across authoring reloads); Animate =
+  clips + live DOF sliders + transport. Standalone build:
+  `AnimaStudio ▸ Build macOS App` or batchmode
+  `AnimaStudioSceneBuilder.BuildAll` → `unity/AnimaStudioUnity/Builds/
+  AnimaStudio.app`. Verified: batch build 0 compile errors; player launch
+  loads `pan_tilt_head` through the engine in ~5 s (Player.log marker) with
+  zero exceptions; the Unity-side add_mate → pose-new-DOF → remove_mate flow
+  proven against `handle_request` directly. Gotcha fixed on the way:
+  desktop players default `runInBackground=false`, which froze the bridge
+  loop when the window was unfocused — now forced true. Known ceilings
+  (`ponytail:` comments): box placeholder for non-.obj part models; new-mate
+  DOF default to unlimited/neutral-0; "attach mesh as new part" waits on the
+  engine `add_part` verb (my queued mailbox packet). **Codex:** `dof_values`
+  is available to the Swift app today; verb JSON is in the test additions in
+  `animacore/tests/test_bridge.py` (§ "dof_values overrides").
+- **2026-07-29 (Codex, coordinated Onshape default):** Tuned the existing
+  Onshape CAD preset into a complete high-key environment—near-white
+  background, pale-blue material, crisp dark B-Rep edges, orange selection,
+  and balanced key/fill/rim lighting—and made it the fresh-install and
+  renderer-fallback default without overwriting an operator's saved preset.
+  Named-preset selection now restores the preset's full material, edges,
+  lighting, and colors and clears stale custom color overrides. Changed the
+  CAD theme/render defaults, app preference bindings and pickers, focused CAD
+  and preference tests, and STATUS. Verification: 364 XCTest + 53 Swift
+  Testing, focused format lint/diff checks, native/root builds, strict deep
+  signing, and packaged launch PID 50076.
+- **2026-07-29 (Codex, selected-Part direct placement):** Retained the
+  existing Metal CAD picker and origin gizmo, strengthened the selected
+  Part's orange faces/feature edges, and added camera-plane dragging for an
+  already-selected editable Part. The operation is depth-scaled from a fixed
+  gesture start and writes through the existing guarded rest-transform
+  callback. Grounded/locked protection, modifier multi-selection, empty-click
+  deselection, right orbit, and middle pan remain intact. Changed
+  `CADMouseInputOverlay`, `CADMetalViewport`, `CADPipelineViewport`,
+  `CADRealityKitViewport` (call-site compatibility),
+  `CADTransformGizmoOverlay`, focused CAD tests, STATUS, and coordination.
+  Verification: 364 XCTest + 55 Swift Testing, focused regression rerun after
+  the modifier guard, touched format lint, native/root builds, strict deep
+  signing, and packaged launch pass.
+- **2026-07-29 (Codex, Metal CAD lighting repair):** Corrected the native
+  Open CASCADE → Metal output path that made STEP surfaces nearly black in the
+  new white Onshape environment. Metal now uses an sRGB drawable/pipeline,
+  high-key hemisphere fill, and view-facing repair for reversed or degenerate
+  imported normals. Selected-Part orange is mixed after lighting so shadowed
+  faces remain unmistakably selected. WebGPU already had sRGB output,
+  double-sided materials, and emissive selection, so it required no duplicate
+  fix. Verification passes 364 XCTest + 56 Swift Testing, focused lighting
+  regressions, touched format lint/diff check, native/root builds, strict
+  signing, and packaged launch.
+- **2026-07-29 (Claude, STEP → assembly pipeline):** Per Jonathan: "import my
+  STEP files and create the assembly using mates as a starting point."
+  **Engine (my assigned add_part packet, additive):** `add_part` (part DTO =
+  the `load_character` part entry shape; duplicate → bad_request, unknown
+  parent / unsafe model path → format_error via rig validation) and
+  `remove_part` (mated part refuses with format_error, nothing deleted) —
+  both in CAPABILITIES, `_part_from_dto` extracted from `rig_from_dict`.
+  +5 tests → 1176 passed + 3 skipped, ruff clean. `pyproject.toml` gains the
+  optional `cad` extra (cascadio, trimesh). **Codex:** `add_connector` is
+  satisfiable today via `update_mate` controls; flag if you need a dedicated
+  verb. **Converter (`unity/Tools/step_to_obj.py`):** STEP → per-solid OBJ
+  (OCCT via cascadio → trimesh), each part reported with its CAD placement as
+  an engine rest transform (`position_m` m, `rotation_euler_rad` intrinsic
+  XYZ — verified `tf.euler 'rxyz'` == `Transform.from_euler_xyz`); scale
+  defaults mm→m; non-rigid placements bake into vertices. Verified on
+  Jonathan's real CAD: JP01 `Assembly 1.step` → 26 named parts (bearings,
+  Arducam cameras, servo) with real placements. **Unity:** Assets toolbar
+  imports `.step`/`.stp` (background thread → serialized `add_part` queue) or
+  `.obj`; **New Assembly** scaffolds `characters/<name>/` + empty character;
+  mesh library rows add as parts; header **Save** = `serialize_character` →
+  file. End-to-end proven against `handle_request`: empty character → 6
+  STEP parts with placements → revolute mate → posed via `dof_values` →
+  serialized → reloads clean. Ceiling (`ponytail:`): mates rotate about the
+  part origin until connector authoring lands (CAD-face pick → `update_mate`
+  connectors is the natural next packet).
+- **2026-07-29 (Claude, Onshape-style viewport interaction):** Per Jonathan:
+  left-click single-select (explicitly NOT Onshape's additive click),
+  left-drag on a FREE part moves it (Onshape assembly drag), left-drag on
+  empty space rubber-band box-selects multiple parts. **Engine:** new
+  `update_part` verb (full part-entry DTO keyed by name, no rename;
+  primary use = viewport drag → rest `position_m`); +2 tests → 1178 passed
+  + 3 skipped, ruff clean. **Unity:** drag guards — grounded parts refuse
+  (status hint), mated children refuse (their pose belongs to their DOF —
+  hint says drive it in Animate), pose responses skip the part being
+  dragged; on release the new position commits through the serialized
+  authoring queue (now generic {method, params}); box select picks parts
+  whose renderer-bounds center projects into the accent-tinted rect
+  (`ponytail:` no enclosed-vs-crossing distinction yet); selection
+  survives authoring reloads. Build verified: batch 0 errors, player
+  loads through engine in ~6 s, no exceptions.
+- **2026-07-29 (Claude, dock chrome):** Per Jonathan ("left and right side
+  bars and tool bar based on the dock variant of AnimaStudio"): the Unity
+  shell now mirrors the Swift dock variant — **44 px icon rails** on both
+  edges with collapsible tabbed panels (left: per-workspace navigator tabs,
+  e.g. PARTS/MATES/REL in 3D Modeling, CHARS/MESH in Assets; right:
+  INS/VIEW), chevron collapse, and a **grouped ribbon toolbar** (Assets:
+  IMPORT + NEW ASSEMBLY; Modeling: MATE types + EDIT with Remove part/
+  Remove mate — first UI for the engine `remove_part` verb; Animate: POSE).
+  New **View tab**: Front/Right/Top/Iso presets, Zoom-to-fit (bounds over
+  engine-posed parts), ground-plane toggle. Viewport hit-testing respects
+  collapsed/open dock widths. Also added an `-anima-screenshot <path>`
+  player flag (capture after load, then quit) for headless visual
+  verification. Build: batch 0 errors, player loads in ~6 s, no exceptions.
+- **2026-07-29 (Codex, operational CAD right sidebar):** Replaced the
+  dedicated CAD workspace's tab-ignoring all-in-one right panel with four
+  independent surfaces: Camera & Display, Environment, selected-Part
+  Appearance, and the existing contextual Inspector. Selected-Part
+  `editor.json` color/finish/opacity now reaches Metal through a retained GPU
+  Part-appearance buffer and Three.js through the web bridge; the diagnostic
+  raw-WebGPU path is labelled rather than exposing an inert editor. Imported
+  XDE-color preservation and fallback-color behavior is explained in place.
+  Changed the routed panel/shell bindings, shared CAD presentation contract,
+  Metal and Three.js adapters/bundle, focused CAD test, STATUS, and
+  coordination only; concurrent dirty hunks were preserved. Verification:
+  complete `swift test` (364 XCTest + 57 Swift Testing), focused regression
+  after final UI copy, touched format lint, JS syntax/build/copy, native Xcode
+  build, signed root-app rebuild, and fresh packaged launch PID 46171.
+- **2026-07-29 (Codex, live CAD ViewCube/world-axis synchronization):**
+  Restored the ViewCube as a projection of the active renderer camera rather
+  than the last requested preset. `CADCameraState` now exposes a normalized
+  world-relative direction plus roll; native Metal/RealityKit and both WebGPU
+  adapters publish that orientation to the shared workspace state. Cube
+  commands are applied only on `cameraCommandRevision`, separating commands
+  from renderer reports so free orbit does not echo, jitter, or reset roll.
+  Added native orientation round-trip and workspace command/report separation
+  regressions. Verification: full `swift test`, focused reruns, touched Swift
+  format lint, JavaScript syntax/build/copy, native Xcode build, signed root
+  app rebuild, and packaged launch pass. Claim released; unrelated dirty work
+  preserved.
+- **2026-07-30 (Claude, light theme + import fix):** Per Jonathan ("import
+  doesn't work and the UI looks terrible compared with AnimaStudio"):
+  (1) **Import** now opens a native macOS file picker (osascript `choose
+  file`) from the Import button — no more typing paths; the text field
+  remains as fallback (and the only path on Win/Linux, `ponytail:`).
+  (2) **Light theme** matching the Swift app: white header/ribbon, light
+  panels and rails, blue accent (active tab pill, rail tabs, selected
+  rows), light-styled buttons; and a **CAD reference grid** (fine 0.1 m +
+  major 1 m lines, red X / blue Z axes, `GridFloor.cs`, Unlit/Color pinned
+  into the build by the scene builder) replacing the dark ground slab on a
+  light canvas. Screenshot-verified via the `-anima-screenshot` hook.
+  Also required: `screencapture`/`imageconversion` built-in modules added
+  to `Packages/manifest.json` (build8/9 SILENTLY looked green earlier —
+  lesson recorded: always check `unity-exit` + `error CS` grep, the shell
+  exit code is not Unity's).
+- **2026-07-30 (Codex, viewport Performance HUD separation):** Moved the
+  always-centered AnimaCore frame badge out from behind the center-view
+  switcher into a dedicated bottom-right adaptive card. Added a Performance
+  right-rail panel for compact HUD visibility, live engine/frame status, and
+  optional detailed CAD metrics. Floating right panels push the HUD inward;
+  detailed renderer telemetry stacks above the compact card. Verification:
+  365 XCTest + 59 Swift Testing, focused HUD ownership/layout tests, touched
+  format lint, native Xcode build, signed root-app rebuild, and packaged launch
+  PID 90723. Claim released; concurrent dirty work preserved.
+- **2026-07-30 (Claude, Onshape look-and-feel round):** Per Jonathan
+  (duplicate Onshape: tree left, environment/appearance right, view cube,
+  tool tray; no fake assets; import must actually work):
+  **Clean start** — deleted the bundled demo OBJs (base_plate/bracket), no
+  auto-loaded example character; the app opens empty with a prompt, and
+  repo examples sit under a collapsed LIBRARY ▸ Examples section.
+  **Import** — native picker; with no assembly open, importing a STEP now
+  auto-creates `characters/<stepname>/` and finishes the import once it
+  loads (`_pendingImport`); staged status + logs; auto zoom-to-fit when
+  the add-parts batch drains. New `-anima-import <file>` player flag =
+  headless end-to-end import test.
+  **Onshape chrome** — left navigator is one Onshape-style tree (filter
+  field, `Instances (N)`, `Mate features (N)`, Relations, Clips, Source
+  Assets) in a floating rounded white panel; right rail gains APP
+  (appearance swatches for selected parts — display-only `ponytail:`
+  until the format carries appearance); **real view cube** (`ViewCube.cs`:
+  layer-30 labeled cube + orthographic mini camera tracking the main
+  orbit in the viewport corner; clicking a face snaps Front/Back/Left/
+  Right/Top/Bottom; TextMesh labels).
+- **2026-07-30 (Codex, production CAD edge/depth pass):** Released the
+  defined-edge and Onshape-depth slice without touching engine semantics.
+  Metal now renders 0.85–3.5 px screen-space feature edges with multisampling
+  and a 2048 px soft self-shadow pass; Three.js WebGPU uses its native wide
+  line node renderer and matching key/fill/ambient/contact-shadow controls.
+  The controls are persisted and honestly identify the authoring technique as
+  interactive raster shadowing rather than offline path tracing. Changed the
+  claimed CAD theme/Metal/web payload and appearance/settings surfaces,
+  Three.js source/generated resources, focused tests, STATUS, and append-only
+  coordination. Verification: 365 XCTest + 61 Swift Testing, runtime Metal
+  shader/pipeline construction, touched diff and JavaScript syntax checks,
+  Swift format lint (only pre-existing warnings elsewhere), native Xcode
+  build, signed root-app rebuild, and strict deep signing. Claim released;
+  every unrelated shared-tree hunk was preserved.
+- **2026-07-30 (Codex, source-faithful CAD mouse routing):** Removed the
+  production CAD overlay's hard-coded left-drag pan fallback. Native Metal and
+  Three.js/WebGPU now consume one resolved profile contract: Default/Onshape =
+  right orbit + middle or Control-right pan; SolidWorks = middle orbit +
+  Control-middle pan + Shift-middle precise zoom; Fusion 360 = Shift-middle
+  orbit + middle pan + Control-Shift-middle precise zoom. Plain left click
+  replaces selection by product choice; left drag moves an editable hit Part
+  or draws a solid window/dashed crossing box, and never moves the camera.
+  Clean right click invokes the existing targeted context menu while right drag
+  suppresses it. Double-middle/`F` fit and stepped arrow-key orbit are wired.
+  Changed only the claimed input/profile adapters, generated web resources,
+  focused tests, STATUS, and append-only coordination while preserving the
+  shared dirty tree. Verification: 365 XCTest + 61 Swift Testing, focused
+  navigation/CAD tests, touched Swift format lint, JavaScript syntax/build,
+  Xcode build, signed root-app rebuild, and packaged launch PID 34387.
+- **2026-07-30 (Codex, source-color/light-off repair):** Removed the
+  synthesized Studio proxy appearance from the imported-CAD override map; only
+  a stored operator Part Appearance now supersedes Open CASCADE STEP/XDE
+  vertex colors. Lowered ambient controls to a real zero, removed the Three.js
+  ambient floor, and gated Metal specular by key-light intensity so all-off is
+  genuinely unlit. Changed only the claimed Studio/CAD/web presentation files,
+  focused regressions, STATUS, and append-only coordination while preserving
+  every unrelated shared-tree edit. Verification: focused appearance,
+  lighting, and theme tests; full `swift test`; JavaScript syntax/bundle checks;
+  touched Swift format lint; native Xcode build; signed root-app rebuild;
+  strict deep signing; and a fresh packaged launch. Claim released.
+- **2026-07-30 (Claude, mate dialog + connectors + multi-import):** Per
+  Jonathan (Onshape mate popup; connector = XYZ triad showing alignment
+  axes; multi-part import). **Scale bug found+fixed:** cascadio already
+  emits metres — the converter double-scaled by 0.001, so imports were
+  microscopic/invisible; `--scale` now defaults 1.0 (verified: JAEP part
+  = real 8×18×10 cm; full JP01 assembly renders framed).
+  **Mate dialog** (`DrawMateDialog`, Onshape-styled: red title, green ✓ /
+  red ✕, type dropdown, bordered Mate-connectors box, per-schema controls
+  from `mate_types.universal_controls` — Offset (m along primary), Flip
+  primary axis, Secondary rotation 0/90/180/270, Simulation connection —
+  plus the type's DOF line and **Solve** = `preview_mate` applied to the
+  viewport before commit). **Connector picking:** clicking a face while
+  the dialog is open raycasts the part, converts hit point/normal to
+  engine part-local (z-negated), builds the RGB **triad gizmo** at the
+  point (primary blue = face normal); first pick = the part that moves
+  (connector b). Engine payload validated verbatim against
+  `handle_request` (preview → add → pose with connectors/flip/rotation/
+  offset all honored). **Multi-file import:** the picker allows ⌘-multi
+  selection (osascript repeat), files queue and import sequentially into
+  the open assembly. View-cube label mirroring fixed; light textfield/
+  toggle styles; scrollbars hidden; tree rows no longer wrap.
+- **2026-07-30 (Codex, shared floor-grid and startup presentation):**
+  Released the CAD-loading/grid claim without changing engine semantics.
+  The main STEP canvas no longer mounts the generic RealityKit preview while
+  AnimaCore model sources resolve; it keeps a theme-matched loading surface,
+  while the same RealityKit scene remains intentionally available as the
+  Assets inspector preview. Added one bounded renderer-neutral XZ floor-grid
+  contract to MetalKit, Three.js/WebGPU, and raw WebGPU, with red X / blue Z
+  axes and persisted visibility, spacing, model-relative extent, major-line
+  interval, and opacity controls in Camera & Display plus Settings → Renderer.
+  The Assets preview shares the visibility preference, and the semantic Top
+  Plane remains independent. Three.js build/copy, raw/Three.js syntax checks,
+  touched Swift format lint, and the corrected focused regression pass. The
+  initial full run compiled and passed all 365 XCTest cases, then caught one
+  exact-Float assertion in the new Swift Testing case; after correction the
+  focused case passes. The external approval usage limiter blocked the
+  redundant full rerun and native packaging before they could execute.
+- **2026-07-30 (Claude, selection/gizmo/loading/doc-types):** Per Jonathan:
+  Onshape **cyan selection highlight** (emissive selected material);
+  **move gizmo** — RGB axis arrows + tips at the selected free part's
+  bounds center, scaled by orbit distance; dragging an arrow slides the
+  part along that world axis (skew-line closest-point math) and commits
+  through the same `update_part` path as ground drags; hidden for
+  grounded/mated/multi selections and during the mate dialog.
+  **Import loading card** — Onshape-style modal (rotating arc spinner,
+  "Importing", filename, stage: Tessellating…/Adding parts… N left/queued
+  count), shown whenever the import pipeline is busy; CI hook captures a
+  mid-import `.loading.png`. **STEP file association** — the build now
+  injects `CFBundleDocumentTypes` (step/stp/obj, Viewer) into the app's
+  Info.plist so Finder offers AnimaStudio under "Open With"; actually
+  RECEIVING the Finder open-document Apple Event needs a small native
+  ObjC plugin — queued as follow-up (`ponytail:` documented in the
+  builder).
+- **2026-07-30 (Claude, ribbon/view-cube redesign + loading-card fix):**
+  Per Jonathan's reference images: **ribbon toolbar v2** — icon-over-label
+  buttons (unicode glyph placeholders until icon art exists), tiny group
+  captions beneath (IMPORT/CREATE, MATE/EDIT, POSE) and vertical
+  separators, toolbar height 66; **view cube v2** — near-white emissive
+  faces, red X + blue Y axis lines from the lower corner with
+  camera-billboarded letter labels; **loading-card leak fixed** — the
+  card keyed off the shared authoring queue, so mate commits and part
+  drags flashed "Importing"; it now tracks an explicit `_importPhase`
+  that only real imports set.
+- **2026-07-30 (Codex, resilient CAD source loading + per-Part relink):**
+  Replaced the all-or-nothing STEP import with an independent source batch.
+  Healthy documents still merge and render when another reference is missing
+  or unreadable; an all-failed batch leaves the empty CAD renderer/environment
+  available instead of presenting a full-canvas error. Source failures project
+  to semantic Part IDs. The 3D Modeling tree shows orange disconnected/relink
+  affordances, and Assets adds Disconnected table/grid state plus inline and
+  context-menu Relink Source, routed through the existing canonical
+  replacement/import flow. Changed only the claimed slices while preserving
+  concurrent dirty hunks. Verification: touched Swift format lint, 366 XCTest
+  + 64 Swift Testing, native Xcode build, and signed root-app rebuild. Claim
+  released.
+- **2026-07-30 (Codex, bounds-centered Part/sub-assembly manipulation):**
+  Verified and completed the production selection path rather than adding a
+  second gizmo. Part selection retains the configured CAD highlight and group
+  selection now expands through the shared highlight projection to every
+  descendant Part. The existing local XYZ arrows, plane handles, and rotation
+  rings are placed at the combined rendered bounds center. Cached local bounds
+  keep dragging inexpensive, while an explicit subject↔gizmo transform maps
+  edits back to the canonical Part/group rest frame. Grounded/locked guards
+  and the existing rigid group update path remain authoritative. Verification:
+  366 XCTest + 66 Swift Testing, focused gizmo/group tests, touched Swift
+  format lint, native Xcode build, and signed root-app rebuild. Claim released.
+- **2026-07-30 (Claude, connector snapping + hover preview):** Per Jonathan
+  (see the connector before placing; snap to edges/concentric bores).
+  New `MeshSnapping.cs` — BRep-free feature detection over the tessellated
+  meshes: per-mesh cache (position-welded vertices to survive OBJ
+  per-normal splits, face normals, edge→triangle adjacency), smooth-patch
+  growing from the hit triangle (≤600 tris, 28° step), then classification:
+  planar patch → **face center**; curved patch → cylinder axis via
+  sign-aligned normal crosses + **Kåsa least-squares circle fit** in the
+  ⊥ plane → **bore/boss center with primary = axis** (radius-consistency
+  check rejects non-cylinders); near-corner hits → **vertex** snap; Shift
+  = raw surface point. Math validated offline against a synthetic
+  24-segment bore (axis exact, center error 0.0 mm). Shell: a **ghost
+  triad follows the cursor** while the mate dialog is open (snap kind
+  named in the status bar), the click commits exactly what the ghost
+  shows, one-entry memo per (mesh,triangle) keeps hover cheap. Boxes
+  (BoxCollider placeholders) fall back to raw hits — no triangleIndex.
+- **2026-07-30 (Claude, snap v2 + triad sizing):** Per Jonathan (connector
+  too large; doesn't snap to faces/edges/origins/centers correctly):
+  triads are now **screen-constant and small** (TriadScaler: scale =
+  camera distance × 0.045). Snapping v2: **feature edges** cached per
+  mesh (dihedral > 32° or boundary); near-edge hits walk the connected
+  chain — a circular chain (bore rim) snaps to its **edge center** with
+  primary = rim-plane normal (plane from three spread chain points +
+  shared Kåsa fit, radius-consistency ≤ 18%), otherwise the closest
+  point on the edge. Bore-wall patch growth loosened 28°→48° — coarse
+  tessellations step 30–45° between facets, which was silently defeating
+  the wall snap on real CAD. Priority: circular-edge center → vertex →
+  edge point → bore wall → face center → raw (Shift). Status bar names
+  the active snap.
+- **2026-07-30 (Claude, Fusion-style header + real icons):** Per Jonathan
+  (header like Fusion: workspace tabs left, toolbar attached, tools per
+  tab, REAL icons in an assets folder). New `unity/Tools/gen_icons.py`
+  (Pillow, 4× supersampled line-art, deterministic) generates 15 icons →
+  `Assets/AnimaStudio/Resources/Icons/` (import/rescan/assembly_new/save/
+  reset/remove_part/remove_mate + all eight mate types, whose icon names
+  equal the engine type strings). Header restructured: quick row (brand,
+  save icon button, centered document name, Workbench, status) + a
+  second row of **left-aligned uppercase workspace tabs with an accent
+  underline** on the active one; the icon ribbon sits attached beneath
+  (icon-above-label buttons, hover pills, captions). Kept the light
+  Onshape theme deliberately — flagged to Jonathan that a full Fusion
+  dark theme is a separate toggle if wanted. Also answered isolation:
+  Unity code is fully contained in `unity/`; the only shared layer is
+  the additive-only animacore engine, per the architecture.
+- **2026-07-30 (Codex, live CAD lighting repair):** The Environment panel now
+  binds directly to the persistent viewport's lighting contract instead of
+  duplicating the same settings locally. Preset changes and Reset restore the
+  complete rig; an all-disabled state is explicit. Raw WebGPU now consumes
+  ambient strength and gates key specular correctly. Metal and raw WebGPU give
+  very dark imported dielectric materials a small response only when real
+  lighting energy exists, preventing black-on-black CAD while preserving a
+  genuinely black all-lights-off result. Verification: 366 XCTest + 66 Swift
+  Testing, touched lint, runtime Metal shader/pipeline construction, native
+  Xcode build, signed root-app rebuild, and packaged launch. Claim released.
+- **2026-07-30 (Codex, real renderer FPS + stable 60 Hz loop):** Replaced the
+  compact card's misleading AnimaCore playhead time with one live CAD renderer
+  telemetry contract shared by both HUDs. Metal counts GPU-completed command
+  buffers; browser adapters publish measured frame batches; telemetry remains
+  active during pointer tracking and reports FPS, frame time, app CPU, and
+  memory. Metal now targets 60 Hz, skips unchanged Part-state uploads, and
+  reuses its shadow map until relevant scene state changes. Verification:
+  touched Swift format lint, JavaScript syntax/build/copy, full `swift test`
+  (366 XCTest + 67 Swift Testing), native Xcode build, signed root-app rebuild,
+  and packaged launch PID 49742. Claim released.
+- **2026-07-30 (Codex, native workspace windows/tabs):** Added a header window
+  menu beside Studio mode for opening any applicable workspace as a native
+  macOS tab or independent window, detaching the current tab, merging windows,
+  toggling the tab bar, and selecting adjacent tabs. All roots share one
+  project/application session but own independent workspace, camera, panel,
+  and center-view presentation. Native `NSWindow` tab groups provide system
+  drag-to-tear-off and Split View. Verification: focused AppShell tests (9),
+  full `swift test` (368 XCTest + 67 Swift Testing), touched lint, native Xcode
+  build, signed root-app rebuild, and packaged launch PID 95568. Claim released.
