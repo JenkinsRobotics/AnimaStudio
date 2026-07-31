@@ -78,3 +78,6 @@ Test Lab.app/
 
 # AI-generated UI reference images (46MB, design scratch, not wired into build)
 reference_ui/
+
+# Test coverage artifacts
+default.profraw

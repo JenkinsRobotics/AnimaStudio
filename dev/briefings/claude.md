@@ -77,6 +77,18 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-07-31 (mate-bridge audit — Task 5 IN item closed): Verified the
+  requested surface exists end-to-end at HEAD: bridge verbs `preview_mate`/
+  `add_mate`/`update_mate`/`remove_mate`/`add_part`/`update_part`/
+  `remove_part` in CAPABILITIES; `AnimaCoreClient` exposes previewMate/
+  addMate/updateMate/removeMate returning the refreshed rig summary;
+  `EngineMateAuthoring` drafts + `StudioWorkspaceModel` run the full loop
+  (two picks → live preview_mate snap → addMate commit → projection
+  refresh). 119 engine mate/preview pytest + 6 EngineMateAuthoringTests
+  green. Checking the IN box; the new goal is spec-completeness of the
+  interactive flow (inference points, Shift-lock, limits-at-creation,
+  WebGPU parity) per Jonathan's Onshape spec (2026-07-31).
+
 - 2026-07-30 (PAUSE, per Jonathan): **Unity front-end development is paused**;
   focus returns to the main (Swift) app. Committing the Unity lane as it
   stands: workspace shell (Fusion-style header + icon ribbon, Onshape dock
