@@ -67,7 +67,7 @@ struct CADAppearancePanel<Inspector: View>: View {
     case none = "None"
     case grid = "Grid"
     case floor = "Floor"
-    case gridAndFloor = "Grid + Floor"
+    case gridAndFloor = "Both"
     var id: String { rawValue }
   }
 

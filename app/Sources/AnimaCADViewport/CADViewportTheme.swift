@@ -28,6 +28,10 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
   public var backgroundBottom: SIMD3<Float>?
   /// Matte color of the optional solid environment floor plane.
   public var floorColor: SIMD3<Float>
+  /// Per-theme environment-floor defaults: whether choosing this preset
+  /// shows the Unity-style grid and/or the solid ground plane.
+  public var floorGrid: Bool
+  public var solidFloor: Bool
   public var edgeColor: SIMD3<Float>
   public var selectionColor: SIMD3<Float>
   public var edgeSelectionColor: SIMD3<Float>
@@ -54,7 +58,9 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     ambientStrength: Float = 0.30,
     shadowStrength: Float = 0.55,
     backgroundBottom: SIMD3<Float>? = nil,
-    floorColor: SIMD3<Float> = SIMD3(0.36, 0.37, 0.40)
+    floorColor: SIMD3<Float> = SIMD3(0.36, 0.37, 0.40),
+    floorGrid: Bool = true,
+    solidFloor: Bool = false
   ) {
     self.name = name
     self.roughness = roughness
@@ -67,6 +73,8 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     self.background = background
     self.backgroundBottom = backgroundBottom
     self.floorColor = floorColor
+    self.floorGrid = floorGrid
+    self.solidFloor = solidFloor
     self.edgeColor = edgeColor
     self.selectionColor = selectionColor
     self.edgeSelectionColor = edgeSelectionColor
@@ -102,7 +110,11 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     fill: (SIMD3<Float>, Float, SIMD3<Float>),
     rim: (SIMD3<Float>, Float, SIMD3<Float>),
     ambient: Float = 0.30,
-    shadow: Float = 0.55
+    shadow: Float = 0.55,
+    bottom: SIMD3<Float>? = nil,
+    floor: SIMD3<Float> = SIMD3(0.36, 0.37, 0.40),
+    floorGrid: Bool = true,
+    solidFloor: Bool = false
   ) -> Self {
     Self(
       name: name, roughness: roughness, metallic: metallic, edgeStrength: edge,
@@ -112,9 +124,28 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
       fill: .init(color: fill.0, intensity: fill.1, directionFrom: fill.2),
       rim: .init(color: rim.0, intensity: rim.1, directionFrom: rim.2),
       ambientStrength: ambient,
-      shadowStrength: shadow
+      shadowStrength: shadow,
+      backgroundBottom: bottom,
+      floorColor: floor,
+      floorGrid: floorGrid,
+      solidFloor: solidFloor
     )
   }
+
+  /// Unity-editor-style environment: dark gradient sky, grid over a solid
+  /// shadow-receiving floor — the preset that demonstrates the floor layer.
+  public static let unity = theme(
+    "Unity", roughness: 0.55, metallic: 0.02, edge: 0.55,
+    model: [0.74, 0.75, 0.78, 1], background: [0.21, 0.22, 0.25],
+    edgeColor: [0.13, 0.14, 0.16], selection: [1, 0.48, 0], edgeSelection: [0.35, 0.62, 1],
+    key: ([1, 0.98, 0.94], 4_000, [0.4, 1, 0.55]),
+    fill: ([0.80, 0.85, 0.95], 1_500, [-0.7, 0.35, 0.45]),
+    rim: ([1, 1, 1], 900, [0.05, 0.45, -0.85]),
+    ambient: 0.26,
+    bottom: [0.11, 0.12, 0.14],
+    floor: [0.20, 0.21, 0.23],
+    floorGrid: true,
+    solidFloor: true)
 
   public static let studioBlue = theme(
     "Studio Blue", roughness: 0.50, metallic: 0, edge: 0.70,
@@ -206,6 +237,6 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
 
   public static let all: [Self] = [
     .studioBlue, .showroom, .technical, .workshop, .solidWorks,
-    .onshape, .fusion360, .blueprint, .clay, .midnight,
+    .onshape, .fusion360, .blueprint, .clay, .midnight, .unity,
   ]
 }

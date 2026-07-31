@@ -427,7 +427,8 @@ final class WorkspaceShellTests: XCTestCase {
 
   func testDockedSidebarsUseFixedPanelWidthsAroundTheCenterColumn() {
     XCTAssertEqual(StudioSidebarSizing.workspacePanelWidth, 232)
-    XCTAssertEqual(StudioSidebarSizing.viewPanelWidth, 200)
+    // 248 (was the demo's 200) so the Environment layer controls fit.
+    XCTAssertEqual(StudioSidebarSizing.viewPanelWidth, 248)
     XCTAssertEqual(
       StudioSidebarSizing.dockedWidth(side: .leading, panelsAreOpen: true),
       StudioSidebarSizing.railWidth + StudioSidebarSizing.workspacePanelWidth + 1

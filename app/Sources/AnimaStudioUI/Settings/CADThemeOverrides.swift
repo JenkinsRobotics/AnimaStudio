@@ -23,9 +23,15 @@ enum CADThemePreferences {
     defaults.set(Double(theme.fill.intensity), forKey: StudioPreferenceKey.cadFillLightIntensity)
     defaults.set(Double(theme.rim.intensity), forKey: StudioPreferenceKey.cadRimLightIntensity)
     // A preset restores the whole coordinated environment, including the
-    // appearance layers: nominal master brightness and a solid background.
+    // appearance layers: nominal master brightness plus the theme's own
+    // background style and floor mode (Unity ships grid + solid floor;
+    // Onshape stays grid-only, for example).
     defaults.set(0.5, forKey: StudioPreferenceKey.cadMasterBrightness)
-    defaults.set(false, forKey: StudioPreferenceKey.cadBackgroundGradientEnabled)
+    defaults.set(
+      theme.backgroundBottom != nil,
+      forKey: StudioPreferenceKey.cadBackgroundGradientEnabled)
+    defaults.set(theme.floorGrid, forKey: StudioPreferenceKey.cadShowsFloorGrid)
+    defaults.set(theme.solidFloor, forKey: StudioPreferenceKey.cadShowsSolidFloor)
 
     for key in colorOverrideKeys {
       defaults.removeObject(forKey: key)

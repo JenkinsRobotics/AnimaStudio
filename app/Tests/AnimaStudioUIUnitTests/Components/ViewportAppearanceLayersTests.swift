@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import AnimaCADViewport
+@testable import AnimaStudioUI
 
 final class ViewportAppearanceLayersTests: XCTestCase {
   // MARK: - Lighting slider curve
@@ -52,5 +53,38 @@ final class ViewportAppearanceLayersTests: XCTestCase {
     var theme = CADViewportTheme.onshape
     theme.backgroundBottom = SIMD3(0.1, 0.2, 0.3)
     XCTAssertEqual(theme.backgroundBottom, SIMD3(0.1, 0.2, 0.3))
+  }
+
+  // MARK: - Per-theme layer calibration
+
+  func testUnityThemeShipsFloorAndGradientWhileOnshapeStaysGridOnly() {
+    let unity = CADViewportTheme.named("Unity")
+    XCTAssertEqual(unity.name, "Unity")
+    XCTAssertTrue(unity.solidFloor)
+    XCTAssertTrue(unity.floorGrid)
+    XCTAssertNotNil(unity.backgroundBottom)
+    XCTAssertTrue(CADViewportTheme.all.contains { $0.name == "Unity" })
+
+    let onshape = CADViewportTheme.onshape
+    XCTAssertFalse(onshape.solidFloor)
+    XCTAssertTrue(onshape.floorGrid)
+    XCTAssertNil(onshape.backgroundBottom)
+  }
+
+  func testApplyPresetCalibratesFloorModeAndBackgroundStyle() throws {
+    let suite = "viewport-appearance-layers-tests"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+
+    CADThemePreferences.applyPreset(named: "Unity", to: defaults)
+    XCTAssertTrue(defaults.bool(forKey: StudioPreferenceKey.cadShowsFloorGrid))
+    XCTAssertTrue(defaults.bool(forKey: StudioPreferenceKey.cadShowsSolidFloor))
+    XCTAssertTrue(defaults.bool(forKey: StudioPreferenceKey.cadBackgroundGradientEnabled))
+    XCTAssertEqual(defaults.double(forKey: StudioPreferenceKey.cadMasterBrightness), 0.5)
+
+    CADThemePreferences.applyPreset(named: "Onshape", to: defaults)
+    XCTAssertTrue(defaults.bool(forKey: StudioPreferenceKey.cadShowsFloorGrid))
+    XCTAssertFalse(defaults.bool(forKey: StudioPreferenceKey.cadShowsSolidFloor))
+    XCTAssertFalse(defaults.bool(forKey: StudioPreferenceKey.cadBackgroundGradientEnabled))
   }
 }

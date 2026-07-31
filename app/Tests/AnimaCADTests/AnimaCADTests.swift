@@ -81,7 +81,7 @@ private enum CADSourceFixtureError: LocalizedError, Sendable {
 }
 
 @Test func coordinatedThemesChangeTheWholeRenderEnvironment() {
-  #expect(CADViewportTheme.all.count == 10)
+  #expect(CADViewportTheme.all.count == 11)
   #expect(Set(CADViewportTheme.all.map(\.name)).count == CADViewportTheme.all.count)
   #expect(CADViewportTheme.defaultTheme == .onshape)
   #expect(CADViewportTheme.named(nil) == .onshape)

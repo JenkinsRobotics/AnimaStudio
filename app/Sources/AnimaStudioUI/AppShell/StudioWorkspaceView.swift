@@ -1365,10 +1365,13 @@ struct StudioWorkspaceView: View {
     theme.fill.intensity = Float(cadFillLightIntensity)
     theme.rim.intensity = Float(cadRimLightIntensity)
     if cadBackgroundGradientEnabled {
-      // Empty/invalid hex falls back to a darkened top color so enabling the
-      // gradient is immediately visible before a bottom color is picked.
+      // Operator override first, then the theme's own gradient bottom (Unity
+      // ships one), then a darkened top color so enabling the gradient is
+      // immediately visible before a bottom color is picked.
       theme.backgroundBottom =
-        CADThemeColor.rgb(cadBackgroundBottomColorHex) ?? theme.background * 0.35
+        CADThemeColor.rgb(cadBackgroundBottomColorHex)
+        ?? theme.backgroundBottom
+        ?? theme.background * 0.35
     } else {
       theme.backgroundBottom = nil
     }

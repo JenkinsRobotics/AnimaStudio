@@ -60,8 +60,11 @@ enum StudioSidebarSizing {
   static let railWidth: CGFloat = 44
   /// Match the accepted demo shell. These are intentionally fixed so a
   /// docked browser or inspector cannot greedily consume the center canvas.
+  /// The right View panel is wider than the demo's 200 so the Environment
+  /// layer controls (segmented floor modes, labelled sliders, color rows)
+  /// fit without clipping.
   static let workspacePanelWidth: CGFloat = 232
-  static let viewPanelWidth: CGFloat = 200
+  static let viewPanelWidth: CGFloat = 248
 
   static func dockedWidth(side: StudioSidebarSide, panelsAreOpen: Bool) -> CGFloat {
     railWidth
