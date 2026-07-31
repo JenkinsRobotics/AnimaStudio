@@ -51,8 +51,61 @@ struct CADAppearancePanel<Inspector: View>: View {
   @AppStorage(StudioPreferenceKey.cadFloorGridMajorLineInterval) private
     var floorGridMajorLineInterval = 5
   @AppStorage(StudioPreferenceKey.cadFloorGridOpacity) private var floorGridOpacity = 0.24
+  @AppStorage(StudioPreferenceKey.cadShowsSolidFloor) private var showsSolidFloor = false
+  @AppStorage(StudioPreferenceKey.cadFloorColorHex) private var floorColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadBackgroundGradientEnabled) private
+    var backgroundGradientEnabled = false
+  @AppStorage(StudioPreferenceKey.cadBackgroundBottomColorHex) private
+    var backgroundBottomHex = ""
+  @AppStorage(StudioPreferenceKey.cadMasterBrightness) private var masterBrightness = 0.5
 
   private var theme: CADViewportTheme { CADViewportTheme.named(themeName) }
+
+  /// The Environment panel's floor layer as one mode, projected onto the two
+  /// persisted bools shared with the renderers.
+  private enum FloorMode: String, CaseIterable, Identifiable {
+    case none = "None"
+    case grid = "Grid"
+    case floor = "Floor"
+    case gridAndFloor = "Grid + Floor"
+    var id: String { rawValue }
+  }
+
+  private var floorMode: Binding<FloorMode> {
+    Binding(
+      get: {
+        switch (showsFloorGrid, showsSolidFloor) {
+        case (false, false): .none
+        case (true, false): .grid
+        case (false, true): .floor
+        case (true, true): .gridAndFloor
+        }
+      },
+      set: { mode in
+        showsFloorGrid = mode == .grid || mode == .gridAndFloor
+        showsSolidFloor = mode == .floor || mode == .gridAndFloor
+      }
+    )
+  }
+
+  /// Perceptual slider over a raw persisted intensity: far left is off,
+  /// mid-slider is the preset's nominal value, far right is 4x (blinding).
+  private func lightPosition(
+    _ raw: Binding<Double>, nominal: Float, fallback: Float
+  ) -> Binding<Double> {
+    Binding(
+      get: {
+        Double(
+          CADLightingScale.position(
+            intensity: Float(raw.wrappedValue), nominal: nominal, fallbackNominal: fallback))
+      },
+      set: {
+        raw.wrappedValue = Double(
+          CADLightingScale.intensity(
+            position: Float($0), nominal: nominal, fallbackNominal: fallback))
+      }
+    )
+  }
 
   var body: some View {
     if tab == .inspector {
@@ -123,43 +176,12 @@ struct CADAppearancePanel<Inspector: View>: View {
 
       referenceGeometrySection
 
-      card("3D FLOOR GRID") {
-        Toggle("Show floor grid", isOn: $showsFloorGrid)
-          .toggleStyle(.switch)
-        slider(
-          "Minor spacing · \(formattedGridSpacing)",
-          $floorGridSpacingMeters,
-          0.001...1
-        )
-        .disabled(!showsFloorGrid)
-        slider(
-          "Extent · \(String(format: "%.1f", floorGridExtentMultiplier))× model",
-          $floorGridExtentMultiplier,
-          1.5...20
-        )
-        .disabled(!showsFloorGrid)
-        Stepper(
-          "Major line every \(floorGridMajorLineInterval) minor lines",
-          value: $floorGridMajorLineInterval,
-          in: 2...20
-        )
-        .font(.system(size: 12))
-        .disabled(!showsFloorGrid)
-        slider("Opacity", $floorGridOpacity, 0.02...0.9)
-          .disabled(!showsFloorGrid)
+      card("LAYERS") {
         Text(
-          "This world-space display aid is shared by the Assets preview, MetalKit, and Three.js/WebGPU. The semantic Top Plane remains a separate assembly reference."
+          "Background, environment floor, and object lighting/shading live in the Environment panel's Background / Environment / Object sections."
         )
         .font(.caption)
         .foregroundStyle(StudioPalette.muted)
-      }
-
-      card("EDGES & SELECTION") {
-        Toggle("Show feature edges", isOn: $showsEdges).toggleStyle(.switch)
-        slider("Edge definition", $edgeStrength, 0...1)
-        colorRow("Edges", $edgeHex, default: theme.edgeColor)
-        colorRow("Selected edges", $selectedEdgeHex, default: theme.edgeSelectionColor)
-        colorRow("Face selection", $faceSelectionHex, default: theme.selectionColor)
       }
     }
   }
@@ -201,15 +223,59 @@ struct CADAppearancePanel<Inspector: View>: View {
 
   private var environmentControls: some View {
     VStack(alignment: .leading, spacing: 14) {
-      card("ENVIRONMENT PRESET") {
+      card("BACKGROUND") {
         Picker("Preset", selection: themeSelection) {
           ForEach(CADViewportTheme.all) { Text($0.name).tag($0.name) }
         }
         .pickerStyle(.menu)
-        colorRow("Background", $backgroundHex, default: theme.background)
+        Picker("Style", selection: $backgroundGradientEnabled) {
+          Text("Solid").tag(false)
+          Text("Gradient").tag(true)
+        }
+        .pickerStyle(.segmented)
+        colorRow(
+          backgroundGradientEnabled ? "Top color" : "Background",
+          $backgroundHex, default: theme.background)
+        if backgroundGradientEnabled {
+          colorRow("Bottom color", $backgroundBottomHex, default: theme.background * 0.35)
+        }
       }
 
-      card("LIGHTING") {
+      card("ENVIRONMENT") {
+        Picker("Floor", selection: floorMode) {
+          ForEach(FloorMode.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        if showsSolidFloor {
+          colorRow("Floor color", $floorColorHex, default: theme.floorColor)
+        }
+        if showsFloorGrid {
+          slider(
+            "Grid spacing · \(formattedGridSpacing)",
+            $floorGridSpacingMeters,
+            0.001...1
+          )
+          slider(
+            "Extent · \(String(format: "%.1f", floorGridExtentMultiplier))× model",
+            $floorGridExtentMultiplier,
+            1.5...20
+          )
+          Stepper(
+            "Major line every \(floorGridMajorLineInterval) minor lines",
+            value: $floorGridMajorLineInterval,
+            in: 2...20
+          )
+          .font(.system(size: 12))
+          slider("Grid opacity", $floorGridOpacity, 0.02...0.9)
+        }
+        Text(
+          "The floor is a world-space display aid shared by MetalKit and Three.js/WebGPU. The semantic Top Plane remains a separate assembly reference."
+        )
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+      }
+
+      card("OBJECT") {
         HStack {
           Text(lightingDisabled ? "All lights are off" : "Live viewport lighting")
             .font(.system(size: 11, weight: .medium))
@@ -221,36 +287,50 @@ struct CADAppearancePanel<Inspector: View>: View {
           .buttonStyle(.borderless)
           .font(.system(size: 11, weight: .semibold))
         }
-        slider("Ambient light", $ambientStrength, 0...0.55)
+        slider("Brightness", $masterBrightness, 0...1)
+        slider(
+          "Ambient light",
+          lightPosition(
+            $ambientStrength,
+            nominal: CADViewportTheme.named(themeName).ambientStrength,
+            fallback: 0.30),
+          0...1
+        )
         slider("Contact shadows", $shadowStrength, 0...1)
         Text(
           lightingDisabled
-            ? "The model is intentionally unlit. Raise Ambient, Key, Fill, or Rim—or press Reset—to restore a readable authoring view."
-            : "Changes are sent directly to the active renderer. A value of 0 truly disables a light; contact shadows use a responsive key-light depth pass."
+            ? "The model is intentionally unlit. Raise Brightness, Ambient, Key, Fill, or Rim—or press Reset—to restore a readable authoring view."
+            : "Every slider is live: far left disables that light, mid-slider is the preset's nominal level, and far right overexposes. Brightness scales all lights at once."
         )
         .font(.caption)
         .foregroundStyle(lightingDisabled ? Color.orange : StudioPalette.muted)
         Divider()
         lightControl(
           "Key light",
-          intensity: $keyLight,
+          intensity: lightPosition($keyLight, nominal: theme.key.intensity, fallback: 4_400),
           colorHex: $keyLightHex,
           defaultColor: theme.key.color
         )
         Divider()
         lightControl(
           "Fill light",
-          intensity: $fillLight,
+          intensity: lightPosition($fillLight, nominal: theme.fill.intensity, fallback: 1_650),
           colorHex: $fillLightHex,
           defaultColor: theme.fill.color
         )
         Divider()
         lightControl(
           "Rim light",
-          intensity: $rimLight,
+          intensity: lightPosition($rimLight, nominal: theme.rim.intensity, fallback: 1_200),
           colorHex: $rimLightHex,
           defaultColor: theme.rim.color
         )
+        Divider()
+        Toggle("Show feature edges", isOn: $showsEdges).toggleStyle(.switch)
+        slider("Edge definition", $edgeStrength, 0...1)
+        colorRow("Edges", $edgeHex, default: theme.edgeColor)
+        colorRow("Selected edges", $selectedEdgeHex, default: theme.edgeSelectionColor)
+        colorRow("Face selection", $faceSelectionHex, default: theme.selectionColor)
       }
     }
   }
@@ -313,10 +393,11 @@ struct CADAppearancePanel<Inspector: View>: View {
   }
 
   private var lightingDisabled: Bool {
-    ambientStrength <= 0.000_1
-      && keyLight <= 0.5
-      && fillLight <= 0.5
-      && rimLight <= 0.5
+    masterBrightness <= 0.000_1
+      || (ambientStrength <= 0.000_1
+        && keyLight <= 0.5
+        && fillLight <= 0.5
+        && rimLight <= 0.5)
   }
 
   private func resetLightingToPreset() {
@@ -326,6 +407,7 @@ struct CADAppearancePanel<Inspector: View>: View {
     keyLight = Double(preset.key.intensity)
     fillLight = Double(preset.fill.intensity)
     rimLight = Double(preset.rim.intensity)
+    masterBrightness = 0.5
     keyLightHex = ""
     fillLightHex = ""
     rimLightHex = ""
@@ -376,9 +458,10 @@ struct CADAppearancePanel<Inspector: View>: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       colorRow(label, colorHex, default: defaultColor)
-      Slider(value: intensity, in: 0...8_000)
+      // Perceptual position: 0 = off, mid = the preset's nominal, 1 = 4x.
+      Slider(value: intensity, in: 0...1)
       Text(
-        "\(Int(intensity.wrappedValue.rounded())) · \(Int((intensity.wrappedValue / 4_000 * 100).rounded()))%"
+        "\(Int((CADLightingScale.multiplier(position: Float(intensity.wrappedValue)) * 100).rounded()))% of nominal"
       )
       .font(.system(.caption, design: .monospaced))
       .foregroundStyle(StudioPalette.muted)

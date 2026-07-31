@@ -161,6 +161,20 @@
   Also: fixed the floating expanded tool ribbon spanning full window width (its
   category strip now hugs content when floating). Design: `2026-07-24`, roadmap
   `VR_Character.md`.
+- **Viewport appearance layers (Background / Environment / Object):** the CAD
+  Environment panel is three sections backed by one shared model. Background:
+  theme preset plus Solid or two-stop vertical Gradient with color pickers.
+  Environment: floor mode None / Grid / Floor / Grid + Floor — the solid floor
+  is a ground plane at Y=0 sized from model bounds that receives the model's
+  soft shadow on Metal and Three.js WebGPU (raw WebGPU renders background
+  colors/gradient only; it has no shadow pass). Object: a master Brightness
+  slider plus per-light key/fill/rim/ambient on one perceptual contract —
+  far left off, mid-slider the preset's nominal, far right 4x (overexposed)
+  via `CADLightingScale` (4t²); persisted intensities keep their raw meaning,
+  master multiplies at theme construction. All values stream live to the
+  renderers per frame/revision. Choosing a preset restores solid background,
+  nominal brightness, and clears floor/bottom color overrides. Floor state is
+  two additive persisted bools (grid existing, solid new); no migration.
 - **Consolidated viewport controls:** the production right sidebar is now the
   single operator surface for camera/display controls, navigation profiles and
   help, materials, lighting, background, reflections, shadows, section view,

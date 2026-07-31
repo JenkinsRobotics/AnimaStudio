@@ -690,6 +690,13 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     var overrideColor: SIMD4<Float>
     /// ambient strength, shadow strength, shadow bias, shadow-map size
     var lighting: SIMD4<Float>
+    var floorColor: SIMD4<Float>
+  }
+
+  /// Two-stop vertical background gradient, delivered by `setFragmentBytes`.
+  struct BackgroundGradient {
+    var top: SIMD4<Float>
+    var bottom: SIMD4<Float>
   }
 
   struct EdgePresentation {
@@ -719,9 +726,12 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   let edgePipeline: MTLRenderPipelineState
   let referencePipeline: MTLRenderPipelineState
   let shadowPipeline: MTLRenderPipelineState
+  let backgroundPipeline: MTLRenderPipelineState
+  let floorPipeline: MTLRenderPipelineState
   let depthState: MTLDepthStencilState
   let edgeDepthState: MTLDepthStencilState
   let shadowDepthState: MTLDepthStencilState
+  let backgroundDepthState: MTLDepthStencilState
   let shadowTexture: MTLTexture
   let shadowSampler: MTLSamplerState
   let onFrame: @MainActor @Sendable () -> Void
@@ -752,6 +762,8 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   private var referenceVertexCounts: [CADReferenceGeometry: Int] = [:]
   private var floorGridBuffer: MTLBuffer?
   private var floorGridVertexCount = 0
+  private var floorPlaneBuffer: MTLBuffer?
+  private var floorPlaneVertexCount = 0
   private var selectedPartOriginBuffer: MTLBuffer?
   private var selectedPartOriginVertexCount = 0
   private var selectedPartOrigin: CADPartOriginPresentation?
@@ -829,6 +841,20 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     shadowDescriptor.vertexFunction = library.makeFunction(name: "cadShadowVertex")
     shadowDescriptor.depthAttachmentPixelFormat = .depth32Float
     shadowPipeline = try device.makeRenderPipelineState(descriptor: shadowDescriptor)
+    let backgroundDescriptor = MTLRenderPipelineDescriptor()
+    backgroundDescriptor.vertexFunction = library.makeFunction(name: "backgroundVertex")
+    backgroundDescriptor.fragmentFunction = library.makeFunction(name: "backgroundFragment")
+    backgroundDescriptor.colorAttachments[0].pixelFormat = CADMetalLightingModel.colorPixelFormat
+    backgroundDescriptor.depthAttachmentPixelFormat = .depth32Float
+    backgroundDescriptor.rasterSampleCount = sampleCount
+    backgroundPipeline = try device.makeRenderPipelineState(descriptor: backgroundDescriptor)
+    let floorDescriptor = MTLRenderPipelineDescriptor()
+    floorDescriptor.vertexFunction = library.makeFunction(name: "floorVertex")
+    floorDescriptor.fragmentFunction = library.makeFunction(name: "floorFragment")
+    floorDescriptor.colorAttachments[0].pixelFormat = CADMetalLightingModel.colorPixelFormat
+    floorDescriptor.depthAttachmentPixelFormat = .depth32Float
+    floorDescriptor.rasterSampleCount = sampleCount
+    floorPipeline = try device.makeRenderPipelineState(descriptor: floorDescriptor)
     let depth = MTLDepthStencilDescriptor()
     depth.depthCompareFunction = .less
     depth.isDepthWriteEnabled = true
@@ -850,6 +876,12 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       throw MetalRendererError.noDepthState
     }
     self.shadowDepthState = shadowDepthState
+    let backgroundDepth = MTLDepthStencilDescriptor()
+    backgroundDepth.depthCompareFunction = .always
+    backgroundDepth.isDepthWriteEnabled = false
+    guard let backgroundDepthState = device.makeDepthStencilState(descriptor: backgroundDepth)
+    else { throw MetalRendererError.noDepthState }
+    self.backgroundDepthState = backgroundDepthState
 
     let shadowTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
       pixelFormat: .depth32Float,
@@ -1067,6 +1099,15 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       inFlightSemaphore.signal()
       return
     }
+    if let bottom = theme.backgroundBottom {
+      var gradient = BackgroundGradient(
+        top: SIMD4(theme.background, 1), bottom: SIMD4(bottom, 1))
+      encoder.setRenderPipelineState(backgroundPipeline)
+      encoder.setDepthStencilState(backgroundDepthState)
+      encoder.setFragmentBytes(
+        &gradient, length: MemoryLayout<BackgroundGradient>.stride, index: 0)
+      encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+    }
     if let vertexBuffer, let indexBuffer, let partTransformBuffer, let partStateBuffer,
       let partAppearanceBuffer, indexCount > 0
     {
@@ -1093,7 +1134,8 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
           theme.ambientStrength,
           theme.shadowStrength,
           0.0007,
-          Float(shadowTexture.width)))
+          Float(shadowTexture.width)),
+        floorColor: SIMD4(theme.floorColor, 1))
       let uniformOffset = uniformFrameIndex * uniformStride
       withUnsafeBytes(of: &uniforms) {
         uniformBuffer.contents().advanced(by: uniformOffset).copyMemory(
@@ -1117,6 +1159,15 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       encoder.drawIndexedPrimitives(
         type: .triangle, indexCount: indexCount, indexType: .uint32,
         indexBuffer: indexBuffer, indexBufferOffset: 0)
+      if referenceGeometry.showsSolidFloor, let floorPlaneBuffer, floorPlaneVertexCount > 0 {
+        // Uniforms stay bound at vertex/fragment buffer(1); the shadow map and
+        // sampler stay at fragment texture/sampler 0 from the pass above.
+        encoder.setRenderPipelineState(floorPipeline)
+        encoder.setDepthStencilState(depthState)
+        encoder.setVertexBuffer(floorPlaneBuffer, offset: 0, index: 0)
+        encoder.drawPrimitives(
+          type: .triangle, vertexStart: 0, vertexCount: floorPlaneVertexCount)
+      }
       if let edgeVertexBuffer, edgeVertexCount > 0, theme.edgeStrength > 0.02 {
         encoder.setRenderPipelineState(edgePipeline)
         encoder.setDepthStencilState(edgeDepthState)
@@ -1214,6 +1265,28 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     let gridVertices = floorGridVertices()
     floorGridBuffer = makePrivateBuffer(gridVertices)
     floorGridVertexCount = gridVertices.count
+    let planeVertices = floorPlaneVertices()
+    floorPlaneBuffer = makePrivateBuffer(planeVertices)
+    floorPlaneVertexCount = planeVertices.count
+  }
+
+  /// Two triangles at Y=0 covering the same extent as the floor grid. Color
+  /// is unused — `floorFragment` shades from the theme's floor color and the
+  /// shared shadow map, so a theme change needs no buffer rebuild.
+  private func floorPlaneVertices() -> [ReferenceVertex] {
+    let halfExtent = max(
+      referenceGeometry.floorGridExtentMeters * 0.5,
+      referenceGeometry.floorGridSpacingMeters)
+    let corners = [
+      SIMD3<Float>(-halfExtent, 0, -halfExtent),
+      SIMD3<Float>(halfExtent, 0, -halfExtent),
+      SIMD3<Float>(halfExtent, 0, halfExtent),
+      SIMD3<Float>(-halfExtent, 0, halfExtent),
+    ]
+    let unused = SIMD4<Float>(0, 0, 0, 1)
+    return [0, 1, 2, 0, 2, 3].map {
+      ReferenceVertex(position: SIMD4(corners[$0], 1), color: unused)
+    }
   }
 
   private func rebuildSelectedPartOriginBuffer() {
@@ -1396,7 +1469,7 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       float4 cameraPosition; float4 keyDirection;
       float4 keyColor; float4 fillDirection; float4 fillColor; float4 rimDirection; float4 rimColor;
       float4 material; float4 edgeColor; float4 selectionColor; float4 overrideColor;
-      float4 lighting; };
+      float4 lighting; float4 floorColor; };
     struct EdgePresentation { float2 viewportSize; float offsetPixels; float opacity; };
     struct ShadowUniforms { float4x4 lightViewProjection; };
     struct PartAppearance { float4 color; float4 material; };
@@ -1555,6 +1628,62 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       o.position = u.viewProjection * v.position; o.color = v.color; return o;
     }
     fragment float4 referenceFragment(ReferenceVarying in [[stage_in]]) { return in.color; }
+    struct BackgroundGradient { float4 top; float4 bottom; };
+    struct BackgroundVarying { float4 position [[position]]; float t; };
+    vertex BackgroundVarying backgroundVertex(uint id [[vertex_id]]) {
+      // Fullscreen triangle; t = 0 at the top of the viewport, 1 at the bottom.
+      float2 corners[3] = { float2(-1, 3), float2(-1, -1), float2(3, -1) };
+      BackgroundVarying o;
+      o.position = float4(corners[id], 1.0, 1.0);
+      o.t = 1.0 - (corners[id].y * 0.5 + 0.5);
+      return o;
+    }
+    fragment float4 backgroundFragment(
+      BackgroundVarying in [[stage_in]],
+      constant BackgroundGradient &gradient [[buffer(0)]]
+    ) {
+      return mix(gradient.top, gradient.bottom, clamp(in.t, 0.0, 1.0));
+    }
+    vertex ReferenceVarying floorVertex(
+      uint id [[vertex_id]],
+      device const ReferenceVertex *vertices [[buffer(0)]],
+      constant Uniforms &u [[buffer(1)]]
+    ) {
+      ReferenceVarying o; ReferenceVertex v = vertices[id];
+      o.position = u.viewProjection * v.position;
+      o.color = v.position; // world position, for shadow projection
+      return o;
+    }
+    fragment float4 floorFragment(
+      ReferenceVarying in [[stage_in]],
+      constant Uniforms &u [[buffer(1)]],
+      depth2d<float> shadowMap [[texture(0)]],
+      sampler shadowSampler [[sampler(0)]]
+    ) {
+      float3 world = in.color.xyz;
+      float4 shadowClip = u.lightViewProjection * float4(world, 1);
+      float3 shadowNDC = shadowClip.xyz / max(abs(shadowClip.w), 0.000001);
+      float2 shadowUV = float2(shadowNDC.x * 0.5 + 0.5, 0.5 - shadowNDC.y * 0.5);
+      float shadowVisibility = 1.0;
+      if (all(shadowUV >= 0.0) && all(shadowUV <= 1.0) && shadowNDC.z >= 0.0 && shadowNDC.z <= 1.0) {
+        float texel = 1.0 / max(u.lighting.w, 1.0);
+        shadowVisibility = 0.0;
+        for (int y = -1; y <= 1; ++y) {
+          for (int x = -1; x <= 1; ++x) {
+            shadowVisibility += shadowMap.sample_compare(
+              shadowSampler,
+              shadowUV + float2(x, y) * texel,
+              shadowNDC.z - u.lighting.z);
+          }
+        }
+        shadowVisibility /= 9.0;
+      }
+      float shadow = mix(1.0, shadowVisibility, clamp(u.lighting.y, 0.0, 1.0));
+      // Upward-facing matte plane: ceiling-hemisphere ambient plus key diffuse.
+      float key = max(u.keyDirection.y, 0.0) * u.keyDirection.w;
+      float3 lighting = float3(u.lighting.x * 1.28) + u.keyColor.rgb * key * shadow;
+      return float4(u.floorColor.rgb * lighting, 1.0);
+    }
     """
 }
 

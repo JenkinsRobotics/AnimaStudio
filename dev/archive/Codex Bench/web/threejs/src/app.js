@@ -156,6 +156,29 @@ function makeFloorGrid() {
   return floor;
 }
 
+// Unreal-style solid ground plane at Y=0, matching the Metal renderer's
+// floor: same extent as the grid, matte theme floor color, receives the
+// model's shadow. The grid draws over it (depthWrite off) for Grid+Floor.
+function makeSolidFloor() {
+  const requestedSpacing = Math.max(referenceGeometry.floorGridSpacingMeters || 0.1, 0.0001);
+  const halfExtent = Math.max(
+    (referenceGeometry.floorGridExtentMeters || 4) * 0.5,
+    requestedSpacing
+  );
+  const geometry = new THREE.PlaneGeometry(halfExtent * 2, halfExtent * 2);
+  const material = new THREE.MeshStandardMaterial({
+    color: color(theme.floorColor || [0.36, 0.37, 0.40]),
+    roughness: 0.92,
+    metalness: 0.0
+  });
+  const floor = new THREE.Mesh(geometry, material);
+  floor.rotation.x = -Math.PI / 2;
+  floor.name = "world-solid-floor";
+  floor.receiveShadow = true;
+  floor.visible = referenceGeometry.showsSolidFloor === true;
+  return floor;
+}
+
 function rebuildReferenceGeometry() {
   if (referenceGroup) {
     scene.remove(referenceGroup);
@@ -169,6 +192,7 @@ function rebuildReferenceGeometry() {
   // The floor is a camera/display aid shared with the native preview and
   // Metal renderer. It remains distinct from the selectable semantic Top Plane.
   referenceGroup.add(makeFloorGrid());
+  referenceGroup.add(makeSolidFloor());
 
   const origin = new THREE.AxesHelper(
     Math.max(referenceGeometry.axisLengthMeters || 0, 0.00025));
@@ -205,12 +229,40 @@ function color(value) {
   return new THREE.Color(value[0], value[1], value[2]);
 }
 
+// Two-stop vertical gradient texture for the scene background, matching the
+// Metal renderer's fullscreen gradient pass.
+function backgroundGradientTexture(top, bottom) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, `#${color(top).getHexString()}`);
+  gradient.addColorStop(1, `#${color(bottom).getHexString()}`);
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function updateTheme() {
   const bg = color(theme.background);
-  scene.background = bg;
+  if (Array.isArray(theme.backgroundBottom)) {
+    if (scene.background && scene.background.isTexture) scene.background.dispose();
+    scene.background = backgroundGradientTexture(theme.background, theme.backgroundBottom);
+  } else {
+    if (scene.background && scene.background.isTexture) scene.background.dispose();
+    scene.background = bg;
+  }
   // Explicit clear as well — some WebGPU builds do not paint scene.background
   // on an otherwise empty frame, which read as a "blank" viewport.
   renderer.setClearColor(bg, 1);
+  const solidFloor = referenceGroup && referenceGroup.getObjectByName("world-solid-floor");
+  if (solidFloor) {
+    solidFloor.material.color = color(theme.floorColor || [0.36, 0.37, 0.40]);
+    solidFloor.material.needsUpdate = true;
+  }
   // Zero is an intentional operator choice. A hard-coded floor made the
   // environment appear unchanged after all lighting controls were disabled.
   ambient.intensity = Math.max(0, theme.ambientStrength ?? 0.3);

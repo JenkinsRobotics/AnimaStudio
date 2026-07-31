@@ -57,6 +57,9 @@ public struct CADWorkspaceReferenceGeometry: Codable, Equatable, Sendable {
   public let axisLengthMeters: Float
   public let gridDivisions: Int
   public let showsFloorGrid: Bool
+  /// Solid Unreal-style ground plane at Y=0 (independent of the grid so the
+  /// panel's None / Grid / Floor / Grid+Floor modes map onto the two bools).
+  public let showsSolidFloor: Bool
   public let floorGridSpacingMeters: Float
   public let floorGridExtentMeters: Float
   public let floorGridMajorLineInterval: Int
@@ -67,6 +70,7 @@ public struct CADWorkspaceReferenceGeometry: Codable, Equatable, Sendable {
     modelDiagonalMeters: Float,
     gridDivisions: Int = 10,
     showsFloorGrid: Bool = true,
+    showsSolidFloor: Bool = false,
     floorGridSpacingMeters: Float = 0.1,
     floorGridExtentMultiplier: Float = 4,
     floorGridMajorLineInterval: Int = 5,
@@ -80,6 +84,7 @@ public struct CADWorkspaceReferenceGeometry: Codable, Equatable, Sendable {
     axisLengthMeters = workingDiagonal * 0.35
     self.gridDivisions = max(gridDivisions, 2)
     self.showsFloorGrid = showsFloorGrid
+    self.showsSolidFloor = showsSolidFloor
     self.floorGridSpacingMeters = spacing
     floorGridExtentMeters = max(
       workingDiagonal * min(max(floorGridExtentMultiplier, 1.5), 20),
@@ -637,6 +642,7 @@ public struct CADPipelineViewport: View {
   public let primaryPartTransformIsEditable: Bool
   public let referenceGeometryVisibility: CADReferenceGeometryVisibility
   public let showsFloorGrid: Bool
+  public let showsSolidFloor: Bool
   public let floorGridSpacingMeters: Float
   public let floorGridExtentMultiplier: Float
   public let floorGridMajorLineInterval: Int
@@ -697,6 +703,7 @@ public struct CADPipelineViewport: View {
     primaryPartTransformIsEditable: Bool = false,
     referenceGeometryVisibility: CADReferenceGeometryVisibility = .init(),
     showsFloorGrid: Bool = true,
+    showsSolidFloor: Bool = false,
     floorGridSpacingMeters: Float = 0.1,
     floorGridExtentMultiplier: Float = 4,
     floorGridMajorLineInterval: Int = 5,
@@ -742,6 +749,7 @@ public struct CADPipelineViewport: View {
     self.primaryPartTransformIsEditable = primaryPartTransformIsEditable
     self.referenceGeometryVisibility = referenceGeometryVisibility
     self.showsFloorGrid = showsFloorGrid
+    self.showsSolidFloor = showsSolidFloor
     self.floorGridSpacingMeters = floorGridSpacingMeters
     self.floorGridExtentMultiplier = floorGridExtentMultiplier
     self.floorGridMajorLineInterval = floorGridMajorLineInterval
@@ -781,6 +789,7 @@ public struct CADPipelineViewport: View {
       visibility: referenceGeometryVisibility,
       modelDiagonalMeters: document?.renderGeometry.bounds.diagonal ?? 1,
       showsFloorGrid: showsFloorGrid,
+      showsSolidFloor: showsSolidFloor,
       floorGridSpacingMeters: floorGridSpacingMeters,
       floorGridExtentMultiplier: floorGridExtentMultiplier,
       floorGridMajorLineInterval: floorGridMajorLineInterval,

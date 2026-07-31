@@ -118,6 +118,13 @@ struct StudioWorkspaceView: View {
     Double(CADThemePreferences.defaultTheme.rim.intensity)
   @AppStorage(StudioPreferenceKey.cadShowsTelemetry) private var cadShowsTelemetry = false
   @AppStorage(StudioPreferenceKey.cadShowsFloorGrid) private var cadShowsFloorGrid = true
+  @AppStorage(StudioPreferenceKey.cadShowsSolidFloor) private var cadShowsSolidFloor = false
+  @AppStorage(StudioPreferenceKey.cadFloorColorHex) private var cadFloorColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadBackgroundGradientEnabled) private
+    var cadBackgroundGradientEnabled = false
+  @AppStorage(StudioPreferenceKey.cadBackgroundBottomColorHex) private
+    var cadBackgroundBottomColorHex = ""
+  @AppStorage(StudioPreferenceKey.cadMasterBrightness) private var cadMasterBrightness = 0.5
   @AppStorage(StudioPreferenceKey.cadFloorGridSpacingMeters) private
     var cadFloorGridSpacingMeters = 0.1
   @AppStorage(StudioPreferenceKey.cadFloorGridExtentMultiplier) private
@@ -826,6 +833,7 @@ struct StudioWorkspaceView: View {
             primaryPartTransformIsEditable: cadPrimaryPartTransformIsEditable,
             referenceGeometryVisibility: workspace.cadReferenceGeometryVisibility,
             showsFloorGrid: cadShowsFloorGrid,
+            showsSolidFloor: cadShowsSolidFloor,
             floorGridSpacingMeters: Float(cadFloorGridSpacingMeters),
             floorGridExtentMultiplier: Float(cadFloorGridExtentMultiplier),
             floorGridMajorLineInterval: cadFloorGridMajorLineInterval,
@@ -1356,6 +1364,24 @@ struct StudioWorkspaceView: View {
     theme.key.intensity = Float(cadKeyLightIntensity)
     theme.fill.intensity = Float(cadFillLightIntensity)
     theme.rim.intensity = Float(cadRimLightIntensity)
+    if cadBackgroundGradientEnabled {
+      // Empty/invalid hex falls back to a darkened top color so enabling the
+      // gradient is immediately visible before a bottom color is picked.
+      theme.backgroundBottom =
+        CADThemeColor.rgb(cadBackgroundBottomColorHex) ?? theme.background * 0.35
+    } else {
+      theme.backgroundBottom = nil
+    }
+    if let floor = CADThemeColor.rgb(cadFloorColorHex) {
+      theme.floorColor = floor
+    }
+    // One master multiplier over every light, applied last so the per-light
+    // sliders keep their persisted meaning. Mid-slider is nominal (1x).
+    let master = CADLightingScale.multiplier(position: Float(cadMasterBrightness))
+    theme.ambientStrength *= master
+    theme.key.intensity *= master
+    theme.fill.intensity *= master
+    theme.rim.intensity *= master
     return theme
   }
 

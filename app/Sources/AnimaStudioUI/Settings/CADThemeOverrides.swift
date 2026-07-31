@@ -22,6 +22,10 @@ enum CADThemePreferences {
     defaults.set(Double(theme.key.intensity), forKey: StudioPreferenceKey.cadKeyLightIntensity)
     defaults.set(Double(theme.fill.intensity), forKey: StudioPreferenceKey.cadFillLightIntensity)
     defaults.set(Double(theme.rim.intensity), forKey: StudioPreferenceKey.cadRimLightIntensity)
+    // A preset restores the whole coordinated environment, including the
+    // appearance layers: nominal master brightness and a solid background.
+    defaults.set(0.5, forKey: StudioPreferenceKey.cadMasterBrightness)
+    defaults.set(false, forKey: StudioPreferenceKey.cadBackgroundGradientEnabled)
 
     for key in colorOverrideKeys {
       defaults.removeObject(forKey: key)
@@ -37,6 +41,8 @@ enum CADThemePreferences {
     StudioPreferenceKey.cadKeyLightColorHex,
     StudioPreferenceKey.cadFillLightColorHex,
     StudioPreferenceKey.cadRimLightColorHex,
+    StudioPreferenceKey.cadBackgroundBottomColorHex,
+    StudioPreferenceKey.cadFloorColorHex,
   ]
 }
 

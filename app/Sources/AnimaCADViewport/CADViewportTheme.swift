@@ -23,6 +23,11 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
   public var neutralColor: SIMD4<Float>
   public var overrideColor: SIMD4<Float>?
   public var background: SIMD3<Float>
+  /// Bottom color of a vertical background gradient; `nil` keeps the flat
+  /// `background` color (additive — older persisted themes decode as solid).
+  public var backgroundBottom: SIMD3<Float>?
+  /// Matte color of the optional solid environment floor plane.
+  public var floorColor: SIMD3<Float>
   public var edgeColor: SIMD3<Float>
   public var selectionColor: SIMD3<Float>
   public var edgeSelectionColor: SIMD3<Float>
@@ -47,7 +52,9 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     fill: Light,
     rim: Light,
     ambientStrength: Float = 0.30,
-    shadowStrength: Float = 0.55
+    shadowStrength: Float = 0.55,
+    backgroundBottom: SIMD3<Float>? = nil,
+    floorColor: SIMD3<Float> = SIMD3(0.36, 0.37, 0.40)
   ) {
     self.name = name
     self.roughness = roughness
@@ -58,6 +65,8 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     self.neutralColor = neutralColor
     self.overrideColor = overrideColor
     self.background = background
+    self.backgroundBottom = backgroundBottom
+    self.floorColor = floorColor
     self.edgeColor = edgeColor
     self.selectionColor = selectionColor
     self.edgeSelectionColor = edgeSelectionColor

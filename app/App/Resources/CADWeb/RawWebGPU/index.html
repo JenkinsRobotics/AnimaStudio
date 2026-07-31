@@ -296,7 +296,12 @@
     }
 
     function updateThemeBackground() {
-      const css = `rgb(${theme.background.map(value => value * 255).join(',')})`;
+      const top = `rgb(${theme.background.map(value => value * 255).join(',')})`;
+      // Color-only parity with the Metal/Three.js background layers: a
+      // two-stop vertical gradient when the theme carries a bottom color.
+      const css = Array.isArray(theme.backgroundBottom)
+        ? `linear-gradient(${top}, rgb(${theme.backgroundBottom.map(value => value * 255).join(',')}))`
+        : top;
       document.body.style.background = css;
       canvas.style.background = css;
     }
@@ -477,9 +482,9 @@
         colorAttachments: [{
           view: multisampleView,
           resolveTarget: context.getCurrentTexture().createView(),
-          clearValue: {
-            r: theme.background[0], g: theme.background[1], b: theme.background[2], a: 1
-          },
+          clearValue: Array.isArray(theme.backgroundBottom)
+            ? { r: 0, g: 0, b: 0, a: 0 }
+            : { r: theme.background[0], g: theme.background[1], b: theme.background[2], a: 1 },
           loadOp: 'clear', storeOp: 'discard'
         }],
         depthStencilAttachment: {
@@ -527,7 +532,9 @@
       context = canvas.getContext('webgpu');
       if (!context) throw new Error('The canvas could not create a WebGPU context.');
       const format = navigator.gpu.getPreferredCanvasFormat();
-      context.configure({ device, format, alphaMode: 'opaque' });
+      // Premultiplied so a transparent clear can reveal the CSS background
+      // gradient; with an opaque (a=1) clear this matches the prior behavior.
+      context.configure({ device, format, alphaMode: 'premultiplied' });
       const module = device.createShaderModule({ code: shaderSource });
       uniformBuffer = device.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       const bindGroupLayout = device.createBindGroupLayout({ entries: [{

@@ -95,6 +95,8 @@ struct CADWebThemePayload: Encodable {
     }
   }
   let background: [Float]
+  let backgroundBottom: [Float]?
+  let floorColor: [Float]
   let edge: [Float]
   let selection: [Float]
   let roughness: Float
@@ -109,6 +111,8 @@ struct CADWebThemePayload: Encodable {
 
   init(theme: CADViewportTheme) {
     background = [theme.background.x, theme.background.y, theme.background.z]
+    backgroundBottom = theme.backgroundBottom.map { [$0.x, $0.y, $0.z] }
+    floorColor = [theme.floorColor.x, theme.floorColor.y, theme.floorColor.z]
     edge = [theme.edgeColor.x, theme.edgeColor.y, theme.edgeColor.z]
     selection = [theme.selectionColor.x, theme.selectionColor.y, theme.selectionColor.z]
     roughness = theme.roughness
