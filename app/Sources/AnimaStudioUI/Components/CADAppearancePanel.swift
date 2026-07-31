@@ -1,55 +1,348 @@
+import AnimaCAD
 import AnimaCADViewport
+import AnimaModel
 import SwiftUI
 
-/// The right-hand appearance/environment panel for the CAD viewport (Metal +
-/// WebGPU). Every control is bound to the CAD theme's AppStorage keys, which
-/// `cadViewportTheme` reads — so changing one here re-themes the live viewport
-/// on both engines. This replaces the RealityKit-only environment panel that
-/// had no effect when the CAD pipeline is active.
-struct CADAppearancePanel: View {
+/// The CAD viewport's four right-sidebar surfaces.
+///
+/// The rail is intentionally split by responsibility:
+/// - View configures the camera/render path and CAD display aids.
+/// - Environment configures the scene, theme, and lights.
+/// - Appearance edits the selected Part and imported-model defaults.
+/// - Inspector remains the context-aware model inspector supplied by the workspace.
+struct CADAppearancePanel<Inspector: View>: View {
   @Bindable var workspace: StudioWorkspaceModel
+  let tab: StudioViewSidebarTab
+  @Binding var renderBackend: CADRenderBackend
+  let performance: CADViewportPerformanceSnapshot
+  @Binding var showsPerformanceHUD: Bool
+  @Binding var showsTelemetry: Bool
+  @Binding var themeName: String
+  @Binding var ambientStrength: Double
+  @Binding var shadowStrength: Double
+  @Binding var keyLight: Double
+  @Binding var fillLight: Double
+  @Binding var rimLight: Double
+  @Binding var keyLightHex: String
+  @Binding var fillLightHex: String
+  @Binding var rimLightHex: String
+  @ViewBuilder let inspector: Inspector
 
-  @AppStorage(StudioPreferenceKey.cadThemeName) private var themeName =
-    CADViewportTheme.studioBlue.name
+  @Environment(\.studioPanelSurfaceMode) private var surfaceMode
+
   @AppStorage(StudioPreferenceKey.cadPreservesImportedColors) private var preservesColors = true
   @AppStorage(StudioPreferenceKey.cadShowsFeatureEdges) private var showsEdges = true
-  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var edgeStrength = 0.7
-  @AppStorage(StudioPreferenceKey.cadRoughness) private var roughness = 0.5
-  @AppStorage(StudioPreferenceKey.cadMetallic) private var metallic = 0.0
-  @AppStorage(StudioPreferenceKey.cadKeyLightIntensity) private var keyLight = 3_000.0
-  @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var fillLight = 1_200.0
-  @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var rimLight = 900.0
+  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var edgeStrength =
+    Double(CADThemePreferences.defaultTheme.edgeStrength)
+  @AppStorage(StudioPreferenceKey.cadRoughness) private var roughness =
+    Double(CADThemePreferences.defaultTheme.roughness)
+  @AppStorage(StudioPreferenceKey.cadMetallic) private var metallic =
+    Double(CADThemePreferences.defaultTheme.metallic)
   @AppStorage(StudioPreferenceKey.cadBackgroundColorHex) private var backgroundHex = ""
   @AppStorage(StudioPreferenceKey.cadNeutralColorHex) private var neutralHex = ""
   @AppStorage(StudioPreferenceKey.cadFaceSelectionColorHex) private var faceSelectionHex = ""
   @AppStorage(StudioPreferenceKey.cadEdgeColorHex) private var edgeHex = ""
   @AppStorage(StudioPreferenceKey.cadSelectedEdgeColorHex) private var selectedEdgeHex = ""
+  @AppStorage(StudioPreferenceKey.cadShowsFloorGrid) private var showsFloorGrid = true
+  @AppStorage(StudioPreferenceKey.cadFloorGridSpacingMeters) private
+    var floorGridSpacingMeters = 0.1
+  @AppStorage(StudioPreferenceKey.cadFloorGridExtentMultiplier) private
+    var floorGridExtentMultiplier = 4.0
+  @AppStorage(StudioPreferenceKey.cadFloorGridMajorLineInterval) private
+    var floorGridMajorLineInterval = 5
+  @AppStorage(StudioPreferenceKey.cadFloorGridOpacity) private var floorGridOpacity = 0.24
 
   private var theme: CADViewportTheme { CADViewportTheme.named(themeName) }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        themeSection
-        referenceGeometrySection
-        colorsSection
-        materialSection
-        lightingSection
+    if tab == .inspector {
+      inspector
+    } else {
+      VStack(alignment: .leading, spacing: 0) {
+        WorkspacePanelHeader(title: panelTitle, systemImage: tab.systemImage)
+        ScrollView {
+          panelContent
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        if surfaceMode == .docked { Spacer(minLength: 0) }
       }
-      .padding(14)
+      .studioPanelSurface()
     }
-    .background(StudioPalette.panel)
   }
 
-  private var themeSection: some View {
-    card("THEME") {
-      Picker("Preset", selection: $themeName) {
-        ForEach(CADViewportTheme.all) { Text($0.name).tag($0.name) }
-      }
-      .pickerStyle(.menu)
-      Toggle("Preserve STEP / XDE colors", isOn: $preservesColors)
-        .toggleStyle(.switch)
+  @ViewBuilder
+  private var panelContent: some View {
+    switch tab {
+    case .view:
+      viewControls
+    case .environment:
+      environmentControls
+    case .appearance:
+      appearanceControls
+    case .performance:
+      performanceControls
+    case .inspector:
+      EmptyView()
     }
+  }
+
+  private var panelTitle: String {
+    switch tab {
+    case .view: "Camera & Display"
+    case .environment: "Environment"
+    case .appearance: "Part Appearance"
+    case .performance: "Performance"
+    case .inspector: "Inspector"
+    }
+  }
+
+  private var viewControls: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      card("RENDERER") {
+        Picker("Engine", selection: $renderBackend) {
+          ForEach(CADRenderBackend.selectable) { backend in
+            Text(backend.title).tag(backend)
+          }
+        }
+        .pickerStyle(.menu)
+        Text(renderBackend.role)
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+      }
+
+      card("CAMERA") {
+        Button("Home View", systemImage: "house") {
+          workspace.setCameraViewpoint(.home)
+        }
+        .buttonStyle(StudioButtonStyle(role: .secondary, density: .compact))
+        Text("Use the ViewCube in the viewport for orthographic and isometric views.")
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+      }
+
+      referenceGeometrySection
+
+      card("3D FLOOR GRID") {
+        Toggle("Show floor grid", isOn: $showsFloorGrid)
+          .toggleStyle(.switch)
+        slider(
+          "Minor spacing · \(formattedGridSpacing)",
+          $floorGridSpacingMeters,
+          0.001...1
+        )
+        .disabled(!showsFloorGrid)
+        slider(
+          "Extent · \(String(format: "%.1f", floorGridExtentMultiplier))× model",
+          $floorGridExtentMultiplier,
+          1.5...20
+        )
+        .disabled(!showsFloorGrid)
+        Stepper(
+          "Major line every \(floorGridMajorLineInterval) minor lines",
+          value: $floorGridMajorLineInterval,
+          in: 2...20
+        )
+        .font(.system(size: 12))
+        .disabled(!showsFloorGrid)
+        slider("Opacity", $floorGridOpacity, 0.02...0.9)
+          .disabled(!showsFloorGrid)
+        Text(
+          "This world-space display aid is shared by the Assets preview, MetalKit, and Three.js/WebGPU. The semantic Top Plane remains a separate assembly reference."
+        )
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+      }
+
+      card("EDGES & SELECTION") {
+        Toggle("Show feature edges", isOn: $showsEdges).toggleStyle(.switch)
+        slider("Edge definition", $edgeStrength, 0...1)
+        colorRow("Edges", $edgeHex, default: theme.edgeColor)
+        colorRow("Selected edges", $selectedEdgeHex, default: theme.edgeSelectionColor)
+        colorRow("Face selection", $faceSelectionHex, default: theme.selectionColor)
+      }
+    }
+  }
+
+  private var performanceControls: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      card("VIEWPORT HUD") {
+        Toggle("Show engine frame status", isOn: $showsPerformanceHUD)
+          .toggleStyle(.switch)
+        Toggle("Show detailed CAD metrics", isOn: $showsTelemetry)
+          .toggleStyle(.switch)
+        Text(
+          "The compact status card stays at bottom-right. Detailed renderer, FPS, CPU, memory, and geometry metrics appear directly above it."
+        )
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+      }
+
+      card("LIVE STATUS") {
+        LabeledContent("Engine", value: workspace.animaCoreStatusLabel)
+        LabeledContent(
+          "Renderer FPS",
+          value: performance.framesPerSecond > 0.01
+            ? String(format: "%.1f", performance.framesPerSecond) : "Measuring"
+        )
+        LabeledContent(
+          "GPU frame",
+          value: performance.frameTimeMilliseconds.map {
+            String(format: "%.2f ms", $0)
+          } ?? "Measuring"
+        )
+        LabeledContent("App CPU", value: String(format: "%.1f %%", performance.cpuPercent))
+        LabeledContent("App memory", value: String(format: "%.1f MB", performance.memoryMegabytes))
+        LabeledContent("Renderer", value: renderBackend.title)
+        LabeledContent("Kernel", value: "Open CASCADE \(CADGeometryKernel.version)")
+      }
+    }
+  }
+
+  private var environmentControls: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      card("ENVIRONMENT PRESET") {
+        Picker("Preset", selection: themeSelection) {
+          ForEach(CADViewportTheme.all) { Text($0.name).tag($0.name) }
+        }
+        .pickerStyle(.menu)
+        colorRow("Background", $backgroundHex, default: theme.background)
+      }
+
+      card("LIGHTING") {
+        HStack {
+          Text(lightingDisabled ? "All lights are off" : "Live viewport lighting")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(lightingDisabled ? Color.orange : StudioPalette.muted)
+          Spacer()
+          Button("Reset") {
+            resetLightingToPreset()
+          }
+          .buttonStyle(.borderless)
+          .font(.system(size: 11, weight: .semibold))
+        }
+        slider("Ambient light", $ambientStrength, 0...0.55)
+        slider("Contact shadows", $shadowStrength, 0...1)
+        Text(
+          lightingDisabled
+            ? "The model is intentionally unlit. Raise Ambient, Key, Fill, or Rim—or press Reset—to restore a readable authoring view."
+            : "Changes are sent directly to the active renderer. A value of 0 truly disables a light; contact shadows use a responsive key-light depth pass."
+        )
+        .font(.caption)
+        .foregroundStyle(lightingDisabled ? Color.orange : StudioPalette.muted)
+        Divider()
+        lightControl(
+          "Key light",
+          intensity: $keyLight,
+          colorHex: $keyLightHex,
+          defaultColor: theme.key.color
+        )
+        Divider()
+        lightControl(
+          "Fill light",
+          intensity: $fillLight,
+          colorHex: $fillLightHex,
+          defaultColor: theme.fill.color
+        )
+        Divider()
+        lightControl(
+          "Rim light",
+          intensity: $rimLight,
+          colorHex: $rimLightHex,
+          defaultColor: theme.rim.color
+        )
+      }
+    }
+  }
+
+  private var appearanceControls: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      if renderBackend == .rawWebGPU {
+        card("RENDERER LIMIT") {
+          Label(
+            "Raw WebGPU is a diagnostic renderer. Use MetalKit or Three.js WebGPU for per-Part materials.",
+            systemImage: "exclamationmark.triangle"
+          )
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+        }
+      } else if let selectedPart {
+        card("SELECTED PART · \(selectedPart.displayName.uppercased())") {
+          Form {
+            ComponentAppearanceEditor(workspace: workspace, part: selectedPart)
+          }
+          .formStyle(.grouped)
+          .scrollDisabled(true)
+          .frame(minHeight: 560)
+        }
+      } else {
+        card("SELECTED PART") {
+          Label("Select a Part to edit its color and material.", systemImage: "cursorarrow.click")
+            .font(.caption)
+            .foregroundStyle(StudioPalette.muted)
+        }
+      }
+
+      card("IMPORTED CAD DEFAULTS") {
+        Toggle("Preserve STEP / XDE colors", isOn: $preservesColors)
+          .toggleStyle(.switch)
+        colorRow("Unspecified model", $neutralHex, default: simd3(theme.neutralColor))
+        slider("Roughness", $roughness, 0...1)
+        slider("Metallic", $metallic, 0...1)
+        Text(
+          preservesColors
+            ? "Source colors remain visible. The fallback color applies only where STEP/XDE has no color; a selected Part override still wins."
+            : "The fallback color replaces imported STEP/XDE colors."
+        )
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+      }
+    }
+  }
+
+  private var selectedPart: RigPartDefinition? {
+    guard let selectedPartID = workspace.selectedPartID else { return nil }
+    return workspace.project.rig.parts.first { $0.id == selectedPartID }
+  }
+
+  private var themeSelection: Binding<String> {
+    Binding(
+      get: { themeName },
+      set: { applyPreset(named: $0) }
+    )
+  }
+
+  private var lightingDisabled: Bool {
+    ambientStrength <= 0.000_1
+      && keyLight <= 0.5
+      && fillLight <= 0.5
+      && rimLight <= 0.5
+  }
+
+  private func resetLightingToPreset() {
+    let preset = CADViewportTheme.named(themeName)
+    ambientStrength = Double(preset.ambientStrength)
+    shadowStrength = Double(preset.shadowStrength)
+    keyLight = Double(preset.key.intensity)
+    fillLight = Double(preset.fill.intensity)
+    rimLight = Double(preset.rim.intensity)
+    keyLightHex = ""
+    fillLightHex = ""
+    rimLightHex = ""
+  }
+
+  private func applyPreset(named name: String) {
+    let preset = CADViewportTheme.named(name)
+    themeName = preset.name
+    edgeStrength = Double(preset.edgeStrength)
+    roughness = Double(preset.roughness)
+    metallic = Double(preset.metallic)
+    backgroundHex = ""
+    neutralHex = ""
+    faceSelectionHex = ""
+    edgeHex = ""
+    selectedEdgeHex = ""
+    resetLightingToPreset()
   }
 
   private var referenceGeometrySection: some View {
@@ -67,34 +360,30 @@ struct CADAppearancePanel: View {
     }
   }
 
-  private var colorsSection: some View {
-    card("SCENE COLORS") {
-      colorRow("Background", $backgroundHex, default: theme.background)
-      colorRow("Unspecified model", $neutralHex, default: simd3(theme.neutralColor))
-      colorRow("Face selection", $faceSelectionHex, default: theme.selectionColor)
-      colorRow("Edges", $edgeHex, default: theme.edgeColor)
-      colorRow("Selected edges", $selectedEdgeHex, default: theme.edgeSelectionColor)
+  private var formattedGridSpacing: String {
+    let millimeters = floorGridSpacingMeters * 1_000
+    if millimeters >= 10 {
+      return "\(Int(millimeters.rounded())) mm"
     }
+    return String(format: "%.1f mm", millimeters)
   }
 
-  private var materialSection: some View {
-    card("MATERIAL & EDGES") {
-      slider("Roughness", $roughness, 0...1)
-      slider("Metallic", $metallic, 0...1)
-      Toggle("Show feature edges", isOn: $showsEdges).toggleStyle(.switch)
-      slider("Edge strength", $edgeStrength, 0...1)
+  private func lightControl(
+    _ label: String,
+    intensity: Binding<Double>,
+    colorHex: Binding<String>,
+    defaultColor: SIMD3<Float>
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      colorRow(label, colorHex, default: defaultColor)
+      Slider(value: intensity, in: 0...8_000)
+      Text(
+        "\(Int(intensity.wrappedValue.rounded())) · \(Int((intensity.wrappedValue / 4_000 * 100).rounded()))%"
+      )
+      .font(.system(.caption, design: .monospaced))
+      .foregroundStyle(StudioPalette.muted)
     }
   }
-
-  private var lightingSection: some View {
-    card("LIGHTING") {
-      slider("Key light", $keyLight, 0...8_000)
-      slider("Fill light", $fillLight, 0...8_000)
-      slider("Rim light", $rimLight, 0...8_000)
-    }
-  }
-
-  // MARK: Helpers
 
   private func card<Content: View>(
     _ title: String, @ViewBuilder _ content: () -> Content
@@ -132,7 +421,9 @@ struct CADAppearancePanel: View {
     }
   }
 
-  private func simd3(_ value: SIMD4<Float>) -> SIMD3<Float> { SIMD3(value.x, value.y, value.z) }
+  private func simd3(_ value: SIMD4<Float>) -> SIMD3<Float> {
+    SIMD3(value.x, value.y, value.z)
+  }
 
   private func referenceGeometryLabel(_ geometry: CADReferenceGeometry) -> String {
     switch geometry {

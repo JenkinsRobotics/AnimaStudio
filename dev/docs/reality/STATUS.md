@@ -10,6 +10,63 @@
   system for AI robots (digital avatars + physical animatronics from
   one rig, one format, one authoring tool)
 - **Version:** 0.1.0 (see `animacore/__init__.py`)
+- **Unity front-end (`unity/AnimaStudioUnity`, self-contained package):** a
+  second front-end over the same Python engine bridge the Swift app uses —
+  nothing reimplemented app-side. `StudioShell.cs` is the app, mirroring the
+  Swift app's workspace model with header tabs **Assets · 3D Modeling ·
+  Animate · Show · Hardware**, a contextual toolbar, left navigator, right
+  inspector, and dark AnimaStudio theming. **Assets**: character library
+  (`examples/` + `characters/`, one-click Load), mesh library
+  (`StreamingAssets/Parts` + user-imported), import-.obj toolbar. **3D
+  Modeling**: parts tree (grounded/suppressed flagged), mates + relations
+  lists, and engine-backed **mate authoring** — the MATE toolbar lists the
+  eight kinematic types from `mate_types`; pick type → click parent part →
+  click child part → `add_mate` commits in the engine and the refreshed rig
+  summary re-renders; select a mate to inspect DOF or `remove_mate` it.
+  **Animate**: clip list, live DOF pose sliders, bottom transport
+  (play/pause/scrub). Clip playback and live posing both go through engine
+  `resolve_pose` (`clip`/`time_s`/`dof_values` overrides — one request in
+  flight, coalesced); parts whose `model` is an `.obj` render the real mesh,
+  others render as placeholder boxes at the engine-resolved pose; suppressed
+  parts hide. Show/Hardware tabs are placeholders until the engine session
+  verbs land. **Standalone macOS app**: menu `AnimaStudio ▸ Build macOS App`
+  (or batchmode `BuildAll`) produces `unity/AnimaStudioUnity/Builds/
+  AnimaStudio.app`, which finds the repo by walking up from its own location
+  or `ANIMASTUDIO_REPO`, and keeps the engine bridge alive while unfocused
+  (`runInBackground`). **STEP → assembly pipeline:** the Assets toolbar
+  imports a `.step`/`.stp` — `unity/Tools/step_to_obj.py` (OCCT via
+  `cascadio` + `trimesh`, optional `cad` extra in `pyproject.toml`)
+  tessellates every solid to a per-part OBJ and reports each part's CAD
+  placement as an engine rest transform (mm→m, intrinsic-XYZ euler); the app
+  commits each as a rig part via the engine's `add_part` verb, so an imported
+  assembly lands positioned and ready for mate authoring; **New Assembly**
+  scaffolds `characters/<name>/` with an empty character, and header **Save**
+  writes the file through `serialize_character`. Verified end-to-end on a
+  real 26-part robot STEP assembly. Engine side: `evaluate_pose` gained an
+  optional `dof_overrides` mapping and the bridge `evaluate`/`resolve_pose`
+  verbs accept an optional `dof_values` object (overrides merge over
+  clip/neutral, relations still run, driven DOF stay driven, out-of-limit
+  overrides are reported never clamped); new `add_part`/`remove_part`
+  authoring verbs (part DTO = the `load_character` part entry shape; removal
+  of a mated part refuses) plus `update_part` (same DTO, keyed by name) —
+  all additive, shared with the Swift app. **Viewport interaction
+  (Onshape-style, non-additive select):** left-click single-selects (cyan
+  highlight); left-drag on a free (unmated, ungrounded) part moves it on
+  the ground plane — or along an axis via the **move gizmo** (RGB arrows
+  on the selection) — committing its rest transform via `update_part` on
+  release; left-drag on empty space box-selects; grounded/mated parts
+  refuse the drag with a status hint. **Mate authoring** uses an
+  Onshape-style dialog (type dropdown, connector list, offset/flip/
+  secondary-rotation/simulation controls from the engine's `mate_types`
+  schemas, Solve = `preview_mate` shown live, ✓ = `add_mate`); clicking
+  faces places **mate connectors with a live ghost XYZ triad** that snaps
+  to bore/cylinder centers (Kåsa circle fit over the welded tessellation,
+  primary = bore axis), flat-face centers, and vertices (Shift = raw).
+  Chrome: clickable view cube with X/Y axis rails, icon ribbon with group
+  captions, project-tree navigator with filter, import loading card,
+  native multi-file picker; STEP/OBJ document types registered in the
+  built app's Info.plist ("Open With" — receiving the open-document Apple
+  Event still needs a native plugin, queued).
 - **2D character pipeline (engine foundation, not yet wired to the app):**
   `animacore/canvas2d.py` models VTuber-style 2D characters — `VisualSource`
   (image/sprite/gif/video), `Surface` display windows, DOF/parameter-driven
@@ -227,6 +284,13 @@
   the same presentation with `AxesHelper`/`GridHelper`. Each tree eye toggles
   only its matching reference on both renderers. This state is editor
   presentation only and never enters `.anima` or changes mate semantics.
+  The open project owns one persistent spatial viewport layer. Switching among
+  Assets, 3D Modeling, Animate, Show, Hardware, or their Table/Timeline/Graph
+  center representations now covers or reveals that same layer instead of
+  reconstructing it from separate SwiftUI switch branches. Imported Open
+  CASCADE geometry, Metal/WebGPU resources, camera position, selection, and
+  renderer telemetry therefore survive workspace-tab changes; only closing the
+  project or changing the actual geometry/backend tears the session down.
   Selecting a primary Part now adds a second, part-local RGB origin triad on
   Metal and Three.js WebGPU. The shared pipeline expands the existing
   source-to-node mapping into one column-major rest-transform map using
@@ -235,6 +299,14 @@
   exposes the corresponding editable values under **Part origin (in
   assembly)** with metre position and degree rotation fields; edits continue
   through the existing AnimaCore-backed rest-transform path.
+  The production Metal viewport now performs real Part picking instead of
+  treating a click as a no-op. On a click without a navigation drag, it
+  unprojects the pointer with the exact shared camera matrix, intersects the
+  nearest visible transformed triangle, and reports the existing node-plus-one
+  Part ID through the same source mapping used by Three.js. Hidden Parts are
+  excluded, empty space clears selection, and Shift or Command extends the
+  current selection. This is presentation-only hit testing; it adds no model
+  or mate meaning to the renderer.
   CAD Parts now also consume that shared transform map: Metal updates the
   already-bound `partTransformBuffer`, while Three.js sets each node mesh's
   column-major `matrix` with `matrixAutoUpdate = false`. Neither path rebuilds
@@ -247,7 +319,12 @@
   render view-projection matrix, while Three.js reports its helper's projected
   world origin through the existing web bridge. The control follows camera and
   transform edits and hides when its origin is behind the camera or offscreen;
-  there is no cosmetic center-screen fallback.
+  there is no cosmetic center-screen fallback. Direct manipulation measures
+  pointer deltas in the stationary viewport coordinate space, so rotating or
+  moving the overlay cannot invert Y or feed its own motion back into the
+  gesture. Screen-up follows the displayed green Y arrow. The web projection
+  path retains its last valid anchor until the next rendered position arrives,
+  preventing the control from being removed and recreated between drag frames.
   Grounded Parts now remain visibly fixed throughout that same flow. The
   pipeline expands `Part.isGrounded` through the shared source-to-node map;
   Metal consumes a retained Part-state bit and Three.js consumes the same
@@ -267,6 +344,26 @@
   v6 persists the hierarchy/frame and decodes older flat groups at the identity
   frame. Group metadata does not define mate semantics or introduce a Swift
   assembly solver.
+  Selection presentation now uses those same semantic descendants everywhere:
+  a selected Part receives the configured CAD selection highlight, while a
+  selected sub-assembly highlights every descendant Part. The local-frame
+  translation/plane/rotation gizmo is placed at the center of the rendered
+  selected bounds (one Part or the combined sub-assembly) rather than at an
+  arbitrary stored frame origin. Gizmo edits are mapped back to the canonical
+  Part/group rest transform, preserving AnimaCore coordinate-frame ownership;
+  local bounds are cached once and only eight corners per Part are transformed
+  while dragging.
+  The CAD right rail now has four real, independent surfaces instead of routing
+  every icon to the former all-in-one appearance panel: Camera & Display owns
+  renderer selection, telemetry, camera home, reference geometry, edges, and
+  selection colors; Environment owns the coordinated preset, background, and
+  key/fill/rim lights; Part Appearance edits the selected Part's persisted
+  color/PBR finish/opacity plus imported-CAD defaults; Inspector remains the
+  workspace's selection-aware context panel. Selected-Part appearance metadata
+  is consumed live by both MetalKit and Three.js WebGPU. Raw WebGPU remains an
+  explicitly labelled diagnostic renderer and does not expose a misleading
+  per-Part material editor. The imported-model fallback color also states why
+  it has no visible effect when an imported STEP/XDE face color is preserved.
   The 40-Part/60-FPS target still needs an operator benchmark on production
   hardware; automated coverage proves transform identity/order and edit math,
   not a display-link frame rate.
@@ -707,22 +804,44 @@
   workspace semantics. Its Bottango-inspired **Add to
   Rig** palette creates real core-backed box, cylinder, sphere, and empty-point
   proxy components with their local origin at the workspace origin, then
-  creates a Revolute Mate through an explicit two-step placement flow. Orange,
+  creates all eight kinematic mate types through one explicit two-step
+  placement flow. Orange,
   hover-reactive connector markers appear only while the mate-placement tool is
   active and expose proxy face centers, edge midpoints,
   corners, cylinder axes/circular centers, sphere cardinal points, and component
   origins. The first selection is the moving component; the second is fixed.
-  The transitional local Revolute draft stores both connector frames but no
-  longer performs a separate Swift mate solve; canonical document mutation and
-  an AnimaCore reload/`resolve_pose` pass must perform alignment and motion.
+  For a loaded character, both connector frames are sent through AnimaCore's
+  `add_mate` bridge mutation; the engine validates the full rig, returns the
+  refreshed canonical DTO, and `resolve_pose` immediately supplies alignment
+  and motion. A local Revolute draft remains only as an isolated no-engine test
+  compatibility path and is not the production source of mate meaning.
+  The two-click production flow now previews that alignment before committing:
+  after the fixed connector is chosen, Studio sends the candidate joint through
+  AnimaCore's non-mutating `preview_mate` verb and applies the returned
+  character-space transforms. Connector flips, 90-degree secondary-axis
+  reorientation, and offsets re-preview live; Cancel restores the last
+  committed pose, while the green confirmation remains the only action that
+  calls `add_mate`. The engine rejects cyclic candidates during preview and
+  commit. STEP face, edge, vertex, and loop picks also display the inferred
+  connector's complete local frame as a red-X, green-Y, blue-Z triad instead of
+  a generic point marker.
   Component names, XYZ positions, XYZ rest rotations, and mate names, axis,
   parent/child
   connection, and angular limits are inspectable/editable in memory. The Rig
   ribbon presents the complete ten-type family: Fastened, Parallel, Slider,
   Revolute, Cylindrical, Pin Slot, Planar, Ball, Width, and Tangent. All ten are
-  backed by the engine catalog for inspection; Revolute remains the sole
-  transitional local draft-creation action until canonical character editing
-  is wired. The mate inspector's Type row and UI Dev lab list the same family
+  backed by the engine catalog for inspection. Fastened, Parallel, Slider,
+  Revolute, Cylindrical, Pin Slot, Planar, and Ball are live engine-backed
+  creation actions. Width and Tangent stay visible but disabled until their
+  geometry-specific surface-selection flows are complete.
+  The production mate inspector is also engine-backed: connector A/B flips,
+  offset enable/XYZ/rotation axis/angle, primary-axis flip, secondary-axis
+  rotation, simulation connection, and every DOF's minimum/maximum/neutral are
+  editable in operator units. Apply preserves the complete engine joint DTO,
+  calls `update_mate`, refreshes the canonical solved pose, and retains the
+  stable mate selection; Revert restores the last engine snapshot. Invalid
+  limits are caught before submission and engine errors leave the draft intact.
+  The mate inspector's Type row and UI Dev lab list the same family
   with per-kind DOF summaries. The Python rig model
   carries the same eight-type kinematic family (`JointType`, including
   `parallel`: XYZ translation + Z rotation) with per-type DOF templates,
@@ -748,7 +867,11 @@
   descriptor carried in the `load_character` joint summary, with
   `category`). The Swift bridge mirrors category, drivable state, DOF axis,
   optional connector controls, and the Tangent-specific surface payload as
-  typed DTOs and requests the engine-owned catalog when it connects. Imported
+  typed DTOs and requests the engine-owned catalog when it connects. The Swift
+  client also exposes AnimaCore's `add_mate`, `update_mate`, and `remove_mate`
+  mutations. Its live bridge test proves add → update → evaluate → remove, and
+  the workspace integration test proves two connector clicks → Fastened mate →
+  canonical resolved pose → serialize/reload without a second Swift solver. Imported
   engine mates are listed in the real Components navigator by their stable
   tracking id, so a zero-DOF Fastened mate remains selectable rather than
   disappearing from the rotational preview projection. Selecting one opens a
@@ -758,23 +881,28 @@
   connection, and its engine-supplied DOF rows with explicit axes. Fastened
   presents an explicit fully-bonded zero-DOF state; Width and Tangent present
   distinct non-drivable geometry-constraint states, and Tangent shows its two
-  opaque surface selections plus propagation. This first panel is intentionally read-only;
-  editing the canonical character text and revalidating it through the bridge
-  is the next mate-authoring packet. Motors, 3D Models & Media, and Events are also
+  opaque surface selections plus propagation. Motors, 3D Models & Media, and Events are also
   present as clearly disabled reference groups rather than fake working
   features. The Rig ribbon also consumes AnimaCore's `relation_types` catalog
   and presents Gear, Rack and pinion, Screw, and Linear in engine order. Each
   opens one shared draft dialog whose Driver and Driven pickers are filtered by
   the engine-declared rotation/translation kinds. The dialog shows the positive
   Relation ratio or Distance per revolution field, a separate Reverse direction
-  checkbox, and a read-only signed-native-ratio preview; it does not mutate the
-  character yet. Imported `load_character.relations` entries appear in the
-  navigator with a dedicated read-only inspector for their paths, ratio, offset,
-  reverse state, and reference geometry. Selecting one resolves both DOF paths
-  to their engine mates and highlights the two corresponding child components
-  in RealityKit. Dependency ordering, coupling motion, limits, and sign meaning
-  remain exclusively engine-owned; canonical create/edit is a later
-  character-document authoring packet. Its project
+  checkbox, a driven-offset field in the driven DOF's display unit, and a
+  signed-native-ratio preview. Create validates distinct compatible DOFs,
+  prevents a second relation from driving an occupied DOF, converts
+  distance-per-revolution millimetres to the engine's metres-per-radian
+  convention, and calls `add_relation`. Imported `load_character.relations`
+  entries appear in the navigator with a dedicated inspector for their paths,
+  ratio, offset, reverse state, and reference geometry. Magnitude, reverse, and
+  driven offset are editable with Apply/Revert through `update_relation`;
+  suppress and delete also use the canonical engine mutation verbs. Every
+  successful mutation replaces Studio's retained full-fidelity rig from the
+  engine response, refreshes `evaluate`/`resolve_pose`, and persists through
+  engine serialization/reload. Selecting a relation resolves both DOF paths to
+  their engine mates and highlights the two corresponding child components in
+  RealityKit. Dependency ordering, coupling motion, limits, and sign meaning
+  remain exclusively engine-owned. Its project
   window now uses a CAD-style two-level header: a compact global document/live
   row followed by one full-width contextual command ribbon. A fixed far-left
   dropdown switches Assets, Rig, Animate, Show, Nodes, and Hardware with Command-1…6;
@@ -944,9 +1072,17 @@
   honest empty Audio/Event capability lanes and switches to a read-only Graph
   presentation of hold/linear curves; selecting mates isolates their curves.
   Show has a distinct multi-track
-  character/audio/screen/event timeline scaffold; Hardware has structured
-  connection, safety, mapping, and filterable-log surfaces that visibly remain
-  safely offline. The gear settings menu stores a user-local viewport
+  character/audio/screen/event timeline scaffold. Hardware now retains
+  AnimaCore's native output endpoints and provides a real mapping table/editor:
+  bounded rotational DOFs display in degrees, bounded translations in
+  millimetres, and parameters as unitless values; channel numbers and 0%/100%
+  endpoints can be added, edited, reversed, or removed. Every edit mutates the
+  retained full-fidelity rig DTO, then passes through
+  `serialize_character`/reload so AnimaCore validates the target, bounded range,
+  and unique channel before it can be saved. The Hardware Outputs navigator and
+  Map DOF/Range/Reverse tools open this same center surface. Driver connection,
+  arming, calibration, and traffic logs visibly remain safely offline and
+  editing never arms hardware. The gear settings menu stores a user-local viewport
   appearance choice with Midnight, Graphite, CAD Light, and Blueprint presets;
   each changes the RealityKit background and major/minor grid colors without
   altering project data. The viewport now provides a readable grid and a live
@@ -1002,10 +1138,11 @@
   with the same camera orientation; hovering previews the exact clickable face,
   edge, or corner. The viewport also provides trackpad pan/pinch and
   persistent Default, SolidWorks, Onshape, Fusion 360, and Custom mouse
-  profiles. Default now intentionally mirrors SolidWorks: middle drag orbits,
-  Option + middle drag pans, and Shift + middle drag performs precise zoom.
-  Onshape uses right drag to orbit and middle drag to pan; Fusion 360 uses
-  Shift + middle drag to orbit and middle drag to pan. Custom exposes
+  profiles. Default now intentionally mirrors Onshape: right drag orbits,
+  middle drag or Control + right drag pans, and the wheel zooms. SolidWorks
+  uses middle drag to orbit, Control + middle drag to pan, and Shift + middle
+  drag for precise zoom. Fusion 360 uses Shift + middle drag to orbit, middle
+  drag to pan, and Control + Shift + middle drag for precise zoom. Custom exposes
   conflict-free orbit, pan, and precise-zoom chords, including Option-based
   bindings. A dedicated Mouse & Navigation sheet opens from the camera HUD and
   follows the supplied compact control-panel reference: Scroll, Mouse, Buttons,
@@ -1022,9 +1159,9 @@
   Studio menu, a drag drives the active profile and suppresses the menu, and a
   double middle click returns to the framed home view. Semantic proxy geometry is
   directly selectable in the viewport and resolves to the same stable part ID
-  used by the Components tree and inspector. Viewport clicks now toggle parts
-  without a modifier, empty clicks clear selection, Option-click walks the
-  RealityKit hit stack to select through overlapping geometry, and a small
+  used by the Components tree and inspector. An unmodified viewport click now
+  replaces the selection, clicking empty space clears it, and Shift/Command
+  explicitly extend it; a small
   cursor-adjacent badge reports multi-selection count. Empty-space drag adds
   directional CAD box selection: left-to-right is a blue solid window requiring
   full projected enclosure; right-to-left is a yellow dashed crossing selecting
@@ -1364,9 +1501,10 @@
   (returns a deterministic handle + a rig summary the app mirrors),
   `validate_character`, `evaluate` (DOF values, parameters, projected
   channels, and reported limit violations for one frame), `resolve_pose`
-  (per-part world transforms — see below), `mate_types`,
-  `relation_types` (the four relation kinds — Gear, Rack and pinion,
-  Screw, Linear — as a static palette catalog), `serialize_character` /
+  (per-part world transforms — see below), `mate_types`, `add_mate`,
+  `update_mate`, `remove_mate`, `relation_types` (the four relation kinds —
+  Gear, Rack and pinion, Screw, Linear — as a static palette catalog),
+  `add_relation`, `update_relation`, `remove_relation`, `serialize_character` /
   `serialize_scene` (the project-Save write side — see below), `release`,
   and `shutdown`. `load_character` also carries a `relations` array
   (`describe_relation` per instance: signed semantic `ratio` split into
@@ -1495,30 +1633,42 @@
   paths; durable source identity, reimport reconciliation, collapse, and
   topology remapping are not implemented. Source nodes are intentionally locked,
   and semantic-part drag reparenting waits for the persistent part/undo model.
-  Proxy connector inference and two-click Revolute Mate placement are live,
-  but connector orientation flip/reorientation controls, persistent custom
-  connectors, and attachment to imported source nodes are not yet implemented.
-  Automatic imported-hole centers require durable mesh/topology references;
-  current hole-like snapping is available on cylinder proxy axes and circular
-  face centers. The shipped part transform gizmo edits semantic-part rest
+  Proxy connector inference and engine-backed two-click placement for all eight
+  kinematic mates are live, including inspector editing of connector flips,
+  orientation, offsets, simulation state, and DOF limits. Choosing a mate tool
+  now opens its nonmodal placement panel immediately. On STEP assemblies the
+  native Metal authoring path raycasts the exact Open CASCADE triangle/edge
+  projection, highlights the inferred face, edge, vertex, or closed-loop axis,
+  and maps its part-local connector frame back to the canonical engine Part.
+  The first connector is the moving Part, the second is fixed, and the panel's
+  green check sends the full connector/orientation/offset draft through
+  AnimaCore before the resolved pose is rendered. Persistent named connector
+  authoring, replacing an existing connector from the viewport, durable
+  topology remapping after reimport, and Width/Tangent surface selection are
+  not yet implemented. The shipped part transform gizmo edits semantic-part rest
   transforms outside mate placement. Sub-object selection covers inferred proxy
   candidates and cached imported-mesh face islands, feature-edge polylines, and
   3+-edge corners. Imported feature IDs are deterministic for unchanged
   topology, but durable identity remapping after a topology-changing reimport
   remains open; this is a mesh projection rather than a CAD-kernel B-rep, so
-  analytic holes/cylinders and tangent curves are not inferred. Transform gizmos are currently
+  analytic holes/cylinders and tangent curves are not inferred in generic mesh
+  imports; STEP mate placement additionally recognizes closed B-Rep edge loops
+  as axis candidates. Transform gizmos are currently
   world-scaled rather than screen-size-stable. Mesh Edges and Wireframe display
   triangle mesh lines, not classified CAD feature edges; hidden-line removal
-  remains unimplemented. The Open CASCADE → MetalKit, Three.js/WebGPU, and raw
-  WebGPU selections are currently STEP inspection/visualization surfaces; live
-  AnimaCore per-Part pose transforms, semantic selection/manipulation, and media
-  surfaces remain on the RealityKit authoring renderer. Section views and saved
+  remains unimplemented. The Open CASCADE → MetalKit and Three.js/WebGPU paths
+  consume live per-Part transforms; exact B-Rep edge vertices carry the same
+  Part ownership as face geometry, so moving a Part no longer leaves a stale
+  wireframe in either path. MetalKit is the exact STEP connector-picking
+  authoring path; raw WebGPU remains an experimental diagnostic renderer, and
+  media surfaces remain on the RealityKit spatial renderer. Section views and saved
   named views are now live. Typed
-  prismatic/cylindrical/ball/planar/fastened joints and keyframes are not yet
-  editable in the canonical rig DTO. Project folders and imported canonical
-  characters persist. Rest-transform, suppress, and ground edits are projected
-  into the retained DTO; transitional proxy creation/rename and mate creation
-  are not all canonical yet. Scene Open is deferred because the
+  All eight kinematic mate kinds can be created and edited in the canonical rig
+  DTO; Width and Tangent remain pending because they require app-owned geometry
+  selections rather than the shared connector-pair flow. Project folders and
+  imported canonical characters persist. Rest-transform, suppress, and ground edits are projected
+  into the retained DTO; transitional proxy creation/rename is not all
+  canonical yet. Scene Open is deferred because the
   bridge has no `load_scene` twin. Undo/redo and live hardware controls remain
   visibly disabled; Home archetype routing is now live, while the Digital
   Character archetype is explicitly marked Preview. Studio never parses `.anima` itself:
@@ -1568,6 +1718,198 @@
   in-flow. Settings > UI > Chrome includes a live dashed visible-zone overlay.
   Full `swift test` passes 348 XCTest plus 27 Swift Testing tests; focused
   format lint, native/root builds, strict deep signing, and live launch pass.
+
+- **Onshape is the coordinated default CAD environment (2026-07-29):**
+  fresh installs and renderer fallbacks use a near-white viewport, pale-blue
+  CAD material, crisp dark B-Rep edges, orange selection, and balanced
+  high-key lighting across the MetalKit and WebGPU adapters. Existing saved
+  operator choices remain intact. Choosing any named CAD preset now restores
+  that preset's complete material, edge, light-intensity, and color set before
+  further customization, so stale saved sliders or color wells cannot reduce a
+  theme to a background-only change. Full `swift test` passes 364 XCTest plus
+  53 Swift Testing tests; focused format lint and diff checks, native/root
+  builds, strict deep signing, and live packaged launch pass.
+
+- **Selected-Part highlighting, gizmo, and direct placement (2026-07-29,
+  corrected 2026-07-30):**
+  in the native Open CASCADE → Metal authoring viewport, clicking a Part gives
+  its faces and feature edges a strong orange selected-state cue and keeps the
+  origin-anchored translate/rotate gizmo visible. Pressing and dragging any
+  editable body with an unmodified left mouse button selects it and performs coarse
+  camera-plane placement with a depth-stable scale; the existing gizmo remains
+  the precise axis/rotation control. Both paths write through the same guarded
+  Part rest-transform callback, so grounded/locked Parts cannot move.
+  Shift/Command-click multi-selection, empty-click deselection, right-button
+  orbit, and middle-button pan retain their existing behavior. Full `swift
+  test` passes 364 XCTest plus 55 Swift Testing tests; focused direct-drag,
+  gizmo, and picker regressions, touched format lint, native/root builds,
+  strict deep signing, and packaged launch pass.
+
+- **CAD mouse mappings and left-button intent are renderer-consistent
+  (2026-07-30):** the native Metal and Three.js/WebGPU production viewports use
+  the same resolved Default/Onshape, SolidWorks, Fusion 360, and Custom
+  bindings. Left drag can only move an editable Part or draw a directional
+  window/crossing selection box; it can never pan the camera. Plain left click
+  is replacement selection by product choice, Shift/Command explicitly extend,
+  and empty click clears. Clean right click opens the context menu while a
+  right drag suppresses it; double middle click and `F` frame the assembly.
+  Arrow keys orbit in 15-degree steps and Shift + arrows use 90-degree steps.
+
+- **Metal CAD surfaces remain readable in the Onshape environment
+  (2026-07-29):** the native Open CASCADE → Metal adapter now renders through
+  an sRGB color target, uses a brighter high-key hemisphere fill, and repairs
+  reversed or degenerate imported normals against the visible side of each
+  surface. Selected-Part orange is composed after surface lighting, so a Part
+  remains visibly selected even when its face is outside the key light.
+  WebGPU already used sRGB output, double-sided materials, and emissive
+  selection; the two production adapters now share the same readability
+  guarantees. Full `swift test` passes 364 XCTest plus 56 Swift Testing tests;
+  focused lighting regressions, touched format lint, native/root builds, and
+  strict deep signing pass.
+
+- **Selected-Part manipulator uses the real projected local frame
+  (2026-07-29):** the 3D Modeling manipulator no longer draws three fixed
+  screen-space directions. Metal projects the selected Part's actual local
+  X/Y/Z frame with the render camera, and Three.js reports the same origin and
+  axis endpoints through the web bridge. Red, green, and blue arrow drags are
+  constrained to their corresponding local axes; XY, YZ, and ZX patches move
+  in those local planes; and the three rings rotate about their perpendicular
+  local axes. Rotation is applied as an exact local matrix delta before the
+  rest transform is serialized, while the existing grounded/locked guards
+  remain in force. Full `swift test` passes 364 XCTest plus 57 Swift Testing
+  tests; focused manipulator regressions, touched format lint, JavaScript
+  syntax/build/copy, native/root builds, strict deep signing, and packaged
+  launch pass.
+
+- **The ViewCube mirrors the live world-camera frame across CAD renderers
+  (2026-07-29):** native Metal/RealityKit orbit and roll now publish their
+  camera orientation into the shared workspace camera state, and Three.js
+  WebGPU/raw WebGPU report the same target-to-camera direction plus roll.
+  The cube's projected faces and positive X/Y/Z axes therefore rotate with the
+  operator's actual view instead of remaining stuck on the last commanded
+  preset. Cube face/edge/corner, nudge, and roll actions travel back to the
+  active renderer only when the camera command revision changes; renderer
+  reports do not echo as new commands or reset roll. The viewport stays alive
+  throughout the exchange. Full `swift test`, focused camera/ViewCube
+  regressions, touched Swift format lint, JavaScript syntax/bundle checks,
+  native Xcode build, signed root-app rebuild, and packaged launch pass.
+
+- **Viewport performance status has its own bottom-right HUD and right-rail
+  owner (2026-07-30):** the AnimaCore evaluated-frame badge no longer occupies
+  bottom-center behind the 3D/Table/Exploded switcher. A compact
+  ViewCube-style Performance card now owns bottom-right, clears any open
+  floating right panel, and remains independently toggleable. The right rail
+  adds a dedicated Performance panel with live engine/frame status and, for
+  STEP/CAD views, a separate detailed renderer-metrics toggle. When both cards
+  are enabled, FPS/CPU/memory/geometry telemetry stacks above the compact
+  engine card rather than overlapping it. Full `swift test` passes 365 XCTest
+  plus 59 Swift Testing tests; focused HUD ownership/layout regressions,
+  touched format lint, native Xcode build, signed root-app rebuild, and fresh
+  packaged launch pass.
+
+- **CAD feature edges now have real screen-space definition and the Onshape
+  environment has interactive self-shadow depth (2026-07-30):** Edge
+  definition no longer acts like an almost-binary one-pixel line switch.
+  Native Metal expands B-Rep feature edges in screen space from 0.85–3.5 px,
+  uses 4x MSAA where supported, and varies opacity with the same setting;
+  Three.js WebGPU uses its native wide-line node material with the matching
+  width range. The Onshape preset now balances a strong key against a restrained
+  fill and hemisphere ambient, while a 2048 px soft key-light shadow map with
+  3x3 percentage-closer filtering gives undersides and occluded interfaces
+  visible depth. Ambient light and Contact shadows are live, persisted controls
+  shared by both production adapters. This is deliberately responsive raster
+  self-shadowing for authoring—not mislabeled offline path tracing. Full
+  `swift test` passes 365 XCTest plus 61 Swift Testing tests, including a
+  runtime GPU test that compiles the actual Metal shaders and pipelines;
+  touched diff checks and JavaScript syntax checks, Swift format lint, native
+  Xcode build, signed root-app rebuild, and strict deep signing pass.
+
+- **CAD source colors and zero-light behavior are honest across production
+  renderers (2026-07-30):** importing a STEP/XDE assembly no longer turns every
+  Part teal because the Studio proxy color is no longer misclassified as an
+  explicit per-Part appearance override. Open CASCADE face/body colors remain
+  authoritative when **Preserve STEP/XDE colors** is enabled; an operator's
+  explicit Part Appearance edit still wins, and uncolored geometry retains the
+  importer's neutral fallback. Ambient light can now reach exactly zero in both
+  Settings and the Environment panel, Three.js/WebGPU no longer inserts a
+  hidden ambient minimum, and Metal key-light specular is gated by the key
+  intensity. Turning all light controls off therefore produces an intentionally
+  unlit result instead of a fixed green, still-highlighted surface. Full
+  `swift test`, focused appearance/lighting/theme regressions, JavaScript syntax
+  and bundle checks, touched Swift format lint, native Xcode build, signed
+  root-app rebuild, strict deep signing, and a fresh packaged launch pass.
+
+- **The reusable preview floor grid is now a configurable CAD display aid
+  without a launch-time renderer flash (2026-07-30):** the black RealityKit
+  grid seen briefly before a STEP character loaded was the same intentional
+  preview environment used by the Assets inspector. The main canvas now keeps
+  that preview widget available where it belongs, but shows a theme-matched
+  CAD loading surface until the active character's engine-backed model sources
+  resolve. MetalKit, Three.js/WebGPU, and raw WebGPU all render a distinct
+  world-space XZ floor grid with red X and blue Z axes. **Camera & Display**
+  and **Settings → Renderer** persist its visibility, minor spacing,
+  model-relative extent, major-line interval, and opacity; the Assets preview
+  consumes the same visibility preference. The display floor remains separate
+  from the semantic, selectable Top Plane. Focused floor-grid regression,
+  365 XCTest plus the pre-fix Swift Testing sweep, touched Swift format lint,
+  Three.js build/copy, and raw/Three.js JavaScript syntax checks pass. A final
+  full rerun and native packaging were blocked by the external approval usage
+  limiter after compilation had already succeeded; no code failure was
+  reported by that limiter.
+
+- **2026-07-30 — missing CAD sources no longer take down the workspace.**
+  STEP sources load independently: healthy Parts continue rendering when
+  another file is missing or unreadable, and an all-failed assembly retains
+  the usable empty CAD environment instead of replacing it with a full-canvas
+  error. Loader failures map back to semantic Part IDs. 3D Modeling marks
+  affected rows with an orange disconnected/relink control; Assets reports
+  **Disconnected** in its normal table/grid and offers **Relink Source** inline
+  and from the context menu. Relink reuses the canonical replace/import path,
+  so the engine rig reference and project asset handling remain the source of
+  truth. Verification: touched Swift format lint, full `swift test` (366 XCTest
+  + 64 Swift Testing), native Xcode build, and signed root-app rebuild.
+
+- **2026-07-30 — CAD lighting controls are now one live renderer contract,
+  including recovery from black imported materials.** The Environment panel
+  binds directly to the same ambient, key, fill, rim, shadow, and color values
+  consumed by the active viewport, rather than maintaining a duplicate
+  preference projection that could fail to invalidate the renderer. Coordinated
+  preset changes and **Reset** restore the complete lighting rig, and disabling
+  every light shows an explicit warning. Raw WebGPU now consumes the ambient
+  uniform it was already receiving and gates specular with key-light intensity.
+  Metal and raw WebGPU give source-black/dark dielectric CAD materials a small
+  light-dependent reflectance floor so geometry remains readable when lit;
+  that contribution becomes exactly zero when all lighting is zero. Full
+  `swift test` (366 XCTest + 66 Swift Testing), focused runtime Metal
+  shader/pipeline construction, touched Swift format lint, native Xcode build,
+  signed root-app rebuild, and packaged launch pass.
+
+- **2026-07-30 — viewport performance status now reports real renderer
+  throughput instead of AnimaCore playhead time.** The compact and detailed
+  HUDs share one live snapshot containing renderer FPS, GPU frame time, app CPU,
+  and app memory. Metal counts command buffers only after GPU completion;
+  Three.js/WebGPU and raw WebGPU report delivered frame batches with their
+  measured interval. Sampling remains active during AppKit pointer tracking.
+  Metal targets a stable 60 Hz, avoids unchanged per-Part state-buffer writes,
+  and reuses its 2048 px shadow map until geometry, transforms, visibility, or
+  lighting actually changes. A displayed zero now means no renderer frames
+  were delivered during the sample—not a mislabeled animation timestamp.
+  Verification: touched Swift format lint, JavaScript syntax/build/copy checks,
+  full `swift test` (366 XCTest + 67 Swift Testing), native Xcode build, signed
+  root-app rebuild, and packaged launch.
+
+- **2026-07-30 — workspaces can now open as native macOS tabs or independent
+  windows.** A compact window control beside the Studio layout control can open
+  any applicable workspace in a new native tab or separate window, detach the
+  current tab, merge all app windows, show or hide the system tab bar, and move
+  between adjacent tabs. The implementation uses macOS `NSWindow` tab groups,
+  so operators also inherit native tab dragging/tear-off and green-button
+  Split View. Every window shares the open project lifecycle/session while
+  retaining independent workspace, camera, panel, and center-view presentation
+  state; tab titles identify both the project and workspace. Verification:
+  focused AppShell regressions, full `swift test` (368 XCTest + 67 Swift
+  Testing), touched Swift format lint, native Xcode build, signed root-app
+  rebuild, and packaged launch.
 
 ## How to update this file
 

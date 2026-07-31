@@ -348,6 +348,7 @@ enum AssetBuilderPartState: Equatable, Sendable {
   case grounded
   case suppressed
   case proxy
+  case disconnected(String)
 
   var label: String {
     switch self {
@@ -355,7 +356,13 @@ enum AssetBuilderPartState: Equatable, Sendable {
     case .grounded: "Grounded"
     case .suppressed: "Suppressed"
     case .proxy: "No model"
+    case .disconnected: "Disconnected"
     }
+  }
+
+  var isDisconnected: Bool {
+    if case .disconnected = self { return true }
+    return false
   }
 }
 
@@ -398,12 +405,15 @@ enum AssetBuilderCatalog {
   static func partRows(
     parts: [AnimaCorePartSummary],
     partID: (String) -> PartID?,
-    version: (String) -> Int = { _ in 1 }
+    version: (String) -> Int = { _ in 1 },
+    sourceFailure: (PartID) -> String? = { _ in nil }
   ) -> [AssetBuilderPartRow] {
     parts.compactMap { part in
       guard let id = partID(part.name) else { return nil }
       let state: AssetBuilderPartState
-      if part.isSuppressed {
+      if let failure = sourceFailure(id), !part.model.isEmpty {
+        state = .disconnected(failure)
+      } else if part.isSuppressed {
         state = .suppressed
       } else if part.isGrounded {
         state = .grounded

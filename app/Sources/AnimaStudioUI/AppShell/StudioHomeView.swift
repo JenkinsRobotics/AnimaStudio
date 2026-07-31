@@ -79,7 +79,8 @@ struct StudioHomeView: View {
     CADRenderBackend.realityKit.rawValue
   @AppStorage(StudioPreferenceKey.viewportAppearance) private var viewportAppearanceRawValue =
     PreviewAppearance.midnight.rawValue
-  @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName = "Studio Blue"
+  @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName =
+    CADThemePreferences.defaultTheme.name
 
   init(
     recentProjects: [RecentProjectSummary],

@@ -1,38 +1,87 @@
 import Foundation
+import Observation
 import SwiftUI
 
-public struct AnimaStudioRootView: View {
-  @State private var projectSession: StudioProjectSession?
-  @State private var designProfile: StudioDesignProfile
-  @State private var recentProjects: [RecentProjectSummary]
-  @State private var lifecycleErrorMessage: String?
-  @State private var startupWorkspace = StudioWorkspaceKind.assets
+/// One application-owned project session shared by every native macOS window.
+///
+/// Individual windows still construct their own `StudioWorkspaceModel`, so an
+/// Assembly tab can retain its camera and panels while an Animate tab shows a
+/// timeline. Project lifecycle and recents remain one application truth.
+@MainActor
+@Observable
+public final class AnimaStudioApplicationState {
+  var projectSession: StudioProjectSession?
+  var designProfile: StudioDesignProfile
+  var recentProjects: [RecentProjectSummary]
+  var lifecycleErrorMessage: String?
+  var startupWorkspace = StudioWorkspaceKind.assets
 
   public init() {
     let profile = StudioDesignPersistence.load()
     StudioDesignRuntime.shared.apply(profile)
     let opensPreview = ProcessInfo.processInfo.arguments.contains("--open-studio-project")
-    _projectSession = State(initialValue: opensPreview ? Self.previewSession() : nil)
-    _designProfile = State(initialValue: profile)
-    _recentProjects = State(initialValue: RecentProjectsPersistence.load())
+    projectSession = opensPreview ? AnimaStudioRootView.previewSession() : nil
+    designProfile = profile
+    recentProjects = RecentProjectsPersistence.load()
+  }
+
+  /// Keeps an outgoing workspace readable during SwiftUI's teardown pass.
+  ///
+  /// Clearing `projectSession` immediately swaps the root to Home, but SwiftUI
+  /// may update dynamic properties in the outgoing workspace once more before
+  /// discarding it. The captured session is safe for that final read. Writes
+  /// are ignored after close so stale controls cannot reopen the project.
+  func presentationBinding(
+    fallback presentedSession: StudioProjectSession
+  ) -> Binding<StudioProjectSession> {
+    Binding(
+      get: { self.projectSession ?? presentedSession },
+      set: { updatedSession in
+        guard self.projectSession != nil else { return }
+        self.projectSession = updatedSession
+      }
+    )
+  }
+}
+
+public struct AnimaStudioRootView: View {
+  @Bindable private var applicationState: AnimaStudioApplicationState
+  @State private var windowContext: StudioWindowContext
+  private let requestedWorkspace: StudioWorkspaceKind?
+
+  public init(
+    applicationState: AnimaStudioApplicationState,
+    windowRequest: StudioWorkspaceWindowRequest? = nil
+  ) {
+    _applicationState = Bindable(applicationState)
+    _windowContext = State(initialValue: StudioWindowContext(request: windowRequest))
+    requestedWorkspace = windowRequest.flatMap {
+      StudioWorkspaceKind(rawValue: $0.workspaceRawValue)
+    }
+  }
+
+  /// Preview/test convenience. The production app supplies one shared state to
+  /// both WindowGroups so tabs and detached windows edit the same project.
+  public init() {
+    self.init(applicationState: AnimaStudioApplicationState())
   }
 
   public var body: some View {
     Group {
-      if projectSession != nil {
+      if let presentedSession = applicationState.projectSession {
         StudioWorkspaceView(
-          session: activeSession,
+          session: applicationState.presentationBinding(fallback: presentedSession),
           designProfile: liveDesignProfile,
-          startupWorkspace: startupWorkspace,
+          startupWorkspace: requestedWorkspace ?? applicationState.startupWorkspace,
           newProject: createProjectWithPanel,
           openProject: openProject,
           didPersistProject: recordRecent,
-          closeProject: { projectSession = nil }
+          closeProject: { applicationState.projectSession = nil }
         )
-        .id(projectSession?.document.projectID)
+        .id(presentedSession.document.projectID)
       } else {
         StudioHomeView(
-          recentProjects: recentProjects,
+          recentProjects: applicationState.recentProjects,
           createProject: createProjectFromHome,
           openProject: openProject,
           openRecentProject: openRecent,
@@ -42,6 +91,7 @@ public struct AnimaStudioRootView: View {
         )
       }
     }
+    .environment(\.studioWindowContext, windowContext)
     .onAppear {
       // Hold the workspace-root security scope for the whole app session so the
       // sandbox permits lazy mesh reads during rendering. Verified in the real
@@ -55,50 +105,43 @@ public struct AnimaStudioRootView: View {
       // Live-apply the light/dark appearance when the setting changes.
       StudioAppearanceMode.applyCurrent()
       let storedProfile = StudioDesignPersistence.load()
-      guard storedProfile != designProfile else { return }
+      guard storedProfile != applicationState.designProfile else { return }
       StudioDesignRuntime.shared.apply(storedProfile)
-      designProfile = storedProfile
+      applicationState.designProfile = storedProfile
     }
     .alert(
       "Project Could Not Be Opened or Saved",
       isPresented: Binding(
-        get: { lifecycleErrorMessage != nil },
-        set: { if !$0 { lifecycleErrorMessage = nil } }
+        get: { applicationState.lifecycleErrorMessage != nil },
+        set: { if !$0 { applicationState.lifecycleErrorMessage = nil } }
       )
     ) {
       Button("OK", role: .cancel) {}
     } message: {
-      Text(lifecycleErrorMessage ?? "Unknown project error")
+      Text(applicationState.lifecycleErrorMessage ?? "Unknown project error")
     }
-  }
-
-  private var activeSession: Binding<StudioProjectSession> {
-    Binding(
-      get: { projectSession! },
-      set: { projectSession = $0 }
-    )
   }
 
   private func createProjectWithPanel() {
     guard let url = ProjectLifecycle.chooseNewProjectURL() else { return }
     do {
       let session = try ProjectLifecycle.createProject(at: url)
-      startupWorkspace = .assets
-      projectSession = session
+      applicationState.startupWorkspace = .assets
+      applicationState.projectSession = session
       recordRecent(session)
     } catch {
-      lifecycleErrorMessage = error.localizedDescription
+      applicationState.lifecycleErrorMessage = error.localizedDescription
     }
   }
 
   private func createProjectFromHome(startingIn workspace: StudioWorkspaceKind) {
     do {
       let session = try ProjectLifecycle.createProjectInDefaultLocation()
-      startupWorkspace = workspace
-      projectSession = session
+      applicationState.startupWorkspace = workspace
+      applicationState.projectSession = session
       recordRecent(session)
     } catch {
-      lifecycleErrorMessage = error.localizedDescription
+      applicationState.lifecycleErrorMessage = error.localizedDescription
     }
   }
 
@@ -106,36 +149,36 @@ public struct AnimaStudioRootView: View {
     guard let url = ProjectLifecycle.chooseProjectToOpen() else { return }
     do {
       let session = try ProjectLifecycle.openProject(at: url)
-      startupWorkspace = .assets
-      projectSession = session
+      applicationState.startupWorkspace = .assets
+      applicationState.projectSession = session
       recordRecent(session)
     } catch {
-      lifecycleErrorMessage = error.localizedDescription
+      applicationState.lifecycleErrorMessage = error.localizedDescription
     }
   }
 
   private func openRecent(_ recent: RecentProjectSummary) {
     do {
       let session = try ProjectLifecycle.openRecent(recent)
-      startupWorkspace = .assets
-      projectSession = session
+      applicationState.startupWorkspace = .assets
+      applicationState.projectSession = session
       recordRecent(session)
     } catch {
       if recent.resolvedProjectURL() == nil {
         removeRecent(recent.id)
       }
-      lifecycleErrorMessage = error.localizedDescription
+      applicationState.lifecycleErrorMessage = error.localizedDescription
     }
   }
 
   private func removeRecent(_ id: RecentProjectSummary.ID) {
-    recentProjects = RecentProjectsPersistence.remove(id: id)
+    applicationState.recentProjects = RecentProjectsPersistence.remove(id: id)
   }
 
   private func recordRecent(_ session: StudioProjectSession) {
-    recentProjects = RecentProjectsPersistence.recordOpened(
+    applicationState.recentProjects = RecentProjectsPersistence.recordOpened(
       .project(session),
-      in: recentProjects
+      in: applicationState.recentProjects
     )
   }
 
@@ -147,27 +190,28 @@ public struct AnimaStudioRootView: View {
       in: ProjectLifecycle.defaultProjectsDirectory()
     )
     RecentProjectsPersistence.save(merged)
-    recentProjects = merged
+    applicationState.recentProjects = merged
     return merged
   }
 
   private func toggleHomeTheme() {
-    liveDesignProfile.wrappedValue = designProfile == .highContrast ? .standard : .highContrast
+    liveDesignProfile.wrappedValue =
+      applicationState.designProfile == .highContrast ? .standard : .highContrast
   }
 
   private var liveDesignProfile: Binding<StudioDesignProfile> {
     Binding(
-      get: { designProfile },
+      get: { applicationState.designProfile },
       set: { newProfile in
         let appliedProfile = newProfile.clamped()
         StudioDesignRuntime.shared.apply(appliedProfile)
         StudioDesignPersistence.save(appliedProfile)
-        designProfile = appliedProfile
+        applicationState.designProfile = appliedProfile
       }
     )
   }
 
-  private static func previewSession() -> StudioProjectSession {
+  fileprivate static func previewSession() -> StudioProjectSession {
     StudioProjectSession(
       document: ProjectLifecycle.makeEmptyDocument(name: "Untitled Character"),
       projectURL: FileManager.default.temporaryDirectory

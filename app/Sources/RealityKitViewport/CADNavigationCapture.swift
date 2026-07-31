@@ -53,51 +53,19 @@ enum CADNavigationMapping {
       return .zoom(delta: input.deltaY)
     case .trackpadPan:
       return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-    case .right:
-      switch profile {
-      // Default and Onshape: right-drag orbits.
-      case .default, .onshape:
-        return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
-      case .custom:
-        return customAction(for: input, mapping: customMapping)
-      case .solidWorks, .fusion360:
-        return nil
-      }
-    case .middle:
-      switch profile {
-      // Default and Onshape: middle-drag pans.
-      case .default, .onshape:
-        return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-      case .solidWorks:
-        if input.isShiftDown {
-          return .preciseZoom(delta: input.deltaY)
-        }
-        if input.isOptionDown {
-          return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-        }
-        return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
-      case .fusion360:
-        return input.isShiftDown
-          ? .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
-          : .pan(deltaX: input.deltaX, deltaY: input.deltaY)
-      case .custom:
-        return customAction(for: input, mapping: customMapping)
-      }
+    case .right, .middle:
+      break
     }
-  }
 
-  private static func customAction(
-    for input: CADNavigationInput,
-    mapping: CustomNavigationMapping
-  ) -> CADNavigationAction? {
     guard let binding = dragBinding(for: input) else { return nil }
-    if binding == mapping.rotateDrag {
+    let mapping = profile.resolvedMapping(customMapping: customMapping)
+    if mapping.rotateDrags.contains(binding) {
       return .orbit(deltaX: input.deltaX, deltaY: input.deltaY)
     }
-    if binding == mapping.panDrag {
+    if mapping.panDrags.contains(binding) {
       return .pan(deltaX: input.deltaX, deltaY: input.deltaY)
     }
-    if binding == mapping.preciseZoomDrag {
+    if mapping.preciseZoomDrags.contains(binding) {
       return .preciseZoom(delta: input.deltaY)
     }
     return nil
@@ -115,6 +83,8 @@ enum CADNavigationMapping {
       .shiftRightMouse
     case .right:
       .rightMouse
+    case .middle where input.isControlDown && input.isShiftDown:
+      .controlShiftMiddleMouse
     case .middle where input.isOptionDown:
       .optionMiddleMouse
     case .middle where input.isControlDown:

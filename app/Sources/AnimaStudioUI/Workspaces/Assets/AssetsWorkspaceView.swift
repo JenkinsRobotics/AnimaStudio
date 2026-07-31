@@ -58,6 +58,7 @@ struct AssetsWorkspaceView: View {
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
   let replaceModel: () -> Void
+  let relinkPart: (PartID) -> Void
   let deleteParts: (Set<PartID>) -> Void
   let dropModels: ([URL]) -> Void
 
@@ -116,6 +117,7 @@ struct AssetsWorkspaceView: View {
       selectCharacter: selectCharacter,
       importModels: importModels,
       replaceModel: replaceModel,
+      relinkPart: relinkPart,
       deleteParts: deleteParts,
       forcedLayoutMode: centerLayoutMode
     )
@@ -325,11 +327,12 @@ struct AssetsWorkspaceView: View {
   }
 
   private var partRows: [AssetBuilderPartRow] {
-    AssetBuilderCatalog.partRows(parts: workspace.engineParts) {
-      workspace.partID(forEngineName: $0)
-    } version: {
-      partAssetVersions[$0] ?? 1
-    }
+    AssetBuilderCatalog.partRows(
+      parts: workspace.engineParts,
+      partID: { workspace.partID(forEngineName: $0) },
+      version: { partAssetVersions[$0] ?? 1 },
+      sourceFailure: { workspace.cadSourceLoadFailure(for: $0) }
+    )
   }
 
   private var selectedPart: AssetBuilderPartRow? {
@@ -456,6 +459,7 @@ struct AssetsWorkspaceView: View {
     selectCharacter: { _ in },
     importModels: {},
     replaceModel: {},
+    relinkPart: { _ in },
     deleteParts: { _ in },
     dropModels: { _ in }
   )

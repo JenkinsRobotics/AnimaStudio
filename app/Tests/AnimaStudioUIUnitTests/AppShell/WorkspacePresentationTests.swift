@@ -59,6 +59,32 @@ final class WorkspacePresentationTests: XCTestCase {
     XCTAssertFalse(model.isPlaying)
   }
 
+  func testSpatialRendererSessionStaysMountedAcrossWorkspaceTabs() {
+    for workspace in StudioWorkspaceKind.allCases {
+      XCTAssertTrue(
+        StudioCenterLayerPolicy.keepsSpatialSessionMounted(for: workspace),
+        "\(workspace) must cover or reveal the shared viewport, never replace it"
+      )
+    }
+  }
+
+  func testOnlyThreeDCenterRepresentationsRevealThePersistentRenderer() {
+    for workspace in StudioWorkspaceKind.centeredNavigation {
+      XCTAssertTrue(
+        StudioCenterLayerPolicy.presentsSpatialSession(workspace: workspace, mode: .threeD)
+      )
+    }
+    XCTAssertFalse(
+      StudioCenterLayerPolicy.presentsSpatialSession(workspace: .animate, mode: .dopeSheet)
+    )
+    XCTAssertFalse(
+      StudioCenterLayerPolicy.presentsSpatialSession(workspace: .show, mode: .nodeGraph)
+    )
+    XCTAssertFalse(
+      StudioCenterLayerPolicy.presentsSpatialSession(workspace: .nodes, mode: nil)
+    )
+  }
+
   func testTimelineRibbonTogglesFullHeightCenterRepresentations() {
     let model = StudioWorkspaceModel()
     XCTAssertFalse(model.activePresentation.showsBottomEditor)

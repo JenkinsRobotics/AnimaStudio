@@ -83,5 +83,19 @@ final class PartModelSourceReloadTests: XCTestCase {
     )
 
     XCTAssertEqual(workspace.enginePartModelSources[partID]?.fileURL, projectAssetURL)
+
+    workspace.reportCADSourceLoadFailures([
+      projectAssetURL: "Source file is missing",
+      URL(fileURLWithPath: "/tmp/unrelated.step"): "Unrelated failure",
+    ])
+    XCTAssertEqual(workspace.cadSourceLoadFailure(for: partID), "Source file is missing")
+    XCTAssertEqual(workspace.cadSourceLoadFailuresByPartID.count, 1)
+
+    workspace.configurePartModelSources(
+      characterDirectoryURL: URL(fileURLWithPath: "/tmp/Project/characters/robot"),
+      editorMetadata: CharacterEditorMetadata(),
+      resolvedProjectAssetURLs: [part.model: projectAssetURL]
+    )
+    XCTAssertTrue(workspace.cadSourceLoadFailuresByPartID.isEmpty)
   }
 }

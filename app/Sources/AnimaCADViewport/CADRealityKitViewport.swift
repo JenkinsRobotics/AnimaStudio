@@ -30,6 +30,7 @@ public struct CADRealityKitViewport: View {
   public let document: CADGeometryDocument?
   @Bindable public var camera: CADCameraState
   public let theme: CADViewportTheme
+  public let navigation: CADViewportNavigationConfiguration
   public let isSelected: Bool
   public let onFrame: @MainActor @Sendable () -> Void
 
@@ -37,12 +38,14 @@ public struct CADRealityKitViewport: View {
     document: CADGeometryDocument?,
     camera: CADCameraState,
     theme: CADViewportTheme,
+    navigation: CADViewportNavigationConfiguration = .onshape,
     isSelected: Bool = false,
     onFrame: @escaping @MainActor @Sendable () -> Void = {}
   ) {
     self.document = document
     self.camera = camera
     self.theme = theme
+    self.navigation = navigation
     self.isSelected = isSelected
     self.onFrame = onFrame
   }
@@ -88,11 +91,22 @@ public struct CADRealityKitViewport: View {
       }
       CADDisplayCadenceCounter(tick: onFrame)
       CADMouseInputOverlay(
+        navigation: navigation,
         orbit: camera.orbit,
         pan: camera.pan,
         roll: camera.roll,
         zoom: camera.zoom,
-        select: {})
+        frameAll: {
+          guard let document else { return }
+          camera.frame(bounds: document.renderGeometry.bounds)
+        },
+        select: { _, _, _ in },
+        boxSelect: { _, _, _, _ in },
+        contextMenu: { _, _ in },
+        hover: { _, _, _ in },
+        beginDirectManipulation: { _, _ in false },
+        updateDirectManipulation: { _, _ in },
+        endDirectManipulation: {})
     }
     .background(
       Color(

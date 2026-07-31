@@ -229,6 +229,7 @@ struct MouseNavigationSettingsView: View {
       systemImage: "keyboard"
     ) {
       mappingReadout("Option", detail: optionKeyDetail)
+      mappingReadout("Control", detail: controlKeyDetail)
       mappingReadout("Shift", detail: shiftKeyDetail)
       mappingReadout("Escape", detail: "Clear feature selection, then component selection")
     }
@@ -270,17 +271,24 @@ struct MouseNavigationSettingsView: View {
 
   private var optionKeyDetail: String {
     switch profile {
-    case .default, .solidWorks: "Option + middle drag pans"
-    case .onshape: "Option + click selects through transparent geometry"
-    case .fusion360: "No preset Option action"
+    case .default, .solidWorks, .onshape, .fusion360: "No preset Option action"
+    case .custom: "Available in the custom button bindings"
+    }
+  }
+
+  private var controlKeyDetail: String {
+    switch profile {
+    case .default, .onshape: "Control + right drag pans"
+    case .solidWorks: "Control + middle drag pans"
+    case .fusion360: "Control + Shift + middle drag performs precise zoom"
     case .custom: "Available in the custom button bindings"
     }
   }
 
   private var shiftKeyDetail: String {
     switch profile {
-    case .default, .solidWorks: "Shift + middle drag performs precise zoom"
-    case .onshape: "Adds to keyboard-assisted selection"
+    case .default, .onshape: "No preset Shift-drag camera action"
+    case .solidWorks: "Shift + middle drag performs precise zoom"
     case .fusion360: "Shift + middle drag orbits"
     case .custom: "Available in the custom button bindings"
     }

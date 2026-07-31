@@ -8,6 +8,9 @@ public enum AnimaCoreRigDocumentEditingError: Error, Equatable, Sendable {
   case unknownPart(String)
   case unknownJoint(String)
   case unknownRelation(String)
+  case unknownOutputChannel(Int)
+  case duplicateOutputChannel(Int)
+  case invalidOutputMapping(String)
   case invalidTransformVector(String)
 }
 
@@ -28,6 +31,12 @@ extension AnimaCoreRigDocumentEditingError: LocalizedError {
       "The character does not contain a mate named ‘\(name)’."
     case .unknownRelation(let id):
       "The character does not contain relation ‘\(id)’."
+    case .unknownOutputChannel(let channel):
+      "The character does not contain an output on channel \(channel)."
+    case .duplicateOutputChannel(let channel):
+      "Output channel \(channel) is already assigned."
+    case .invalidOutputMapping(let reason):
+      "The output mapping is invalid: \(reason)"
     case .invalidTransformVector(let field):
       "\(field) must contain three finite values."
     }
@@ -247,6 +256,25 @@ public enum AnimaCoreRigDocumentEditor {
     return .object(root)
   }
 
+  /// Returns one full-fidelity joint DTO exactly as AnimaCore supplied it.
+  ///
+  /// Inspector editors use this as their mutation base, then submit the
+  /// resulting joint through `update_mate`. This preserves additive engine
+  /// fields that an older Swift summary may not understand.
+  public static func jointDocument(
+    identifiedBy identifier: String,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    let root = try rootObject(document)
+    let joints = try objectArray(root, key: "joints")
+    guard
+      let joint = joints.first(where: {
+        stringValue($0["id"]) == identifier || stringValue($0["name"]) == identifier
+      })
+    else { throw AnimaCoreRigDocumentEditingError.unknownJoint(identifier) }
+    return .object(joint)
+  }
+
   public static func settingRelationSuppressed(
     kind: AnimaCoreRelationKind,
     driver: String,
@@ -270,6 +298,33 @@ public enum AnimaCoreRigDocumentEditor {
     relations[index]["suppressed"] = .bool(suppressed)
     root["relations"] = .array(relations.map(AnimaCoreJSONValue.object))
     return .object(root)
+  }
+
+  /// Returns one full-fidelity relation DTO exactly as AnimaCore supplied it.
+  ///
+  /// A relation's driven DOF is unique in the canonical rig and is therefore
+  /// its mutation key. `kind` and `driver` additionally protect against
+  /// accidentally editing a stale selection after the document changes.
+  public static func relationDocument(
+    kind: AnimaCoreRelationKind,
+    driver: String,
+    driven: String,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    let root = try rootObject(document)
+    let relations = try objectArray(root, key: "relations")
+    guard
+      let relation = relations.first(where: {
+        stringValue($0["kind"]) == kind.rawValue
+          && stringValue($0["driver"]) == driver
+          && stringValue($0["driven"]) == driven
+      })
+    else {
+      throw AnimaCoreRigDocumentEditingError.unknownRelation(
+        "\(kind.rawValue):\(driver)->\(driven)"
+      )
+    }
+    return .object(relation)
   }
 
   /// Removes one mate and every relation, output, and keyframe value that
@@ -322,6 +377,96 @@ public enum AnimaCoreRigDocumentEditor {
     return .object(root)
   }
 
+  /// Adds or replaces one output mapping in the full-fidelity engine DTO.
+  ///
+  /// `originalChannel` is the stable edit key supplied by the UI before a
+  /// channel number is changed. AnimaCore still performs semantic validation
+  /// (known target, bounded DOF, unique channel, valid range) when the caller
+  /// serializes and reloads the returned document.
+  public static func settingOutputMapping(
+    originalChannel: Int?,
+    targetPath: String,
+    channel: Int,
+    valueAtZero: Double,
+    valueAtOne: Double,
+    in document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    guard !targetPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw AnimaCoreRigDocumentEditingError.invalidOutputMapping("select a target")
+    }
+    guard channel >= 0 else {
+      throw AnimaCoreRigDocumentEditingError.invalidOutputMapping(
+        "the channel must be zero or greater"
+      )
+    }
+    guard valueAtZero.isFinite, valueAtOne.isFinite else {
+      throw AnimaCoreRigDocumentEditingError.invalidOutputMapping(
+        "range endpoints must be finite"
+      )
+    }
+    guard valueAtZero != valueAtOne else {
+      throw AnimaCoreRigDocumentEditingError.invalidOutputMapping(
+        "range endpoints must differ"
+      )
+    }
+
+    var root = try rootObject(document)
+    var outputs = try objectArray(root, key: "outputs")
+    let editIndex: Int?
+    if let originalChannel {
+      guard
+        let index = outputs.firstIndex(where: {
+          numberValue($0["channel"]).map(Int.init) == originalChannel
+        })
+      else {
+        throw AnimaCoreRigDocumentEditingError.unknownOutputChannel(originalChannel)
+      }
+      editIndex = index
+    } else {
+      editIndex = nil
+    }
+
+    if outputs.indices.contains(where: { index in
+      index != editIndex && numberValue(outputs[index]["channel"]).map(Int.init) == channel
+    }) {
+      throw AnimaCoreRigDocumentEditingError.duplicateOutputChannel(channel)
+    }
+
+    var mapping = editIndex.map { outputs[$0] } ?? [:]
+    mapping["dof_path"] = .string(targetPath)
+    mapping["channel"] = .number(Double(channel))
+    mapping["value_at_zero"] = .number(valueAtZero)
+    mapping["value_at_one"] = .number(valueAtOne)
+    if let editIndex {
+      outputs[editIndex] = mapping
+    } else {
+      outputs.append(mapping)
+    }
+    outputs.sort {
+      (numberValue($0["channel"]) ?? 0) < (numberValue($1["channel"]) ?? 0)
+    }
+    root["outputs"] = .array(outputs.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
+  public static func removingOutput(
+    channel: Int,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    var root = try rootObject(document)
+    var outputs = try objectArray(root, key: "outputs")
+    guard
+      let index = outputs.firstIndex(where: {
+        numberValue($0["channel"]).map(Int.init) == channel
+      })
+    else {
+      throw AnimaCoreRigDocumentEditingError.unknownOutputChannel(channel)
+    }
+    outputs.remove(at: index)
+    root["outputs"] = .array(outputs.map(AnimaCoreJSONValue.object))
+    return .object(root)
+  }
+
   private static func rootObject(
     _ document: AnimaCoreJSONValue
   ) throws -> [String: AnimaCoreJSONValue] {
@@ -363,6 +508,11 @@ public enum AnimaCoreRigDocumentEditor {
 
   private static func stringValue(_ value: AnimaCoreJSONValue?) -> String? {
     guard case .string(let value) = value else { return nil }
+    return value
+  }
+
+  private static func numberValue(_ value: AnimaCoreJSONValue?) -> Double? {
+    guard case .number(let value) = value else { return nil }
     return value
   }
 

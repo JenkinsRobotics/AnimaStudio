@@ -166,6 +166,10 @@ final class FeatureSelectionTests: XCTestCase {
     let target = try candidate(for: base, id: "face-right")
     model.selectMateConnector(ViewportPickEvent.feature(target))
 
+    XCTAssertEqual(model.matePlacement?.targetCandidate, target)
+    XCTAssertTrue(model.project.rig.joints.isEmpty)
+    model.confirmMatePlacement()
+
     XCTAssertNil(model.matePlacement)
     XCTAssertEqual(model.project.rig.joints.count, 1)
     XCTAssertNil(model.selectedFeature)

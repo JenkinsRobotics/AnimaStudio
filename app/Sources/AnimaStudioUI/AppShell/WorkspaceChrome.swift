@@ -145,6 +145,7 @@ struct StudioDocumentBar: View {
       Divider().frame(height: 18)
 
       WorkspaceLayoutMenu(workspace: workspace)
+      WorkspaceWindowMenu(workspace: workspace)
 
       appearanceToggle
 
@@ -482,6 +483,93 @@ struct WorkspaceLayoutMenu: View {
     }
   }
 
+}
+
+/// Native macOS window and tab controls for the active project.
+///
+/// This deliberately delegates window chrome, tab dragging, tear-off physics,
+/// and Split View to AppKit. Anima Studio only chooses the workspace shown by
+/// a new editor and whether it should initially join the current tab group.
+struct WorkspaceWindowMenu: View {
+  @Environment(\.openWindow) private var openWindow
+  @Environment(\.studioWindowContext) private var windowContext
+  @Bindable var workspace: StudioWorkspaceModel
+
+  var body: some View {
+    Menu {
+      Menu("New Workspace Tab", systemImage: "rectangle.stack.badge.plus") {
+        workspaceButtons(opensAsTab: true)
+      }
+
+      Menu("New Workspace Window", systemImage: "macwindow.badge.plus") {
+        workspaceButtons(opensAsTab: false)
+      }
+
+      Divider()
+
+      Button("Detach Current Tab", systemImage: "macwindow.on.rectangle") {
+        windowContext?.window?.moveTabToNewWindow(nil)
+      }
+
+      Button("Merge All Windows", systemImage: "rectangle.stack.fill") {
+        windowContext?.window?.mergeAllWindows(nil)
+      }
+
+      Button("Show or Hide Tab Bar", systemImage: "rectangle.topthird.inset.filled") {
+        windowContext?.window?.toggleTabBar(nil)
+      }
+
+      Divider()
+
+      Button("Previous Workspace Tab", systemImage: "chevron.left") {
+        windowContext?.window?.selectPreviousTab(nil)
+      }
+      .keyboardShortcut("[", modifiers: [.command, .shift])
+
+      Button("Next Workspace Tab", systemImage: "chevron.right") {
+        windowContext?.window?.selectNextTab(nil)
+      }
+      .keyboardShortcut("]", modifiers: [.command, .shift])
+    } label: {
+      Image(systemName: "rectangle.on.rectangle")
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(StudioPalette.muted)
+        .frame(width: 28, height: 24)
+        .background(StudioPalette.panelInset, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+          RoundedRectangle(cornerRadius: 6)
+            .stroke(StudioPalette.border, lineWidth: 1)
+        }
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .accessibilityLabel("Workspace windows and tabs")
+    .help("Workspace windows and tabs")
+  }
+
+  @ViewBuilder
+  private func workspaceButtons(opensAsTab: Bool) -> some View {
+    ForEach(workspace.availableWindowWorkspaces) { kind in
+      Button {
+        open(kind, asTab: opensAsTab)
+      } label: {
+        Label(kind.descriptor.title, systemImage: kind.descriptor.systemImage)
+      }
+    }
+  }
+
+  private func open(_ kind: StudioWorkspaceKind, asTab: Bool) {
+    let targetWindowNumber = asTab ? windowContext?.window?.windowNumber : nil
+    openWindow(
+      id: "studio-workspace",
+      value: StudioWorkspaceWindowRequest(
+        workspaceRawValue: kind.rawValue,
+        projectDisplayName: workspace.project.name,
+        targetTabWindowNumber: targetWindowNumber
+      )
+    )
+  }
 }
 
 /// Compact, in-window presentation of the same workspace tool catalog used by

@@ -18,6 +18,8 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
   public var roughness: Float
   public var metallic: Float
   public var edgeStrength: Float
+  public var ambientStrength: Float
+  public var shadowStrength: Float
   public var neutralColor: SIMD4<Float>
   public var overrideColor: SIMD4<Float>?
   public var background: SIMD3<Float>
@@ -43,12 +45,16 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     edgeSelectionColor: SIMD3<Float>,
     key: Light,
     fill: Light,
-    rim: Light
+    rim: Light,
+    ambientStrength: Float = 0.30,
+    shadowStrength: Float = 0.55
   ) {
     self.name = name
     self.roughness = roughness
     self.metallic = metallic
     self.edgeStrength = edgeStrength
+    self.ambientStrength = ambientStrength
+    self.shadowStrength = shadowStrength
     self.neutralColor = neutralColor
     self.overrideColor = overrideColor
     self.background = background
@@ -65,8 +71,12 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
   }
 
   public static func named(_ name: String?) -> Self {
-    all.first { $0.name == name } ?? .studioBlue
+    all.first { $0.name == name } ?? .defaultTheme
   }
+
+  /// The coordinated CAD environment used when an operator has not selected
+  /// and saved a different preset.
+  public static var defaultTheme: Self { .onshape }
 
   private static func theme(
     _ name: String,
@@ -81,7 +91,9 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     edgeSelection: SIMD3<Float>,
     key: (SIMD3<Float>, Float, SIMD3<Float>),
     fill: (SIMD3<Float>, Float, SIMD3<Float>),
-    rim: (SIMD3<Float>, Float, SIMD3<Float>)
+    rim: (SIMD3<Float>, Float, SIMD3<Float>),
+    ambient: Float = 0.30,
+    shadow: Float = 0.55
   ) -> Self {
     Self(
       name: name, roughness: roughness, metallic: metallic, edgeStrength: edge,
@@ -89,7 +101,9 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
       edgeColor: edgeColor, selectionColor: selection, edgeSelectionColor: edgeSelection,
       key: .init(color: key.0, intensity: key.1, directionFrom: key.2),
       fill: .init(color: fill.0, intensity: fill.1, directionFrom: fill.2),
-      rim: .init(color: rim.0, intensity: rim.1, directionFrom: rim.2)
+      rim: .init(color: rim.0, intensity: rim.1, directionFrom: rim.2),
+      ambientStrength: ambient,
+      shadowStrength: shadow
     )
   }
 
@@ -135,13 +149,15 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     rim: ([1, 1, 1], 1_600, [0.1, 0.4, -0.9]))
 
   public static let onshape = theme(
-    "Onshape", roughness: 0.55, metallic: 0.10, edge: 0.35,
-    model: [0.70, 0.74, 0.80, 1], override: [0.66, 0.71, 0.78, 1],
-    background: [0.86, 0.88, 0.90], edgeColor: [0.35, 0.38, 0.42],
-    selection: [1, 0.48, 0], edgeSelection: [0.10, 0.48, 1],
-    key: ([1, 1, 1], 5_500, [0.3, 1, 0.6]),
-    fill: ([1, 1, 1], 4_500, [-0.7, 0.5, 0.5]),
-    rim: ([1, 1, 1], 2_500, [0, 0.3, -0.9]))
+    "Onshape", roughness: 0.46, metallic: 0.02, edge: 0.82,
+    model: [0.52, 0.68, 0.78, 1], override: [0.52, 0.68, 0.78, 1],
+    background: [0.985, 0.988, 0.992], edgeColor: [0.07, 0.10, 0.12],
+    selection: [1, 0.48, 0], edgeSelection: [1, 0.48, 0],
+    key: ([1, 1, 1], 4_400, [0.35, 1, 0.65]),
+    fill: ([0.97, 0.99, 1], 1_650, [-0.75, 0.55, 0.45]),
+    rim: ([1, 1, 1], 1_200, [0.05, 0.35, -0.9]),
+    ambient: 0.24,
+    shadow: 0.72)
 
   public static let fusion360 = theme(
     "Fusion 360", roughness: 0.40, metallic: 0.25, edge: 0.40,

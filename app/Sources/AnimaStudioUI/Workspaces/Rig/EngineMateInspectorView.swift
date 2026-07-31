@@ -5,14 +5,33 @@ import SwiftUI
 /// Every mate kind uses this surface; the engine catalog supplies the label
 /// and DOF rows, while `describe_mate` supplies the instance controls.
 struct EngineMateInspectorView: View {
+  @Bindable var workspace: StudioWorkspaceModel
   let mate: AnimaCoreJointSummary
   let mateType: AnimaCoreMateTypeSummary?
+  @State private var baseline: EngineMateEditDraft
+  @State private var draft: EngineMateEditDraft
+  @State private var isApplying = false
+  @State private var editErrorMessage: String?
+
+  init(
+    workspace: StudioWorkspaceModel,
+    mate: AnimaCoreJointSummary,
+    mateType: AnimaCoreMateTypeSummary?
+  ) {
+    self.workspace = workspace
+    self.mate = mate
+    self.mateType = mateType
+    let initialDraft = EngineMateEditDraft(mate: mate)
+    _baseline = State(initialValue: initialDraft)
+    _draft = State(initialValue: initialDraft)
+  }
 
   private var presentation: EngineMateInspectorPresentation {
     EngineMateInspectorPresentation(mate: mate, mateType: mateType)
   }
 
   var body: some View {
+    editActionsSection
     identitySection
     connectorSection
     tangentSelectionSection
@@ -20,6 +39,55 @@ struct EngineMateInspectorView: View {
     orientationSection
     degreesOfFreedomSection
     authoringBoundarySection
+    if let editErrorMessage {
+      Section {
+        Label(editErrorMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.orange)
+      }
+    }
+    Group {}
+      .onChange(of: mate) { _, updatedMate in
+        let updatedDraft = EngineMateEditDraft(mate: updatedMate)
+        baseline = updatedDraft
+        draft = updatedDraft
+        editErrorMessage = nil
+      }
+  }
+
+  private var editActionsSection: some View {
+    Section {
+      HStack(spacing: 8) {
+        Button("Revert") {
+          draft = baseline
+          editErrorMessage = nil
+        }
+        .disabled(isApplying || draft == baseline)
+
+        Spacer(minLength: 8)
+
+        if isApplying {
+          ProgressView()
+            .controlSize(.small)
+        }
+        Button("Apply") {
+          applyDraft()
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(
+          isApplying || draft == baseline || draft.validationMessage != nil
+        )
+      }
+      if let validationMessage = draft.validationMessage {
+        Text(validationMessage)
+          .font(.caption)
+          .foregroundStyle(.orange)
+      }
+    } header: {
+      Text("Engine Edit")
+    } footer: {
+      Text("Apply validates the complete mate through AnimaCore and refreshes the solved pose.")
+    }
   }
 
   private var identitySection: some View {
@@ -80,13 +148,15 @@ struct EngineMateInspectorView: View {
         if supports("connector_a") {
           EngineMateConnectorRow(
             label: "A",
-            connector: controls.connectors.a
+            connector: controls.connectors.a,
+            isFlipped: $draft.connectorAFlipped
           )
         }
         if supports("connector_b") {
           EngineMateConnectorRow(
             label: "B",
-            connector: controls.connectors.b
+            connector: controls.connectors.b,
+            isFlipped: $draft.connectorBFlipped
           )
         }
       }
@@ -110,62 +180,65 @@ struct EngineMateInspectorView: View {
 
   @ViewBuilder
   private var offsetSection: some View {
-    if let controls = mate.controls, supports("offset") {
+    if mate.controls != nil, supports("offset") {
       Section("Offset") {
-        EngineMateReadOnlyToggle(
-          title: "Enable Offset",
-          isOn: controls.offset.isEnabled
-        )
+        Toggle("Enable Offset", isOn: $draft.offsetEnabled)
         Group {
           ForEach(0..<3, id: \.self) { index in
-            EngineMateAxisReadout(
+            EngineMateAxisField(
               axis: ["X", "Y", "Z"][index],
-              value: presentation.offsetMillimeters.indices.contains(index)
-                ? presentation.offsetMillimeters[index] : 0,
+              value: offsetBinding(at: index),
               unit: "mm"
             )
           }
-          LabeledContent(
-            "Rotate About", value: controls.offset.rotationAxis.rawValue.uppercased())
+          Picker("Rotate About", selection: $draft.offsetRotationAxis) {
+            ForEach(AnimaCoreMateAxis.allCases, id: \.self) { axis in
+              Text(axis.rawValue.uppercased()).tag(axis)
+            }
+          }
           LabeledContent("Rotation Angle") {
-            Text(
-              presentation.offsetRotationDegrees,
+            TextField(
+              "Angle",
+              value: $draft.offsetRotationDegrees,
               format: .number.precision(.fractionLength(0...3))
             )
-            .monospacedDigit()
+            .multilineTextAlignment(.trailing)
+            .frame(width: 88)
             Text("°")
               .foregroundStyle(StudioPalette.muted)
           }
         }
-        .opacity(controls.offset.isEnabled ? 1 : 0.55)
+        .disabled(!draft.offsetEnabled)
+        .opacity(draft.offsetEnabled ? 1 : 0.55)
       }
     }
   }
 
   @ViewBuilder
   private var orientationSection: some View {
-    if let controls = mate.controls,
+    if mate.controls != nil,
       supports("flip_primary_axis") || supports("secondary_axis_rotation")
         || supports("simulation_connection") || !presentation.additionalControlIDs.isEmpty
     {
       Section("Orientation & Simulation") {
         if supports("flip_primary_axis") {
-          EngineMateReadOnlyToggle(
-            title: "Flip Primary Axis",
-            isOn: controls.flipsPrimaryAxis
-          )
+          Toggle("Flip Primary Axis", isOn: $draft.flipsPrimaryAxis)
         }
         if supports("secondary_axis_rotation") {
           LabeledContent("Secondary Axis Rotation") {
-            Text("\(controls.secondaryAxisRotationDegrees)°")
-              .monospacedDigit()
+            TextField(
+              "Rotation",
+              value: $draft.secondaryAxisRotationDegrees,
+              format: .number
+            )
+            .multilineTextAlignment(.trailing)
+            .frame(width: 72)
+            Text("°")
+              .foregroundStyle(StudioPalette.muted)
           }
         }
         if supports("simulation_connection") {
-          EngineMateReadOnlyToggle(
-            title: "Simulation Connection",
-            isOn: controls.isSimulationConnection
-          )
+          Toggle("Simulation Connection", isOn: $draft.isSimulationConnection)
         }
         ForEach(presentation.additionalControlIDs, id: \.self) { controlID in
           LabeledContent(
@@ -194,8 +267,8 @@ struct EngineMateInspectorView: View {
         }
         .accessibilityElement(children: .combine)
       } else {
-        ForEach(mate.degreesOfFreedom, id: \.path) { degreeOfFreedom in
-          EngineMateDOFRow(degreeOfFreedom: degreeOfFreedom)
+        ForEach($draft.degreesOfFreedom) { $degreeOfFreedom in
+          EngineMateDOFEditor(degreeOfFreedom: $degreeOfFreedom)
         }
       }
     }
@@ -206,7 +279,7 @@ struct EngineMateInspectorView: View {
       Label("Validated by AnimaCore", systemImage: "checkmark.shield.fill")
         .foregroundStyle(StudioPalette.hardware)
       Text(
-        "This panel is an engine-backed snapshot. The canonical character document remains the authoring source of truth; Studio does not recreate mate semantics."
+        "This editor changes the retained engine DTO and submits it through update_mate. AnimaCore remains the validator, solver, and canonical character author."
       )
       .font(.caption)
       .foregroundStyle(StudioPalette.muted)
@@ -218,6 +291,36 @@ struct EngineMateInspectorView: View {
       return mateType.universalControls.contains(controlID)
     }
     return mate.controls != nil && mate.type != "tangent"
+  }
+
+  private func offsetBinding(at index: Int) -> Binding<Double> {
+    Binding(
+      get: {
+        draft.offsetTranslationMillimeters.indices.contains(index)
+          ? draft.offsetTranslationMillimeters[index] : 0
+      },
+      set: { newValue in
+        guard draft.offsetTranslationMillimeters.indices.contains(index) else { return }
+        draft.offsetTranslationMillimeters[index] = newValue
+      }
+    )
+  }
+
+  private func applyDraft() {
+    guard !isApplying else { return }
+    isApplying = true
+    editErrorMessage = nil
+    Task { @MainActor in
+      defer { isApplying = false }
+      do {
+        let updated = try await workspace.updateEngineMate(mate, with: draft)
+        let updatedDraft = EngineMateEditDraft(mate: updated)
+        baseline = updatedDraft
+        draft = updatedDraft
+      } catch {
+        editErrorMessage = error.localizedDescription
+      }
+    }
   }
 }
 
@@ -332,6 +435,7 @@ private struct EngineMateSurfaceSelectionRow: View {
 private struct EngineMateConnectorRow: View {
   let label: String
   let connector: AnimaCoreMateConnector?
+  @Binding var isFlipped: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 7) {
@@ -339,11 +443,10 @@ private struct EngineMateConnectorRow: View {
         Label("Connector \(label)", systemImage: "scope")
           .font(.callout.weight(.semibold))
         Spacer(minLength: 8)
-        EngineMateReadOnlyToggle(
-          title: "Flip",
-          isOn: connector?.isFlipped ?? false,
-          isCompact: true
-        )
+        Toggle("Flip", isOn: $isFlipped)
+          .toggleStyle(.checkbox)
+          .controlSize(.small)
+          .disabled(connector == nil)
       }
 
       if let connector {
@@ -398,15 +501,20 @@ private struct EngineMateReadOnlyToggle: View {
   }
 }
 
-private struct EngineMateAxisReadout: View {
+private struct EngineMateAxisField: View {
   let axis: String
-  let value: Double
+  @Binding var value: Double
   let unit: String
 
   var body: some View {
     LabeledContent {
-      Text(value, format: .number.precision(.fractionLength(0...3)))
-        .monospacedDigit()
+      TextField(
+        axis,
+        value: $value,
+        format: .number.precision(.fractionLength(0...3))
+      )
+      .multilineTextAlignment(.trailing)
+      .frame(width: 88)
       Text(unit)
         .foregroundStyle(StudioPalette.muted)
     } label: {
@@ -425,42 +533,70 @@ private struct EngineMateAxisReadout: View {
   }
 }
 
-private struct EngineMateDOFRow: View {
-  let degreeOfFreedom: AnimaCoreDOFSummary
+private struct EngineMateDOFEditor: View {
+  @Binding var degreeOfFreedom: EngineMateDOFEditDraft
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 5) {
+    VStack(alignment: .leading, spacing: 7) {
       Text(degreeOfFreedom.path)
         .font(.caption.monospaced().weight(.semibold))
       LabeledContent("Kind", value: degreeOfFreedom.kind.rawValue.capitalized)
       LabeledContent("Axis", value: degreeOfFreedom.axis.rawValue.uppercased())
-      LabeledContent("Neutral", value: formatted(degreeOfFreedom.neutral))
-      LabeledContent(
-        "Limits",
-        value: limitsLabel
-      )
+      numericField("Neutral", value: $degreeOfFreedom.neutral)
+      optionalLimitField("Minimum", value: $degreeOfFreedom.minimum)
+      optionalLimitField("Maximum", value: $degreeOfFreedom.maximum)
     }
     .padding(.vertical, 3)
   }
 
-  private var limitsLabel: String {
-    guard let minimum = degreeOfFreedom.minimum,
-      let maximum = degreeOfFreedom.maximum
-    else { return "Unbounded" }
-    return "\(formatted(minimum)) … \(formatted(maximum))"
+  private func numericField(_ title: String, value: Binding<Double>) -> some View {
+    LabeledContent(title) {
+      TextField(
+        title,
+        value: value,
+        format: .number.precision(.fractionLength(0...3))
+      )
+      .multilineTextAlignment(.trailing)
+      .frame(width: 88)
+      Text(degreeOfFreedom.unitLabel)
+        .foregroundStyle(StudioPalette.muted)
+    }
   }
 
-  private func formatted(_ nativeValue: Double) -> String {
-    let value: Double
-    let unit: String
-    switch degreeOfFreedom.unit {
-    case .radians:
-      value = nativeValue * 180 / .pi
-      unit = "°"
-    case .meters:
-      value = nativeValue * 1_000
-      unit = " mm"
+  private func optionalLimitField(
+    _ title: String,
+    value: Binding<Double?>
+  ) -> some View {
+    HStack(spacing: 8) {
+      Toggle(
+        title,
+        isOn: Binding(
+          get: { value.wrappedValue != nil },
+          set: { isEnabled in
+            value.wrappedValue = isEnabled ? (value.wrappedValue ?? 0) : nil
+          }
+        )
+      )
+      .toggleStyle(.checkbox)
+      Spacer(minLength: 8)
+      if value.wrappedValue != nil {
+        TextField(
+          title,
+          value: Binding(
+            get: { value.wrappedValue ?? 0 },
+            set: { value.wrappedValue = $0 }
+          ),
+          format: .number.precision(.fractionLength(0...3))
+        )
+        .multilineTextAlignment(.trailing)
+        .frame(width: 88)
+        Text(degreeOfFreedom.unitLabel)
+          .foregroundStyle(StudioPalette.muted)
+      } else {
+        Text("Unbounded")
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+      }
     }
-    return value.formatted(.number.precision(.fractionLength(0...3))) + unit
   }
 }

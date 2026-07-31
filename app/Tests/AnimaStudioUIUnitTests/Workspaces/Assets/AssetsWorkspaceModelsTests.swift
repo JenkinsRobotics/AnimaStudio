@@ -233,6 +233,35 @@ final class AssetsWorkspaceModelsTests: XCTestCase {
       AssetBuilderCatalog.filteredParts(rows, query: "head.usdz").map(\.name), ["head"])
   }
 
+  func testPartRowsPromoteSourceFailuresToDisconnectedRecoveryState() throws {
+    let payload = Data(
+      """
+      [
+        {"name":"base","parent":null,"model":"assets/base.step"},
+        {"name":"locator","parent":"base","model":""}
+      ]
+      """.utf8
+    )
+    let parts = try JSONDecoder().decode([AnimaCorePartSummary].self, from: payload)
+    let ids = Dictionary(uniqueKeysWithValues: parts.map { ($0.name, PartID()) })
+    let baseID = try XCTUnwrap(ids["base"])
+
+    let rows = AssetBuilderCatalog.partRows(
+      parts: parts,
+      partID: { ids[$0] },
+      sourceFailure: { $0 == baseID ? "Source file is missing" : nil }
+    )
+
+    XCTAssertEqual(rows[0].state, .disconnected("Source file is missing"))
+    XCTAssertTrue(rows[0].state.isDisconnected)
+    XCTAssertEqual(rows[0].state.label, "Disconnected")
+    XCTAssertEqual(rows[1].state, .proxy)
+    XCTAssertEqual(
+      AssetBuilderCatalog.filteredParts(rows, query: "disconnected").map(\.name),
+      ["base"]
+    )
+  }
+
   func testAssetBuilderTreeUsesTheSharedTreeNodeContract() {
     let character = ProjectCharacterReference(folderName: "robot", displayName: "Robot")
     let nodes = AssetBuilderTreeAdapter.nodes(

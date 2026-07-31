@@ -21,7 +21,14 @@ struct AnimaCoreClientTests {
     #expect(hello.capabilities.contains("evaluate"))
     #expect(hello.capabilities.contains("resolve_pose"))
     #expect(hello.capabilities.contains("mate_types"))
+    #expect(hello.capabilities.contains("preview_mate"))
+    #expect(hello.capabilities.contains("add_mate"))
+    #expect(hello.capabilities.contains("update_mate"))
+    #expect(hello.capabilities.contains("remove_mate"))
     #expect(hello.capabilities.contains("relation_types"))
+    #expect(hello.capabilities.contains("add_relation"))
+    #expect(hello.capabilities.contains("update_relation"))
+    #expect(hello.capabilities.contains("remove_relation"))
     #expect(hello.capabilities.contains("serialize_character"))
     #expect(hello.capabilities.contains("forward_kinematics"))
     #expect(hello.capabilities.contains("solve_ik"))
@@ -96,6 +103,15 @@ struct AnimaCoreClientTests {
     }
     #expect(rigDocument["clips"] != nil)
     #expect(rigDocument["outputs"] != nil)
+    let baseYawOutput = try #require(
+      loaded.rig.outputs.first { $0.targetPath == "base_yaw.rotation" }
+    )
+    #expect(abs(baseYawOutput.valueAtZero - (-170 * .pi / 180)) < 1e-12)
+    #expect(abs(baseYawOutput.valueAtOne - (170 * .pi / 180)) < 1e-12)
+    let invertedShoulderOutput = try #require(
+      loaded.rig.outputs.first { $0.targetPath == "shoulder_pitch.rotation" }
+    )
+    #expect(invertedShoulderOutput.valueAtZero > invertedShoulderOutput.valueAtOne)
 
     let serialized = try await client.serializeCharacter(rig: loaded.rigDocument)
     #expect(serialized.text.contains("six_axis_arm"))
@@ -152,6 +168,138 @@ struct AnimaCoreClientTests {
     #expect(emptyEvaluation.degreesOfFreedom.isEmpty)
     #expect(emptyPose.parts.isEmpty)
 
+    let mateAuthoring = try await client.loadCharacter(
+      text: """
+        anima_version: "2.0"
+        type: character
+        identity:
+          name: bridge_mate_authoring
+          display_name: Bridge Mate Authoring
+        parts:
+          base:
+            grounded: true
+          arm: {}
+          tool: {}
+        """
+    )
+    let fastened = AnimaCoreJSONValue.object([
+      "id": .string("Fastened 1"),
+      "name": .string("fastened_1"),
+      "type": .string("fastened"),
+      "parent_part": .string("base"),
+      "child_part": .string("arm"),
+      "dofs": .array([]),
+    ])
+    let previewedMate = try await client.previewMate(
+      handle: mateAuthoring.handle,
+      joint: fastened
+    )
+    #expect(previewedMate.parts["base"]?.position == [0, 0, 0])
+    #expect(previewedMate.parts["arm"]?.position == [0, 0, 0])
+    // The preview did not mutate the handle: this first add still succeeds.
+    let addedMate = try await client.addMate(
+      handle: mateAuthoring.handle,
+      joint: fastened
+    )
+    #expect(addedMate.handle == mateAuthoring.handle)
+    #expect(addedMate.rig.joints.map(\.name) == ["fastened_1"])
+    #expect(addedMate.rig.joints.first?.id == "Fastened 1")
+    guard case .object(let addedRigDocument) = addedMate.rigDocument else {
+      Issue.record("add_mate must return a full-fidelity rig document")
+      return
+    }
+    #expect(addedRigDocument["joints"] != nil)
+
+    let revolute = AnimaCoreJSONValue.object([
+      "id": .string("Fastened 1"),
+      "name": .string("fastened_1"),
+      "type": .string("revolute"),
+      "parent_part": .string("base"),
+      "child_part": .string("arm"),
+      "dofs": .array([
+        .object([
+          "name": .string("rotation"),
+          "kind": .string("rotation"),
+          "neutral": .number(0),
+          "axis_vector": .array([.number(0), .number(0), .number(1)]),
+        ])
+      ]),
+    ])
+    let updatedMate = try await client.updateMate(
+      handle: mateAuthoring.handle,
+      joint: revolute
+    )
+    #expect(updatedMate.rig.joints.first?.type == "revolute")
+    #expect(updatedMate.rig.joints.first?.degreesOfFreedom.first?.axis == .z)
+    let mutationEvaluation = try await client.evaluate(handle: mateAuthoring.handle)
+    #expect(mutationEvaluation.degreesOfFreedom["fastened_1.rotation"] == 0)
+
+    let toolJoint = AnimaCoreJSONValue.object([
+      "id": .string("Revolute 2"),
+      "name": .string("tool_joint"),
+      "type": .string("revolute"),
+      "parent_part": .string("arm"),
+      "child_part": .string("tool"),
+      "dofs": .array([
+        .object([
+          "name": .string("rotation"),
+          "kind": .string("rotation"),
+          "neutral": .number(0),
+          "axis_vector": .array([.number(0), .number(0), .number(1)]),
+        ])
+      ]),
+    ])
+    _ = try await client.addMate(handle: mateAuthoring.handle, joint: toolJoint)
+
+    let gear = AnimaCoreJSONValue.object([
+      "kind": .string("gear"),
+      "driver": .string("fastened_1.rotation"),
+      "driven": .string("tool_joint.rotation"),
+      "ratio": .number(-2),
+      "offset": .number(0.1),
+      "display": .object([
+        "driver_teeth": .number(12),
+        "driven_teeth": .number(24),
+      ]),
+    ])
+    let addedRelation = try await client.addRelation(
+      handle: mateAuthoring.handle,
+      relation: gear
+    )
+    let createdGear = try #require(addedRelation.rig.relations.first)
+    #expect(createdGear.kind == .gear)
+    #expect(createdGear.driver == "fastened_1.rotation")
+    #expect(createdGear.driven == "tool_joint.rotation")
+    #expect(createdGear.ratio == -2)
+    #expect(createdGear.offset == 0.1)
+    #expect(createdGear.display == ["driver_teeth": 12, "driven_teeth": 24])
+
+    guard case .object(var updatedGearObject) = gear else {
+      Issue.record("Relation fixture must be an object")
+      return
+    }
+    updatedGearObject["ratio"] = .number(3)
+    updatedGearObject["offset"] = .number(-0.2)
+    let updatedRelation = try await client.updateRelation(
+      handle: mateAuthoring.handle,
+      relation: .object(updatedGearObject)
+    )
+    let editedGear = try #require(updatedRelation.rig.relations.first)
+    #expect(editedGear.ratio == 3)
+    #expect(editedGear.offset == -0.2)
+
+    let removedRelation = try await client.removeRelation(
+      handle: mateAuthoring.handle,
+      driven: "tool_joint.rotation"
+    )
+    #expect(removedRelation.rig.relations.isEmpty)
+
+    let removedMate = try await client.removeMate(
+      handle: mateAuthoring.handle,
+      name: "fastened_1"
+    )
+    #expect(removedMate.rig.joints.map(\.name) == ["tool_joint"])
+
     let evaluation = try await client.evaluate(
       handle: loaded.handle,
       clip: "pick",
@@ -175,6 +323,7 @@ struct AnimaCoreClientTests {
     try await client.release(handle: assetReloaded.handle)
     try await client.release(handle: stateReloaded.handle)
     try await client.release(handle: emptyReloaded.handle)
+    try await client.release(handle: mateAuthoring.handle)
     await client.shutdown()
   }
 
@@ -409,6 +558,45 @@ struct AnimaCoreClientTests {
     #expect(relations.count == 1)
     #expect(values == ["jaw.rotation": .number(0.2)])
 
+    let retainedRelation = try AnimaCoreRigDocumentEditor.relationDocument(
+      kind: .linear,
+      driver: "slider.travel",
+      driven: "lift.travel",
+      from: withoutMate
+    )
+    #expect(
+      retainedRelation
+        == .object([
+          "kind": .string("linear"),
+          "driver": .string("slider.travel"),
+          "driven": .string("lift.travel"),
+        ])
+    )
+    #expect(
+      throws: AnimaCoreRigDocumentEditingError.unknownRelation(
+        "gear:missing.rotation->missing.travel"
+      )
+    ) {
+      _ = try AnimaCoreRigDocumentEditor.relationDocument(
+        kind: .gear,
+        driver: "missing.rotation",
+        driven: "missing.travel",
+        from: withoutMate
+      )
+    }
+
+    let retainedJaw = try AnimaCoreRigDocumentEditor.jointDocument(
+      identifiedBy: "jaw",
+      from: source
+    )
+    #expect(retainedJaw == .object(["name": .string("jaw")]))
+    #expect(throws: AnimaCoreRigDocumentEditingError.unknownJoint("missing")) {
+      _ = try AnimaCoreRigDocumentEditor.jointDocument(
+        identifiedBy: "missing",
+        from: source
+      )
+    }
+
     let withoutRelation = try AnimaCoreRigDocumentEditor.removingRelation(
       kind: .linear,
       driver: "slider.travel",
@@ -422,6 +610,78 @@ struct AnimaCoreClientTests {
       return
     }
     #expect(remainingRelations.isEmpty)
+  }
+
+  @Test
+  func rigDocumentEditorAddsEditsSortsAndRemovesOutputMappings() throws {
+    let source: AnimaCoreJSONValue = .object([
+      "parts": .array([]),
+      "outputs": .array([
+        .object([
+          "dof_path": .string("jaw.rotation"),
+          "channel": .number(2),
+          "value_at_zero": .number(-0.5),
+          "value_at_one": .number(0.5),
+          "future_field": .string("old"),
+        ])
+      ]),
+    ])
+
+    let added = try AnimaCoreRigDocumentEditor.settingOutputMapping(
+      originalChannel: nil,
+      targetPath: "head.rotation",
+      channel: 0,
+      valueAtZero: -1,
+      valueAtOne: 1,
+      in: source
+    )
+    let edited = try AnimaCoreRigDocumentEditor.settingOutputMapping(
+      originalChannel: 2,
+      targetPath: "jaw.rotation",
+      channel: 3,
+      valueAtZero: 0.75,
+      valueAtOne: -0.75,
+      in: added
+    )
+    guard case .object(let root) = edited,
+      case .array(let outputs) = root["outputs"],
+      case .object(let first) = outputs.first,
+      case .object(let second) = outputs.last
+    else {
+      Issue.record("Output editing must retain an object array")
+      return
+    }
+    #expect(first["channel"] == .number(0))
+    #expect(first["dof_path"] == .string("head.rotation"))
+    #expect(second["channel"] == .number(3))
+    #expect(second["value_at_zero"] == .number(0.75))
+    #expect(second["value_at_one"] == .number(-0.75))
+    #expect(second["future_field"] == .string("old"))
+
+    #expect(
+      throws: AnimaCoreRigDocumentEditingError.duplicateOutputChannel(0)
+    ) {
+      try AnimaCoreRigDocumentEditor.settingOutputMapping(
+        originalChannel: 3,
+        targetPath: "jaw.rotation",
+        channel: 0,
+        valueAtZero: -1,
+        valueAtOne: 1,
+        in: edited
+      )
+    }
+
+    let removed = try AnimaCoreRigDocumentEditor.removingOutput(
+      channel: 0,
+      from: edited
+    )
+    guard case .object(let removedRoot) = removed,
+      case .array(let remaining) = removedRoot["outputs"]
+    else {
+      Issue.record("Output removal must retain the outputs array")
+      return
+    }
+    #expect(remaining.count == 1)
   }
 
   @Test

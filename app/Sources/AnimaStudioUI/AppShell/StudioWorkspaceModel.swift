@@ -127,6 +127,10 @@ final class StudioWorkspaceModel {
   var engineEvaluationTimeSeconds: Double?
   var engineResolvedPartPoses: [PartID: EngineResolvedPartPose] = [:]
   var enginePartModelSources: [PartID: PartModelSource] = [:]
+  /// Presentation-only health reported by the active CAD loader. The engine
+  /// retains the canonical model reference; this map says which resolved URL
+  /// currently cannot be opened so Assets/3D Modeling can offer relink.
+  var cadSourceLoadFailuresByPartID: [PartID: String] = [:]
   @ObservationIgnored private var configuredAssetDirectoryURL: URL?
   @ObservationIgnored private var configuredEditorMetadata: CharacterEditorMetadata?
   @ObservationIgnored private var configuredProjectAssetURLs: [String: URL] = [:]
@@ -137,6 +141,8 @@ final class StudioWorkspaceModel {
   var engineMates: [AnimaCoreJointSummary] = []
   var engineRelationTypes: [AnimaCoreRelationTypeSummary] = []
   var engineRelations: [AnimaCoreRelationSummary] = []
+  var engineParameters: [AnimaCoreParameterSummary] = []
+  var engineOutputs: [AnimaCoreOutputSummary] = []
   var engineKinematicChain: AnimaCoreKinematicChainSummary?
   var armJointValues: [String: Double] = [:]
   var armToolPose: EngineResolvedPartPose?
@@ -165,6 +171,8 @@ final class StudioWorkspaceModel {
   @ObservationIgnored private var enginePartIDsByName: [String: PartID] = [:]
   @ObservationIgnored private var engineClipName: String?
   @ObservationIgnored private var engineFrameRequestRevision = 0
+  @ObservationIgnored private var matePreviewRequestRevision = 0
+  @ObservationIgnored private var matePreviewBaselinePartPoses: [PartID: EngineResolvedPartPose]?
   @ObservationIgnored private var armRequestRevision = 0
   @ObservationIgnored private var manualCameraHistoryOrigin:
     (state: PreviewCameraState, projection: PreviewCameraProjection)?
@@ -237,6 +245,26 @@ final class StudioWorkspaceModel {
     workspacePresentations[activeWorkspace] ?? activeWorkspace.descriptor.defaultPresentation
   }
 
+  /// Workspaces that can be opened beside the current editor as a native
+  /// macOS tab/window. Only the active character's authoring surface is shown;
+  /// utility workspaces remain available without crowding the centered tabs.
+  var availableWindowWorkspaces: [StudioWorkspaceKind] {
+    [
+      .assets,
+      characterType.authoringWorkspace,
+      .animate,
+      .show,
+      .hardware,
+      .nodes,
+      .design,
+    ]
+    .reduce(into: []) { result, workspace in
+      if !result.contains(workspace) {
+        result.append(workspace)
+      }
+    }
+  }
+
   var activeCenterView: StudioCenterViewMode? {
     let available = StudioCenterViewCatalog.modes(for: activeWorkspace)
     guard !available.isEmpty else { return nil }
@@ -292,6 +320,9 @@ final class StudioWorkspaceModel {
 
   var viewportHighlightedPartIDs: Set<PartID> {
     var highlighted = Set(selectedComponentIDs)
+    if case .componentGroup(let groupID) = primarySelection {
+      highlighted.formUnion(componentIDs(inGroupIncludingDescendants: groupID))
+    }
     guard let relation = selectedEngineRelation else { return highlighted }
     for path in [relation.driver, relation.driven] {
       guard let mateName = Self.mateName(fromDOFPath: path),
@@ -480,6 +511,8 @@ final class StudioWorkspaceModel {
       engineMates = loaded.rig.joints
       engineRelationTypes = relationCatalog.relationTypes
       engineRelations = loaded.rig.relations
+      engineParameters = loaded.rig.parameters
+      engineOutputs = loaded.rig.outputs
       engineKinematicChain = loaded.rig.kinematicChain
       self.armJointValues = armJointValues
       engineEvaluation = evaluation
@@ -644,6 +677,7 @@ final class StudioWorkspaceModel {
   private func rebuildPartModelSources() {
     guard let characterDirectoryURL = configuredAssetDirectoryURL else {
       enginePartModelSources.removeAll()
+      cadSourceLoadFailuresByPartID.removeAll()
       return
     }
     let editorMetadata = configuredEditorMetadata ?? CharacterEditorMetadata()
@@ -666,6 +700,24 @@ final class StudioWorkspaceModel {
         )
       }
     )
+    cadSourceLoadFailuresByPartID.removeAll()
+  }
+
+  func reportCADSourceLoadFailures(_ failuresByURL: [URL: String]) {
+    let failuresByPath = Dictionary(
+      uniqueKeysWithValues: failuresByURL.map {
+        ($0.key.standardizedFileURL.path, $0.value)
+      }
+    )
+    cadSourceLoadFailuresByPartID = Dictionary(
+      uniqueKeysWithValues: enginePartModelSources.compactMap { partID, source in
+        failuresByPath[source.fileURL.standardizedFileURL.path].map { (partID, $0) }
+      }
+    )
+  }
+
+  func cadSourceLoadFailure(for partID: PartID) -> String? {
+    cadSourceLoadFailuresByPartID[partID]
   }
 
   func enginePart(for id: PartID) -> AnimaCorePartSummary? {
@@ -917,6 +969,8 @@ final class StudioWorkspaceModel {
     engineMates.removeAll()
     engineRelationTypes.removeAll()
     engineRelations.removeAll()
+    engineParameters.removeAll()
+    engineOutputs.removeAll()
     engineKinematicChain = nil
     armJointValues.removeAll()
     armToolPose = nil
@@ -946,10 +1000,103 @@ final class StudioWorkspaceModel {
     relationDraft = nil
   }
 
-  func relationDOFOptions(kind: AnimaCoreDOFKind) -> [RelationDOFOption] {
+  var hardwareOutputTargets: [HardwareOutputTargetOption] {
+    HardwareOutputTargetOption.catalog(
+      mates: engineMates,
+      chain: engineKinematicChain,
+      parameters: engineParameters
+    )
+  }
+
+  var nextAvailableOutputChannel: Int {
+    let occupied = Set(engineOutputs.map(\.channel))
+    return (0...).first(where: { !occupied.contains($0) }) ?? 0
+  }
+
+  @discardableResult
+  func saveOutputMapping(
+    _ draft: HardwareOutputMappingDraft,
+    originalChannel: Int?
+  ) async throws -> AnimaCoreOutputSummary {
+    guard let sourceDocument = engineRigDocument else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    do {
+      let values = try draft.validatedNativeValues(
+        targets: hardwareOutputTargets,
+        existingMappings: engineOutputs,
+        originalChannel: originalChannel
+      )
+      let editedDocument = try AnimaCoreRigDocumentEditor.settingOutputMapping(
+        originalChannel: originalChannel,
+        targetPath: values.target.path,
+        channel: draft.channel,
+        valueAtZero: values.valueAtZero,
+        valueAtOne: values.valueAtOne,
+        in: sourceDocument
+      )
+      engineRigDocument = editedDocument
+      do {
+        try await reloadEditedEngineRig()
+      } catch {
+        engineRigDocument = sourceDocument
+        throw error
+      }
+      guard
+        let output = engineOutputs.first(where: {
+          $0.channel == draft.channel && $0.targetPath == draft.targetPath
+        })
+      else {
+        throw AnimaCoreClientError.invalidResponse(
+          "AnimaCore omitted the saved output mapping from its rig response."
+        )
+      }
+      documentEditRevision += 1
+      animaCoreErrorMessage = nil
+      return output
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+      throw error
+    }
+  }
+
+  func removeOutputMapping(channel: Int) async throws {
+    guard let sourceDocument = engineRigDocument else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    do {
+      let editedDocument = try AnimaCoreRigDocumentEditor.removingOutput(
+        channel: channel,
+        from: sourceDocument
+      )
+      engineRigDocument = editedDocument
+      do {
+        try await reloadEditedEngineRig()
+      } catch {
+        engineRigDocument = sourceDocument
+        throw error
+      }
+      documentEditRevision += 1
+      animaCoreErrorMessage = nil
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+      throw error
+    }
+  }
+
+  func relationDOFOptions(
+    kind: AnimaCoreDOFKind,
+    availableAsDriven: Bool = false,
+    allowingDrivenPath: String? = nil
+  ) -> [RelationDOFOption] {
     engineMates.flatMap { mate in
       mate.degreesOfFreedom.compactMap { degreeOfFreedom in
         guard degreeOfFreedom.kind == kind else { return nil }
+        guard
+          !availableAsDriven
+            || degreeOfFreedom.path == allowingDrivenPath
+            || !engineRelations.contains(where: { $0.driven == degreeOfFreedom.path })
+        else { return nil }
         return RelationDOFOption(
           path: degreeOfFreedom.path,
           mateName: mate.name,
@@ -958,6 +1105,128 @@ final class StudioWorkspaceModel {
         )
       }
     }
+  }
+
+  private func relationDOFOption(path: String) -> RelationDOFOption? {
+    engineMates.lazy.compactMap { mate in
+      mate.degreesOfFreedom.first(where: { $0.path == path }).map {
+        RelationDOFOption(
+          path: $0.path,
+          mateName: mate.name,
+          mateTrackingID: mate.id,
+          kind: $0.kind
+        )
+      }
+    }.first
+  }
+
+  @discardableResult
+  func createEngineRelation(
+    from draft: RelationDraft
+  ) async throws -> AnimaCoreRelationSummary {
+    guard let animaCoreClient, let handle = animaCoreHandle else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    do {
+      try validateRelationDraftCompatibility(draft)
+      let relationDocument = try draft.document()
+      let mutated = try await animaCoreClient.addRelation(
+        handle: handle,
+        relation: relationDocument
+      )
+      let created = try await adoptRelationMutation(
+        mutated,
+        handle: handle,
+        drivenPath: draft.drivenPath
+      )
+      relationDraft = nil
+      return created
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+      throw error
+    }
+  }
+
+  @discardableResult
+  func updateEngineRelation(
+    _ relation: AnimaCoreRelationSummary,
+    with draft: RelationDraft
+  ) async throws -> AnimaCoreRelationSummary {
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let sourceRigDocument = engineRigDocument
+    else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+    do {
+      try validateRelationDraftCompatibility(draft)
+      let source = try AnimaCoreRigDocumentEditor.relationDocument(
+        kind: relation.kind,
+        driver: relation.driver,
+        driven: relation.driven,
+        from: sourceRigDocument
+      )
+      let relationDocument = try draft.document(preserving: source)
+      let mutated = try await animaCoreClient.updateRelation(
+        handle: handle,
+        relation: relationDocument
+      )
+      return try await adoptRelationMutation(
+        mutated,
+        handle: handle,
+        drivenPath: relation.driven
+      )
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+      throw error
+    }
+  }
+
+  private func validateRelationDraftCompatibility(
+    _ draft: RelationDraft
+  ) throws {
+    if let validationError = draft.validationError { throw validationError }
+    guard let driverPath = draft.driverPath,
+      relationDOFOption(path: driverPath)?.kind == draft.type.driverKind
+    else {
+      throw RelationAuthoringError.incompatibleDriver
+    }
+    guard let drivenPath = draft.drivenPath,
+      relationDOFOption(path: drivenPath)?.kind == draft.type.drivenKind
+    else {
+      throw RelationAuthoringError.incompatibleDriven
+    }
+  }
+
+  private func adoptRelationMutation(
+    _ mutated: AnimaCoreCharacterLoad,
+    handle: String,
+    drivenPath: String?
+  ) async throws -> AnimaCoreRelationSummary {
+    guard handle == animaCoreHandle, mutated.handle == handle else {
+      throw AnimaCoreClientError.invalidResponse(
+        "AnimaCore returned a relation mutation for an inactive character."
+      )
+    }
+    engineRigDocument = mutated.rigDocument
+    engineRigIdentity = mutated.rig.identity
+    engineParts = mutated.rig.parts
+    engineMates = mutated.rig.joints
+    engineRelations = mutated.rig.relations
+    engineParameters = mutated.rig.parameters
+    engineOutputs = mutated.rig.outputs
+    engineKinematicChain = mutated.rig.kinematicChain
+    guard let drivenPath,
+      let updated = engineRelations.first(where: { $0.driven == drivenPath })
+    else {
+      throw AnimaCoreClientError.invalidResponse(
+        "AnimaCore omitted the mutated relation from its rig response."
+      )
+    }
+    selection = [.relation(updated.id)]
+    documentEditRevision += 1
+    animaCoreErrorMessage = nil
+    await refreshAnimaCoreFrameAtPlayhead()
+    return updated
   }
 
   /// Refreshes both the inspector/output frame and the renderer transform from
@@ -1142,7 +1411,7 @@ final class StudioWorkspaceModel {
   }
 
   var canCreateRevoluteJoint: Bool {
-    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+    let connectedChildren = connectedMateChildPartIDs
     let eligibleChildren = project.rig.parts.filter {
       !connectedChildren.contains($0.id) && !isComponentLocked($0.id)
     }
@@ -1155,8 +1424,17 @@ final class StudioWorkspaceModel {
     }
   }
 
+  func canCreateMate(_ kind: MateCreationToolKind) -> Bool {
+    guard kind.supportsTwoConnectorAuthoring, canCreateRevoluteJoint else { return false }
+    if animaCoreHandle != nil {
+      return engineMateTypes.contains { $0.type == kind.engineTypeID }
+    }
+    return kind.hasLocalDraftAuthoringAction
+  }
+
   var mateCandidatePartIDs: Set<PartID> {
     guard let matePlacement else { return [] }
+    guard !matePlacement.isSubmitting else { return [] }
     if let source = matePlacement.sourceCandidate {
       return Set(
         project.rig.parts.compactMap { part in
@@ -1168,7 +1446,7 @@ final class StudioWorkspaceModel {
       )
     }
 
-    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+    let connectedChildren = connectedMateChildPartIDs
     let eligible = project.rig.parts.filter {
       !connectedChildren.contains($0.id) && !isComponentLocked($0.id)
     }
@@ -1178,6 +1456,17 @@ final class StudioWorkspaceModel {
       return [preferredPartID]
     }
     return Set(eligible.map(\.id))
+  }
+
+  private var connectedMateChildPartIDs: Set<PartID> {
+    var connected = Set(project.rig.joints.compactMap(\.childPartID))
+    for mate in engineMates where !mate.isSuppressed {
+      guard let childPart = mate.childPart,
+        let childID = partID(forEngineName: childPart)
+      else { continue }
+      connected.insert(childID)
+    }
+    return connected
   }
 
   func importModel(from url: URL, unitScaleToMeters: Double = 1) async {
@@ -1285,19 +1574,52 @@ final class StudioWorkspaceModel {
     selection = [.joint(joint.id)]
   }
 
-  func beginRevoluteMatePlacement() {
-    guard canCreateRevoluteJoint else { return }
-    let connectedChildren = Set(project.rig.joints.compactMap(\.childPartID))
+  func beginMatePlacement(_ kind: MateCreationToolKind) {
+    guard canCreateMate(kind) else { return }
+    if matePlacement != nil {
+      restoreCommittedPoseAfterMatePreview()
+    }
+    let connectedChildren = connectedMateChildPartIDs
     let preferredPartID = selectedPartID.flatMap { partID in
       !connectedChildren.contains(partID) && !isComponentLocked(partID) ? partID : nil
     }
     storedSelectedFeature = nil
-    matePlacement = MatePlacementSession(preferredPartID: preferredPartID)
+    matePreviewRequestRevision += 1
+    matePreviewBaselinePartPoses = engineResolvedPartPoses
+    matePlacement = MatePlacementSession(kind: kind, preferredPartID: preferredPartID)
     isPlaying = false
     showsCreationPalette = false
   }
 
+  /// Immediate toolbar actions that open nonmodal authoring surfaces. Part
+  /// placement and Design tools remain armed because they require a canvas
+  /// location; mates and relations must open as soon as their icon is chosen.
+  func activateTool(_ tool: StudioToolDescriptor) -> Bool {
+    guard case .arm(let payload) = tool.behavior else { return false }
+    switch payload {
+    case .createMate(let kind):
+      beginMatePlacement(kind)
+      return matePlacement != nil
+    case .createRelation(let kindID):
+      guard
+        let relation = engineRelationTypes.first(where: {
+          $0.kind.rawValue == kindID
+        })
+      else { return false }
+      beginRelationDraft(relation)
+      return true
+    case .addPart, .designPlaceholder:
+      return false
+    }
+  }
+
+  func beginRevoluteMatePlacement() {
+    beginMatePlacement(.revolute)
+  }
+
   func cancelMatePlacement() {
+    restoreCommittedPoseAfterMatePreview()
+    matePreviewBaselinePartPoses = nil
     matePlacement = nil
   }
 
@@ -1339,10 +1661,46 @@ final class StudioWorkspaceModel {
 
     guard let source = placement.sourceCandidate,
       source.partID != candidate.partID,
-      mateCandidatePartIDs.contains(candidate.partID),
-      let parent = project.rig.parts.first(where: { $0.id == candidate.partID })
+      mateCandidatePartIDs.contains(candidate.partID)
     else { return }
 
+    placement.targetCandidate = candidate
+    placement.previewErrorMessage = nil
+    matePlacement = placement
+    selection = [.part(source.partID), .part(candidate.partID)]
+    requestMatePlacementPreview()
+  }
+
+  func confirmMatePlacement() {
+    guard var placement = matePlacement,
+      let source = placement.sourceCandidate,
+      let target = placement.targetCandidate,
+      placement.canConfirm
+    else { return }
+    placement.isSubmitting = true
+    matePreviewRequestRevision += 1
+    matePlacement = placement
+    if animaCoreHandle != nil {
+      Task {
+        await authorEngineMate(
+          kind: placement.kind,
+          movingConnector: source,
+          fixedConnector: target,
+          options: placement.options
+        )
+      }
+      return
+    }
+    // Test/proxy-only compatibility path. Production characters always use
+    // the live AnimaCore handle above, so local Swift joints never become the
+    // saved source of mate meaning.
+    guard placement.kind == .revolute,
+      let parent = project.rig.parts.first(where: { $0.id == target.partID })
+    else {
+      placement.isSubmitting = false
+      matePlacement = placement
+      return
+    }
     var sequence = project.rig.joints.count + 1
     while project.rig.joints.contains(where: { $0.id.rawValue == "joint_\(sequence)" }) {
       sequence += 1
@@ -1355,7 +1713,7 @@ final class StudioWorkspaceModel {
       maximumRadians: .pi / 2,
       parentPartID: parent.id,
       childPartID: source.partID,
-      parentConnector: candidate.connector,
+      parentConnector: target.connector,
       childConnector: source.connector
     )
     project.rig.joints.append(joint)
@@ -1363,14 +1721,367 @@ final class StudioWorkspaceModel {
     selection = [.joint(joint.id)]
   }
 
+  func clearMatePlacementConnector(source: Bool) {
+    guard var placement = matePlacement, !placement.isSubmitting else { return }
+    if source {
+      placement.sourceCandidate = nil
+      placement.targetCandidate = nil
+    } else {
+      placement.targetCandidate = nil
+    }
+    placement.isPreviewing = false
+    placement.previewErrorMessage = nil
+    restoreCommittedPoseAfterMatePreview()
+    matePlacement = placement
+  }
+
+  func updateMatePlacementOptions(_ options: EngineMatePlacementOptions) {
+    guard var placement = matePlacement, !placement.isSubmitting else { return }
+    placement.options = options
+    placement.previewErrorMessage = nil
+    matePlacement = placement
+    requestMatePlacementPreview()
+  }
+
+  private func restoreCommittedPoseAfterMatePreview() {
+    matePreviewRequestRevision += 1
+    if let matePreviewBaselinePartPoses {
+      engineResolvedPartPoses = matePreviewBaselinePartPoses
+    }
+  }
+
+  /// Requests a canonical, non-mutating AnimaCore solve for the two selected
+  /// connector frames. Rapid option edits may queue actor calls, but revision
+  /// gating ensures only the newest result can reach the viewport.
+  private func requestMatePlacementPreview() {
+    guard animaCoreClient != nil, animaCoreHandle != nil,
+      var placement = matePlacement,
+      placement.sourceCandidate != nil,
+      placement.targetCandidate != nil,
+      !placement.isSubmitting
+    else { return }
+    placement.isPreviewing = true
+    placement.previewErrorMessage = nil
+    matePlacement = placement
+    matePreviewRequestRevision += 1
+    let revision = matePreviewRequestRevision
+    Task {
+      await previewEngineMate(placement, revision: revision)
+    }
+  }
+
+  /// Maps a renderer topology pick onto the canonical engine Part projection.
+  /// Exact geometry inference remains renderer-side; the resulting frame is
+  /// sent unchanged to AnimaCore when the operator confirms the mate.
+  func selectCADMateFeature(
+    _ feature: CADViewportFeaturePick,
+    sourceURL: URL?
+  ) {
+    guard matePlacement != nil else { return }
+    let standardizedSource = sourceURL?.standardizedFileURL
+    let sourceMatches = enginePartModelSources.filter { _, source in
+      standardizedSource == nil || source.fileURL.standardizedFileURL == standardizedSource
+    }
+    let exactNodeMatches = sourceMatches.filter { _, source in
+      guard let modelNode = source.modelNode else { return false }
+      return modelNode == feature.nodeName
+        || modelNode.split(separator: "/").last.map(String.init) == feature.nodeName
+    }
+    let resolvedPartID: PartID? = {
+      if exactNodeMatches.count == 1 { return exactNodeMatches.first?.key }
+      if sourceMatches.count == 1 { return sourceMatches.first?.key }
+      if let selectedPartID, sourceMatches[selectedPartID] != nil { return selectedPartID }
+      return nil
+    }()
+    guard let partID = resolvedPartID else {
+      animaCoreErrorMessage =
+        "That CAD feature could not be mapped to one character Part. Select the Part in the tree, then pick the feature again."
+      return
+    }
+    let kind: MateConnectorFeatureKind =
+      switch feature.kind {
+      case .face: .faceCenter
+      case .edge: .edgeMidpoint
+      case .vertex: .corner
+      case .axis: .axis
+      }
+    let label: String =
+      switch feature.kind {
+      case .face: "Face center"
+      case .edge: "Edge midpoint"
+      case .vertex: "Vertex"
+      case .axis: "Cylindrical axis"
+      }
+    selectMateConnector(
+      MateConnectorCandidate(
+        id: "cad-\(feature.kind.rawValue)-\(feature.topologyID)",
+        partID: partID,
+        displayName: "\(feature.nodeName) · \(label)",
+        featureKind: kind,
+        connector: MateConnectorDefinition(
+          originMeters: RigVector3(
+            x: feature.positionMeters.x,
+            y: feature.positionMeters.y,
+            z: feature.positionMeters.z
+          ),
+          primaryAxis: RigVector3(
+            x: feature.primaryAxis.x,
+            y: feature.primaryAxis.y,
+            z: feature.primaryAxis.z
+          ),
+          secondaryAxis: RigVector3(
+            x: feature.secondaryAxis.x,
+            y: feature.secondaryAxis.y,
+            z: feature.secondaryAxis.z
+          )
+        )
+      )
+    )
+  }
+
   private func wouldCreateMateCycle(childID: PartID, parentID: PartID) -> Bool {
     var currentID: PartID? = parentID
     var visited: Set<PartID> = []
     while let current = currentID, visited.insert(current).inserted {
       if current == childID { return true }
-      currentID = project.rig.joints.first { $0.childPartID == current }?.parentPartID
+      if let localParent = project.rig.joints.first(where: {
+        $0.childPartID == current
+      })?.parentPartID {
+        currentID = localParent
+        continue
+      }
+      guard let currentName = enginePartName(for: current),
+        let parentName = engineMates.first(where: {
+          !$0.isSuppressed && $0.childPart == currentName
+        })?.parentPart
+      else {
+        currentID = nil
+        continue
+      }
+      currentID = partID(forEngineName: parentName)
     }
     return false
+  }
+
+  private func previewEngineMate(
+    _ placement: MatePlacementSession,
+    revision: Int
+  ) async {
+    guard let source = placement.sourceCandidate,
+      let target = placement.targetCandidate
+    else { return }
+    guard let animaCoreClient, let handle = animaCoreHandle else {
+      guard revision == matePreviewRequestRevision,
+        var current = matePlacement
+      else { return }
+      current.isPreviewing = false
+      matePlacement = current
+      return
+    }
+    guard
+      let movingPartName = enginePartName(for: source.partID),
+      let fixedPartName = enginePartName(for: target.partID)
+    else {
+      finishMatePreview(
+        revision: revision,
+        errorMessage: EngineMateAuthoringError.missingPartMapping.localizedDescription
+      )
+      return
+    }
+    guard
+      let type = engineMateTypes.first(where: {
+        $0.type == placement.kind.engineTypeID
+      })
+    else {
+      finishMatePreview(
+        revision: revision,
+        errorMessage: EngineMateAuthoringError.typeUnavailable(
+          placement.kind.title
+        ).localizedDescription
+      )
+      return
+    }
+
+    do {
+      let draft = try EngineMateAuthoring.makeDraft(
+        kind: placement.kind,
+        type: type,
+        movingPartName: movingPartName,
+        movingConnector: source,
+        fixedPartName: fixedPartName,
+        fixedConnector: target,
+        existingMateNames: Set(engineMates.map(\.name)),
+        options: placement.options
+      )
+      let pose = try await animaCoreClient.previewMate(
+        handle: handle,
+        joint: draft.document,
+        clip: engineClipName,
+        timeSeconds: playheadSeconds
+      )
+      guard revision == matePreviewRequestRevision,
+        handle == animaCoreHandle,
+        var current = matePlacement
+      else { return }
+      engineResolvedPartPoses = Self.previewPoses(
+        from: pose,
+        partIDsByEngineName: enginePartIDsByName
+      )
+      current.isPreviewing = false
+      current.previewErrorMessage = nil
+      matePlacement = current
+    } catch is CancellationError {
+      return
+    } catch {
+      finishMatePreview(
+        revision: revision,
+        errorMessage: error.localizedDescription
+      )
+    }
+  }
+
+  private func finishMatePreview(
+    revision: Int,
+    errorMessage: String
+  ) {
+    guard revision == matePreviewRequestRevision,
+      var current = matePlacement
+    else { return }
+    if let matePreviewBaselinePartPoses {
+      engineResolvedPartPoses = matePreviewBaselinePartPoses
+    }
+    current.isPreviewing = false
+    current.previewErrorMessage = errorMessage
+    matePlacement = current
+  }
+
+  private func authorEngineMate(
+    kind: MateCreationToolKind,
+    movingConnector: MateConnectorCandidate,
+    fixedConnector: MateConnectorCandidate,
+    options: EngineMatePlacementOptions = .init()
+  ) async {
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let movingPartName = enginePartName(for: movingConnector.partID),
+      let fixedPartName = enginePartName(for: fixedConnector.partID)
+    else {
+      animaCoreErrorMessage = EngineMateAuthoringError.missingPartMapping.localizedDescription
+      if var placement = matePlacement {
+        placement.isSubmitting = false
+        matePlacement = placement
+      }
+      return
+    }
+    guard let type = engineMateTypes.first(where: { $0.type == kind.engineTypeID }) else {
+      animaCoreErrorMessage =
+        EngineMateAuthoringError.typeUnavailable(kind.title).localizedDescription
+      if var placement = matePlacement {
+        placement.isSubmitting = false
+        matePlacement = placement
+      }
+      return
+    }
+
+    do {
+      let draft = try EngineMateAuthoring.makeDraft(
+        kind: kind,
+        type: type,
+        movingPartName: movingPartName,
+        movingConnector: movingConnector,
+        fixedPartName: fixedPartName,
+        fixedConnector: fixedConnector,
+        existingMateNames: Set(engineMates.map(\.name)),
+        options: options
+      )
+      let mutated = try await animaCoreClient.addMate(
+        handle: handle,
+        joint: draft.document
+      )
+      guard handle == animaCoreHandle, mutated.handle == handle else { return }
+
+      engineRigDocument = mutated.rigDocument
+      engineRigIdentity = mutated.rig.identity
+      engineParts = mutated.rig.parts
+      engineMates = mutated.rig.joints
+      engineRelations = mutated.rig.relations
+      engineParameters = mutated.rig.parameters
+      engineOutputs = mutated.rig.outputs
+      engineKinematicChain = mutated.rig.kinematicChain
+      matePreviewBaselinePartPoses = nil
+      matePlacement = nil
+      if let mate = engineMates.first(where: { $0.name == draft.name }) {
+        selection = [.joint(JointID(rawValue: mate.selectionKey))]
+      }
+      documentEditRevision += 1
+      animaCoreErrorMessage = nil
+      await refreshAnimaCoreFrameAtPlayhead()
+    } catch {
+      if var placement = matePlacement {
+        placement.isSubmitting = false
+        matePlacement = placement
+      }
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  /// Applies presentation edits to one full-fidelity AnimaCore mate DTO.
+  ///
+  /// The app edits only fields already published by the bridge, then asks the
+  /// engine to validate and replace the mate. The returned rig and resolved
+  /// pose remain the only authoritative state.
+  @discardableResult
+  func updateEngineMate(
+    _ mate: AnimaCoreJointSummary,
+    with edit: EngineMateEditDraft
+  ) async throws -> AnimaCoreJointSummary {
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let sourceRigDocument = engineRigDocument
+    else {
+      throw ProjectLifecycleError.noCharacterLoaded
+    }
+
+    do {
+      let source = try AnimaCoreRigDocumentEditor.jointDocument(
+        identifiedBy: mate.selectionKey,
+        from: sourceRigDocument
+      )
+      let joint = try edit.applying(to: source)
+      let mutated = try await animaCoreClient.updateMate(
+        handle: handle,
+        joint: joint
+      )
+      guard handle == animaCoreHandle, mutated.handle == handle else {
+        throw AnimaCoreClientError.invalidResponse(
+          "AnimaCore returned a mate mutation for an inactive character."
+        )
+      }
+
+      engineRigDocument = mutated.rigDocument
+      engineRigIdentity = mutated.rig.identity
+      engineParts = mutated.rig.parts
+      engineMates = mutated.rig.joints
+      engineRelations = mutated.rig.relations
+      engineParameters = mutated.rig.parameters
+      engineOutputs = mutated.rig.outputs
+      engineKinematicChain = mutated.rig.kinematicChain
+      guard
+        let updated = engineMates.first(where: {
+          $0.id == mate.id || $0.name == mate.name
+        })
+      else {
+        throw AnimaCoreClientError.invalidResponse(
+          "AnimaCore omitted the updated mate from its rig response."
+        )
+      }
+      selection = [.joint(JointID(rawValue: updated.selectionKey))]
+      documentEditRevision += 1
+      animaCoreErrorMessage = nil
+      await refreshAnimaCoreFrameAtPlayhead()
+      return updated
+    } catch {
+      animaCoreErrorMessage = error.localizedDescription
+      throw error
+    }
   }
 
   func switchWorkspace(to workspace: StudioWorkspaceKind) {
@@ -1555,6 +2266,15 @@ final class StudioWorkspaceModel {
     return componentAppearances[id] ?? .defaultAppearance(for: part.primitiveKind)
   }
 
+  /// Returns only an operator-authored appearance, without synthesizing the
+  /// teal proxy color used by Studio's primitive previews.
+  ///
+  /// Imported CAD renderers must use this accessor so an absent editor
+  /// override continues to expose the STEP/XDE material colors.
+  func cadAppearanceOverride(for id: PartID) -> PreviewPartAppearance? {
+    componentAppearances[id]
+  }
+
   func setComponentAppearance(id: PartID, to appearance: PreviewPartAppearance) {
     guard !isComponentLocked(id), project.rig.parts.contains(where: { $0.id == id }) else {
       return
@@ -1652,34 +2372,56 @@ final class StudioWorkspaceModel {
   }
 
   func toggleRelationSuppressed(_ relation: AnimaCoreRelationSummary) async {
-    guard let document = engineRigDocument else { return }
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let document = engineRigDocument
+    else { return }
     do {
-      engineRigDocument = try AnimaCoreRigDocumentEditor.settingRelationSuppressed(
+      let source = try AnimaCoreRigDocumentEditor.relationDocument(
         kind: relation.kind,
         driver: relation.driver,
         driven: relation.driven,
-        suppressed: !relation.isSuppressed,
-        in: document
+        from: document
       )
-      documentEditRevision += 1
-      try await reloadEditedEngineRig()
+      guard case .object(var relationObject) = source else {
+        throw AnimaCoreClientError.invalidResponse(
+          "AnimaCore relation document is not an object."
+        )
+      }
+      relationObject["suppressed"] = .bool(!relation.isSuppressed)
+      let mutated = try await animaCoreClient.updateRelation(
+        handle: handle,
+        relation: .object(relationObject)
+      )
+      _ = try await adoptRelationMutation(
+        mutated,
+        handle: handle,
+        drivenPath: relation.driven
+      )
     } catch {
       animaCoreErrorMessage = error.localizedDescription
     }
   }
 
   func deleteEngineRelation(_ relation: AnimaCoreRelationSummary) async {
-    guard let document = engineRigDocument else { return }
+    guard let animaCoreClient, let handle = animaCoreHandle else { return }
     do {
-      engineRigDocument = try AnimaCoreRigDocumentEditor.removingRelation(
-        kind: relation.kind,
-        driver: relation.driver,
-        driven: relation.driven,
-        from: document
+      let mutated = try await animaCoreClient.removeRelation(
+        handle: handle,
+        driven: relation.driven
       )
+      guard handle == animaCoreHandle, mutated.handle == handle else { return }
+      engineRigDocument = mutated.rigDocument
+      engineRigIdentity = mutated.rig.identity
+      engineParts = mutated.rig.parts
+      engineMates = mutated.rig.joints
+      engineRelations = mutated.rig.relations
+      engineParameters = mutated.rig.parameters
+      engineOutputs = mutated.rig.outputs
+      engineKinematicChain = mutated.rig.kinematicChain
       selection.remove(.relation(relation.id))
       documentEditRevision += 1
-      try await reloadEditedEngineRig()
+      animaCoreErrorMessage = nil
+      await refreshAnimaCoreFrameAtPlayhead()
     } catch {
       animaCoreErrorMessage = error.localizedDescription
     }
@@ -2306,11 +3048,26 @@ final class StudioWorkspaceModel {
   /// ViewCube in step without an undo checkpoint or command-revision bump
   /// (which would flood undo and re-issue camera commands every frame).
   func reportCameraDirection(_ direction: PreviewCameraDirection) {
-    guard cameraState.orientation.direction != direction else { return }
-    cameraState.orientation = PreviewCameraOrientation(
-      direction: direction,
+    reportCameraOrientation(
+      direction,
       rollRadians: cameraState.orientation.rollRadians
     )
+  }
+
+  /// Lightweight full-orientation sync from CAD renderers. This deliberately
+  /// does not increment `cameraCommandRevision`: it is a report from the live
+  /// camera, not a command to send back to that camera.
+  func reportCameraOrientation(
+    _ direction: PreviewCameraDirection,
+    rollRadians: Float
+  ) {
+    let orientation = PreviewCameraOrientation(
+      direction: direction,
+      rollRadians: rollRadians
+    )
+    guard cameraState.orientation != orientation else { return }
+    cameraState.orientation = orientation
+    cameraViewpoint = .custom
   }
 
   func nudgeCamera(horizontalRadians: Float = 0, verticalRadians: Float = 0) {

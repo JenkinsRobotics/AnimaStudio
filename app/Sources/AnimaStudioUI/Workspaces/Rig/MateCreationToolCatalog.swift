@@ -1,10 +1,9 @@
 import Foundation
 
-/// UI-facing mate catalog used by the Rig creation ribbon.
+/// UI-facing mate catalog used by the 3D Modeling creation ribbon.
 ///
 /// AnimaCore supplies the operational type/category/DOF contract at runtime.
-/// This enum is only the stable ribbon presentation order. Revolute retains the
-/// transitional local draft action until canonical character mutation ships.
+/// This enum is only the stable ribbon presentation order.
 enum MateCreationToolKind: String, CaseIterable, Identifiable, Sendable {
   case fastened
   case parallel

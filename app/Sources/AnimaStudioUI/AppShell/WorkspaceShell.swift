@@ -176,7 +176,7 @@ final class StudioToolSettings {
 
 enum StudioToolPayload: Sendable {
   case addPart(RigPrimitiveKind)
-  case createRevoluteMate
+  case createMate(MateCreationToolKind)
   case createRelation(kindID: String)
   case designPlaceholder(toolID: String)
 }
@@ -291,15 +291,17 @@ enum StudioViewSidebarTab: String, CaseIterable, Identifiable, Sendable {
   case view = "View"
   case environment = "Environment"
   case appearance = "Appearance"
+  case performance = "Performance"
   case inspector = "Inspector"
 
   var id: Self { self }
 
   var systemImage: String {
     switch self {
-    case .view: "cube"
+    case .view: "camera.aperture"
     case .environment: "sun.max"
     case .appearance: "paintpalette"
+    case .performance: "gauge.with.dots.needle.67percent"
     case .inspector: "slider.horizontal.3"
     }
   }
@@ -713,7 +715,6 @@ enum StudioWorkspaceToolCatalog {
 
   @MainActor
   static func rigCategories(workspace: StudioWorkspaceModel) -> [StudioToolCategory] {
-    let canCreateRevoluteJoint = workspace.canCreateRevoluteJoint
     let partTools = RigPrimitiveKind.creatableCases.map { kind in
       StudioToolDescriptor(
         id: "rig.part.\(kind.rawValue)",
@@ -729,8 +730,8 @@ enum StudioWorkspaceToolCatalog {
         title: kind.title,
         systemImage: kind.systemImage,
         help: kind.motionSummary,
-        behavior: kind == .revolute && canCreateRevoluteJoint
-          ? .arm(.createRevoluteMate) : .unavailable
+        behavior: workspace.canCreateMate(kind)
+          ? .arm(.createMate(kind)) : .unavailable
       )
     }
     let relationTools = workspace.engineRelationTypes.map { relation in
@@ -841,6 +842,7 @@ enum WorkspaceRibbonActionDispatcher {
     case .frameSelection: workspace.frameSelection()
     case .toggleGrid: workspace.showsPreviewGrid.toggle()
     case .toggleBottomEditor: workspace.toggleBottomEditor()
+    case .showOutputMappings: workspace.selectCenterView(.table)
     }
   }
 
@@ -854,7 +856,7 @@ enum WorkspaceRibbonActionDispatcher {
     case .frameSelection: workspace.canFrameSelection
     case .stopPlayback, .togglePlayback, .toggleLoop, .previousKeyframe, .nextKeyframe,
       .toggleGrid, .toggleBottomEditor, .createCharacter3D, .createCharacter2D,
-      .createCharacterVR, .importImage, .importAudio, .importVideo:
+      .createCharacterVR, .importImage, .importAudio, .importVideo, .showOutputMappings:
       true
     }
   }
@@ -1659,6 +1661,7 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
   let leftTabs: [StudioWorkspaceSidebarTab]
   let leftPanels: StudioPanelStackState
   var didToggleLeftPanel: (String) -> Void = { _ in }
+  var performToolActivation: (StudioToolDescriptor) -> Bool = { _ in false }
   let performCommand: (WorkspaceRibbonAction) -> Void
   @ViewBuilder let center: Center
   @ViewBuilder let left: (String) -> Left
@@ -1853,6 +1856,7 @@ struct StudioWorkspaceScaffold<Center: View, Left: View, Right: View>: View {
 
   private func installToolActionHandler() {
     tools.actionHandler = { tool in
+      if performToolActivation(tool) { return true }
       guard case .command(let command) = tool.behavior else { return false }
       performCommand(command)
       return true

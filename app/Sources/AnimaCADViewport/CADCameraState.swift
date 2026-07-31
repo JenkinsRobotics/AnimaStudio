@@ -3,6 +3,22 @@ import Foundation
 import Observation
 import simd
 
+/// Renderer-neutral snapshot of the CAD camera's orientation relative to the
+/// fixed world axes. `direction` points from the target toward the camera.
+public struct CADCameraOrientationPresentation: Equatable, Sendable {
+  public let direction: SIMD3<Float>
+  public let rollRadians: Float
+
+  public init(direction: SIMD3<Float>, rollRadians: Float) {
+    let length = simd_length(direction)
+    self.direction =
+      length.isFinite && length > 0.0001
+      ? direction / length
+      : SIMD3<Float>(0, 0, 1)
+    self.rollRadians = rollRadians.isFinite ? rollRadians : 0
+  }
+}
+
 @Observable
 @MainActor
 public final class CADCameraState {
@@ -28,6 +44,20 @@ public final class CADCameraState {
     let baseUp = simd_normalize(simd_cross(baseRight, forward))
     return simd_normalize(
       baseUp * cos(rollRadians) + baseRight * sin(rollRadians))
+  }
+
+  public var orientationPresentation: CADCameraOrientationPresentation {
+    CADCameraOrientationPresentation(
+      direction: position - target,
+      rollRadians: rollRadians
+    )
+  }
+
+  public func set(orientation: CADCameraOrientationPresentation) {
+    let direction = orientation.direction
+    pitch = -asin(max(-1, min(1, direction.y)))
+    yaw = atan2(direction.x, direction.z)
+    rollRadians = orientation.rollRadians
   }
 
   public func orbit(deltaX: Float, deltaY: Float) {

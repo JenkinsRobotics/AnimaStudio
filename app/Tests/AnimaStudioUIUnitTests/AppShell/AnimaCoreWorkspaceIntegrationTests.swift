@@ -128,7 +128,6 @@ struct AnimaCoreWorkspaceIntegrationTests {
     """.write(to: characterURL, atomically: true, encoding: .utf8)
     defer {
       try? FileManager.default.removeItem(at: characterURL)
-      Task { await workspace.shutdownAnimaCore() }
     }
 
     await workspace.importAnimaCharacter(from: characterURL)
@@ -452,9 +451,319 @@ struct AnimaCoreWorkspaceIntegrationTests {
 
     let driverOptions = workspace.relationDOFOptions(kind: .rotation)
     let drivenOptions = workspace.relationDOFOptions(kind: .translation)
+    let availableDrivenOptions = workspace.relationDOFOptions(
+      kind: .translation,
+      availableAsDriven: true
+    )
     #expect(driverOptions.contains { $0.path == "steering.rotation" })
     #expect(drivenOptions.map(\.path) == ["rack.travel"])
+    #expect(availableDrivenOptions.isEmpty)
 
+    await workspace.shutdownAnimaCore()
+  }
+
+  @Test
+  func relationAuthoringCreatesEditsPersistsSuppressesAndDeletesThroughEngine() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    let characterURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "relation-authoring-\(UUID().uuidString).character.anima"
+    )
+    try """
+    anima_version: "2.0"
+    type: character
+    identity:
+      name: relation_authoring
+      display_name: Relation Authoring
+    parts:
+      base: { grounded: true }
+      driver: { parent: base }
+      driven: { parent: driver }
+    joints:
+      driver_joint:
+        type: revolute
+        parent: base
+        child: driver
+        dofs:
+          rotation:
+            neutral_deg: 0
+            axis: [0, 0, 1]
+      driven_joint:
+        type: revolute
+        parent: driver
+        child: driven
+        dofs:
+          rotation:
+            neutral_deg: 0
+            axis: [0, 0, 1]
+    clips:
+      motion:
+        duration_s: 1
+        tracks:
+          - time: 0
+            values: { driver_joint.rotation: 0 }
+          - time: 1
+            values: { driver_joint.rotation: 10 }
+    """.write(to: characterURL, atomically: true, encoding: .utf8)
+    defer {
+      try? FileManager.default.removeItem(at: characterURL)
+      Task { await workspace.shutdownAnimaCore() }
+    }
+
+    await workspace.importAnimaCharacter(from: characterURL)
+    let gearType = try #require(workspace.engineRelationTypes.first { $0.kind == .gear })
+    var draft = RelationDraft(type: gearType)
+    draft.driverPath = "driver_joint.rotation"
+    draft.drivenPath = "driven_joint.rotation"
+    draft.ratioFieldValue = 2
+    draft.offsetFieldValue = 5
+
+    let created = try await workspace.createEngineRelation(from: draft)
+
+    #expect(workspace.relationDraft == nil)
+    #expect(workspace.selection == [.relation(created.id)])
+    #expect(created.ratio == 2)
+    #expect(abs(created.offset - 5 * .pi / 180) < 0.000_001)
+    #expect(
+      abs(
+        (workspace.evaluatedFrame.jointAnglesRadians["driven_joint.rotation"] ?? 0)
+          - 25 * .pi / 180
+      ) < 0.000_001
+    )
+
+    var edit = RelationDraft(relation: created, type: gearType)
+    edit.ratioFieldValue = 3
+    edit.offsetFieldValue = 10
+    edit.isReversed = true
+    let updated = try await workspace.updateEngineRelation(created, with: edit)
+    #expect(updated.ratio == -3)
+    #expect(abs(updated.offset - 10 * .pi / 180) < 0.000_001)
+    #expect(workspace.selection == [.relation(updated.id)])
+
+    let serialized = try await workspace.serializedCharacterText()
+    let reloaded = try await client.loadCharacter(text: serialized)
+    let persisted = try #require(reloaded.rig.relations.first)
+    #expect(persisted.kind == .gear)
+    #expect(persisted.ratio == -3)
+    #expect(abs(persisted.offset - 10 * .pi / 180) < 0.000_001)
+
+    await workspace.toggleRelationSuppressed(updated)
+    let suppressed = try #require(workspace.engineRelations.first)
+    #expect(suppressed.isSuppressed)
+
+    await workspace.deleteEngineRelation(suppressed)
+    #expect(workspace.engineRelations.isEmpty)
+    #expect(workspace.selectedEngineRelation == nil)
+  }
+
+  @Test
+  func twoConnectorPlacementCreatesCanonicalFastenedMateAndResolvedPose() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    let characterURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "mate-authoring-\(UUID().uuidString).character.anima"
+    )
+    try """
+    anima_version: "2.0"
+    type: character
+    identity:
+      name: mate_authoring
+      display_name: Mate Authoring
+    parts:
+      base:
+        grounded: true
+        position_m: [1.0, 0.0, 0.0]
+      arm: {}
+    """.write(to: characterURL, atomically: true, encoding: .utf8)
+    defer {
+      try? FileManager.default.removeItem(at: characterURL)
+      Task { await workspace.shutdownAnimaCore() }
+    }
+
+    await workspace.importAnimaCharacter(from: characterURL)
+    let base = try #require(workspace.partID(forEngineName: "base"))
+    let arm = try #require(workspace.partID(forEngineName: "arm"))
+    #expect(workspace.canCreateMate(.fastened))
+    #expect(workspace.canCreateMate(.revolute))
+    #expect(workspace.canCreateMate(.slider))
+
+    workspace.beginMatePlacement(.fastened)
+    workspace.selectMateConnector(
+      MateConnectorCandidate(
+        id: "arm-origin",
+        partID: arm,
+        displayName: "Arm Origin",
+        featureKind: .origin,
+        connector: MateConnectorDefinition()
+      )
+    )
+    workspace.selectMateConnector(
+      MateConnectorCandidate(
+        id: "base-origin",
+        partID: base,
+        displayName: "Base Origin",
+        featureKind: .origin,
+        connector: MateConnectorDefinition()
+      )
+    )
+    #expect(workspace.matePlacement?.targetCandidate?.partID == base)
+    for _ in 0..<80 {
+      if workspace.matePlacement?.isPreviewing == false { break }
+      try await Task.sleep(for: .milliseconds(25))
+    }
+    #expect(workspace.engineMates.isEmpty)
+    #expect(workspace.engineResolvedPartPoses[arm]?.positionMeters.x == 1)
+
+    var previewOptions = EngineMatePlacementOptions()
+    previewOptions.offsetEnabled = true
+    previewOptions.offsetTranslationMillimeters = [250, 0, 0]
+    previewOptions.flipsPrimaryAxis = true
+    workspace.updateMatePlacementOptions(previewOptions)
+    for _ in 0..<80 {
+      if workspace.matePlacement?.isPreviewing == false { break }
+      try await Task.sleep(for: .milliseconds(25))
+    }
+    #expect(workspace.engineMates.isEmpty)
+    #expect(workspace.engineResolvedPartPoses[arm]?.positionMeters.x == 1.25)
+
+    workspace.cancelMatePlacement()
+    #expect(workspace.engineResolvedPartPoses[arm]?.positionMeters.x == 0)
+    #expect(workspace.engineMates.isEmpty)
+
+    workspace.beginMatePlacement(.fastened)
+    workspace.selectMateConnector(
+      MateConnectorCandidate(
+        id: "arm-origin",
+        partID: arm,
+        displayName: "Arm Origin",
+        featureKind: .origin,
+        connector: MateConnectorDefinition()
+      )
+    )
+    workspace.selectMateConnector(
+      MateConnectorCandidate(
+        id: "base-origin",
+        partID: base,
+        displayName: "Base Origin",
+        featureKind: .origin,
+        connector: MateConnectorDefinition()
+      )
+    )
+    for _ in 0..<80 {
+      if workspace.matePlacement?.isPreviewing == false { break }
+      try await Task.sleep(for: .milliseconds(25))
+    }
+    workspace.confirmMatePlacement()
+
+    for _ in 0..<80 {
+      if !workspace.engineMates.isEmpty { break }
+      try await Task.sleep(for: .milliseconds(25))
+    }
+
+    let mate = try #require(workspace.engineMates.first)
+    #expect(mate.type == "fastened")
+    #expect(mate.parentPart == "base")
+    #expect(mate.childPart == "arm")
+    #expect(mate.controls?.connectors.a?.feature == "base-origin")
+    #expect(mate.controls?.connectors.b?.feature == "arm-origin")
+    #expect(workspace.matePlacement == nil)
+    #expect(workspace.selection == [.joint(JointID(rawValue: mate.selectionKey))])
+    #expect(workspace.engineResolvedPartPoses[arm]?.positionMeters.x == 1)
+
+    var edit = EngineMateEditDraft(mate: mate)
+    edit.offsetEnabled = true
+    edit.offsetTranslationMillimeters = [250, 0, 0]
+    edit.flipsPrimaryAxis = true
+    edit.isSimulationConnection = false
+    let updated = try await workspace.updateEngineMate(mate, with: edit)
+    #expect(updated.id == mate.id)
+    #expect(updated.controls?.offset.isEnabled == true)
+    #expect(updated.controls?.offset.translationMeters == [0.25, 0, 0])
+    #expect(updated.controls?.flipsPrimaryAxis == true)
+    #expect(updated.controls?.isSimulationConnection == false)
+    #expect(workspace.selection == [.joint(JointID(rawValue: mate.selectionKey))])
+    #expect(workspace.engineResolvedPartPoses[arm]?.positionMeters.x == 1.25)
+
+    let saved = try await workspace.serializedCharacterText()
+    let reopened = try await client.loadCharacter(text: saved)
+    #expect(reopened.rig.joints.map(\.name) == ["fastened_1"])
+    #expect(reopened.rig.joints.first?.id == "Fastened 1")
+    #expect(reopened.rig.joints.first?.controls?.offset.translationMeters == [0.25, 0, 0])
+    try await client.release(handle: reopened.handle)
+    await workspace.shutdownAnimaCore()
+  }
+
+  @Test
+  func outputMappingEditsRoundTripThroughCanonicalEngine() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      startupWorkspace: .hardware,
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    await workspace.importAnimaCharacter(
+      from: repositoryRoot.appendingPathComponent(
+        "examples/six_axis_arm.character.anima"
+      )
+    )
+
+    let original = try #require(
+      workspace.engineOutputs.first { $0.targetPath == "base_yaw.rotation" }
+    )
+    let target = try #require(
+      workspace.hardwareOutputTargets.first { $0.path == original.targetPath }
+    )
+    var draft = HardwareOutputMappingDraft(mapping: original, target: target)
+    draft.channel = 6
+    draft.valueAtZero = 160
+    draft.valueAtOne = -160
+
+    let saved = try await workspace.saveOutputMapping(
+      draft,
+      originalChannel: original.channel
+    )
+
+    #expect(saved.channel == 6)
+    #expect(abs(saved.valueAtZero - (160 * .pi / 180)) < 1e-12)
+    #expect(abs(saved.valueAtOne - (-160 * .pi / 180)) < 1e-12)
+    #expect(!workspace.engineOutputs.contains { $0.channel == original.channel })
+
+    let canonicalText = try await workspace.serializedCharacterText()
+    let reopened = try await client.loadCharacter(text: canonicalText)
+    let reopenedMapping = try #require(
+      reopened.rig.outputs.first { $0.channel == 6 }
+    )
+    #expect(reopenedMapping.targetPath == "base_yaw.rotation")
+    #expect(reopenedMapping.valueAtZero > reopenedMapping.valueAtOne)
+    try await client.release(handle: reopened.handle)
+
+    try await workspace.removeOutputMapping(channel: 6)
+    #expect(workspace.engineOutputs.count == 5)
+    #expect(!workspace.engineOutputs.contains { $0.targetPath == "base_yaw.rotation" })
     await workspace.shutdownAnimaCore()
   }
 

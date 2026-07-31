@@ -8,10 +8,15 @@
       #viewport{display:block;outline:none}
       #notice{position:fixed;inset:0;display:grid;place-items:center;color:#7d8799;
         font:13px -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none}
+      #selectionBox{position:fixed;display:none;pointer-events:none;box-sizing:border-box;
+        border:1px solid #2d92ff;background:rgba(45,146,255,.12)}
+      #selectionBox.crossing{border-color:#f0b429;border-style:dashed;
+        background:rgba(240,180,41,.12)}
     </style>
   </head>
   <body>
     <canvas id="viewport" tabindex="0"></canvas>
+    <div id="selectionBox"></div>
     <div id="notice">Starting Three.js WebGPU renderer…</div>
     <script src="./app.js"></script>
   </body>

@@ -15,12 +15,15 @@ final class ComponentAppearanceTests: XCTestCase {
     let edited = try XCTUnwrap(
       PreviewPartAppearance(hexRGB: "#9DCFED", opacity: 0.65, isVisible: true)
     )
+    XCTAssertNil(model.cadAppearanceOverride(for: part.id))
 
     model.setComponentAppearance(id: part.id, to: edited)
     XCTAssertEqual(model.componentAppearance(for: part.id), edited)
+    XCTAssertEqual(model.cadAppearanceOverride(for: part.id), edited)
 
     model.resetComponentAppearance(id: part.id)
     XCTAssertEqual(model.componentAppearance(for: part.id), original)
+    XCTAssertNil(model.cadAppearanceOverride(for: part.id))
     XCTAssertNil(model.componentAppearances[part.id])
   }
 

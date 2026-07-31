@@ -61,7 +61,14 @@ line — one error surface, never a second parser.
 | `evaluate` | `{handle, clip?, time_s?}` | `{dof_values:{path:native_units}, parameters:{name:0..1}, channels:{channel:0..1}, limit_violations:[{dof_path,value,min,max}]}` |
 | `resolve_pose` | `{handle, clip?, time_s?}` | `{parts:{part_name:{position:[x,y,z], orientation:[x,y,z,w]}}}` — per-part **world** transforms after forward kinematics. **The RealityKit render hook.** Unknown handle → `unknown_handle`. See below. |
 | `mate_types` | `{}` | `{mate_types:[{type,label,category,drivable,dof_count,universal_controls:[…],dofs:[{name,kind,unit}]}]}` — the static per-kind catalog for all **10** mate kinds (the palette / panel-builder hook); no handle needed. See categories below. |
+| `preview_mate` | `{handle,joint,clip?,time_s?}` | `{parts:{part_name:{position,orientation}}}` — validate a candidate full-fidelity joint DTO and resolve the resulting pose without mutating the loaded rig. Used for the two-click connector alignment and live flip/reorient/offset preview; only `add_mate` commits. A cyclic candidate returns `format_error`. |
+| `add_mate` | `{handle,joint}` | `{handle,rig}` — validate and append one full-fidelity joint DTO (the same shape carried by `load_character.rig.joints`), store the resulting canonical rig under the same handle, and return its refreshed summary. |
+| `update_mate` | `{handle,joint}` | `{handle,rig}` — replace the existing mate keyed by `joint.name`, validate the complete rig, and return its refreshed canonical summary. |
+| `remove_mate` | `{handle,name}` | `{handle,rig}` — remove the named mate, validate the resulting rig, and return its refreshed canonical summary. |
 | `relation_types` | `{}` | `{relation_types:[{kind,label,driver_kind,driven_kind,ratio_field:{key,unit},reverse_supported}]}` — the static per-kind catalog for all **4** relation kinds (Gear, Rack and pinion, Screw, Linear); the relations palette/dialog hook; no handle needed. See relations below. |
+| `add_relation` | `{handle,relation}` | `{handle,rig}` — validate and append a full-fidelity relation DTO; rejects a second relation driving the same DOF. |
+| `update_relation` | `{handle,relation}` | `{handle,rig}` — replace the relation keyed by its `driven` DOF path, validate the complete rig, and return its refreshed canonical summary. |
+| `remove_relation` | `{handle,driven}` | `{handle,rig}` — remove the relation keyed by its unique driven DOF path and return the refreshed canonical summary. |
 | `serialize_character` | `{rig}` — the full rig DTO, **exactly the shape `load_character` returns in its `rig` field** (identity, parts, joints w/ controls + enriched dofs, parameters, clips w/ keyframes, relations, outputs w/ ranges) | `{text}` — canonical `.character.anima` YAML. The write side of Save: one format author. The engine rebuilds a `Rig` from the DTO (native units in, degrees out) and validates it — an un-serializable/invalid rig is a `format_error` (with `path` when the loader supplies one), so the app can never write a broken file. See "Serialization" below. |
 | `serialize_scene` | `{scene}` — the `.scene.anima` document structure (identity, character, variables, inputs, subroutines, sequence with every v1+v2 action incl. condition trees/select/call/wait_until, monitors, editor). No `load_scene` verb exists yet, so this DTO is the parsed-document shape (what `scene_to_dict` emits). | `{text}` — canonical `.scene.anima` YAML. Validated by re-parsing through the canonical scene loader; invalid → `format_error` with `path`. |
 | `release` | `{handle}` | `{}` — drop a loaded rig |
@@ -142,6 +149,12 @@ where `driver`/`driven` are DOF paths (`"<joint>.<dof>"`), `ratio` is
 the raw **signed** semantic value (the truth), `offset` is in the driven
 DOF's native units, and `display` passes the round-tripped non-semantic
 fields (teeth, lead, diameter — see the format) through unchanged.
+The three mutation verbs accept this semantic subset directly:
+`{kind,driver,driven,ratio,offset?,display?,suppressed?}`. They mutate the
+rig held by the bridge handle, re-run complete rig validation, and return
+the same full-fidelity `rig` summary shape as `load_character`. Studio must
+replace its retained DTO from that response; it must not independently
+reconstruct relation meaning.
 
 **Reverse / ratio-sign convention.** The engine stores exactly one
 signed `ratio`. The UI never edits that sign directly — it shows a
@@ -178,6 +191,15 @@ canonical convention lives in `Kinematics.md` → "Pose resolution". This
 verb **supersedes** the Swift `RigPoseResolver` + `MateConnectorMath`
 (migration step 2 below): RealityKit renders engine-resolved geometry
 instead of applying scalar joint angles to rest transforms.
+
+**Non-destructive mate preview (`preview_mate`).** The request's `joint`
+is exactly the DTO accepted by `add_mate`. AnimaCore temporarily appends
+it to the loaded rig, validates the parent→child graph (including cycle
+rejection), evaluates `clip`/`time_s`, and resolves the pose through the
+same connector equation as `resolve_pose`. The temporary rig is discarded
+before the response; the handle remains unchanged. Studio may therefore
+send every flip, 90° secondary reorientation, and offset edit for live
+feedback while the green checkmark remains the only committing action.
 
 ## Serialization (the Save write side — `serialize_character` / `serialize_scene`)
 

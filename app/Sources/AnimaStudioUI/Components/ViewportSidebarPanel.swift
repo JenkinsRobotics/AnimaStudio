@@ -10,12 +10,14 @@ enum ViewportControlID: String, Hashable, Sendable {
   case mouseSettings
   case cameraHelp
   case visualization
+  case performance
 }
 
 enum ViewportControlPlacement {
   static let viewportHUD: [ViewportControlID] = [.viewCube, .home]
   static let viewSidebar: [ViewportControlID] = [.display, .mouseSettings, .cameraHelp]
   static let environmentSidebar: [ViewportControlID] = [.visualization]
+  static let performanceSidebar: [ViewportControlID] = [.performance]
 }
 
 /// The single production control contract for viewport presentation.
@@ -47,6 +49,7 @@ struct ConsolidatedViewportSidebarBindings {
   let panSpeed: Binding<PreviewNavigationSpeed>
   let zoomSpeed: Binding<PreviewNavigationSpeed>
   let reversesWheelZoom: Binding<Bool>
+  let showsPerformanceHUD: Binding<Bool>
   let openMouseSettings: () -> Void
 }
 
@@ -75,6 +78,8 @@ struct ConsolidatedViewportSidebarPanel<Inspector: View>: View {
           visualizationControls
         case .appearance:
           scrollable(appearanceControls)
+        case .performance:
+          scrollable(performanceControls)
         case .inspector:
           EmptyView()
         }
@@ -296,6 +301,30 @@ struct ConsolidatedViewportSidebarPanel<Inspector: View>: View {
       )
       Text("PREVIEW OPACITY").studioViewportSidebarCaption()
       Slider(value: Binding(get: { state.opacity }, set: { state.opacity = $0 }), in: 0.2...1)
+    }
+    .controlSize(.small)
+  }
+
+  private var performanceControls: some View {
+    VStack(alignment: .leading, spacing: 11) {
+      Text("VIEWPORT HUD").studioViewportSidebarCaption()
+      Toggle("Show engine frame status", isOn: viewport.showsPerformanceHUD)
+        .controlSize(.small)
+      Text(
+        "The runtime card stays at bottom-right, clear of the center-view switcher and any open View panels."
+      )
+      .font(.caption)
+      .foregroundStyle(StudioPalette.muted)
+
+      Divider()
+      Text("LIVE STATUS").studioViewportSidebarCaption()
+      LabeledContent("Engine", value: viewport.workspace.animaCoreStatusLabel)
+      LabeledContent(
+        "Evaluated frame",
+        value: viewport.workspace.engineEvaluationTimeSeconds.map {
+          String(format: "%.3f s", $0)
+        } ?? "Waiting"
+      )
     }
     .controlSize(.small)
   }

@@ -100,11 +100,108 @@ public actor AnimaCoreClient {
     )
   }
 
+  /// Resolves a candidate mate at the requested frame without mutating the
+  /// canonical rig held by `handle`. The returned transforms use the same
+  /// engine path as `resolve_pose`; only `addMate` commits the candidate.
+  public func previewMate(
+    handle: String,
+    joint: AnimaCoreJSONValue,
+    clip: String? = nil,
+    timeSeconds: Double = 0
+  ) async throws -> AnimaCoreResolvedPose {
+    _ = try await start()
+    return try request(
+      method: "preview_mate",
+      params: MatePreviewParameters(
+        handle: handle,
+        joint: joint,
+        clip: clip,
+        timeSeconds: timeSeconds
+      )
+    )
+  }
+
+  /// Adds one mate to the canonical rig held by `handle`.
+  ///
+  /// `joint` is the same full-fidelity DTO shape returned in
+  /// `load_character.rig.joints`. AnimaCore validates the complete rig,
+  /// mutates the handle only when valid, and returns the refreshed rig DTO.
+  public func addMate(
+    handle: String,
+    joint: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "add_mate",
+      params: MateMutationParameters(handle: handle, joint: joint)
+    )
+  }
+
+  /// Replaces an existing mate, keyed by the mate's editable `name`.
+  public func updateMate(
+    handle: String,
+    joint: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "update_mate",
+      params: MateMutationParameters(handle: handle, joint: joint)
+    )
+  }
+
+  /// Removes an existing mate from the canonical rig held by `handle`.
+  public func removeMate(
+    handle: String,
+    name: String
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "remove_mate",
+      params: RemoveMateParameters(handle: handle, name: name)
+    )
+  }
+
   public func relationTypes() async throws -> AnimaCoreRelationTypeCatalog {
     _ = try await start()
     return try request(
       method: "relation_types",
       params: EmptyParameters()
+    )
+  }
+
+  /// Adds one advanced relation to the canonical rig held by `handle`.
+  public func addRelation(
+    handle: String,
+    relation: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "add_relation",
+      params: RelationMutationParameters(handle: handle, relation: relation)
+    )
+  }
+
+  /// Replaces an existing relation, keyed by its unique driven DOF path.
+  public func updateRelation(
+    handle: String,
+    relation: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "update_relation",
+      params: RelationMutationParameters(handle: handle, relation: relation)
+    )
+  }
+
+  /// Removes the relation that drives `driven`.
+  public func removeRelation(
+    handle: String,
+    driven: String
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "remove_relation",
+      params: RemoveRelationParameters(handle: handle, driven: driven)
     )
   }
 
@@ -323,7 +420,37 @@ public protocol AnimaCoreServing: Actor {
   func validateCharacter(text: String) async throws -> AnimaCoreValidation
   func serializeCharacter(rig: AnimaCoreJSONValue) async throws -> AnimaCoreSerializedText
   func mateTypes() async throws -> AnimaCoreMateTypeCatalog
+  func previewMate(
+    handle: String,
+    joint: AnimaCoreJSONValue,
+    clip: String?,
+    timeSeconds: Double
+  ) async throws -> AnimaCoreResolvedPose
+  func addMate(
+    handle: String,
+    joint: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad
+  func updateMate(
+    handle: String,
+    joint: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad
+  func removeMate(
+    handle: String,
+    name: String
+  ) async throws -> AnimaCoreCharacterLoad
   func relationTypes() async throws -> AnimaCoreRelationTypeCatalog
+  func addRelation(
+    handle: String,
+    relation: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad
+  func updateRelation(
+    handle: String,
+    relation: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad
+  func removeRelation(
+    handle: String,
+    driven: String
+  ) async throws -> AnimaCoreCharacterLoad
   func evaluate(
     handle: String,
     clip: String?,
@@ -382,6 +509,40 @@ private struct HandleParameters: Encodable {
 
 private struct RigParameters: Encodable {
   let rig: AnimaCoreJSONValue
+}
+
+private struct MateMutationParameters: Encodable {
+  let handle: String
+  let joint: AnimaCoreJSONValue
+}
+
+private struct MatePreviewParameters: Encodable {
+  let handle: String
+  let joint: AnimaCoreJSONValue
+  let clip: String?
+  let timeSeconds: Double
+
+  enum CodingKeys: String, CodingKey {
+    case handle
+    case joint
+    case clip
+    case timeSeconds = "time_s"
+  }
+}
+
+private struct RemoveMateParameters: Encodable {
+  let handle: String
+  let name: String
+}
+
+private struct RelationMutationParameters: Encodable {
+  let handle: String
+  let relation: AnimaCoreJSONValue
+}
+
+private struct RemoveRelationParameters: Encodable {
+  let handle: String
+  let driven: String
 }
 
 private struct EvaluationParameters: Encodable {

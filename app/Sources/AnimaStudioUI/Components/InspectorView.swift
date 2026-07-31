@@ -124,11 +124,13 @@ struct InspectorView: View {
       modelNodeInspector(selectedModelNode)
     } else if let selectedEngineMate = workspace.selectedEngineMate {
       EngineMateInspectorView(
+        workspace: workspace,
         mate: selectedEngineMate,
         mateType: workspace.engineMateType(for: selectedEngineMate)
       )
     } else if let selectedEngineRelation = workspace.selectedEngineRelation {
       EngineRelationInspectorView(
+        workspace: workspace,
         relation: selectedEngineRelation,
         relationType: workspace.engineRelationType(for: selectedEngineRelation)
       )

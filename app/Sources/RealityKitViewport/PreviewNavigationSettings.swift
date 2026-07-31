@@ -18,13 +18,14 @@ public enum PreviewNavigationProfile: String, CaseIterable, Identifiable, Sendab
   }
 }
 
-public enum NavigationDragBinding: String, CaseIterable, Identifiable, Sendable {
+public enum NavigationDragBinding: String, CaseIterable, Identifiable, Hashable, Sendable {
   case rightMouse
   case shiftRightMouse
   case optionRightMouse
   case middleMouse
   case controlRightMouse
   case controlMiddleMouse
+  case controlShiftMiddleMouse
   case shiftMiddleMouse
   case optionMiddleMouse
 
@@ -38,6 +39,7 @@ public enum NavigationDragBinding: String, CaseIterable, Identifiable, Sendable 
     case .middleMouse: "Middle Mouse Drag"
     case .controlRightMouse: "Control + Right Mouse Drag"
     case .controlMiddleMouse: "Control + Middle Mouse Drag"
+    case .controlShiftMiddleMouse: "Control + Shift + Middle Mouse Drag"
     case .shiftMiddleMouse: "Shift + Middle Mouse Drag"
     case .optionMiddleMouse: "Option + Middle Mouse Drag"
     }
@@ -66,30 +68,30 @@ extension PreviewNavigationProfile {
     case .default:
       PreviewNavigationProfileSummary(
         orbit: "Right drag",
-        pan: "Middle drag",
+        pan: "Middle or Control + right drag",
         zoom: "Scroll wheel",
         special: "Left drag — box select · right click — menu"
       )
     case .solidWorks:
       PreviewNavigationProfileSummary(
         orbit: "Middle drag",
-        pan: "Option + middle drag",
+        pan: "Control + middle drag",
         zoom: "Scroll wheel",
         special: "Shift + middle drag — precise zoom"
       )
     case .onshape:
       PreviewNavigationProfileSummary(
         orbit: "Right drag",
-        pan: "Middle drag",
+        pan: "Middle or Control + right drag",
         zoom: "Scroll wheel",
-        special: "Option + click — select through"
+        special: "Double middle click or F — zoom to fit"
       )
     case .fusion360:
       PreviewNavigationProfileSummary(
         orbit: "Shift + middle drag",
         pan: "Middle drag",
         zoom: "Scroll wheel",
-        special: "Double middle click — zoom to fit"
+        special: "Control + Shift + middle drag — precise zoom"
       )
     case .custom:
       PreviewNavigationProfileSummary(
@@ -98,6 +100,54 @@ extension PreviewNavigationProfile {
         zoom: "Scroll wheel",
         special: "\(customMapping.preciseZoomDrag.title) — precise zoom"
       )
+    }
+  }
+}
+
+/// The executable pointer chords for a navigation profile. Render adapters
+/// receive this resolved form so native Metal, RealityKit, and WebGPU all
+/// follow one canonical preset definition.
+public struct ResolvedNavigationMapping: Equatable, Sendable {
+  public let rotateDrags: Set<NavigationDragBinding>
+  public let panDrags: Set<NavigationDragBinding>
+  public let preciseZoomDrags: Set<NavigationDragBinding>
+
+  public init(
+    rotateDrags: Set<NavigationDragBinding>,
+    panDrags: Set<NavigationDragBinding>,
+    preciseZoomDrags: Set<NavigationDragBinding>
+  ) {
+    self.rotateDrags = rotateDrags
+    self.panDrags = panDrags
+    self.preciseZoomDrags = preciseZoomDrags
+  }
+}
+
+extension PreviewNavigationProfile {
+  public func resolvedMapping(
+    customMapping: CustomNavigationMapping = CustomNavigationMapping()
+  ) -> ResolvedNavigationMapping {
+    switch self {
+    case .default, .onshape:
+      ResolvedNavigationMapping(
+        rotateDrags: [.rightMouse],
+        panDrags: [.middleMouse, .controlRightMouse],
+        preciseZoomDrags: [])
+    case .solidWorks:
+      ResolvedNavigationMapping(
+        rotateDrags: [.middleMouse],
+        panDrags: [.controlMiddleMouse],
+        preciseZoomDrags: [.shiftMiddleMouse])
+    case .fusion360:
+      ResolvedNavigationMapping(
+        rotateDrags: [.shiftMiddleMouse],
+        panDrags: [.middleMouse],
+        preciseZoomDrags: [.controlShiftMiddleMouse])
+    case .custom:
+      ResolvedNavigationMapping(
+        rotateDrags: [customMapping.rotateDrag],
+        panDrags: [customMapping.panDrag],
+        preciseZoomDrags: [customMapping.preciseZoomDrag])
     }
   }
 }

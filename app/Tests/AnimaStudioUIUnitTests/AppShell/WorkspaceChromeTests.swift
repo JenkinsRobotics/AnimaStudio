@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 @testable import AnimaStudioUI
@@ -98,6 +99,68 @@ final class WorkspaceChromeTests: XCTestCase {
     XCTAssertLessThan(shortNameWidth, mediumNameWidth)
     XCTAssertLessThan(mediumNameWidth, longNameWidth)
     XCTAssertEqual(longNameWidth, 170)
+  }
+
+  func testWorkspaceWindowRequestRoundTripsItsPresentationIntent() throws {
+    let id = UUID()
+    let request = StudioWorkspaceWindowRequest(
+      id: id,
+      workspaceRawValue: StudioWorkspaceKind.animate.rawValue,
+      projectDisplayName: "Atlas",
+      targetTabWindowNumber: 42
+    )
+
+    let decoded = try JSONDecoder().decode(
+      StudioWorkspaceWindowRequest.self,
+      from: JSONEncoder().encode(request)
+    )
+
+    XCTAssertEqual(decoded, request)
+    XCTAssertEqual(decoded.id, id)
+    XCTAssertEqual(decoded.workspaceRawValue, "animate")
+    XCTAssertEqual(decoded.projectDisplayName, "Atlas")
+    XCTAssertEqual(decoded.targetTabWindowNumber, 42)
+  }
+
+  @MainActor
+  func testClosingProjectKeepsOutgoingBindingSafeWithoutResurrectingSession() {
+    let session = StudioProjectSession(
+      document: ProjectLifecycle.makeEmptyDocument(name: "Atlas"),
+      projectURL: URL(fileURLWithPath: "/tmp/Atlas", isDirectory: true)
+    )
+    let applicationState = AnimaStudioApplicationState()
+    applicationState.projectSession = session
+    let outgoingBinding = applicationState.presentationBinding(fallback: session)
+
+    applicationState.projectSession = nil
+
+    XCTAssertEqual(outgoingBinding.wrappedValue, session)
+    var staleUpdate = session
+    staleUpdate.isDirty = true
+    outgoingBinding.wrappedValue = staleUpdate
+    XCTAssertNil(applicationState.projectSession)
+  }
+
+  @MainActor
+  func testWorkspaceWindowCatalogUsesTheActiveCharacterAuthoringSurface() {
+    let workspace = StudioWorkspaceModel(resolvesDefaultAnimaCoreClient: false)
+
+    workspace.characterType = .threeD
+    XCTAssertEqual(
+      workspace.availableWindowWorkspaces,
+      [.assets, .rig, .animate, .show, .hardware, .nodes, .design]
+    )
+
+    workspace.characterType = .twoD
+    XCTAssertEqual(workspace.availableWindowWorkspaces[1], .canvas2d)
+    XCTAssertFalse(workspace.availableWindowWorkspaces.contains(.rig))
+
+    workspace.characterType = .vr
+    XCTAssertEqual(workspace.availableWindowWorkspaces[1], .vr)
+    XCTAssertEqual(
+      Set(workspace.availableWindowWorkspaces).count,
+      workspace.availableWindowWorkspaces.count
+    )
   }
 
   @MainActor

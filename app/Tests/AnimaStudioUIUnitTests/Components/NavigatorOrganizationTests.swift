@@ -132,6 +132,7 @@ final class NavigatorOrganizationTests: XCTestCase {
     let groupID = model.createComponentGroup(named: "Head")
     XCTAssertEqual(model.componentGroups.first?.componentIDs, [first, second])
     XCTAssertEqual(model.selection, [.componentGroup(groupID)])
+    XCTAssertEqual(model.viewportHighlightedPartIDs, [first, second])
 
     model.moveComponent(second, direction: .up)
     XCTAssertEqual(model.componentGroups.first?.componentIDs, [second, first])

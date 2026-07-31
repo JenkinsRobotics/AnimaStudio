@@ -98,6 +98,10 @@ final class RigCreationTests: XCTestCase {
     )
     model.selectMateConnector(target)
 
+    XCTAssertEqual(model.matePlacement?.targetCandidate, target)
+    XCTAssertTrue(model.project.rig.joints.isEmpty)
+    model.confirmMatePlacement()
+
     let mate = try XCTUnwrap(model.project.rig.joints.first)
     let movedPart = try XCTUnwrap(model.project.rig.parts.first { $0.id == moving.id })
     XCTAssertNil(model.matePlacement)
@@ -107,6 +111,23 @@ final class RigCreationTests: XCTestCase {
     XCTAssertEqual(mate.childConnector, source.connector)
     XCTAssertEqual(movedPart.positionMeters, RigVector3())
     XCTAssertEqual(model.selection, [.joint(mate.id)])
+  }
+
+  func testMateToolbarActivationImmediatelyOpensThePlacementPanel() {
+    let model = StudioWorkspaceModel()
+    model.addPart(kind: .box)
+    model.addPart(kind: .box)
+    let tool = StudioToolDescriptor(
+      id: "rig.mate.revolute",
+      title: "Revolute",
+      systemImage: "rotate.3d",
+      help: "Create a revolute mate",
+      behavior: .arm(.createMate(.revolute))
+    )
+
+    XCTAssertTrue(model.activateTool(tool))
+    XCTAssertEqual(model.matePlacement?.kind, .revolute)
+    XCTAssertNil(model.matePlacement?.sourceCandidate)
   }
 
   func testMatePlacementDoesNotOfferADescendantAsItsOwnParent() throws {

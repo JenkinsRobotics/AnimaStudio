@@ -9,6 +9,10 @@ public struct CADRenderGeometry: Sendable {
   public let partIDs: [UInt32]
   public let indices: [UInt32]
   public let edgePositions: [SIMD3<Float>]
+  /// Owning renderer Part ID for every edge vertex. This mirrors
+  /// `edgePositions` one-for-one so exact B-Rep edges receive the same rigid
+  /// transform as their face geometry.
+  public let edgePartIDs: [UInt32]
   public let batches: [CADRenderBatch]
   public let bounds: CADRenderBounds
 
@@ -73,10 +77,14 @@ public struct CADRenderGeometry: Sendable {
     }
 
     var edgePositions: [SIMD3<Float>] = []
+    var edgePartIDs: [UInt32] = []
     for edge in edges where edge.points.count > 1 {
+      let partID = edge.assemblyNode >= 0 ? UInt32(edge.assemblyNode + 1) : 0
       for index in 0..<(edge.points.count - 1) {
         edgePositions.append(edge.points[index])
         edgePositions.append(edge.points[index + 1])
+        edgePartIDs.append(partID)
+        edgePartIDs.append(partID)
       }
     }
     self.positions = positions
@@ -86,6 +94,7 @@ public struct CADRenderGeometry: Sendable {
     self.partIDs = partIDs
     self.indices = indices
     self.edgePositions = edgePositions
+    self.edgePartIDs = edgePartIDs
     self.batches = batches
     bounds = positions.isEmpty ? .empty : .init(minimum: minimum, maximum: maximum)
   }

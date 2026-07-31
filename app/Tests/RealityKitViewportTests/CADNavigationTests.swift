@@ -14,7 +14,7 @@ final class CADNavigationTests: XCTestCase {
     )
     XCTAssertEqual(
       action(button: .right, control: true, profile: .onshape),
-      .orbit(deltaX: 3, deltaY: -2)
+      .pan(deltaX: 3, deltaY: -2)
     )
   }
 
@@ -28,11 +28,10 @@ final class CADNavigationTests: XCTestCase {
       action(button: .middle, profile: .default),
       .pan(deltaX: 3, deltaY: -2)
     )
-    // Modifiers on middle stay a plain pan in the default profile.
+    XCTAssertNil(action(button: .middle, shift: true, profile: .default))
     XCTAssertEqual(
-      action(button: .middle, shift: true, profile: .default),
-      .pan(deltaX: 3, deltaY: -2)
-    )
+      action(button: .right, control: true, profile: .default),
+      .pan(deltaX: 3, deltaY: -2))
   }
 
   func testSolidWorksMouseProfileUsesMiddleButtonModifiers() {
@@ -41,7 +40,7 @@ final class CADNavigationTests: XCTestCase {
       .orbit(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
-      action(button: .middle, option: true, profile: .solidWorks),
+      action(button: .middle, control: true, profile: .solidWorks),
       .pan(deltaX: 3, deltaY: -2)
     )
     XCTAssertEqual(
@@ -49,9 +48,8 @@ final class CADNavigationTests: XCTestCase {
       .preciseZoom(delta: -2)
     )
     XCTAssertEqual(
-      action(button: .middle, control: true, profile: .solidWorks),
-      .orbit(deltaX: 3, deltaY: -2)
-    )
+      action(button: .middle, option: true, profile: .solidWorks),
+      nil)
     XCTAssertNil(action(button: .right, profile: .solidWorks))
   }
 
@@ -63,6 +61,10 @@ final class CADNavigationTests: XCTestCase {
     XCTAssertEqual(
       action(button: .middle, profile: .fusion360),
       .pan(deltaX: 3, deltaY: -2)
+    )
+    XCTAssertEqual(
+      action(button: .middle, control: true, shift: true, profile: .fusion360),
+      .preciseZoom(delta: -2)
     )
   }
 
@@ -258,10 +260,10 @@ final class CADNavigationTests: XCTestCase {
 
   func testPresetSummariesMatchExecutableMappings() {
     XCTAssertEqual(PreviewNavigationProfile.default.summary().orbit, "Right drag")
-    XCTAssertEqual(PreviewNavigationProfile.default.summary().pan, "Middle drag")
-    XCTAssertEqual(PreviewNavigationProfile.solidWorks.summary().pan, "Option + middle drag")
+    XCTAssertTrue(PreviewNavigationProfile.default.summary().pan.contains("Control + right"))
+    XCTAssertEqual(PreviewNavigationProfile.solidWorks.summary().pan, "Control + middle drag")
     XCTAssertEqual(PreviewNavigationProfile.onshape.summary().orbit, "Right drag")
-    XCTAssertTrue(PreviewNavigationProfile.fusion360.summary().special.contains("Double"))
+    XCTAssertTrue(PreviewNavigationProfile.fusion360.summary().special.contains("Control + Shift"))
   }
 
   func testRightMouseSequenceSeparatesClickFromDrag() {

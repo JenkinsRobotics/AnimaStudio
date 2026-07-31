@@ -122,7 +122,13 @@ struct CreationPaletteView: View {
           set: { workspace.relationDraft = $0 }
         ),
         driverOptions: workspace.relationDOFOptions(kind: draft.type.driverKind),
-        drivenOptions: workspace.relationDOFOptions(kind: draft.type.drivenKind),
+        drivenOptions: workspace.relationDOFOptions(
+          kind: draft.type.drivenKind,
+          availableAsDriven: true
+        ),
+        create: { draft in
+          _ = try await workspace.createEngineRelation(from: draft)
+        },
         dismiss: workspace.dismissRelationDraft
       )
     }
@@ -152,7 +158,7 @@ struct CreationPaletteView: View {
       title: "Mates",
       systemImage: "rotate.3d",
       tint: StudioPalette.joint,
-      detail: "10 engine types · 1 draft action"
+      detail: "10 engine types · 8 live actions"
     ) {
       ForEach(MateCreationToolKind.allCases) { kind in
         CreationToolButton(
@@ -162,28 +168,27 @@ struct CreationPaletteView: View {
           isEnabled: isMateToolEnabled(kind),
           help: mateToolHelp(kind)
         ) {
-          if kind == .revolute {
-            workspace.beginRevoluteMatePlacement()
-          }
+          workspace.beginMatePlacement(kind)
         }
       }
     }
   }
 
   private func isMateToolEnabled(_ kind: MateCreationToolKind) -> Bool {
-    kind.hasLocalDraftAuthoringAction && workspace.canCreateRevoluteJoint
+    workspace.canCreateMate(kind)
   }
 
   private func mateToolHelp(_ kind: MateCreationToolKind) -> String {
-    guard kind.hasLocalDraftAuthoringAction else {
+    guard kind.supportsTwoConnectorAuthoring else {
       return
-        "\(kind.motionSummary) Engine-backed inspection is available; canonical document editing is the next authoring packet."
+        "\(kind.motionSummary) This geometry constraint needs its specialized surface-selection workflow."
     }
-    guard workspace.canCreateRevoluteJoint else {
-      return "\(kind.motionSummary) Add two unlocked components before creating this mate."
+    guard workspace.canCreateMate(kind) else {
+      return
+        "\(kind.motionSummary) Load an AnimaCore character with two eligible unlocked components."
     }
     return
-      "\(kind.motionSummary) Choose a connector on the moving component, then one on the fixed component."
+      "\(kind.motionSummary) Choose a connector on the moving component, then one on the fixed component. AnimaCore validates and solves it."
   }
 
   private var relationsGroup: some View {
@@ -219,7 +224,7 @@ struct CreationPaletteView: View {
   private func relationToolHelp(_ type: AnimaCoreRelationTypeSummary) -> String {
     let presentation = RelationEditorPresentation(type: type)
     return
-      "\(presentation.compatibilitySummary). Opens the engine-backed relation draft dialog; document mutation is not wired yet."
+      "\(presentation.compatibilitySummary). Select two compatible mate DOFs, then AnimaCore validates and creates the relation."
   }
 
   private func futureGroup(

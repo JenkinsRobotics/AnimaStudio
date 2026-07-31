@@ -17,6 +17,7 @@ enum WorkspaceRibbonAction: String, Sendable {
   case frameSelection
   case toggleGrid
   case toggleBottomEditor
+  case showOutputMappings
 }
 
 enum WorkspaceRibbonGroupRole: Sendable {
@@ -356,9 +357,14 @@ enum WorkspaceRibbonCatalog {
       "Mapping", "arrow.triangle.branch", .components,
       [
         tool(
-          "Map DOF", "point.3.connected.trianglepath.dotted", "Map a rig DOF to an output channel."),
-        tool("Range", "slider.horizontal.below.rectangle", "Set minimum and maximum output."),
-        tool("Reverse", "arrow.left.arrow.right", "Reverse output direction."),
+          "Map DOF", "point.3.connected.trianglepath.dotted", "Map a rig DOF to an output channel.",
+          .showOutputMappings),
+        tool(
+          "Range", "slider.horizontal.below.rectangle", "Set minimum and maximum output.",
+          .showOutputMappings),
+        tool(
+          "Reverse", "arrow.left.arrow.right", "Reverse output direction.",
+          .showOutputMappings),
         tool("Neutral", "scope", "Set the neutral output value."),
         tool("Deadband", "minus.plus.batteryblock", "Set an output deadband."),
         tool("Curve", "chart.xyaxis.line", "Shape the output response curve."),

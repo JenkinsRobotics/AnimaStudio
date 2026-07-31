@@ -56,17 +56,37 @@ public struct CADWorkspaceReferenceGeometry: Codable, Equatable, Sendable {
   public let planeSizeMeters: Float
   public let axisLengthMeters: Float
   public let gridDivisions: Int
+  public let showsFloorGrid: Bool
+  public let floorGridSpacingMeters: Float
+  public let floorGridExtentMeters: Float
+  public let floorGridMajorLineInterval: Int
+  public let floorGridOpacity: Float
 
   public init(
     visibility: CADReferenceGeometryVisibility,
     modelDiagonalMeters: Float,
-    gridDivisions: Int = 10
+    gridDivisions: Int = 10,
+    showsFloorGrid: Bool = true,
+    floorGridSpacingMeters: Float = 0.1,
+    floorGridExtentMultiplier: Float = 4,
+    floorGridMajorLineInterval: Int = 5,
+    floorGridOpacity: Float = 0.24
   ) {
     let workingDiagonal = max(modelDiagonalMeters, 0.001)
+    let spacing = min(max(floorGridSpacingMeters, 0.000_1), 100)
+    let majorInterval = min(max(floorGridMajorLineInterval, 2), 20)
     self.visibility = visibility
     planeSizeMeters = workingDiagonal * 1.25
     axisLengthMeters = workingDiagonal * 0.35
     self.gridDivisions = max(gridDivisions, 2)
+    self.showsFloorGrid = showsFloorGrid
+    self.floorGridSpacingMeters = spacing
+    floorGridExtentMeters = max(
+      workingDiagonal * min(max(floorGridExtentMultiplier, 1.5), 20),
+      spacing * Float(majorInterval) * 2
+    )
+    self.floorGridMajorLineInterval = majorInterval
+    self.floorGridOpacity = min(max(floorGridOpacity, 0.02), 0.9)
   }
 }
 
@@ -161,13 +181,99 @@ public struct CADPartRestTransform: Codable, Equatable, Sendable {
   public func rotated(localAxis: CADTransformAxis, angleRadians: Double)
     -> CADPartRestTransform
   {
-    var result = self
-    result.rotationEulerRadians[localAxis.rawIndex] += angleRadians
-    return result
+    var localRotation = [0.0, 0.0, 0.0]
+    localRotation[localAxis.rawIndex] = angleRadians
+    let delta = CADPartRestTransform(rotationEulerRadians: localRotation).matrix
+    return CADPartRestTransform(matrix: matrix * delta)
   }
 
   public func applyingAssemblyDelta(_ delta: simd_float4x4) -> CADPartRestTransform {
     CADPartRestTransform(matrix: delta * matrix)
+  }
+}
+
+struct CADPartLocalBounds: Equatable, Sendable {
+  var minimum: SIMD3<Float>
+  var maximum: SIMD3<Float>
+
+  var corners: [SIMD3<Float>] {
+    [
+      SIMD3(minimum.x, minimum.y, minimum.z),
+      SIMD3(maximum.x, minimum.y, minimum.z),
+      SIMD3(minimum.x, maximum.y, minimum.z),
+      SIMD3(maximum.x, maximum.y, minimum.z),
+      SIMD3(minimum.x, minimum.y, maximum.z),
+      SIMD3(maximum.x, minimum.y, maximum.z),
+      SIMD3(minimum.x, maximum.y, maximum.z),
+      SIMD3(maximum.x, maximum.y, maximum.z),
+    ]
+  }
+}
+
+/// Keeps the transform manipulator centered on the geometry the operator
+/// actually selected. Local bounds are cached once per imported renderer Part;
+/// subsequent selection/drag updates transform only eight corners per Part.
+enum CADSelectionGizmoPlacement {
+  static func localBoundsByPartID(
+    geometry: CADRenderGeometry
+  ) -> [Int: CADPartLocalBounds] {
+    var result: [Int: CADPartLocalBounds] = [:]
+    for index in geometry.positions.indices where index < geometry.partIDs.count {
+      let partID = Int(geometry.partIDs[index])
+      guard partID > 0 else { continue }
+      let position = geometry.positions[index]
+      if let current = result[partID] {
+        result[partID] = CADPartLocalBounds(
+          minimum: simd_min(current.minimum, position),
+          maximum: simd_max(current.maximum, position))
+      } else {
+        result[partID] = CADPartLocalBounds(minimum: position, maximum: position)
+      }
+    }
+    return result
+  }
+
+  static func centeredTransform(
+    subjectTransform: CADPartRestTransform,
+    selectedPartIDs: Set<Int>,
+    localBoundsByPartID: [Int: CADPartLocalBounds],
+    partTransforms: [Int: simd_float4x4]
+  ) -> CADPartRestTransform {
+    var minimum = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+    var maximum = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+    var hasGeometry = false
+
+    for partID in selectedPartIDs {
+      guard let bounds = localBoundsByPartID[partID] else { continue }
+      let transform = partTransforms[partID] ?? matrix_identity_float4x4
+      for corner in bounds.corners {
+        let transformed = transform * SIMD4(corner, 1)
+        let worldPosition = SIMD3(transformed.x, transformed.y, transformed.z)
+        minimum = simd_min(minimum, worldPosition)
+        maximum = simd_max(maximum, worldPosition)
+        hasGeometry = true
+      }
+    }
+
+    guard hasGeometry else { return subjectTransform }
+    var centered = subjectTransform.matrix
+    centered.columns.3 = SIMD4((minimum + maximum) * 0.5, 1)
+    return CADPartRestTransform(matrix: centered)
+  }
+
+  /// Converts an absolute manipulator edit back to the semantic Part/group
+  /// origin. The center offset stays rigid in subject-local coordinates, so
+  /// rotations happen around the visual selection center without changing the
+  /// canonical meaning of the stored origin.
+  static func subjectTransform(
+    for gizmoTransform: CADPartRestTransform,
+    currentGizmoTransform: CADPartRestTransform,
+    currentSubjectTransform: CADPartRestTransform
+  ) -> CADPartRestTransform {
+    let subjectToGizmo =
+      simd_inverse(currentSubjectTransform.matrix) * currentGizmoTransform.matrix
+    return CADPartRestTransform(
+      matrix: gizmoTransform.matrix * simd_inverse(subjectToGizmo))
   }
 }
 
@@ -261,6 +367,40 @@ public struct CADPartTransformPresentation: Codable, Equatable, Sendable {
   }
 }
 
+/// Renderer-facing, view-only material override for one CAD assembly node.
+///
+/// The app expands its semantic Part appearance metadata to the same node+1
+/// IDs used by transforms and selection. This presentation never enters the
+/// AnimaCore rig: color/material/opacity remain editor metadata.
+public struct CADPartAppearancePresentation: Codable, Equatable, Sendable {
+  public let partID: Int
+  public let color: SIMD4<Float>
+  public let roughness: Float
+  public let metallic: Float
+
+  public init(
+    partID: Int,
+    color: SIMD4<Float>,
+    roughness: Float,
+    metallic: Float
+  ) {
+    self.partID = partID
+    self.color = SIMD4(
+      color.x.clamped(to: 0...1),
+      color.y.clamped(to: 0...1),
+      color.z.clamped(to: 0...1),
+      color.w.clamped(to: 0...1))
+    self.roughness = roughness.clamped(to: 0...1)
+    self.metallic = metallic.clamped(to: 0...1)
+  }
+}
+
+extension Float {
+  fileprivate func clamped(to range: ClosedRange<Float>) -> Float {
+    min(max(self, range.lowerBound), range.upperBound)
+  }
+}
+
 public struct CADNormalizedViewportPoint: Codable, Equatable, Sendable {
   public let x: Double
   public let y: Double
@@ -268,6 +408,72 @@ public struct CADNormalizedViewportPoint: Codable, Equatable, Sendable {
   public init(x: Double, y: Double) {
     self.x = x
     self.y = y
+  }
+}
+
+/// The selected Part's local orthogonal frame after projection through the
+/// active renderer camera. The origin and three axis endpoints use normalized
+/// top-left viewport coordinates, so one manipulator implementation can serve
+/// native Metal and Three.js/WebGPU without inventing screen-space axes.
+public struct CADProjectedLocalFrame: Codable, Equatable, Sendable {
+  public let origin: CADNormalizedViewportPoint
+  public let xAxis: CADNormalizedViewportPoint
+  public let yAxis: CADNormalizedViewportPoint
+  public let zAxis: CADNormalizedViewportPoint
+
+  public init(
+    origin: CADNormalizedViewportPoint,
+    xAxis: CADNormalizedViewportPoint,
+    yAxis: CADNormalizedViewportPoint,
+    zAxis: CADNormalizedViewportPoint
+  ) {
+    self.origin = origin
+    self.xAxis = xAxis
+    self.yAxis = yAxis
+    self.zAxis = zAxis
+  }
+
+  public init?(
+    localFrame: simd_float4x4,
+    axisLengthMeters: Float,
+    viewProjection: simd_float4x4
+  ) {
+    let originWorld = SIMD3(
+      localFrame.columns.3.x,
+      localFrame.columns.3.y,
+      localFrame.columns.3.z)
+    let xWorld =
+      originWorld
+      + SIMD3(localFrame.columns.0.x, localFrame.columns.0.y, localFrame.columns.0.z)
+      * axisLengthMeters
+    let yWorld =
+      originWorld
+      + SIMD3(localFrame.columns.1.x, localFrame.columns.1.y, localFrame.columns.1.z)
+      * axisLengthMeters
+    let zWorld =
+      originWorld
+      + SIMD3(localFrame.columns.2.x, localFrame.columns.2.y, localFrame.columns.2.z)
+      * axisLengthMeters
+    guard
+      let origin = Self.projectUnclipped(originWorld, viewProjection: viewProjection),
+      let xAxis = Self.projectUnclipped(xWorld, viewProjection: viewProjection),
+      let yAxis = Self.projectUnclipped(yWorld, viewProjection: viewProjection),
+      let zAxis = Self.projectUnclipped(zWorld, viewProjection: viewProjection)
+    else { return nil }
+    self.init(origin: origin, xAxis: xAxis, yAxis: yAxis, zAxis: zAxis)
+  }
+
+  private static func projectUnclipped(
+    _ worldPosition: SIMD3<Float>,
+    viewProjection: simd_float4x4
+  ) -> CADNormalizedViewportPoint? {
+    let clip = viewProjection * SIMD4(worldPosition, 1)
+    guard clip.w > 0.000_001 else { return nil }
+    let inverseW = 1 / clip.w
+    let x = Double((clip.x * inverseW + 1) * 0.5)
+    let y = Double((1 - clip.y * inverseW) * 0.5)
+    guard x.isFinite, y.isFinite else { return nil }
+    return CADNormalizedViewportPoint(x: x, y: y)
   }
 }
 
@@ -340,15 +546,80 @@ public enum CADViewportProjection {
   }
 }
 
+struct CADSourceLoadBatch: Sendable {
+  let document: CADGeometryDocument?
+  let partIDRangesByURL: [URL: Range<Int>]
+  let triangleCountsByURL: [URL: Int]
+  let failuresByURL: [URL: String]
+
+  static func importing(
+    _ sourceURLs: [URL],
+    loader: @Sendable (URL) throws -> CADGeometryDocument = {
+      try CADGeometryDocument.loadSTEP($0)
+    }
+  ) -> Self {
+    var imported: [(url: URL, document: CADGeometryDocument)] = []
+    var failures: [URL: String] = [:]
+
+    for sourceURL in sourceURLs {
+      let standardizedURL = sourceURL.standardizedFileURL
+      do {
+        imported.append((standardizedURL, try loader(sourceURL)))
+      } catch {
+        failures[standardizedURL] = error.localizedDescription
+      }
+    }
+
+    var rangesByURL: [URL: Range<Int>] = [:]
+    var countsByURL: [URL: Int] = [:]
+    var nodeOffset = 0
+    for source in imported {
+      countsByURL[source.url] = source.document.triangleCount
+      let count = source.document.nodes.count
+      rangesByURL[source.url] = nodeOffset..<(nodeOffset + count)
+      nodeOffset += count
+    }
+
+    let mergedDocument: CADGeometryDocument?
+    if imported.isEmpty {
+      mergedDocument = nil
+    } else {
+      do {
+        mergedDocument = try CADGeometryDocument.merging(imported.map(\.document))
+      } catch {
+        mergedDocument = nil
+        for source in imported {
+          failures[source.url] =
+            "The imported geometry could not be combined: \(error.localizedDescription)"
+        }
+        rangesByURL.removeAll()
+        countsByURL.removeAll()
+      }
+    }
+
+    return Self(
+      document: mergedDocument,
+      partIDRangesByURL: rangesByURL,
+      triangleCountsByURL: countsByURL,
+      failuresByURL: failures
+    )
+  }
+}
+
 /// Production host for the four Codex Bench pipelines. It imports every STEP
-/// source once through Open CASCADE, then switches only the renderer consumer.
+/// source through Open CASCADE, keeps every successful source available when
+/// another source fails, then switches only the renderer consumer.
 public struct CADPipelineViewport: View {
   public let sourceURLs: [URL]
   public let backend: CADRenderBackend
   public let theme: CADViewportTheme
+  public let navigation: CADViewportNavigationConfiguration
   public let showsTelemetry: Bool
+  public let telemetryTrailingPadding: CGFloat
+  public let telemetryBottomPadding: CGFloat
   public let isSelected: Bool
-  /// Unit view direction (target→camera, Y-up) the shared ViewCube requests.
+  /// View direction and optional roll `[x, y, z, roll]` the shared ViewCube
+  /// requests. The direction is target→camera in the fixed world frame.
   public let viewDirection: [Double]?
   public let cameraCommandRevision: Int
   /// STEP source files whose parts are hidden / selected in the assembly tree.
@@ -357,71 +628,135 @@ public struct CADPipelineViewport: View {
   public let hiddenSourceURLs: Set<URL>
   public let selectedSourceURLs: Set<URL>
   public let groundedSourceURLs: Set<URL>
+  public let editableSourceURLs: Set<URL>
   public let primarySelectedSourceURL: URL?
   public let partRestTransformsBySourceURL: [URL: CADPartRestTransform]
+  public let partAppearancesBySourceURL: [URL: CADPartAppearancePresentation]
   public let primarySelectionTransformOverride: CADPartRestTransform?
   public let primarySelectionTransformLabel: String
   public let primaryPartTransformIsEditable: Bool
   public let referenceGeometryVisibility: CADReferenceGeometryVisibility
+  public let showsFloorGrid: Bool
+  public let floorGridSpacingMeters: Float
+  public let floorGridExtentMultiplier: Float
+  public let floorGridMajorLineInterval: Int
+  public let floorGridOpacity: Float
+  /// Enables exact B-Rep feature inference for mate connector placement.
+  public let mateConnectorPickingEnabled: Bool
+  /// Reports real completed/presented renderer frames and process diagnostics.
+  /// This is not the AnimaCore animation playhead or evaluation timestamp.
+  public let onPerformanceUpdate: @MainActor @Sendable (CADViewportPerformanceSnapshot) -> Void
   public let onSourceTriangleCountsChange: ([URL: Int]) -> Void
-  /// Reports the live view direction so the ViewCube tracks CAD orbits.
-  public let onCameraDirection: @MainActor @Sendable ([Double]) -> Void
+  /// Reports only source-level failures. The owning document maps these URLs
+  /// back to semantic Parts and presents recovery in its tree/table instead of
+  /// replacing the entire CAD viewport with an error screen.
+  public let onSourceLoadFailuresChange: ([URL: String]) -> Void
+  /// Reports the live world-relative camera orientation so the ViewCube tracks
+  /// CAD orbit and roll without owning a second camera.
+  public let onCameraOrientation: @MainActor @Sendable (CADCameraOrientationPresentation) -> Void
   /// A part clicked in the viewport, mapped back to its STEP file (nil = empty
   /// click → clear). The caller maps the file to a PartID and selects it.
   public let onPickPart: @MainActor @Sendable (URL?, Bool) -> Void
+  public let onBoxPickParts: @MainActor @Sendable (Set<URL>, Bool) -> Void
+  public let onContextMenuPart: @MainActor @Sendable (URL?, CGPoint) -> Void
+  public let onPickMateFeature: @MainActor @Sendable (CADViewportFeaturePick?, URL?) -> Void
   public let onSetPrimaryPartRestTransform: @MainActor @Sendable (CADPartRestTransform) -> Void
+  public let onSetPartRestTransform: @MainActor @Sendable (URL, CADPartRestTransform) -> Void
 
   @State private var document: CADGeometryDocument?
   @State private var camera = CADCameraState()
   @State private var telemetry = CADLiveTelemetry()
   @State private var status = "Waiting for STEP geometry"
-  @State private var errorMessage: String?
+  @State private var isLoading = true
   @State private var partIDRangesByURL: [URL: Range<Int>] = [:]
-  @State private var webProjectedSelectedOrigin: CADNormalizedViewportPoint?
+  @State private var localBoundsByPartID: [Int: CADPartLocalBounds] = [:]
+  @State private var webProjectedSelectedFrame: CADProjectedLocalFrame?
+  @State private var directPartDragStart: CADPartRestTransform?
+  @State private var directPartDragSourceURL: URL?
 
   public init(
     sourceURLs: [URL],
     backend: CADRenderBackend,
     theme: CADViewportTheme,
+    navigation: CADViewportNavigationConfiguration = .onshape,
     showsTelemetry: Bool = false,
+    telemetryTrailingPadding: CGFloat = 14,
+    telemetryBottomPadding: CGFloat = 14,
     isSelected: Bool = false,
     viewDirection: [Double]? = nil,
     cameraCommandRevision: Int = 0,
     hiddenSourceURLs: Set<URL> = [],
     selectedSourceURLs: Set<URL> = [],
     groundedSourceURLs: Set<URL> = [],
+    editableSourceURLs: Set<URL> = [],
     primarySelectedSourceURL: URL? = nil,
     partRestTransformsBySourceURL: [URL: CADPartRestTransform] = [:],
+    partAppearancesBySourceURL: [URL: CADPartAppearancePresentation] = [:],
     primarySelectionTransformOverride: CADPartRestTransform? = nil,
     primarySelectionTransformLabel: String = "Part origin",
     primaryPartTransformIsEditable: Bool = false,
     referenceGeometryVisibility: CADReferenceGeometryVisibility = .init(),
+    showsFloorGrid: Bool = true,
+    floorGridSpacingMeters: Float = 0.1,
+    floorGridExtentMultiplier: Float = 4,
+    floorGridMajorLineInterval: Int = 5,
+    floorGridOpacity: Float = 0.24,
+    mateConnectorPickingEnabled: Bool = false,
+    onPerformanceUpdate:
+      @escaping @MainActor @Sendable (CADViewportPerformanceSnapshot) -> Void = { _ in },
     onSourceTriangleCountsChange: @escaping ([URL: Int]) -> Void = { _ in },
-    onCameraDirection: @escaping @MainActor @Sendable ([Double]) -> Void = { _ in },
+    onSourceLoadFailuresChange: @escaping ([URL: String]) -> Void = { _ in },
+    onCameraOrientation:
+      @escaping @MainActor @Sendable (CADCameraOrientationPresentation) -> Void = { _ in },
     onPickPart: @escaping @MainActor @Sendable (URL?, Bool) -> Void = { _, _ in },
+    onBoxPickParts:
+      @escaping @MainActor @Sendable (Set<URL>, Bool) -> Void = { _, _ in },
+    onContextMenuPart:
+      @escaping @MainActor @Sendable (URL?, CGPoint) -> Void = { _, _ in },
+    onPickMateFeature:
+      @escaping @MainActor @Sendable (CADViewportFeaturePick?, URL?) -> Void = { _, _ in },
     onSetPrimaryPartRestTransform:
-      @escaping @MainActor @Sendable (CADPartRestTransform) -> Void = { _ in }
+      @escaping @MainActor @Sendable (CADPartRestTransform) -> Void = { _ in },
+    onSetPartRestTransform:
+      @escaping @MainActor @Sendable (URL, CADPartRestTransform) -> Void = { _, _ in }
   ) {
     self.sourceURLs = sourceURLs
     self.backend = backend
     self.theme = theme
+    self.navigation = navigation
     self.showsTelemetry = showsTelemetry
+    self.telemetryTrailingPadding = telemetryTrailingPadding
+    self.telemetryBottomPadding = telemetryBottomPadding
     self.isSelected = isSelected
     self.viewDirection = viewDirection
     self.cameraCommandRevision = cameraCommandRevision
     self.hiddenSourceURLs = hiddenSourceURLs
     self.selectedSourceURLs = selectedSourceURLs
     self.groundedSourceURLs = groundedSourceURLs
+    self.editableSourceURLs = editableSourceURLs
     self.primarySelectedSourceURL = primarySelectedSourceURL
     self.partRestTransformsBySourceURL = partRestTransformsBySourceURL
+    self.partAppearancesBySourceURL = partAppearancesBySourceURL
     self.primarySelectionTransformOverride = primarySelectionTransformOverride
     self.primarySelectionTransformLabel = primarySelectionTransformLabel
     self.primaryPartTransformIsEditable = primaryPartTransformIsEditable
     self.referenceGeometryVisibility = referenceGeometryVisibility
+    self.showsFloorGrid = showsFloorGrid
+    self.floorGridSpacingMeters = floorGridSpacingMeters
+    self.floorGridExtentMultiplier = floorGridExtentMultiplier
+    self.floorGridMajorLineInterval = floorGridMajorLineInterval
+    self.floorGridOpacity = floorGridOpacity
+    self.mateConnectorPickingEnabled = mateConnectorPickingEnabled
+    self.onPerformanceUpdate = onPerformanceUpdate
     self.onSourceTriangleCountsChange = onSourceTriangleCountsChange
-    self.onCameraDirection = onCameraDirection
+    self.onSourceLoadFailuresChange = onSourceLoadFailuresChange
+    self.onCameraOrientation = onCameraOrientation
     self.onPickPart = onPickPart
+    self.onBoxPickParts = onBoxPickParts
+    self.onContextMenuPart = onContextMenuPart
+    self.onPickMateFeature = onPickMateFeature
     self.onSetPrimaryPartRestTransform = onSetPrimaryPartRestTransform
+    self.onSetPartRestTransform = onSetPartRestTransform
   }
 
   /// CAD partIDs (assemblyNode + 1) for the given source files.
@@ -444,7 +779,12 @@ public struct CADPipelineViewport: View {
   private var workspaceReferenceGeometry: CADWorkspaceReferenceGeometry {
     CADWorkspaceReferenceGeometry(
       visibility: referenceGeometryVisibility,
-      modelDiagonalMeters: document?.renderGeometry.bounds.diagonal ?? 1
+      modelDiagonalMeters: document?.renderGeometry.bounds.diagonal ?? 1,
+      showsFloorGrid: showsFloorGrid,
+      floorGridSpacingMeters: floorGridSpacingMeters,
+      floorGridExtentMultiplier: floorGridExtentMultiplier,
+      floorGridMajorLineInterval: floorGridMajorLineInterval,
+      floorGridOpacity: floorGridOpacity
     )
   }
 
@@ -462,28 +802,37 @@ public struct CADPipelineViewport: View {
     return result
   }
 
+  private var selectedSubjectTransform: CADPartRestTransform? {
+    if let primarySelectionTransformOverride { return primarySelectionTransformOverride }
+    guard let sourceURL = primarySelectedSourceURL?.standardizedFileURL else { return nil }
+    return partRestTransformsBySourceURL[sourceURL]
+  }
+
+  private var selectedGizmoTransform: CADPartRestTransform? {
+    guard let subjectTransform = selectedSubjectTransform else { return nil }
+    return CADSelectionGizmoPlacement.centeredTransform(
+      subjectTransform: subjectTransform,
+      selectedPartIDs: partIDs(for: selectedSourceURLs),
+      localBoundsByPartID: localBoundsByPartID,
+      partTransforms: partTransforms)
+  }
+
   private var selectedPartOrigin: CADPartOriginPresentation? {
-    if let primarySelectionTransformOverride {
-      return CADPartOriginPresentation(
-        transform: primarySelectionTransformOverride,
-        axisLengthMeters: workspaceReferenceGeometry.axisLengthMeters * 0.72)
-    }
-    guard let sourceURL = primarySelectedSourceURL?.standardizedFileURL,
-      let range = partIDRangesByURL[sourceURL],
-      let firstNode = range.first,
-      let transform = partTransforms[firstNode + 1]
-    else { return nil }
+    guard let selectedGizmoTransform else { return nil }
     return CADPartOriginPresentation(
-      matrix: transform,
+      transform: selectedGizmoTransform,
       axisLengthMeters: workspaceReferenceGeometry.axisLengthMeters * 0.72)
   }
 
-  private var selectedPartRestTransform: CADPartRestTransform? {
-    if let primarySelectionTransformOverride {
-      return primarySelectionTransformOverride
-    }
-    guard let sourceURL = primarySelectedSourceURL?.standardizedFileURL else { return nil }
-    return partRestTransformsBySourceURL[sourceURL]
+  private func setSelectedGizmoTransform(_ transform: CADPartRestTransform) {
+    guard let currentSubjectTransform = selectedSubjectTransform,
+      let currentGizmoTransform = selectedGizmoTransform
+    else { return }
+    onSetPrimaryPartRestTransform(
+      CADSelectionGizmoPlacement.subjectTransform(
+        for: transform,
+        currentGizmoTransform: currentGizmoTransform,
+        currentSubjectTransform: currentSubjectTransform))
   }
 
   private var partTransformPresentations: [CADPartTransformPresentation] {
@@ -494,31 +843,51 @@ public struct CADPipelineViewport: View {
     }
   }
 
+  private var partAppearancePresentations: [CADPartAppearancePresentation] {
+    var presentations: [CADPartAppearancePresentation] = []
+    for (sourceURL, appearance) in partAppearancesBySourceURL {
+      guard let range = partIDRangesByURL[sourceURL.standardizedFileURL] else { continue }
+      presentations.append(
+        contentsOf: range.map {
+          CADPartAppearancePresentation(
+            partID: $0 + 1,
+            color: appearance.color,
+            roughness: appearance.roughness,
+            metallic: appearance.metallic)
+        })
+    }
+    return presentations.sorted { $0.partID < $1.partID }
+  }
+
   public var body: some View {
     GeometryReader { geometry in
       ZStack {
         renderer
-        if let selectedPartRestTransform,
-          let anchor = selectedOriginAnchor(in: geometry.size)
+        if let selectedGizmoTransform,
+          let projectedFrame = selectedGizmoProjection(in: geometry.size)
         {
           CADTransformGizmoOverlay(
-            transform: selectedPartRestTransform,
+            transform: selectedGizmoTransform,
+            projectedFrame: projectedFrame,
+            viewportSize: geometry.size,
             label: primarySelectionTransformLabel,
             isEnabled: primaryPartTransformIsEditable,
             metersPerPoint: Double(
               max(document?.renderGeometry.bounds.diagonal ?? 1, 0.001) * 0.0015),
-            onChange: onSetPrimaryPartRestTransform
+            onChange: setSelectedGizmoTransform
           )
-          .position(anchor)
+          .position(
+            x: projectedFrame.origin.x * geometry.size.width,
+            y: projectedFrame.origin.y * geometry.size.height)
         }
-        if document == nil {
+        if isLoading {
           ContentUnavailableView {
             Label(
-              errorMessage == nil ? "Loading STEP" : "STEP Could Not Load",
-              systemImage: errorMessage == nil ? "gearshape.2" : "exclamationmark.triangle")
+              "Loading STEP",
+              systemImage: "gearshape.2")
           } description: {
             Text(
-              errorMessage ?? "Open CASCADE is reading hierarchy, colors, faces, and feature edges."
+              "Open CASCADE is reading hierarchy, colors, faces, and feature edges."
             )
           }
         }
@@ -526,22 +895,34 @@ public struct CADPipelineViewport: View {
           telemetry(document)
         }
       }
+      .coordinateSpace(name: CADGizmoInteraction.viewportCoordinateSpace)
     }
     .task(id: sourceSignature) { await loadSources() }
-    .onAppear { telemetry.start() }
-    .onDisappear { telemetry.stop() }
-    .onChange(of: viewDirection ?? []) { _, direction in
-      applyViewDirectionToMetalCamera(direction)
+    .onAppear {
+      applyRequestedOrientationToNativeCamera()
+      reportNativeCameraOrientation()
+      telemetry.start(onSample: onPerformanceUpdate)
     }
-    .onChange(of: selectedPartOrigin) { _, _ in
-      if backend != .metalKit {
-        webProjectedSelectedOrigin = nil
+    .onDisappear { telemetry.stop() }
+    .onChange(of: cameraCommandRevision) { _, _ in
+      applyRequestedOrientationToNativeCamera()
+    }
+    .onChange(of: camera.orientationPresentation) { _, _ in
+      reportNativeCameraOrientation()
+    }
+    .onChange(of: selectedPartOrigin == nil) { _, originIsMissing in
+      if backend != .metalKit, originIsMissing {
+        webProjectedSelectedFrame = nil
       }
+    }
+    .onChange(of: backend) { _, _ in
+      webProjectedSelectedFrame = nil
+      applyRequestedOrientationToNativeCamera()
+      reportNativeCameraOrientation()
     }
   }
 
-  private func selectedOriginAnchor(in size: CGSize) -> CGPoint? {
-    let projected: CADNormalizedViewportPoint?
+  private func selectedGizmoProjection(in size: CGSize) -> CADProjectedLocalFrame? {
     if backend == .metalKit, let selectedPartOrigin {
       let aspect = Float(max(size.width, 1) / max(size.height, 1))
       let viewProjection = CADViewportProjection.viewProjection(
@@ -551,27 +932,37 @@ public struct CADPipelineViewport: View {
         cameraDistance: camera.distance,
         modelDiagonalMeters: document?.renderGeometry.bounds.diagonal ?? 1,
         aspect: aspect)
-      let origin = selectedPartOrigin.matrix.columns.3
-      projected = CADViewportProjection.project(
-        worldPosition: SIMD3(origin.x, origin.y, origin.z),
+      return CADProjectedLocalFrame(
+        localFrame: selectedPartOrigin.matrix,
+        axisLengthMeters: selectedPartOrigin.axisLengthMeters,
         viewProjection: viewProjection)
-    } else {
-      projected = webProjectedSelectedOrigin
     }
-    guard let projected else { return nil }
-    return CGPoint(
-      x: projected.x * size.width,
-      y: projected.y * size.height)
+    return webProjectedSelectedFrame
   }
 
-  /// Snap the native Metal camera to a ViewCube direction. WebGPU applies the
-  /// direction in JS (see CADWebGPUViewport); this covers the Metal backend.
-  private func applyViewDirectionToMetalCamera(_ direction: [Double]) {
-    guard backend == .metalKit, direction.count == 3 else { return }
-    let dy = Float(max(-1, min(1, direction[1])))
-    camera.pitch = -asin(dy)
-    camera.yaw = atan2(Float(direction[0]), Float(direction[2]))
-    camera.rollRadians = 0
+  /// Apply only explicit ViewCube/navigation commands. Live renderer reports
+  /// do not increment `cameraCommandRevision`, so they cannot echo back and
+  /// fight a pointer orbit.
+  private func applyRequestedOrientationToNativeCamera() {
+    guard backend == .metalKit || backend == .realityKit,
+      let direction = viewDirection,
+      direction.count >= 3
+    else { return }
+    camera.set(
+      orientation: CADCameraOrientationPresentation(
+        direction: SIMD3(
+          Float(direction[0]),
+          Float(direction[1]),
+          Float(direction[2])
+        ),
+        rollRadians: direction.count >= 4 ? Float(direction[3]) : 0
+      )
+    )
+  }
+
+  private func reportNativeCameraOrientation() {
+    guard backend == .metalKit || backend == .realityKit else { return }
+    onCameraOrientation(camera.orientationPresentation)
   }
 
   @ViewBuilder
@@ -579,22 +970,41 @@ public struct CADPipelineViewport: View {
     switch backend {
     case .metalKit:
       CADMetalViewport(
-        document: document, camera: camera, theme: theme, isSelected: isSelected,
+        document: document, camera: camera, theme: theme, navigation: navigation,
+        isSelected: isSelected,
         hiddenPartIDs: partIDs(for: hiddenSourceURLs),
         selectedPartIDs: partIDs(for: selectedSourceURLs),
         groundedPartIDs: partIDs(for: groundedSourceURLs),
         referenceGeometry: workspaceReferenceGeometry,
         partTransforms: partTransformPresentations,
+        partAppearances: partAppearancePresentations,
         selectedPartOrigin: selectedPartOrigin,
+        mateConnectorPickingEnabled: mateConnectorPickingEnabled,
         onFrame: recordFrame,
-        onError: { errorMessage = $0 })
+        onError: { status = "Renderer unavailable: \($0)" },
+        onPick: { partID, extend in onPickPart(sourceURL(forPartID: partID), extend) },
+        onBoxPick: { partIDs, extend in
+          onBoxPickParts(Set(partIDs.compactMap(sourceURL(forPartID:))), extend)
+        },
+        onContextMenu: { partID, point, viewportSize in
+          onContextMenuPart(
+            partID.flatMap(sourceURL(forPartID:)),
+            CGPoint(x: point.x, y: viewportSize.height - point.y))
+        },
+        onPickFeature: { feature in
+          onPickMateFeature(feature, feature.flatMap { sourceURL(forPartID: $0.partID) })
+        },
+        onBeginDirectPartDrag: beginDirectPartDrag,
+        onUpdateDirectPartDrag: updateDirectPartDrag,
+        onEndDirectPartDrag: endDirectPartDrag)
     case .realityKit:
       CADRealityKitViewport(
-        document: document, camera: camera, theme: theme, isSelected: isSelected,
+        document: document, camera: camera, theme: theme, navigation: navigation,
+        isSelected: isSelected,
         onFrame: recordFrame)
     case .threeJSWebGPU, .rawWebGPU:
       CADWebGPUViewport(
-        backend: backend, document: document, theme: theme,
+        backend: backend, document: document, theme: theme, navigation: navigation,
         viewDirection: viewDirection,
         cameraCommandRevision: cameraCommandRevision,
         hiddenPartIDs: partIDs(for: hiddenSourceURLs),
@@ -602,13 +1012,66 @@ public struct CADPipelineViewport: View {
         groundedPartIDs: partIDs(for: groundedSourceURLs),
         referenceGeometry: workspaceReferenceGeometry,
         partTransforms: partTransformPresentations,
+        partAppearances: partAppearancePresentations,
         selectedPartOrigin: selectedPartOrigin,
         onStatus: { status = $0 },
-        onFrameCount: telemetry.recordFrames,
-        onCameraDirection: onCameraDirection,
-        onSelectedOriginScreenPosition: { webProjectedSelectedOrigin = $0 },
-        onPick: { partID, extend in onPickPart(sourceURL(forPartID: partID), extend) })
+        onFrameCount: { count, intervalSeconds in
+          telemetry.recordFrames(count, intervalSeconds: intervalSeconds)
+        },
+        onCameraOrientation: { orientation in
+          camera.set(orientation: orientation)
+          onCameraOrientation(orientation)
+        },
+        onSelectedGizmoProjection: { webProjectedSelectedFrame = $0 },
+        onPick: { partID, extend in onPickPart(sourceURL(forPartID: partID), extend) },
+        onBoxPick: { partIDs, extend in
+          onBoxPickParts(Set(partIDs.compactMap(sourceURL(forPartID:))), extend)
+        },
+        onContextMenu: { partID, point in
+          onContextMenuPart(partID.flatMap(sourceURL(forPartID:)), point)
+        },
+        onBeginDirectPartDrag: beginDirectPartDrag,
+        onUpdateDirectPartDrag: updateDirectPartDrag,
+        onEndDirectPartDrag: endDirectPartDrag)
     }
+  }
+
+  private func beginDirectPartDrag(_ partID: Int) -> Bool {
+    guard let sourceURL = sourceURL(forPartID: partID)?.standardizedFileURL else {
+      return false
+    }
+    // Every hit selects, even when that component is locked or constrained and
+    // cannot be directly repositioned.
+    onPickPart(sourceURL, false)
+    guard
+      editableSourceURLs.contains(sourceURL),
+      let start = partRestTransformsBySourceURL[sourceURL]
+    else { return false }
+    // Mouse-down selects the hit component before its transform starts
+    // moving. Plain left-drag is therefore a single select-and-place gesture.
+    directPartDragStart = start
+    directPartDragSourceURL = sourceURL
+    return true
+  }
+
+  private func updateDirectPartDrag(_ translation: CGSize, _ viewportSize: CGSize) {
+    guard let start = directPartDragStart, let sourceURL = directPartDragSourceURL else {
+      return
+    }
+    onSetPartRestTransform(
+      sourceURL,
+      CADDirectManipulation.translated(
+        start,
+        screenTranslation: translation,
+        viewportHeightPoints: viewportSize.height,
+        cameraPosition: camera.position,
+        cameraTarget: camera.target,
+        cameraUp: camera.upVector))
+  }
+
+  private func endDirectPartDrag() {
+    directPartDragStart = nil
+    directPartDragSourceURL = nil
   }
 
   private func telemetry(_ document: CADGeometryDocument) -> some View {
@@ -640,7 +1103,8 @@ public struct CADPipelineViewport: View {
     .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 10))
     .overlay(RoundedRectangle(cornerRadius: 10).stroke(.white.opacity(0.12)))
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-    .padding(14)
+    .padding(.trailing, telemetryTrailingPadding)
+    .padding(.bottom, telemetryBottomPadding)
     .allowsHitTesting(false)
   }
 
@@ -672,41 +1136,41 @@ public struct CADPipelineViewport: View {
   @MainActor
   private func loadSources() async {
     document = nil
-    errorMessage = nil
+    isLoading = true
+    partIDRangesByURL = [:]
+    localBoundsByPartID = [:]
     onSourceTriangleCountsChange([:])
+    onSourceLoadFailuresChange([:])
     let urls = sourceURLs.filter { ["step", "stp"].contains($0.pathExtension.lowercased()) }
     guard !urls.isEmpty else {
-      errorMessage = "The selected CAD backend needs at least one STEP or STP source."
+      isLoading = false
+      status = "No STEP sources"
       return
     }
-    do {
-      let imported = try await Task.detached(priority: .userInitiated) {
-        try urls.map { try CADGeometryDocument.loadSTEP($0) }
-      }.value
-      var counts: [URL: Int] = [:]
-      for (url, sourceDocument) in zip(urls, imported) {
-        counts[url.standardizedFileURL] = sourceDocument.triangleCount
-      }
-      onSourceTriangleCountsChange(counts)
-      // Record each source's assembly-node range in merge order (merging appends
-      // nodes per document in this same order), so per-part hide/select can map
-      // a STEP file to its CAD partIDs.
-      var rangesByURL: [URL: Range<Int>] = [:]
-      var nodeOffset = 0
-      for (url, sourceDocument) in zip(urls, imported) {
-        let count = sourceDocument.nodes.count
-        rangesByURL[url.standardizedFileURL] = nodeOffset..<(nodeOffset + count)
-        nodeOffset += count
-      }
-      partIDRangesByURL = rangesByURL
-      let merged = try CADGeometryDocument.merging(imported)
-      document = merged
+    let batch = await Task.detached(priority: .userInitiated) {
+      CADSourceLoadBatch.importing(urls)
+    }.value
+    guard !Task.isCancelled else { return }
+
+    partIDRangesByURL = batch.partIDRangesByURL
+    onSourceTriangleCountsChange(batch.triangleCountsByURL)
+    onSourceLoadFailuresChange(batch.failuresByURL)
+    document = batch.document
+    if let merged = batch.document {
+      localBoundsByPartID = CADSelectionGizmoPlacement.localBoundsByPartID(
+        geometry: merged.renderGeometry)
       camera.frame(bounds: merged.renderGeometry.bounds)
-      status = "Loaded \(urls.count) STEP source\(urls.count == 1 ? "" : "s")"
-    } catch {
-      errorMessage = error.localizedDescription
-      status = "STEP import failed"
     }
+    let loadedCount = batch.triangleCountsByURL.count
+    let failedCount = batch.failuresByURL.count
+    if failedCount == 0 {
+      status = "Loaded \(loadedCount) STEP source\(loadedCount == 1 ? "" : "s")"
+    } else {
+      status =
+        "Loaded \(loadedCount) source\(loadedCount == 1 ? "" : "s"); "
+        + "\(failedCount) need\(failedCount == 1 ? "s" : "") relinking"
+    }
+    isLoading = false
   }
 
   @MainActor private func recordFrame() { telemetry.recordFrames() }

@@ -11,6 +11,7 @@ import SwiftUI
 struct AssemblyTreeView: View {
   @Bindable var workspace: StudioWorkspaceModel
   let deleteParts: (Set<PartID>) -> Void
+  let relinkPart: (PartID) -> Void
 
   @State private var expanded: Set<String> = ["ref", "mates"]
   @State private var hoveredID: String?
@@ -134,6 +135,22 @@ struct AssemblyTreeView: View {
           .foregroundStyle(StudioPalette.hardware)
       }
       Spacer(minLength: 4)
+      if let partID = item.partID,
+        let failure = workspace.cadSourceLoadFailure(for: partID)
+      {
+        Button {
+          relinkPart(partID)
+        } label: {
+          Image(systemName: "link.badge.plus")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.orange)
+            .frame(width: 18, height: 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Source disconnected: \(failure)\nChoose a replacement file")
+        .accessibilityLabel("Relink \(item.title)")
+      }
       if item.canToggleVisibility, hoveredID == item.id || isHidden {
         Button {
           toggleVisibility(item)
@@ -180,6 +197,11 @@ struct AssemblyTreeView: View {
   private func contextMenu(_ item: AssemblyItem) -> some View {
     if let partID = item.partID {
       Button("Rename…", systemImage: "pencil") { beginRename(partID) }
+      if workspace.cadSourceLoadFailure(for: partID) != nil {
+        Button("Relink Source…", systemImage: "link.badge.plus") {
+          relinkPart(partID)
+        }
+      }
       Button("Group Selection", systemImage: "folder.badge.plus") {
         _ = workspace.createComponentGroup()
       }
@@ -296,6 +318,9 @@ struct AssemblyTreeView: View {
   private func iconColor(_ item: AssemblyItem, hidden: Bool, selected: Bool) -> Color {
     if hidden { return .secondary.opacity(0.5) }
     if selected { return StudioPalette.accent }
+    if let partID = item.partID, workspace.cadSourceLoadFailure(for: partID) != nil {
+      return .orange
+    }
     switch item.kind {
     case .part: return StudioPalette.sourceModel
     case .group, .section: return .secondary

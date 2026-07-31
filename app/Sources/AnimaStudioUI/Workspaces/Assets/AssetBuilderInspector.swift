@@ -128,7 +128,7 @@ struct AssetBuilderInspector: View {
           rig: workspace.project.rig,
           engineResolvedPartPoses: workspace.engineResolvedPartPoses,
           partModelSources: workspace.enginePartModelSources,
-          showsGrid: true,
+          showsGrid: workspace.showsPreviewGrid,
           viewpoint: previewViewpoint,
           cameraCommandRevision: previewCameraCommandRevision,
           cameraState: previewCameraState,
@@ -223,6 +223,7 @@ struct AssetBuilderInspector: View {
     case .grounded: "pin.fill"
     case .suppressed: "eye.slash.fill"
     case .proxy: "cube"
+    case .disconnected: "link.slash"
     }
   }
 }

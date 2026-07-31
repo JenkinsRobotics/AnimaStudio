@@ -22,6 +22,7 @@ struct AssetBuilderContentView: View {
   let selectCharacter: (ProjectCharacterReference) -> Void
   let importModels: () -> Void
   let replaceModel: () -> Void
+  let relinkPart: (PartID) -> Void
   let deleteParts: (Set<PartID>) -> Void
   var forcedLayoutMode: AssetBuilderLayoutMode? = nil
 
@@ -475,50 +476,61 @@ struct AssetBuilderContentView: View {
   }
 
   private func partTableRow(_ part: AssetBuilderPartRow) -> some View {
-    Button {
-      selectPart(part.id)
-    } label: {
-      HStack(spacing: 12) {
-        HStack(spacing: 10) {
-          partThumbnail(part)
-          VStack(alignment: .leading, spacing: 2) {
-            Text(part.name).font(.callout.weight(.medium)).lineLimit(1)
-            if !part.description.isEmpty {
-              Text(part.description)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            }
+    HStack(spacing: 12) {
+      HStack(spacing: 10) {
+        partThumbnail(part)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(part.name).font(.callout.weight(.medium)).lineLimit(1)
+          if !part.description.isEmpty {
+            Text(part.description)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
           }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-
-        Text(part.sourceLabel)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .frame(width: 190, alignment: .leading)
-        Text("V\(part.version)")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(StudioPalette.sourceModel)
-          .frame(width: 62, alignment: .leading)
-        Text(part.parent ?? "Character origin")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .frame(width: 120, alignment: .leading)
-        statusBadge(part.state)
-          .frame(width: 92, alignment: .leading)
       }
-      .padding(.horizontal, 16)
-      .frame(height: 54)
-      .background(
-        selectedPartIDs.contains(part.id) ? StudioPalette.accent.opacity(0.22) : Color.clear
-      )
-      .contentShape(Rectangle())
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      Text(part.sourceLabel)
+        .font(.caption)
+        .foregroundStyle(part.state.isDisconnected ? .orange : .secondary)
+        .lineLimit(1)
+        .frame(width: 190, alignment: .leading)
+      Text("V\(part.version)")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(StudioPalette.sourceModel)
+        .frame(width: 62, alignment: .leading)
+      Text(part.parent ?? "Character origin")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .frame(width: 120, alignment: .leading)
+      HStack(spacing: 5) {
+        statusBadge(part.state)
+        if part.state.isDisconnected {
+          Button {
+            relinkPart(part.id)
+          } label: {
+            Image(systemName: "link.badge.plus")
+              .font(.system(size: 11, weight: .semibold))
+              .frame(width: 20, height: 20)
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .foregroundStyle(.orange)
+          .help("Choose a replacement source for \(part.name)")
+        }
+      }
+      .frame(width: 92, alignment: .leading)
     }
-    .buttonStyle(.plain)
-    .contextMenu { partContextMenu(part.id) }
+    .padding(.horizontal, 16)
+    .frame(height: 54)
+    .background(
+      selectedPartIDs.contains(part.id) ? StudioPalette.accent.opacity(0.22) : Color.clear
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { selectPart(part.id) }
+    .contextMenu { partContextMenu(part) }
   }
 
   private func listTableRow(_ item: AssetBuilderListItem) -> some View {
@@ -575,7 +587,7 @@ struct AssetBuilderContentView: View {
       }
     }
     .buttonStyle(.plain)
-    .contextMenu { partContextMenu(part.id) }
+    .contextMenu { partContextMenu(part) }
   }
 
   private func selectPart(_ id: PartID) {
@@ -594,8 +606,17 @@ struct AssetBuilderContentView: View {
   }
 
   @ViewBuilder
-  private func partContextMenu(_ id: PartID) -> some View {
-    let deletion = selectedPartIDs.contains(id) ? selectedPartIDs : Set([id])
+  private func partContextMenu(_ part: AssetBuilderPartRow) -> some View {
+    let deletion =
+      selectedPartIDs.contains(part.id) ? selectedPartIDs : Set([part.id])
+    Button(
+      part.state.isDisconnected ? "Relink Source…" : "Replace Model…",
+      systemImage: part.state.isDisconnected ? "link.badge.plus" : "arrow.triangle.2.circlepath"
+    ) {
+      relinkPart(part.id)
+    }
+    .disabled(part.model.isEmpty)
+    Divider()
     Button(role: .destructive) {
       requestDeletion(deletion)
     } label: {
@@ -788,7 +809,8 @@ struct AssetBuilderContentView: View {
     }
     // A copied part model is also registered as a document asset — the same
     // file. Show it once (as the part model) so imports aren't double-counted.
-    let documentItems = assets
+    let documentItems =
+      assets
       .filter { !modelFilenames.contains($0.originalFilename) }
       .map { asset in
         AssetBuilderListItem(
@@ -855,6 +877,7 @@ struct AssetBuilderContentView: View {
     case .grounded: "pin.fill"
     case .suppressed: "eye.slash.fill"
     case .proxy: "cube"
+    case .disconnected: "link.slash"
     }
   }
 
@@ -864,6 +887,7 @@ struct AssetBuilderContentView: View {
     case .grounded: .blue
     case .suppressed: .orange
     case .proxy: .secondary
+    case .disconnected: .orange
     }
   }
 

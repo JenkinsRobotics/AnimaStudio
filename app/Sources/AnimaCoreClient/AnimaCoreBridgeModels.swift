@@ -593,10 +593,31 @@ public struct AnimaCoreClipSummary: Codable, Equatable, Sendable {
 public struct AnimaCoreOutputSummary: Codable, Equatable, Sendable {
   public let targetPath: String
   public let channel: Int
+  /// Target value that projects to normalized channel value 0.
+  ///
+  /// AnimaCore reports native units: radians for rotational DOFs, metres for
+  /// translational DOFs, and unitless values for parameters.
+  public let valueAtZero: Double
+  /// Target value that projects to normalized channel value 1.
+  public let valueAtOne: Double
 
   enum CodingKeys: String, CodingKey {
     case targetPath = "dof_path"
     case channel
+    case valueAtZero = "value_at_zero"
+    case valueAtOne = "value_at_one"
+  }
+
+  public init(
+    targetPath: String,
+    channel: Int,
+    valueAtZero: Double,
+    valueAtOne: Double
+  ) {
+    self.targetPath = targetPath
+    self.channel = channel
+    self.valueAtZero = valueAtZero
+    self.valueAtOne = valueAtOne
   }
 }
 

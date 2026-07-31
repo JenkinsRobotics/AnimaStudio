@@ -315,6 +315,16 @@ final class WorkspaceShellTests: XCTestCase {
       importAnimaCharacter: {}
     )
     XCTAssertEqual(workspace.showsPreviewGrid, !initial)
+
+    workspace.activeWorkspace = .hardware
+    workspace.selectCenterView(.servoTimeline)
+    WorkspaceRibbonActionDispatcher.perform(
+      .showOutputMappings,
+      workspace: workspace,
+      importModel: {},
+      importAnimaCharacter: {}
+    )
+    XCTAssertEqual(workspace.activeCenterView, .table)
   }
 
   func testPanelReorderIndexAndOrderAreDeterministic() {

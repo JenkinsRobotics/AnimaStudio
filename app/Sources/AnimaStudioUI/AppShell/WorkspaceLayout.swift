@@ -60,6 +60,30 @@ enum StudioCenterViewCatalog {
   }
 }
 
+/// Keeps the expensive 3D renderer in one stable SwiftUI subtree while the
+/// operator changes workspaces or center representations.
+///
+/// Structured centers cover the renderer instead of replacing it. This
+/// preserves imported geometry, GPU resources, camera, and selection across
+/// tabs; returning to 3D reveals the existing render session.
+enum StudioCenterLayerPolicy {
+  static func keepsSpatialSessionMounted(for _: StudioWorkspaceKind) -> Bool {
+    true
+  }
+
+  static func presentsSpatialSession(
+    workspace: StudioWorkspaceKind,
+    mode: StudioCenterViewMode?
+  ) -> Bool {
+    switch workspace {
+    case .assets, .rig, .animate, .show, .hardware:
+      return mode == .threeD
+    case .nodes, .design, .canvas2d, .vr:
+      return false
+    }
+  }
+}
+
 /// The rectangular area guaranteed not to sit behind live shell chrome.
 /// Spatial canvases intentionally ignore this value; structured content reads
 /// it from the environment and pads itself into the visible zone.

@@ -2,6 +2,44 @@ import AnimaCADViewport
 import AppKit
 import SwiftUI
 
+/// Owns the persisted values that turn a named CAD preset into one coordinated
+/// environment. Choosing a preset intentionally restores all of its material,
+/// edge, lighting, and color values; operators can then customize any field.
+enum CADThemePreferences {
+  static let defaultTheme = CADViewportTheme.defaultTheme
+
+  static func applyPreset(
+    named name: String,
+    to defaults: UserDefaults = .standard
+  ) {
+    let theme = CADViewportTheme.named(name)
+    defaults.set(theme.name, forKey: StudioPreferenceKey.cadThemeName)
+    defaults.set(Double(theme.edgeStrength), forKey: StudioPreferenceKey.cadEdgeStrength)
+    defaults.set(Double(theme.ambientStrength), forKey: StudioPreferenceKey.cadAmbientStrength)
+    defaults.set(Double(theme.shadowStrength), forKey: StudioPreferenceKey.cadShadowStrength)
+    defaults.set(Double(theme.roughness), forKey: StudioPreferenceKey.cadRoughness)
+    defaults.set(Double(theme.metallic), forKey: StudioPreferenceKey.cadMetallic)
+    defaults.set(Double(theme.key.intensity), forKey: StudioPreferenceKey.cadKeyLightIntensity)
+    defaults.set(Double(theme.fill.intensity), forKey: StudioPreferenceKey.cadFillLightIntensity)
+    defaults.set(Double(theme.rim.intensity), forKey: StudioPreferenceKey.cadRimLightIntensity)
+
+    for key in colorOverrideKeys {
+      defaults.removeObject(forKey: key)
+    }
+  }
+
+  private static let colorOverrideKeys = [
+    StudioPreferenceKey.cadEdgeColorHex,
+    StudioPreferenceKey.cadSelectedEdgeColorHex,
+    StudioPreferenceKey.cadBackgroundColorHex,
+    StudioPreferenceKey.cadFaceSelectionColorHex,
+    StudioPreferenceKey.cadNeutralColorHex,
+    StudioPreferenceKey.cadKeyLightColorHex,
+    StudioPreferenceKey.cadFillLightColorHex,
+    StudioPreferenceKey.cadRimLightColorHex,
+  ]
+}
+
 /// Bridges the CAD viewport theme's SIMD colors to persisted hex strings so the
 /// demo's per-color settings (edge color, selected edge, scene colors, per-light
 /// colors) can be imported. Each override is stored as a hex string; an empty

@@ -23,6 +23,7 @@ struct StudioWorkspaceView: View {
   @State private var isCreatingCharacter = false
   @State private var showsCharacterLoadingStage = false
   @State private var characterImportProgress: CharacterImportProgress?
+  @State private var cadViewportPerformance = CADViewportPerformanceSnapshot.waiting
   @State private var characterImportErrorMessage: String?
   @State private var isSwitchingCharacter = false
   @State private var characterEditorMetadata = CharacterEditorMetadata()
@@ -95,17 +96,37 @@ struct StudioWorkspaceView: View {
   @AppStorage(StudioPreferenceKey.cadRenderBackend) private var cadRenderBackendRawValue =
     CADRenderBackend.defaultBackend.rawValue
   @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName =
-    CADViewportTheme.studioBlue.name
+    CADThemePreferences.defaultTheme.name
   @AppStorage(StudioPreferenceKey.cadPreservesImportedColors) private
     var cadPreservesImportedColors = true
   @AppStorage(StudioPreferenceKey.cadShowsFeatureEdges) private var cadShowsFeatureEdges = true
-  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var cadEdgeStrength = 0.7
-  @AppStorage(StudioPreferenceKey.cadRoughness) private var cadRoughness = 0.5
-  @AppStorage(StudioPreferenceKey.cadMetallic) private var cadMetallic = 0.0
-  @AppStorage(StudioPreferenceKey.cadKeyLightIntensity) private var cadKeyLightIntensity = 3_000.0
-  @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity = 1_200.0
-  @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity = 900.0
+  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var cadEdgeStrength =
+    Double(CADThemePreferences.defaultTheme.edgeStrength)
+  @AppStorage(StudioPreferenceKey.cadAmbientStrength) private var cadAmbientStrength =
+    Double(CADThemePreferences.defaultTheme.ambientStrength)
+  @AppStorage(StudioPreferenceKey.cadShadowStrength) private var cadShadowStrength =
+    Double(CADThemePreferences.defaultTheme.shadowStrength)
+  @AppStorage(StudioPreferenceKey.cadRoughness) private var cadRoughness =
+    Double(CADThemePreferences.defaultTheme.roughness)
+  @AppStorage(StudioPreferenceKey.cadMetallic) private var cadMetallic =
+    Double(CADThemePreferences.defaultTheme.metallic)
+  @AppStorage(StudioPreferenceKey.cadKeyLightIntensity) private var cadKeyLightIntensity =
+    Double(CADThemePreferences.defaultTheme.key.intensity)
+  @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity =
+    Double(CADThemePreferences.defaultTheme.fill.intensity)
+  @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity =
+    Double(CADThemePreferences.defaultTheme.rim.intensity)
   @AppStorage(StudioPreferenceKey.cadShowsTelemetry) private var cadShowsTelemetry = false
+  @AppStorage(StudioPreferenceKey.cadShowsFloorGrid) private var cadShowsFloorGrid = true
+  @AppStorage(StudioPreferenceKey.cadFloorGridSpacingMeters) private
+    var cadFloorGridSpacingMeters = 0.1
+  @AppStorage(StudioPreferenceKey.cadFloorGridExtentMultiplier) private
+    var cadFloorGridExtentMultiplier = 4.0
+  @AppStorage(StudioPreferenceKey.cadFloorGridMajorLineInterval) private
+    var cadFloorGridMajorLineInterval = 5
+  @AppStorage(StudioPreferenceKey.cadFloorGridOpacity) private var cadFloorGridOpacity = 0.24
+  @AppStorage(StudioPreferenceKey.viewportShowsPerformanceHUD) private
+    var showsPerformanceHUD = true
   @AppStorage(StudioPreferenceKey.cadEdgeColorHex) private var cadEdgeColorHex = ""
   @AppStorage(StudioPreferenceKey.cadSelectedEdgeColorHex) private var cadSelectedEdgeColorHex = ""
   @AppStorage(StudioPreferenceKey.cadBackgroundColorHex) private var cadBackgroundColorHex = ""
@@ -282,6 +303,10 @@ struct StudioWorkspaceView: View {
       workspace.applyLayoutPreset(
         StudioLayoutPreset(rawValue: defaultLayoutPresetRawValue) ?? .floating
       )
+      // RealityKit's reusable Assets preview and both CAD renderers consume
+      // this one operator preference. Keeping the model synchronized also
+      // preserves existing non-CAD sidebar bindings.
+      workspace.showsPreviewGrid = cadShowsFloorGrid
       await workspace.connectToAnimaCore()
       await loadIndexedCharacterIfNeeded()
       if AssetBuilderFeatureAvailability.showsLibraries {
@@ -293,6 +318,9 @@ struct StudioWorkspaceView: View {
       if let preset {
         defaultLayoutPresetRawValue = preset.rawValue
       }
+    }
+    .onChange(of: cadShowsFloorGrid) { _, showsGrid in
+      workspace.showsPreviewGrid = showsGrid
     }
     .task(id: workspace.isPlaying) {
       guard workspace.isPlaying else { return }
@@ -356,6 +384,7 @@ struct StudioWorkspaceView: View {
           selectWorkspaceSidebarTab(tab)
         }
       },
+      performToolActivation: workspace.activateTool,
       performCommand: performWorkspaceRibbonAction,
       center: {
         workspaceCanvas
@@ -365,9 +394,25 @@ struct StudioWorkspaceView: View {
       },
       right: { tab in
         if usesDedicatedCADPipeline {
-          // CAD pipeline uses its own theme; show the appearance panel that
-          // actually drives it (background, colors, material, lighting, grid).
-          CADAppearancePanel(workspace: workspace)
+          CADAppearancePanel(
+            workspace: workspace,
+            tab: tab,
+            renderBackend: cadRenderBackendBinding,
+            performance: cadViewportPerformance,
+            showsPerformanceHUD: $showsPerformanceHUD,
+            showsTelemetry: $cadShowsTelemetry,
+            themeName: $cadThemeName,
+            ambientStrength: $cadAmbientStrength,
+            shadowStrength: $cadShadowStrength,
+            keyLight: $cadKeyLightIntensity,
+            fillLight: $cadFillLightIntensity,
+            rimLight: $cadRimLightIntensity,
+            keyLightHex: $cadKeyLightColorHex,
+            fillLightHex: $cadFillLightColorHex,
+            rimLightHex: $cadRimLightColorHex
+          ) {
+            workspaceInspectorContent
+          }
         } else {
           ConsolidatedViewportSidebarPanel(
             tab: tab,
@@ -395,6 +440,7 @@ struct StudioWorkspaceView: View {
               panSpeed: viewportPanSpeedBinding,
               zoomSpeed: viewportZoomSpeedBinding,
               reversesWheelZoom: $viewportReversesWheelZoom,
+              showsPerformanceHUD: $showsPerformanceHUD,
               openMouseSettings: openMouseSettings
             )
           ) {
@@ -452,7 +498,8 @@ struct StudioWorkspaceView: View {
       // engine so it always shows the loaded parts.
       AssemblyTreeView(
         workspace: workspace,
-        deleteParts: { ids in Task { await deleteParts(ids) } }
+        deleteParts: { ids in Task { await deleteParts(ids) } },
+        relinkPart: relinkPart
       )
     } else {
       ProjectNavigatorView(
@@ -535,8 +582,8 @@ struct StudioWorkspaceView: View {
     case .addPart(let kind):
       workspace.addPart(kind: kind)
       toolState.committed()
-    case .createRevoluteMate:
-      workspace.beginRevoluteMatePlacement()
+    case .createMate(let kind):
+      workspace.beginMatePlacement(kind)
       toolState.committed()
     case .createRelation(let kindID):
       if let relation = workspace.engineRelationTypes.first(where: {
@@ -578,18 +625,41 @@ struct StudioWorkspaceView: View {
   }
 
   private var authoringWorkspaceCanvas: some View {
-    workspaceCenterRepresentation
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .clipped()
+    ZStack {
+      // One renderer instance owns the entire open-project session. Workspace
+      // and center-mode changes only cover/reveal it; they never reconstruct
+      // Open CASCADE geometry, Metal/WebGPU resources, or the camera.
+      if StudioCenterLayerPolicy.keepsSpatialSessionMounted(for: workspace.activeWorkspace) {
+        viewport
+          .opacity(presentsSpatialViewport ? 1 : 0)
+          .allowsHitTesting(presentsSpatialViewport)
+          .accessibilityHidden(!presentsSpatialViewport)
+      }
+
+      if !presentsSpatialViewport {
+        StudioPalette.canvas
+          .ignoresSafeArea()
+        workspaceNonSpatialCenterRepresentation
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .clipped()
+  }
+
+  private var presentsSpatialViewport: Bool {
+    StudioCenterLayerPolicy.presentsSpatialSession(
+      workspace: workspace.activeWorkspace,
+      mode: workspace.activeCenterView
+    )
   }
 
   @ViewBuilder
-  private var workspaceCenterRepresentation: some View {
+  private var workspaceNonSpatialCenterRepresentation: some View {
     switch workspace.activeWorkspace {
     case .assets:
       switch workspace.activeCenterView ?? .threeD {
       case .threeD:
-        viewport
+        EmptyView()
       case .gallery:
         StudioContentSafeCenter {
           assetsWorkspaceView(surface: .center, centerLayoutMode: .grid)
@@ -599,13 +669,13 @@ struct StudioWorkspaceView: View {
           assetsWorkspaceView(surface: .center, centerLayoutMode: .table)
         }
       case .exploded, .dopeSheet, .curves, .nodeGraph, .servoTimeline:
-        viewport
+        EmptyView()
       }
 
     case .rig:
       switch workspace.activeCenterView ?? .threeD {
       case .threeD:
-        viewport
+        EmptyView()
       case .table:
         StudioContentSafeCenter {
           StudioRigTableCenterView(parts: workspace.engineParts, mates: workspace.engineMates)
@@ -615,19 +685,19 @@ struct StudioWorkspaceView: View {
           StudioRigExplodedCenterView(parts: workspace.engineParts)
         }
       case .gallery, .dopeSheet, .curves, .nodeGraph, .servoTimeline:
-        viewport
+        EmptyView()
       }
 
     case .animate:
       switch workspace.activeCenterView ?? .threeD {
       case .threeD:
-        viewport
+        EmptyView()
       case .dopeSheet, .curves:
         StudioContentSafeCenter {
           TimelineEditorView(workspace: workspace, showsModeBar: false)
         }
       case .gallery, .table, .exploded, .nodeGraph, .servoTimeline:
-        viewport
+        EmptyView()
       }
 
     case .show:
@@ -642,9 +712,9 @@ struct StudioWorkspaceView: View {
           )
         }
       case .threeD:
-        viewport
+        EmptyView()
       case .gallery, .exploded, .dopeSheet, .curves, .servoTimeline:
-        viewport
+        EmptyView()
       }
 
     case .hardware:
@@ -652,11 +722,11 @@ struct StudioWorkspaceView: View {
       case .servoTimeline:
         StudioContentSafeCenter { StudioServoTimelineCenterView(workspace: workspace) }
       case .table:
-        StudioContentSafeCenter { HardwareWorkspaceView() }
+        StudioContentSafeCenter { HardwareWorkspaceView(workspace: workspace) }
       case .threeD:
-        viewport
+        EmptyView()
       case .gallery, .exploded, .dopeSheet, .curves, .nodeGraph:
-        viewport
+        EmptyView()
       }
 
     case .nodes:
@@ -705,6 +775,7 @@ struct StudioWorkspaceView: View {
       replaceModel: {
         presentModelImportPanel(replacingSelectedPart: true)
       },
+      relinkPart: relinkPart,
       deleteParts: { ids in
         Task { await deleteParts(ids) }
       },
@@ -725,24 +796,42 @@ struct StudioWorkspaceView: View {
   private var viewport: some View {
     ZStack(alignment: .top) {
       Group {
-        if usesDedicatedCADPipeline {
+        if showsCADViewportLoadingSurface {
+          cadViewportLoadingSurface
+        } else if usesDedicatedCADPipeline {
           CADPipelineViewport(
             sourceURLs: stepModelURLs,
-            backend: cadRenderBackend,
+            // Exact B-Rep face/edge/vertex inference currently runs in the
+            // native Metal adapter. Switching only the renderer (not the
+            // document) keeps mate placement functional even when WebGPU is
+            // the operator's normal presentation backend.
+            backend: workspace.matePlacement == nil ? cadRenderBackend : .metalKit,
             theme: cadViewportTheme,
+            navigation: cadNavigationConfiguration,
             showsTelemetry: cadShowsTelemetry,
+            telemetryTrailingPadding: viewportTrailingHUDPadding,
+            telemetryBottomPadding: detailedTelemetryBottomPadding,
             isSelected: workspace.selectionCount > 0,
             viewDirection: cadViewCubeDirection,
             cameraCommandRevision: workspace.cameraCommandRevision,
             hiddenSourceURLs: cadHiddenSourceURLs,
             selectedSourceURLs: cadSelectedSourceURLs,
             groundedSourceURLs: cadGroundedSourceURLs,
+            editableSourceURLs: cadEditableSourceURLs,
             primarySelectedSourceURL: cadPrimarySelectedSourceURL,
             partRestTransformsBySourceURL: cadPartRestTransformsBySourceURL,
+            partAppearancesBySourceURL: cadPartAppearancesBySourceURL,
             primarySelectionTransformOverride: cadPrimarySelectionTransformOverride,
             primarySelectionTransformLabel: cadPrimarySelectionTransformLabel,
             primaryPartTransformIsEditable: cadPrimaryPartTransformIsEditable,
             referenceGeometryVisibility: workspace.cadReferenceGeometryVisibility,
+            showsFloorGrid: cadShowsFloorGrid,
+            floorGridSpacingMeters: Float(cadFloorGridSpacingMeters),
+            floorGridExtentMultiplier: Float(cadFloorGridExtentMultiplier),
+            floorGridMajorLineInterval: cadFloorGridMajorLineInterval,
+            floorGridOpacity: Float(cadFloorGridOpacity),
+            mateConnectorPickingEnabled: workspace.matePlacement != nil,
+            onPerformanceUpdate: { cadViewportPerformance = $0 },
             onSourceTriangleCountsChange: { counts in
               cadSourceTriangleCounts = Dictionary(
                 uniqueKeysWithValues: counts.map {
@@ -750,11 +839,18 @@ struct StudioWorkspaceView: View {
                 }
               )
             },
-            onCameraDirection: { direction in
-              guard direction.count == 3 else { return }
-              workspace.reportCameraDirection(
+            onSourceLoadFailuresChange: { failures in
+              workspace.reportCADSourceLoadFailures(failures)
+            },
+            onCameraOrientation: { orientation in
+              workspace.reportCameraOrientation(
                 PreviewCameraDirection(
-                  x: Float(direction[0]), y: Float(direction[1]), z: Float(direction[2])))
+                  x: orientation.direction.x,
+                  y: orientation.direction.y,
+                  z: orientation.direction.z
+                ),
+                rollRadians: orientation.rollRadians
+              )
             },
             onPickPart: { url, extend in
               guard let url else {
@@ -769,7 +865,47 @@ struct StudioWorkspaceView: View {
               else { return }
               workspace.selectPart(id: partID, extendingSelection: extend)
             },
-            onSetPrimaryPartRestTransform: setCADPrimaryPartRestTransform
+            onBoxPickParts: { urls, extend in
+              let standardized = Set(urls.map(\.standardizedFileURL))
+              let picked = Set(
+                workspace.enginePartModelSources.compactMap { partID, source in
+                  standardized.contains(source.fileURL.standardizedFileURL) ? partID : nil
+                })
+              if extend {
+                workspace.selectParts(ids: Set(workspace.selectedComponentIDs).union(picked))
+              } else {
+                workspace.selectParts(ids: picked)
+              }
+            },
+            onContextMenuPart: { url, location in
+              let pointerTarget: ViewportPointerTarget
+              if let url,
+                let partID = workspace.enginePartModelSources.first(where: {
+                  $0.value.fileURL.standardizedFileURL == url.standardizedFileURL
+                })?.key
+              {
+                workspace.selectPart(id: partID, extendingSelection: false)
+                pointerTarget = .component(partID)
+              } else {
+                pointerTarget = .canvas
+              }
+              viewportContextMenuRequest = ViewportContextMenuRequest(
+                location: location,
+                pointerTarget: pointerTarget)
+            },
+            onPickMateFeature: { feature, sourceURL in
+              guard let feature else { return }
+              workspace.selectCADMateFeature(feature, sourceURL: sourceURL)
+            },
+            onSetPrimaryPartRestTransform: setCADPrimaryPartRestTransform,
+            onSetPartRestTransform: { url, transform in
+              guard
+                let partID = workspace.enginePartModelSources.first(where: {
+                  $0.value.fileURL.standardizedFileURL == url.standardizedFileURL
+                })?.key
+              else { return }
+              setCADPartRestTransform(partID: partID, transform)
+            }
           )
         } else {
           RobotPreviewView(
@@ -875,14 +1011,25 @@ struct StudioWorkspaceView: View {
       // RealityKit and the CAD pipeline (Metal/WebGPU) alike.
       cameraHUD
 
-      if let engineEvaluationTimeSeconds = workspace.engineEvaluationTimeSeconds {
-        engineFrameBadge(timeSeconds: engineEvaluationTimeSeconds)
+      if showsPerformanceHUD {
+        ViewportPerformanceHUD(
+          engineStatus: workspace.animaCoreStatusLabel,
+          rendererName: usesDedicatedCADPipeline ? cadRenderBackend.title : "RealityKit",
+          performance: usesDedicatedCADPipeline ? cadViewportPerformance : .waiting
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, viewportTrailingHUDPadding)
+        .padding(.bottom, 16)
       }
 
       if let matePlacement = workspace.matePlacement {
         MatePlacementOverlay(
           session: matePlacement,
-          cancel: workspace.cancelMatePlacement
+          confirm: workspace.confirmMatePlacement,
+          cancel: workspace.cancelMatePlacement,
+          clearSource: { workspace.clearMatePlacementConnector(source: true) },
+          clearTarget: { workspace.clearMatePlacementConnector(source: false) },
+          updateOptions: workspace.updateMatePlacementOptions
         )
         .padding(.top, 50)
       }
@@ -922,11 +1069,36 @@ struct StudioWorkspaceView: View {
     (CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .defaultBackend).selectableOrDefault
   }
 
-  /// The ViewCube's current direction, handed to the CAD pipeline so the shared
-  /// cube drives the Metal/WebGPU camera the same way it drives RealityKit.
+  private var cadNavigationConfiguration: CADViewportNavigationConfiguration {
+    let mapping = viewportNavigationProfile.resolvedMapping(
+      customMapping: viewportCustomNavigationMapping)
+    return CADViewportNavigationConfiguration(
+      orbitDragBindings: Set(mapping.rotateDrags.map(\.rawValue)),
+      panDragBindings: Set(mapping.panDrags.map(\.rawValue)),
+      preciseZoomDragBindings: Set(mapping.preciseZoomDrags.map(\.rawValue)),
+      orbitMultiplier: Float(viewportNavigationSensitivity.orbit.multiplier),
+      panMultiplier: Float(viewportNavigationSensitivity.pan.multiplier),
+      zoomMultiplier: Float(viewportNavigationSensitivity.zoom.multiplier),
+      reversesWheelZoom: viewportReversesWheelZoom)
+  }
+
+  private var cadRenderBackendBinding: Binding<CADRenderBackend> {
+    Binding(
+      get: { cadRenderBackend },
+      set: { cadRenderBackendRawValue = $0.selectableOrDefault.rawValue }
+    )
+  }
+
+  /// The ViewCube's complete world-relative orientation, handed to the CAD
+  /// pipeline so direction and screen-axis roll drive every renderer alike.
   private var cadViewCubeDirection: [Double] {
-    let direction = workspace.cameraState.orientation.direction
-    return [Double(direction.x), Double(direction.y), Double(direction.z)]
+    let orientation = workspace.cameraState.orientation
+    return [
+      Double(orientation.direction.x),
+      Double(orientation.direction.y),
+      Double(orientation.direction.z),
+      Double(orientation.rollRadians),
+    ]
   }
 
   /// STEP files whose parts are hidden in the assembly tree — the CAD pipeline
@@ -958,6 +1130,15 @@ struct StudioWorkspaceView: View {
       })
   }
 
+  private var cadEditableSourceURLs: Set<URL> {
+    Set(
+      workspace.enginePartModelSources.compactMap { partID, source in
+        !workspace.isComponentLocked(partID) && workspace.isPartRestTransformEditable(partID)
+          ? source.fileURL.standardizedFileURL
+          : nil
+      })
+  }
+
   private var cadPrimarySelectedSourceURL: URL? {
     guard let partID = workspace.selectedPartID,
       let source = workspace.enginePartModelSources[partID]
@@ -975,7 +1156,7 @@ struct StudioWorkspaceView: View {
   }
 
   private var cadPrimarySelectionTransformLabel: String {
-    selectedComponentGroupID == nil ? "Part origin" : "Sub-assembly origin"
+    selectedComponentGroupID == nil ? "Part center" : "Sub-assembly center"
   }
 
   private var cadPartRestTransformsBySourceURL: [URL: CADPartRestTransform] {
@@ -985,6 +1166,43 @@ struct StudioWorkspaceView: View {
       result[source.fileURL.standardizedFileURL] = transform
     }
     return result
+  }
+
+  /// Projects app-owned Part appearance metadata onto each imported CAD source.
+  /// `CADPipelineViewport` expands the value to the source's Open CASCADE
+  /// assembly-node IDs so Metal and Three.js receive the same override.
+  private var cadPartAppearancesBySourceURL: [URL: CADPartAppearancePresentation] {
+    var result: [URL: CADPartAppearancePresentation] = [:]
+    for (partID, source) in workspace.enginePartModelSources {
+      // `componentAppearance(for:)` intentionally returns a teal proxy default
+      // when no editor metadata exists. Imported CAD must not mistake that UI
+      // fallback for an explicit material override or it replaces every
+      // STEP/XDE face color with one teal surface.
+      guard let appearance = workspace.cadAppearanceOverride(for: partID) else { continue }
+      let material = cadMaterialValues(for: appearance.finish)
+      result[source.fileURL.standardizedFileURL] = CADPartAppearancePresentation(
+        partID: 0,
+        color: SIMD4(
+          Float(appearance.red),
+          Float(appearance.green),
+          Float(appearance.blue),
+          Float(appearance.opacity)),
+        roughness: material.roughness,
+        metallic: material.metallic
+      )
+    }
+    return result
+  }
+
+  private func cadMaterialValues(for finish: ViewportMaterialFinish) -> (
+    roughness: Float, metallic: Float
+  ) {
+    switch finish {
+    case .matte: (0.82, 0.02)
+    case .satin: (0.48, 0.02)
+    case .glossy: (0.18, 0.02)
+    case .metallic: (0.24, 0.92)
+    }
   }
 
   private var cadPrimaryPartTransformIsEditable: Bool {
@@ -1001,7 +1219,15 @@ struct StudioWorkspaceView: View {
       workspace.setComponentGroupTransform(id: groupID, to: transform)
       return
     }
-    guard let partID = workspace.selectedPartID,
+    guard let partID = workspace.selectedPartID else { return }
+    setCADPartRestTransform(partID: partID, transform)
+  }
+
+  private func setCADPartRestTransform(
+    partID: PartID,
+    _ transform: CADPartRestTransform
+  ) {
+    guard
       transform.positionMeters.count == 3,
       transform.rotationEulerRadians.count == 3,
       let current = workspace.project.rig.parts.first(where: { $0.id == partID })
@@ -1054,6 +1280,37 @@ struct StudioWorkspaceView: View {
     }
   }
 
+  /// Do not mount the generic RealityKit preview while the character index and
+  /// engine-backed model sources are still resolving. That preview is useful
+  /// in the Assets inspector, but briefly showing its black grid in the main
+  /// CAD canvas made launch look like a renderer swap.
+  private var showsCADViewportLoadingSurface: Bool {
+    guard session.document.activeCharacter != nil else { return false }
+    if isSwitchingCharacter || !didLoadIndexedCharacter { return true }
+    return workspace.animaCoreState == .connecting
+      && workspace.enginePartModelSources.isEmpty
+  }
+
+  private var cadViewportLoadingSurface: some View {
+    let background = cadViewportTheme.background
+    return ZStack {
+      Color(
+        red: Double(background.x),
+        green: Double(background.y),
+        blue: Double(background.z)
+      )
+      VStack(spacing: 10) {
+        ProgressView()
+          .controlSize(.small)
+        Text("Preparing CAD viewport")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Preparing CAD viewport")
+  }
+
   private var stepModelURLs: [URL] {
     var seen = Set<String>()
     return workspace.enginePartModelSources.values.compactMap { source in
@@ -1092,6 +1349,8 @@ struct StudioWorkspaceView: View {
     )
     theme.overrideColor = cadPreservesImportedColors ? nil : theme.neutralColor
     theme.edgeStrength = cadShowsFeatureEdges ? Float(cadEdgeStrength) : 0
+    theme.ambientStrength = Float(cadAmbientStrength)
+    theme.shadowStrength = Float(cadShadowStrength)
     theme.roughness = Float(cadRoughness)
     theme.metallic = Float(cadMetallic)
     theme.key.intensity = Float(cadKeyLightIntensity)
@@ -1100,28 +1359,17 @@ struct StudioWorkspaceView: View {
     return theme
   }
 
-  private func engineFrameBadge(timeSeconds: Double) -> some View {
-    HStack(spacing: 7) {
-      Image(systemName: "checkmark.seal.fill")
-        .foregroundStyle(StudioPalette.hardware)
-      Text("ANIMACORE FRAME")
-        .font(.caption2.weight(.bold))
-        .tracking(0.8)
-      Text(timeSeconds, format: .number.precision(.fractionLength(3)))
-        .font(.caption.monospacedDigit())
-      Text("s")
-        .font(.caption2)
-        .foregroundStyle(StudioPalette.muted)
-    }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 7)
-    .background(.ultraThinMaterial, in: Capsule())
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-    .padding(.bottom, 16)
-    .allowsHitTesting(false)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("AnimaCore evaluated frame")
-    .accessibilityValue("\(timeSeconds) seconds")
+  private var viewportTrailingHUDPadding: CGFloat {
+    ViewportPerformanceHUDLayout.trailingPadding(
+      hasFloatingRightPanel: showsFloatingInspector
+    )
+  }
+
+  private var detailedTelemetryBottomPadding: CGFloat {
+    ViewportPerformanceHUDLayout.detailedMetricsBottomPadding(
+      showsCompactHUD: showsPerformanceHUD,
+      hasEvaluatedFrame: usesDedicatedCADPipeline || workspace.engineEvaluationTimeSeconds != nil
+    )
   }
 
   private var cameraHUD: some View {
@@ -1408,8 +1656,11 @@ struct StudioWorkspaceView: View {
 
   private var previewGridBinding: Binding<Bool> {
     Binding(
-      get: { workspace.showsPreviewGrid },
-      set: { workspace.showsPreviewGrid = $0 }
+      get: { cadShowsFloorGrid },
+      set: {
+        cadShowsFloorGrid = $0
+        workspace.showsPreviewGrid = $0
+      }
     )
   }
 
@@ -1826,6 +2077,12 @@ struct StudioWorkspaceView: View {
   @MainActor
   private func presentModelImportPanel() {
     presentModelImportPanel(replacingSelectedPart: false)
+  }
+
+  @MainActor
+  private func relinkPart(_ partID: PartID) {
+    workspace.selectPart(id: partID, extendingSelection: false)
+    presentModelImportPanel(replacingSelectedPart: true)
   }
 
   @MainActor

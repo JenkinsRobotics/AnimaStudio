@@ -260,9 +260,18 @@ final class ViewCubeGeometryTests: XCTestCase {
     XCTAssertEqual(workspace.cameraViewpoint, .custom)
     XCTAssertEqual(workspace.cameraCommandRevision, 1)
 
+    workspace.reportCameraOrientation(.top, rollRadians: -.pi / 3)
+    XCTAssertEqual(workspace.cameraState.orientation.direction, .top)
+    XCTAssertEqual(workspace.cameraState.orientation.rollRadians, -.pi / 3, accuracy: 0.001)
+    XCTAssertEqual(workspace.cameraCommandRevision, 1)
+
     workspace.rollCamera(by: .pi / 2)
-    XCTAssertEqual(workspace.cameraState.orientation.direction, .left)
-    XCTAssertEqual(workspace.cameraState.orientation.rollRadians, .pi / 2, accuracy: 0.001)
+    XCTAssertEqual(workspace.cameraState.orientation.direction, .top)
+    XCTAssertEqual(
+      workspace.cameraState.orientation.rollRadians,
+      .pi / 6,
+      accuracy: 0.001
+    )
     XCTAssertEqual(workspace.cameraCommandRevision, 2)
 
     workspace.setCameraViewpoint(.home)

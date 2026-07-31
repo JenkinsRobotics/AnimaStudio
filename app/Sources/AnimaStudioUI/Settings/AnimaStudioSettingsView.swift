@@ -63,17 +63,35 @@ public struct AnimaStudioSettingsView: View {
   @AppStorage(StudioPreferenceKey.cadRenderBackend) private var cadRenderBackendRawValue =
     CADRenderBackend.defaultBackend.rawValue
   @AppStorage(StudioPreferenceKey.cadThemeName) private var cadThemeName =
-    CADViewportTheme.studioBlue.name
+    CADThemePreferences.defaultTheme.name
   @AppStorage(StudioPreferenceKey.cadPreservesImportedColors) private
     var cadPreservesImportedColors = true
   @AppStorage(StudioPreferenceKey.cadShowsFeatureEdges) private var cadShowsFeatureEdges = true
-  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var cadEdgeStrength = 0.7
-  @AppStorage(StudioPreferenceKey.cadRoughness) private var cadRoughness = 0.5
-  @AppStorage(StudioPreferenceKey.cadMetallic) private var cadMetallic = 0.0
-  @AppStorage(StudioPreferenceKey.cadKeyLightIntensity) private var cadKeyLightIntensity = 3_000.0
-  @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity = 1_200.0
-  @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity = 900.0
+  @AppStorage(StudioPreferenceKey.cadEdgeStrength) private var cadEdgeStrength =
+    Double(CADThemePreferences.defaultTheme.edgeStrength)
+  @AppStorage(StudioPreferenceKey.cadAmbientStrength) private var cadAmbientStrength =
+    Double(CADThemePreferences.defaultTheme.ambientStrength)
+  @AppStorage(StudioPreferenceKey.cadShadowStrength) private var cadShadowStrength =
+    Double(CADThemePreferences.defaultTheme.shadowStrength)
+  @AppStorage(StudioPreferenceKey.cadRoughness) private var cadRoughness =
+    Double(CADThemePreferences.defaultTheme.roughness)
+  @AppStorage(StudioPreferenceKey.cadMetallic) private var cadMetallic =
+    Double(CADThemePreferences.defaultTheme.metallic)
+  @AppStorage(StudioPreferenceKey.cadKeyLightIntensity) private var cadKeyLightIntensity =
+    Double(CADThemePreferences.defaultTheme.key.intensity)
+  @AppStorage(StudioPreferenceKey.cadFillLightIntensity) private var cadFillLightIntensity =
+    Double(CADThemePreferences.defaultTheme.fill.intensity)
+  @AppStorage(StudioPreferenceKey.cadRimLightIntensity) private var cadRimLightIntensity =
+    Double(CADThemePreferences.defaultTheme.rim.intensity)
   @AppStorage(StudioPreferenceKey.cadShowsTelemetry) private var cadShowsTelemetry = false
+  @AppStorage(StudioPreferenceKey.cadShowsFloorGrid) private var cadShowsFloorGrid = true
+  @AppStorage(StudioPreferenceKey.cadFloorGridSpacingMeters) private
+    var cadFloorGridSpacingMeters = 0.1
+  @AppStorage(StudioPreferenceKey.cadFloorGridExtentMultiplier) private
+    var cadFloorGridExtentMultiplier = 4.0
+  @AppStorage(StudioPreferenceKey.cadFloorGridMajorLineInterval) private
+    var cadFloorGridMajorLineInterval = 5
+  @AppStorage(StudioPreferenceKey.cadFloorGridOpacity) private var cadFloorGridOpacity = 0.24
   // Per-color theme overrides imported from the demo settings (empty = use the
   // named theme's color; resolved in CADViewportTheme.applyingOverrides).
   @AppStorage(StudioPreferenceKey.cadEdgeColorHex) private var cadEdgeColorHex = ""
@@ -270,7 +288,7 @@ public struct AnimaStudioSettingsView: View {
         }
         .studioCardSurface()
         VStack(alignment: .leading, spacing: 12) {
-          Picker("Coordinated CAD theme", selection: $cadThemeName) {
+          Picker("Coordinated CAD theme", selection: cadThemeSelection) {
             ForEach(CADViewportTheme.all) { theme in Text(theme.name).tag(theme.name) }
           }
           Toggle("Preserve STEP/XDE colors", isOn: $cadPreservesImportedColors)
@@ -341,6 +359,45 @@ public struct AnimaStudioSettingsView: View {
         }
         .studioCardSurface()
 
+        VStack(alignment: .leading, spacing: 12) {
+          Text("3D FLOOR GRID")
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(StudioPalette.muted)
+          Toggle("Show world-space floor grid", isOn: $cadShowsFloorGrid)
+            .toggleStyle(.switch)
+          settingSlider(
+            "Minor spacing (meters)",
+            value: $cadFloorGridSpacingMeters,
+            range: 0.001...1
+          )
+          .disabled(!cadShowsFloorGrid)
+          settingSlider(
+            "Extent relative to model",
+            value: $cadFloorGridExtentMultiplier,
+            range: 1.5...20
+          )
+          .disabled(!cadShowsFloorGrid)
+          Stepper(
+            "Major line every \(cadFloorGridMajorLineInterval) minor lines",
+            value: $cadFloorGridMajorLineInterval,
+            in: 2...20
+          )
+          .disabled(!cadShowsFloorGrid)
+          settingSlider(
+            "Grid opacity",
+            value: $cadFloorGridOpacity,
+            range: 0.02...0.9
+          )
+          .disabled(!cadShowsFloorGrid)
+          Text(
+            "One presentation setting drives the Assets preview, MetalKit CAD viewport, and Three.js/WebGPU viewport. Reference planes remain independently selectable."
+          )
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
+        }
+        .studioCardSurface()
+
         settingsPicker(
           "Render style", selection: renderStyleBinding, values: ViewportRenderStyle.allCases
         ) { $0.title }
@@ -376,7 +433,7 @@ public struct AnimaStudioSettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
           Toggle("Show exact B-Rep feature edges", isOn: $cadShowsFeatureEdges)
             .toggleStyle(.switch)
-          settingSlider("Edge strength", value: $cadEdgeStrength, range: 0...1)
+          settingSlider("Edge definition", value: $cadEdgeStrength, range: 0...1)
             .disabled(!cadShowsFeatureEdges)
           themeColorRow("Edge color", $cadEdgeColorHex, default: currentCADTheme.edgeColor)
           themeColorRow(
@@ -408,6 +465,13 @@ public struct AnimaStudioSettingsView: View {
         }
         .studioCardSurface()
         VStack(alignment: .leading, spacing: 12) {
+          settingSlider("Ambient light", value: $cadAmbientStrength, range: 0...0.55)
+          settingSlider("Contact shadows", value: $cadShadowStrength, range: 0...1)
+          Text(
+            "Contact shadows use an interactive soft depth pass. Offline path tracing remains a future render/export mode."
+          )
+          .font(.caption)
+          .foregroundStyle(StudioPalette.muted)
           settingSlider("Key light", value: $cadKeyLightIntensity, range: 0...8_000)
           themeColorRow("Key light color", $cadKeyLightColorHex, default: currentCADTheme.key.color)
           settingSlider("Fill light", value: $cadFillLightIntensity, range: 0...8_000)
@@ -561,7 +625,8 @@ public struct AnimaStudioSettingsView: View {
   private var cadRenderBackendBinding: Binding<CADRenderBackend> {
     Binding(
       get: {
-        (CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .defaultBackend).selectableOrDefault
+        (CADRenderBackend(rawValue: cadRenderBackendRawValue) ?? .defaultBackend)
+          .selectableOrDefault
       },
       set: { cadRenderBackendRawValue = $0.rawValue }
     )
@@ -582,6 +647,13 @@ public struct AnimaStudioSettingsView: View {
   /// The named theme, used to seed a color override control with the preset's
   /// value until the operator picks a custom color.
   private var currentCADTheme: CADViewportTheme { CADViewportTheme.named(cadThemeName) }
+
+  private var cadThemeSelection: Binding<String> {
+    Binding(
+      get: { cadThemeName },
+      set: { CADThemePreferences.applyPreset(named: $0) }
+    )
+  }
 
   /// A labelled color override row: shows `default` (the theme color) until the
   /// hex string is set, then persists the picked color as hex.

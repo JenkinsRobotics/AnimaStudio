@@ -5,7 +5,10 @@ struct RelationEditorView: View {
   @Binding var draft: RelationDraft
   let driverOptions: [RelationDOFOption]
   let drivenOptions: [RelationDOFOption]
+  let create: (RelationDraft) async throws -> Void
   let dismiss: () -> Void
+  @State private var isApplying = false
+  @State private var errorMessage: String?
 
   private var presentation: RelationEditorPresentation {
     RelationEditorPresentation(type: draft.type)
@@ -93,6 +96,12 @@ struct RelationEditorView: View {
       )
       Toggle("Reverse direction", isOn: $draft.isReversed)
         .disabled(!draft.type.supportsReverse)
+      StudioNumberFieldRow(
+        title: "Driven offset",
+        value: $draft.offsetFieldValue,
+        unit: draft.type.drivenKind == .translation ? "mm" : "deg",
+        help: "Initial offset applied in the driven DOF's display units."
+      )
       if let signedRatio = draft.signedSemanticRatio {
         StudioReadoutRow(
           title: "Canonical ratio",
@@ -108,26 +117,50 @@ struct RelationEditorView: View {
     Section("Authoring Status") {
       Label("Catalog and compatibility are engine-backed", systemImage: "checkmark.shield")
         .foregroundStyle(StudioPalette.hardware)
-      Text(
-        "This dialog prepares a relation draft. Creating or editing the canonical character document is the next authoring packet, so no rig mutation occurs here."
-      )
-      .font(.caption)
-      .foregroundStyle(StudioPalette.muted)
+      Text("Create validates and mutates the loaded character through AnimaCore.")
+        .font(.caption)
+        .foregroundStyle(StudioPalette.muted)
+      if let validationError = draft.validationError?.localizedDescription {
+        Label(validationError, systemImage: "exclamationmark.triangle")
+          .font(.caption)
+          .foregroundStyle(.orange)
+      }
+      if let errorMessage {
+        Label(errorMessage, systemImage: "xmark.octagon")
+          .font(.caption)
+          .foregroundStyle(.red)
+      }
     }
   }
 
   private var footer: some View {
     HStack {
       Button("Cancel", role: .cancel, action: dismiss)
+        .disabled(isApplying)
       Spacer()
-      Button("Create Relation", systemImage: "checkmark") {}
-        .buttonStyle(.borderedProminent)
-        .disabled(true)
-        .help(
-          draft.canPrepareForAuthoring
-            ? "Canonical document mutation is not wired yet"
-            : "Select compatible driver and driven DOFs and enter a positive value"
-        )
+      if isApplying {
+        ProgressView()
+          .controlSize(.small)
+      }
+      Button("Create Relation", systemImage: "checkmark") {
+        isApplying = true
+        errorMessage = nil
+        Task {
+          do {
+            try await create(draft)
+          } catch {
+            errorMessage = error.localizedDescription
+          }
+          isApplying = false
+        }
+      }
+      .buttonStyle(.borderedProminent)
+      .disabled(!draft.canPrepareForAuthoring || isApplying)
+      .help(
+        draft.canPrepareForAuthoring
+          ? "Create this relation through AnimaCore"
+          : "Select compatible driver and driven DOFs and enter a positive value"
+      )
     }
     .padding(14)
   }

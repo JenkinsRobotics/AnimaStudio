@@ -24,6 +24,7 @@
     let context;
     let surfacePipeline;
     let edgePipeline;
+    let gridPipeline;
     let uniformBuffer;
     let bindGroup;
     let positionBuffer;
@@ -31,8 +32,10 @@
     let colorBuffer;
     let indexBuffer;
     let edgeBuffer;
+    let gridBuffer;
     let indexCount = 0;
     let edgeVertexCount = 0;
+    let gridVertexCount = 0;
     let depthTexture;
     let depthView;
     let multisampleTexture;
@@ -50,7 +53,7 @@
     let theme = {
       background: [0.16, 0.17, 0.19], edge: [0.16, 0.18, 0.22],
       selection: [1, 0.48, 0], roughness: 0.5, metallic: 0,
-      edgeStrength: 0.7, overrideColor: null,
+      edgeStrength: 0.7, ambientStrength: 0.3, shadowStrength: 0.55, overrideColor: null,
       key: { color: [1,1,1], direction: [0.5,0.9,0.6], intensity: 0.75 },
       fill: { color: [0.75,0.82,1], direction: [-0.7,0.3,0.4], intensity: 0.3 },
       rim: { color: [1,1,1], direction: [0.1,0.5,-0.8], intensity: 0.225 }
@@ -69,6 +72,7 @@
         overrideColor: vec4f,
         selectionColor: vec4f,
         edgeColor: vec4f,
+        lighting: vec4f,
       };
       @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
@@ -105,7 +109,8 @@
         let key = max(dot(n, keyDirection), 0.0) * uniforms.keyDirection.w;
         let fill = max(dot(n, fillDirection), 0.0) * uniforms.fillDirection.w;
         let rim = pow(1.0 - max(dot(n, view), 0.0), 3.0) * uniforms.rimColor.w;
-        let hemisphere = mix(0.18, 0.34, n.y * 0.5 + 0.5);
+        let hemisphere = uniforms.lighting.x
+          * mix(0.42, 1.28, n.y * 0.5 + 0.5);
         let halfVector = normalize(keyDirection + view);
         let exponent = mix(96.0, 8.0, clamp(uniforms.material.x, 0.0, 1.0));
         let highlight = pow(max(dot(n, halfVector), 0.0), exponent)
@@ -113,13 +118,23 @@
         let sourceColor = select(input.color, uniforms.overrideColor, uniforms.material.z > 0.5);
         let specular = mix(vec3f(1), sourceColor.rgb, clamp(uniforms.material.y, 0.0, 1.0))
           * highlight;
-        let base = select(
+        var base = select(
           sourceColor.rgb,
           mix(sourceColor.rgb, uniforms.selectionColor.rgb, 0.38),
           uniforms.material.w > 0.5);
+        let lightEnergy = clamp(
+          uniforms.lighting.x + key + fill * 0.62 + rim * 0.22,
+          0.0,
+          1.0);
+        let sourceLuminance = dot(sourceColor.rgb, vec3f(0.2126, 0.7152, 0.0722));
+        let darkMaterialLift = (1.0 - smoothstep(0.0, 0.08, sourceLuminance))
+          * lightEnergy * 0.055;
+        base = max(base, vec3f(darkMaterialLift));
         let lighting = vec3f(hemisphere) + uniforms.keyColor.rgb * key
           + uniforms.fillColor.rgb * fill * 0.62;
-        return vec4f(base * lighting + specular + uniforms.rimColor.rgb * rim * 0.22,
+        let keyHighlight = min(key, 1.0);
+        return vec4f(base * lighting + specular * keyHighlight
+          + uniforms.rimColor.rgb * rim * 0.22,
           sourceColor.a);
       }
 
@@ -129,6 +144,24 @@
       }
       @fragment fn edgeFragment() -> @location(0) vec4f {
         return vec4f(uniforms.edgeColor.rgb, 1.0);
+      }
+
+      struct GridInput {
+        @location(0) position: vec3f,
+        @location(1) color: vec4f,
+      };
+      struct GridOutput {
+        @builtin(position) position: vec4f,
+        @location(0) color: vec4f,
+      };
+      @vertex fn gridVertex(input: GridInput) -> GridOutput {
+        var output: GridOutput;
+        output.position = projectedPosition(input.position);
+        output.color = input.color;
+        return output;
+      }
+      @fragment fn gridFragment(input: GridOutput) -> @location(0) vec4f {
+        return input.color;
       }
     `;
 
@@ -157,6 +190,14 @@
       const baseUp = normalize(cross(right, forward));
       const up = add(scale(baseUp, Math.cos(roll)), scale(right, Math.sin(roll)));
       return { position, right, up };
+    };
+    const reportCamera = () => {
+      const cp = Math.cos(pitch);
+      send({
+        type: 'camera',
+        direction: [cp * Math.sin(yaw), Math.sin(pitch), cp * Math.cos(yaw)],
+        roll
+      });
     };
 
     function decodeBinary(payload) {
@@ -191,6 +232,53 @@
       }
       positionBuffer = normalBuffer = colorBuffer = indexBuffer = edgeBuffer = undefined;
       indexCount = edgeVertexCount = 0;
+    }
+
+    function rebuildFloorGrid(value) {
+      gridBuffer?.destroy();
+      gridBuffer = undefined;
+      gridVertexCount = 0;
+      if (!value || value.showsFloorGrid === false) return;
+
+      const requestedSpacing = Math.max(value.floorGridSpacingMeters || 0.1, 0.0001);
+      const halfExtent = Math.max(
+        (value.floorGridExtentMeters || 4) * 0.5,
+        requestedSpacing
+      );
+      const lineCount = Math.min(
+        Math.max(Math.ceil(halfExtent / requestedSpacing), 1),
+        240
+      );
+      const spacing = halfExtent / lineCount;
+      const majorInterval = Math.max(value.floorGridMajorLineInterval || 5, 2);
+      const opacity = Math.max(0.02, Math.min(value.floorGridOpacity ?? 0.24, 0.9));
+      const minor = [0.47, 0.53, 0.60, opacity * 0.52];
+      const major = [0.36, 0.43, 0.51, opacity];
+      const xAxis = [0.95, 0.24, 0.28, Math.min(opacity * 1.35, 0.95)];
+      const zAxis = [0.24, 0.50, 1.0, Math.min(opacity * 1.35, 0.95)];
+      const values = [];
+      const appendVertex = (position, color) => values.push(...position, ...color);
+      const appendLine = (start, end, color) => {
+        appendVertex(start, color);
+        appendVertex(end, color);
+      };
+      for (let index = -lineCount; index <= lineCount; index += 1) {
+        const coordinate = index * spacing;
+        const isMajor = index % majorInterval === 0;
+        appendLine(
+          [-halfExtent, 0, coordinate],
+          [halfExtent, 0, coordinate],
+          index === 0 ? xAxis : (isMajor ? major : minor)
+        );
+        appendLine(
+          [coordinate, 0, -halfExtent],
+          [coordinate, 0, halfExtent],
+          index === 0 ? zAxis : (isMajor ? major : minor)
+        );
+      }
+      const vertices = new Float32Array(values);
+      gridBuffer = gpuBuffer(vertices, GPUBufferUsage.VERTEX);
+      gridVertexCount = vertices.length / 7;
     }
 
     function fitPositions(positions) {
@@ -252,6 +340,12 @@
       uniformValues.set(theme.overrideColor || [0, 0, 0, 0], 44);
       put(48, theme.selection, 1);
       put(52, theme.edge, theme.edgeStrength || 0);
+      uniformValues.set([
+        Math.max(0, theme.ambientStrength ?? 0.3),
+        Math.max(0, Math.min(theme.shadowStrength ?? 0.55, 1)),
+        0,
+        0
+      ], 56);
       device.queue.writeBuffer(uniformBuffer, 0, uniformValues);
     }
 
@@ -278,6 +372,9 @@
       setTheme(value) {
         if (value) Object.assign(theme, value);
         updateThemeBackground();
+      },
+      setReferenceGeometry(value) {
+        rebuildFloorGrid(value);
       },
       clearMesh() {
         destroyGeometry();
@@ -310,6 +407,14 @@
       orbit(deltaX, deltaY) {
         yaw -= deltaX * 0.006;
         pitch = Math.max(-1.52, Math.min(1.52, pitch + deltaY * 0.006));
+        reportCamera();
+      },
+      setViewDirection(direction) {
+        if (!direction || direction.length < 3) return;
+        const normalized = normalize(direction.slice(0, 3));
+        pitch = Math.max(-1.52, Math.min(1.52, Math.asin(normalized[1])));
+        yaw = Math.atan2(normalized[0], normalized[2]);
+        roll = Number.isFinite(direction[3]) ? direction[3] : 0;
       }
     };
 
@@ -334,8 +439,10 @@
       if (dragMode === 'orbit') {
         yaw -= dx * 0.006;
         pitch = Math.max(-1.52, Math.min(1.52, pitch + dy * 0.006));
+        reportCamera();
       } else if (dragMode === 'roll') {
         roll += dx * 0.006;
+        reportCamera();
       } else {
         const currentCamera = camera();
         const amount = distance * 0.0015;
@@ -381,6 +488,11 @@
         }
       });
       pass.setBindGroup(0, bindGroup);
+      if (gridVertexCount) {
+        pass.setPipeline(gridPipeline);
+        pass.setVertexBuffer(0, gridBuffer);
+        pass.draw(gridVertexCount);
+      }
       if (indexCount) {
         pass.setPipeline(surfacePipeline);
         pass.setVertexBuffer(0, positionBuffer);
@@ -398,7 +510,9 @@
       device.queue.submit([encoder.finish()]);
       frames += 1;
       if (now - lastReport >= 1000) {
-        send({ type: 'frames', count: frames });
+        send({
+          type: 'frames', count: frames, elapsedMilliseconds: now - lastReport
+        });
         frames = 0;
         lastReport = now;
       }
@@ -451,6 +565,44 @@
         fragment: { module, entryPoint: 'edgeFragment', targets: [{ format }] },
         primitive: { topology: 'line-list' },
         depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
+        multisample: { count: 4 }
+      });
+      gridPipeline = device.createRenderPipeline({
+        layout,
+        vertex: {
+          module, entryPoint: 'gridVertex', buffers: [{
+            arrayStride: 28,
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: 'float32x3' },
+              { shaderLocation: 1, offset: 12, format: 'float32x4' }
+            ]
+          }]
+        },
+        fragment: {
+          module,
+          entryPoint: 'gridFragment',
+          targets: [{
+            format,
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add'
+              },
+              alpha: {
+                srcFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add'
+              }
+            }
+          }]
+        },
+        primitive: { topology: 'line-list' },
+        depthStencil: {
+          format: 'depth24plus',
+          depthWriteEnabled: false,
+          depthCompare: 'less-equal'
+        },
         multisample: { count: 4 }
       });
       device.lost.then(info => send({

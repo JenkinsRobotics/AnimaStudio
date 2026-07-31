@@ -392,8 +392,35 @@ struct ProjectNavigatorView: View {
 
   private var outputSection: some View {
     Section("Actuator Mappings") {
-      Label("No output mappings", systemImage: "arrow.triangle.branch")
-        .foregroundStyle(.secondary)
+      if workspace.engineOutputs.isEmpty {
+        Label("No output mappings", systemImage: "arrow.triangle.branch")
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(workspace.engineOutputs.sorted(by: { $0.channel < $1.channel }), id: \.channel) {
+          mapping in
+          Button {
+            workspace.selectCenterView(.table)
+          } label: {
+            HStack(spacing: 8) {
+              Image(systemName: "powerplug")
+                .foregroundStyle(StudioPalette.hardware)
+              VStack(alignment: .leading, spacing: 2) {
+                Text("Channel \(mapping.channel)")
+                Text(mapping.targetPath)
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+              }
+              Spacer()
+            }
+          }
+          .buttonStyle(.plain)
+          .contextMenu {
+            Button("Open Output Mappings", systemImage: "slider.horizontal.3") {
+              workspace.selectCenterView(.table)
+            }
+          }
+        }
+      }
     }
   }
 
