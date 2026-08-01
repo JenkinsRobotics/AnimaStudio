@@ -189,6 +189,40 @@ enum CADMetalFeaturePicker {
         partTransforms: partTransforms
       )
     else { return nil }
+    return hoverResult(
+      hit: hit, at: point, viewportSize: viewportSize,
+      document: document, viewProjection: viewProjection)
+  }
+
+  /// GPU-pick entry: the ID buffer already answered "which part/face" — no
+  /// CPU geometry walk happens here. The face's tessellation supplies the
+  /// local frame the raycast used to provide.
+  static func hoverResult(
+    pickedPartID: Int,
+    pickedFaceID: Int,
+    at point: CGPoint,
+    viewportSize: CGSize,
+    document: CADGeometryDocument,
+    viewProjection: simd_float4x4,
+    partTransforms: [CADPartTransformPresentation]
+  ) -> (pick: CADViewportFeaturePick?, partID: Int, candidates: [CADConnectorCandidate])? {
+    guard
+      let hit = hit(
+        partID: pickedPartID, faceID: pickedFaceID,
+        document: document, partTransforms: partTransforms)
+    else { return nil }
+    return hoverResult(
+      hit: hit, at: point, viewportSize: viewportSize,
+      document: document, viewProjection: viewProjection)
+  }
+
+  private static func hoverResult(
+    hit: SurfaceHit,
+    at point: CGPoint,
+    viewportSize: CGSize,
+    document: CADGeometryDocument,
+    viewProjection: simd_float4x4
+  ) -> (pick: CADViewportFeaturePick?, partID: Int, candidates: [CADConnectorCandidate])? {
     let candidates = CADConnectorCandidateEngine.candidates(
       nodeIndex: hit.partID - 1,
       hitFaceID: hit.faceID,
@@ -198,6 +232,32 @@ enum CADMetalFeaturePicker {
       from: candidates, hit: hit, at: point, viewportSize: viewportSize,
       document: document, viewProjection: viewProjection)
     return (pick, hit.partID, candidates)
+  }
+
+  private static func hit(
+    partID: Int,
+    faceID: Int,
+    document: CADGeometryDocument,
+    partTransforms: [CADPartTransformPresentation]
+  ) -> SurfaceHit? {
+    let nodeIndex = partID - 1
+    guard
+      let face = document.faces.first(where: {
+        $0.id == faceID && $0.assemblyNode == nodeIndex
+      }), !face.positions.isEmpty
+    else { return nil }
+    let center = face.positions.reduce(.zero, +) / Float(face.positions.count)
+    let normalSum = face.normals.reduce(SIMD3<Float>.zero, +)
+    let normal =
+      simd_length_squared(normalSum) > 0.000_001
+      ? simd_normalize(normalSum)
+      : SIMD3<Float>(0, 0, 1)
+    let transform =
+      partTransforms.first(where: { $0.partID == partID })?.matrix
+      ?? matrix_identity_float4x4
+    return SurfaceHit(
+      partID: partID, faceID: faceID, localPoint: center,
+      localNormal: normal, transform: transform)
   }
 
   private static func snapThresholdPixels(for kind: CADConnectorCandidateKind) -> Double {

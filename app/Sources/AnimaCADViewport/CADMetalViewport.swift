@@ -267,6 +267,7 @@ public struct CADMetalViewport: View {
   @State private var selectedFeatures: [CADViewportFeaturePick] = []
   @State private var hoverCandidates: [CADConnectorMarker] = []
   @State private var lastHoverHostTime: CFTimeInterval = 0
+  @State private var pickService = CADMetalPickService()
 
   public init(
     document: CADGeometryDocument?,
@@ -331,6 +332,7 @@ public struct CADMetalViewport: View {
         partAppearances: partAppearances,
         selectedPartOrigin: selectedPartOrigin,
         connectorMarkers: liveConnectorMarkers,
+        pickService: pickService,
         onFrame: onFrame, onError: onError)
       CADMouseInputOverlay(
         navigation: navigation,
@@ -355,12 +357,19 @@ public struct CADMetalViewport: View {
             modelDiagonalMeters: document.renderGeometry.bounds.diagonal,
             aspect: Float(max(viewportSize.width, 1) / max(viewportSize.height, 1)))
           if mateConnectorPickingEnabled {
-            let feature =
-              lockedFeature
-              ?? CADMetalFeaturePicker.feature(
+            let inferredFeature: CADViewportFeaturePick?
+            if let ids = pickService.pick(at: point, viewportSize: viewportSize) {
+              inferredFeature = CADMetalFeaturePicker.hoverResult(
+                pickedPartID: ids.partID, pickedFaceID: ids.faceID,
+                at: point, viewportSize: viewportSize, document: document,
+                viewProjection: viewProjection, partTransforms: partTransforms)?.pick
+            } else {
+              inferredFeature = CADMetalFeaturePicker.feature(
                 at: point, viewportSize: viewportSize, document: document,
                 viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
                 partTransforms: partTransforms)
+            }
+            let feature = lockedFeature ?? inferredFeature
             if let feature {
               if let existing = selectedFeatures.firstIndex(where: {
                 $0.partID == feature.partID
@@ -375,11 +384,13 @@ public struct CADMetalViewport: View {
             }
             onPickFeature(feature)
           } else {
-            let partID = pickedPartID(
-              at: point,
-              viewportSize: viewportSize,
-              document: document,
-              viewProjection: viewProjection)
+            let partID =
+              pickService.pick(at: point, viewportSize: viewportSize)?.partID
+              ?? pickedPartID(
+                at: point,
+                viewportSize: viewportSize,
+                document: document,
+                viewProjection: viewProjection)
             onPick(partID ?? 0, extendsSelection)
           }
         },
@@ -430,12 +441,23 @@ public struct CADMetalViewport: View {
           let now = CACurrentMediaTime()
           guard now - lastHoverHostTime >= 1.0 / 60.0 else { return }
           lastHoverHostTime = now
-          // ONE raycast yields both the snapped pick and the illumination
-          // set (Mate Lab parity: see every snappable node before picking).
-          let result = CADMetalFeaturePicker.hoverResult(
-            at: point, viewportSize: viewportSize, document: document,
-            viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
-            partTransforms: partTransforms)
+          // GPU ID-buffer pick answers "which part/face" from the buffers
+          // the GPU already holds; the CPU raycast survives only as a
+          // fallback for the first frames before the renderer is attached.
+          let result: (
+            pick: CADViewportFeaturePick?, partID: Int, candidates: [CADConnectorCandidate]
+          )?
+          if let ids = pickService.pick(at: point, viewportSize: viewportSize) {
+            result = CADMetalFeaturePicker.hoverResult(
+              pickedPartID: ids.partID, pickedFaceID: ids.faceID,
+              at: point, viewportSize: viewportSize, document: document,
+              viewProjection: viewProjection, partTransforms: partTransforms)
+          } else {
+            result = CADMetalFeaturePicker.hoverResult(
+              at: point, viewportSize: viewportSize, document: document,
+              viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
+              partTransforms: partTransforms)
+          }
           if locksFeature {
             if lockedFeature == nil { lockedFeature = result?.pick }
             hoveredFeature = lockedFeature
@@ -459,14 +481,14 @@ public struct CADMetalViewport: View {
         },
         beginDirectManipulation: { point, viewportSize in
           guard !mateConnectorPickingEnabled, let document else { return false }
-          let viewProjection = viewProjection(for: document, viewportSize: viewportSize)
-          guard
-            let partID = pickedPartID(
+          let partID =
+            pickService.pick(at: point, viewportSize: viewportSize)?.partID
+            ?? pickedPartID(
               at: point,
               viewportSize: viewportSize,
               document: document,
-              viewProjection: viewProjection)
-          else { return false }
+              viewProjection: viewProjection(for: document, viewportSize: viewportSize))
+          guard let partID else { return false }
           return onBeginDirectPartDrag(partID)
         },
         updateDirectManipulation: onUpdateDirectPartDrag,
@@ -601,6 +623,21 @@ struct CADConnectorMarker: Equatable {
   var isNode: Bool = false
 }
 
+/// Hands the GPU ID-buffer pick to the SwiftUI layer without exposing the
+/// renderer. The overlay's pointer handlers ask this service "what part/face
+/// is under the cursor" and the GPU answers from its retained ID buffers.
+@MainActor final class CADMetalPickService {
+  fileprivate weak var renderer: MetalRenderer?
+
+  func pick(at point: CGPoint, viewportSize: CGSize) -> (partID: Int, faceID: Int)? {
+    guard let renderer, viewportSize.width >= 1, viewportSize.height >= 1 else { return nil }
+    let scale = renderer.lastDrawableSize.width / viewportSize.width
+    guard scale > 0 else { return nil }
+    return renderer.gpuPick(
+      atDrawablePoint: CGPoint(x: point.x * scale, y: point.y * scale))
+  }
+}
+
 private struct MetalCanvas: NSViewRepresentable {
   let document: CADGeometryDocument?
   let camera: CADCameraState
@@ -614,6 +651,7 @@ private struct MetalCanvas: NSViewRepresentable {
   let partAppearances: [CADPartAppearancePresentation]
   let selectedPartOrigin: CADPartOriginPresentation?
   let connectorMarkers: [CADConnectorMarker]
+  let pickService: CADMetalPickService
   let onFrame: @MainActor @Sendable () -> Void
   let onError: @MainActor @Sendable (String) -> Void
 
@@ -634,6 +672,7 @@ private struct MetalCanvas: NSViewRepresentable {
     view.enableSetNeedsDisplay = false
     view.isPaused = false
     context.coordinator.attach(view)
+    pickService.renderer = context.coordinator.renderer
     update(view, coordinator: context.coordinator)
     return view
   }
@@ -768,6 +807,7 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   let shadowPipeline: MTLRenderPipelineState
   let backgroundPipeline: MTLRenderPipelineState
   let floorPipeline: MTLRenderPipelineState
+  let pickPipeline: MTLRenderPipelineState
   let depthState: MTLDepthStencilState
   let edgeDepthState: MTLDepthStencilState
   let shadowDepthState: MTLDepthStencilState
@@ -807,6 +847,11 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   private var connectorMarkers: [CADConnectorMarker] = []
   private var connectorMarkerBuffer: MTLBuffer?
   private var connectorMarkerVertexCount = 0
+  private var lastUniforms: Uniforms?
+  private var pickIDTexture: MTLTexture?
+  private var pickDepthTexture: MTLTexture?
+  private var pickReadbackBuffer: MTLBuffer?
+  var lastDrawableSize: CGSize = .zero
   /// While transforms stream (drag), the shadow pass waits for this host
   /// time so the depth pre-pass does not re-render the assembly per tick.
   private var shadowSettleHostTime: CFTimeInterval = 0
@@ -901,6 +946,12 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     floorDescriptor.depthAttachmentPixelFormat = .depth32Float
     floorDescriptor.rasterSampleCount = sampleCount
     floorPipeline = try device.makeRenderPipelineState(descriptor: floorDescriptor)
+    let pickDescriptor = MTLRenderPipelineDescriptor()
+    pickDescriptor.vertexFunction = library.makeFunction(name: "pickVertex")
+    pickDescriptor.fragmentFunction = library.makeFunction(name: "pickFragment")
+    pickDescriptor.colorAttachments[0].pixelFormat = .rg32Uint
+    pickDescriptor.depthAttachmentPixelFormat = .depth32Float
+    pickPipeline = try device.makeRenderPipelineState(descriptor: pickDescriptor)
     let depth = MTLDepthStencilDescriptor()
     depth.depthCompareFunction = .less
     depth.isDepthWriteEnabled = true
@@ -1142,6 +1193,82 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     }
   }
 
+  /// GPU ID-buffer pick: renders part/face IDs into an offscreen RG32Uint
+  /// target and reads back one pixel. The GPU already holds every triangle
+  /// with its IDs — the CPU never re-walks geometry to answer "what is
+  /// under the cursor", so pick cost is constant at any assembly size.
+  func gpuPick(atDrawablePoint point: CGPoint) -> (partID: Int, faceID: Int)? {
+    guard let vertexBuffer, let indexBuffer, let partTransformBuffer,
+      let partStateBuffer, indexCount > 0, lastUniforms != nil,
+      lastDrawableSize.width >= 1, lastDrawableSize.height >= 1
+    else { return nil }
+    let width = Int(lastDrawableSize.width)
+    let height = Int(lastDrawableSize.height)
+    let x = min(max(Int(point.x), 0), width - 1)
+    let y = min(max(Int(point.y), 0), height - 1)
+    if pickIDTexture?.width != width || pickIDTexture?.height != height {
+      let idDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rg32Uint, width: width, height: height, mipmapped: false)
+      idDescriptor.usage = [.renderTarget]
+      idDescriptor.storageMode = .private
+      pickIDTexture = device.makeTexture(descriptor: idDescriptor)
+      let depthDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .depth32Float, width: width, height: height, mipmapped: false)
+      depthDescriptor.usage = [.renderTarget]
+      depthDescriptor.storageMode = .private
+      pickDepthTexture = device.makeTexture(descriptor: depthDescriptor)
+      pickReadbackBuffer = device.makeBuffer(length: 8, options: .storageModeShared)
+    }
+    guard let pickIDTexture, let pickDepthTexture, let pickReadbackBuffer,
+      let commandBuffer = commandQueue.makeCommandBuffer()
+    else { return nil }
+
+    let pass = MTLRenderPassDescriptor()
+    pass.colorAttachments[0].texture = pickIDTexture
+    pass.colorAttachments[0].loadAction = .clear
+    pass.colorAttachments[0].storeAction = .store
+    pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+    pass.depthAttachment.texture = pickDepthTexture
+    pass.depthAttachment.loadAction = .clear
+    pass.depthAttachment.storeAction = .dontCare
+    pass.depthAttachment.clearDepth = 1
+    guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+      return nil
+    }
+    guard var uniforms = lastUniforms else { return nil }
+    encoder.setRenderPipelineState(pickPipeline)
+    encoder.setDepthStencilState(depthState)
+    // Fragment work outside the cursor neighborhood is wasted; the scissor
+    // keeps the pass to vertex transforms plus a handful of fragments.
+    let scissorOrigin = MTLScissorRect(
+      x: max(x - 1, 0), y: max(y - 1, 0),
+      width: min(3, width - max(x - 1, 0)), height: min(3, height - max(y - 1, 0)))
+    encoder.setScissorRect(scissorOrigin)
+    encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
+    encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+    encoder.setVertexBuffer(partTransformBuffer, offset: 0, index: 2)
+    encoder.setVertexBuffer(partStateBuffer, offset: 0, index: 3)
+    encoder.drawIndexedPrimitives(
+      type: .triangle, indexCount: indexCount, indexType: .uint32,
+      indexBuffer: indexBuffer, indexBufferOffset: 0)
+    encoder.endEncoding()
+    guard let blit = commandBuffer.makeBlitCommandEncoder() else { return nil }
+    blit.copy(
+      from: pickIDTexture, sourceSlice: 0, sourceLevel: 0,
+      sourceOrigin: MTLOrigin(x: x, y: y, z: 0),
+      sourceSize: MTLSize(width: 1, height: 1, depth: 1),
+      to: pickReadbackBuffer, destinationOffset: 0,
+      destinationBytesPerRow: 8, destinationBytesPerImage: 8)
+    blit.endEncoding()
+    commandBuffer.commit()
+    commandBuffer.waitUntilCompleted()
+    let values = pickReadbackBuffer.contents().bindMemory(to: UInt32.self, capacity: 2)
+    let partID = Int(values[0])
+    let faceID = Int(values[1])
+    guard partID > 0, faceID > 0 else { return nil }
+    return (partID, faceID - 1)
+  }
+
   private func writePartTransforms() {
     guard let partTransformBuffer, partSlotCount > 0 else { return }
     let pointer = partTransformBuffer.contents().bindMemory(
@@ -1167,7 +1294,9 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     rebuildSelectedPartOriginBuffer()
   }
 
-  func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+  func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+    lastDrawableSize = size
+  }
 
   func draw(in view: MTKView) {
     guard let drawable = view.currentDrawable,
@@ -1258,6 +1387,7 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
           0.0007,
           Float(shadowTexture.width)),
         floorColor: SIMD4(theme.floorColor, 1))
+      lastUniforms = uniforms
       let uniformOffset = uniformFrameIndex * uniformStride
       withUnsafeBytes(of: &uniforms) {
         uniformBuffer.contents().advanced(by: uniformOffset).copyMemory(
@@ -1755,6 +1885,27 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       o.position = u.viewProjection * v.position; o.color = v.color; return o;
     }
     fragment float4 referenceFragment(ReferenceVarying in [[stage_in]]) { return in.color; }
+    struct PickVarying { float4 position [[position]]; uint partID [[flat]]; uint faceID [[flat]]; };
+    vertex PickVarying pickVertex(
+      uint id [[vertex_id]],
+      device const Vertex *vertices [[buffer(0)]],
+      constant Uniforms &u [[buffer(1)]],
+      device const float4x4 *partTransforms [[buffer(2)]],
+      device const uint *partState [[buffer(3)]]
+    ) {
+      Vertex v = vertices[id];
+      PickVarying o;
+      if (partState[v.partID] & 1u) {
+        o.position = float4(2.0, 2.0, 2.0, 1.0); o.partID = 0; o.faceID = 0; return o;
+      }
+      o.position = u.viewProjection * partTransforms[v.partID] * float4(float3(v.position), 1.0);
+      o.partID = v.partID;
+      o.faceID = v.faceID + 1u;
+      return o;
+    }
+    fragment uint2 pickFragment(PickVarying in [[stage_in]]) {
+      return uint2(in.partID, in.faceID);
+    }
     struct BackgroundGradient { float4 top; float4 bottom; };
     struct BackgroundVarying { float4 position [[position]]; float t; };
     vertex BackgroundVarying backgroundVertex(uint id [[vertex_id]]) {
