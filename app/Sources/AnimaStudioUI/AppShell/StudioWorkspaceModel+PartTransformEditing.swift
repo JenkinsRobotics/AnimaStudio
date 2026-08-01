@@ -105,15 +105,7 @@ extension StudioWorkspaceModel {
     guard let document = engineRigDocument,
       let name = enginePartName(for: id),
       let part = project.rig.parts.first(where: { $0.id == id })
-    else {
-      // TEMP transform diagnostics (remove after the regression is fixed).
-      StudioDiagLog.append(
-        "XFORM-DIAG silent bail id=\(id) hasDoc=\(engineRigDocument != nil) "
-          + "engineName=\(enginePartName(for: id) ?? "nil") "
-          + "inLocalRig=\(project.rig.parts.contains { $0.id == id }) "
-          + "idMapCount=\(enginePartIDsByName.count)")
-      return
-    }
+    else { return }
     do {
       engineRigDocument = try AnimaCoreRigDocumentEditor.settingPartTransform(
         named: name,
@@ -131,9 +123,6 @@ extension StudioWorkspaceModel {
       // the part back (the drag-reset regression).
       engineResolvedPartPoses.removeValue(forKey: id)
       documentEditRevision += 1
-      StudioDiagLog.append(
-        "XFORM-DIAG applied id=\(id) name=\(name) "
-          + "pos=[\(part.positionMeters.x), \(part.positionMeters.y), \(part.positionMeters.z)]")
       schedulePartTransformPush(id: id)
     } catch {
       animaCoreErrorMessage = error.localizedDescription
@@ -148,6 +137,11 @@ extension StudioWorkspaceModel {
     let revision = enginePartTransformPushRevision
     enginePartTransformPushTask?.cancel()
     enginePartTransformPushTask = Task { [weak self] in
+      // Debounce: a 60 Hz drag must not become 60 engine round-trips per
+      // second (each update_part revalidates the whole rig in Python).
+      // Only the final quiet edit reaches the engine handle.
+      try? await Task.sleep(for: .milliseconds(150))
+      guard !Task.isCancelled else { return }
       await self?.pushPartTransformToEngine(id: id, revision: revision)
     }
   }

@@ -141,16 +141,6 @@ extension StudioWorkspaceModel {
     let sourceMatches = enginePartModelSources.filter { _, source in
       standardizedSource == nil || source.fileURL.standardizedFileURL == standardizedSource
     }
-    // TEMP mate-mapping diagnostics (remove after the regression is fixed).
-    StudioDiagLog.append(
-      "MATE-DIAG pick partID=\(feature.partID) node=\(feature.nodeName) "
-        + "sourceURL=\(standardizedSource?.path ?? "nil") "
-        + "engineSources=\(enginePartModelSources.count) matches=\(sourceMatches.count) "
-        + "selected=\(selectedPartID.map(String.init(describing:)) ?? "nil")")
-    for (partID, source) in enginePartModelSources.prefix(3) {
-      StudioDiagLog.append(
-        "MATE-DIAG engine part=\(partID) url=\(source.fileURL.standardizedFileURL.path)")
-    }
     let exactNodeMatches = sourceMatches.filter { _, source in
       guard let modelNode = source.modelNode else { return false }
       return modelNode == feature.nodeName

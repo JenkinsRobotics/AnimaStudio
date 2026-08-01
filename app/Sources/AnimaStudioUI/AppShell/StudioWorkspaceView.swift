@@ -6,6 +6,7 @@ import AnimaModel
 import AppKit
 import RealityKitViewport
 import SwiftUI
+import simd
 
 struct StudioWorkspaceView: View {
   @Environment(\.openSettings) private var openSettings
@@ -1171,7 +1172,23 @@ struct StudioWorkspaceView: View {
     var result: [URL: CADPartRestTransform] = [:]
     for (partID, source) in workspace.enginePartModelSources {
       guard let transform = workspace.cadPartRestTransform(for: partID) else { continue }
-      result[source.fileURL.standardizedFileURL] = transform
+      // An AnimaCore-resolved pose (mate placement/preview, clip evaluation)
+      // overrides the authored rest transform, so mate motion is visible on
+      // the CAD renderers exactly as it is on RealityKit. Without this the
+      // Metal/WebGPU paths silently drew rest placement only and a committed
+      // mate appeared to do nothing.
+      if let pose = workspace.engineResolvedPartPoses[partID] {
+        var matrix = simd_float4x4(
+          simd_quatf(
+            ix: pose.orientationImaginaryReal.x,
+            iy: pose.orientationImaginaryReal.y,
+            iz: pose.orientationImaginaryReal.z,
+            r: pose.orientationImaginaryReal.w))
+        matrix.columns.3 = SIMD4(pose.positionMeters, 1)
+        result[source.fileURL.standardizedFileURL] = CADPartRestTransform(matrix: matrix)
+      } else {
+        result[source.fileURL.standardizedFileURL] = transform
+      }
     }
     return result
   }

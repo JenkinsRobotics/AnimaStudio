@@ -764,6 +764,9 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   private var floorGridVertexCount = 0
   private var floorPlaneBuffer: MTLBuffer?
   private var floorPlaneVertexCount = 0
+  /// While transforms stream (drag), the shadow pass waits for this host
+  /// time so the depth pre-pass does not re-render the assembly per tick.
+  private var shadowSettleHostTime: CFTimeInterval = 0
   private var selectedPartOriginBuffer: MTLBuffer?
   private var selectedPartOriginVertexCount = 0
   private var selectedPartOrigin: CADPartOriginPresentation?
@@ -995,23 +998,12 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
 
   func set(partTransforms: [CADPartTransformPresentation]) {
     guard self.partTransforms != partTransforms else { return }
-    // TEMP renderer-side diagnostics (remove after the drag regression closes):
-    // what the GPU path actually receives when the model layer applies an edit.
-    let first = partTransforms.first.map {
-      "part\($0.partID)@[\($0.matrix.columns.3.x), \($0.matrix.columns.3.y), \($0.matrix.columns.3.z)]"
-    }
-    let line =
-      "\(Date().timeIntervalSince1970) RENDER-DIAG metal set transforms "
-      + "count=\(partTransforms.count) first=\(first ?? "none")\n"
-    if let data = line.data(using: .utf8),
-      let handle = FileHandle(forWritingAtPath: NSTemporaryDirectory() + "/anima-diag.log")
-    {
-      _ = try? handle.seekToEnd()
-      try? handle.write(contentsOf: data)
-      try? handle.close()
-    }
     self.partTransforms = partTransforms
+    // Shadows settle after the interaction: re-rendering the 2048px shadow
+    // depth pass for the full assembly on every drag tick collapsed the
+    // frame rate, and a briefly stale contact shadow is imperceptible.
     shadowNeedsUpdate = true
+    shadowSettleHostTime = CACurrentMediaTime() + 0.15
     writePartTransforms()
   }
 
@@ -1076,6 +1068,7 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
 
     let lightViewProjection = shadowViewProjection()
     if shadowNeedsUpdate,
+      CACurrentMediaTime() >= shadowSettleHostTime,
       theme.shadowStrength > 0.02,
       let vertexBuffer,
       let indexBuffer,
