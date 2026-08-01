@@ -14,7 +14,7 @@ their products and are renamed into the Aether identity when extracted.
 The three projects temporarily co-locate in this repo as sibling root
 folders and later split into their own repos:
 
-- `aether/` — Aether Core, the engine (product-free)
+- `aether-core/` — Aether Core, the engine (product-free)
 - `aether-animation/` — Aether Animation, the animatronics/animation product
 - `open-cad-studio/` — the CAD authoring product (started 2026-08-01)
 

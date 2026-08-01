@@ -12,4 +12,4 @@ solidifies; until then, active development continues in place and this
 folder holds product-specific planning and any new product-only modules.
 
 Product-specific = timelines, show control, hardware panels, character
-library UX. Anything two products need belongs in `/aether/`.
+library UX. Anything two products need belongs in `/aether-core/`.
