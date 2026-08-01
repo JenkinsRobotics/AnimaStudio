@@ -5,9 +5,9 @@ agent plans against.
 
 ## The family: the Aether ecosystem
 
-**Aether** is the shared family name; **Aether Core** is the universal
-engine at its center — the CAD, rendering, and scene core every product
-consumes.
+**Aether** is the shared family name; **Aether Core** is the universal,
+headless deterministic engine at its center — mathematical kernel, parametric
+B-Rep DAG, geometric/assembly constraint solving, and shared state evaluation.
 Modules baked into the engine carry the Aether prefix (AetherScene,
 AetherViewport, AetherKernel); product-branded names (Anima*) stay in
 their products and are renamed into the Aether identity when extracted.
@@ -16,7 +16,7 @@ folders and later split into their own repos:
 
 - `aether-core/` — Aether Core, the engine (product-free)
 - `aether-animation/` — Aether Animation, the animatronics/animation product
-- `open-cad-studio/` — the CAD authoring product (started 2026-08-01)
+- `Aether CAD/` — Aether CAD, the CAD authoring product (started 2026-08-01)
 
 Later products (simulation, show control) sit on the same Aether engine. The
 folders are scaffolds today; existing code (`animacore/`, `app/`)
@@ -26,11 +26,22 @@ migrates as the split solidifies rather than in one disruptive move.
 
 | Layer | Strategy | Today |
 |---|---|---|
-| Kernel (B-Rep math) | **Adopt, never build**: Open CASCADE behind our shim; swappable, never load-bearing for architecture | `app/Sources/AnimaCADShim` |
-| Aether / semantics | **Build & own**: mates, DOF, kinematics, scenes, evaluation, hardware contracts | `animacore/` |
+| Kernel (B-Rep math) | **Adopt, integrate, and distribute**: Aether Core owns the supported Open CASCADE build plus its stable WebAssembly/C++ seam, topology/tolerance policy, and STEP/IGES I/O | `app/Sources/AnimaCADShim` + `Aether CAD/` proof today |
+| Aether / parametric state | **Build & own**: deterministic feature DAG, migrations, rebuild diagnostics, stable IDs, 2D constraints, 3D mates, DOF, kinematics, and evaluation | split across `Aether CAD/` and `animacore/` today |
 | Aether / AetherScene | **Build & own**: the one 3D world — entities with a single stable ID space (part instances, connectors, mates), transforms, selection, interaction ops | being built inside Anima Studio |
 | Aether / render contracts | **Build & own**: one entity stream consumed by Metal and WebGPU; GPU pick contract | `app/Sources/AnimaCADViewport` |
 | Products | Thin front-ends over Aether | `app/` today |
+
+Product responsibilities are explicit:
+
+- **Aether CAD** — web-native parametric solid modeling, 2D constrained
+  sketches, mechanical assemblies/topological features, and STEP/IGES export.
+- **Aether Animation** — motion authoring, real-time puppetry, avatar/MoCap
+  mapping, animatronics, show control, and routing trajectories to hardware
+  buses.
+
+Aether Core has no UI and no raw hardware drivers. It may compute deterministic
+geometry, poses, and trajectories; products own presentation and I/O.
 
 Renderer commitments: **OCCT and WebGPU stay** (with Metal as the native
 co-primary). RealityKit is retired from CAD paths.
