@@ -48,8 +48,11 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Correct OCCT Mate Lab assembly import and connector-first authoring | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | repeated and multi-file imports remain distinct visible Parts; operator may create unlimited persistent mate connectors on exact OCCT candidates; Fastened mates select two existing connectors on different Parts and reference their stable IDs; connector markers follow Part transforms; focused tests/check/build and browser smoke | released 2026-07-31 — connector registry + separate mate draft; persistent Part-local marker/triad; multi-file append with per-document assembly placement; 7 tests/check/build and cylindrical STEP probe pass; revised empty UI loads in Safari; operator connector/mate walkthrough pending |
+| Codex | Repair curved STEP import and prove the complete browser authoring flow | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | a failed analytic face never discards the imported Part; a curved STEP and second STEP render and appear in the tree; connector placement + Fastened mating pass through the actual browser UI | released 2026-07-31 — raw OCCT face enumeration, exact plane/cylinder axes, per-face/edge fault isolation, pointer-transparent tool card; live browser regression reaches 2 Parts / 2 connectors / 1 mate; 7 tests/check/build pass |
 | Claude | Viewport appearance layers — Background/Environment/Object panel + gradient bg + solid shadow floor + perceptual lighting sliders (Jonathan-approved design, cross-lane authorized 2026-07-31) | `app/Sources/AnimaCADViewport/{CADViewportTheme,CADMetalViewport,CADPipelineViewport,CADWebPayload,CADWebGPUViewport}.swift`, `app/App/Resources/CADWeb/ThreeJSWeb/**` + `dev/Codex Bench/web/threejs/src/app.js` regen, `app/App/Resources/CADWeb/RawWebGPU/index.html`, `app/Sources/AnimaStudioUI/Components/CADAppearancePanel.swift`, `app/Sources/AnimaStudioUI/Settings/StudioPreferenceKeys.swift`, narrow wiring in `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, tests under `app/Tests/**`, `dev/docs/roadmap/Viewport_Appearance_Layers.md`, STATUS + coordination | design doc acceptance: three-section panel, 4 floor modes, off→nominal→4x sliders live on Metal + Three.js WebGPU, color-only raw WebGPU; swift build/test + JS build/copy + root app + live walkthrough | released 2026-07-31 — 376 XCTest + Swift Testing green, lint clean, JS rebuilt+copied, root app launches under MTL_DEBUG_LAYER=1; operator visual walkthrough pending. Note: Three.js build source now lives under dev/archive/Codex Bench/web/threejs (post-archive) — production bundle builds from there; consider relocating under app/ |
-| Codex | Fix Home navigation crash during shared-session teardown | `app/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, focused AppShell regression in `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, STATUS + append-only coordination; preserve all concurrent dirty hunks | clearing the shared project session never force-unwraps nil while SwiftUI tears down the workspace; stale outgoing bindings cannot resurrect a closed project; focused/full tests, lint, native/root build/sign/launch pass | active 2026-07-30 |
+| Codex | Build isolated OCCT topology + WebGPU mate-connector proof app | `dev/OCCTMateLab/**`, `dev/docs/reality/STATUS.md`, append-only coordination only; do not touch the production Swift/engine lanes | operator STEP import; OCCT analytic face/edge/vertex topology and per-face tessellation identity; fast hover inference; visible mate-connector frames; two-pick Fastened mate preview/commit using the documented homogeneous transform; already-constrained moving parts reject clearly; deterministic math/inference tests, production build, browser walkthrough | released 2026-07-31 — isolated TypeScript/Vite app; OCCT worker exact topology + face-hash mapping; WebGPU/WebGL renderer; two-pick Fastened solve; conservative constraint tracker; 5 tests/check/build pass; STEP probes retain 12/12 and 9/9 face groups incl. CYLINDRE; Safari worker reports OCCT ready; operator two-click walkthrough pending |
+| Codex | Fix Home navigation crash during shared-session teardown | `app/Sources/AnimaStudioUI/AppShell/AnimaStudioRootView.swift`, focused AppShell regression in `app/Tests/AnimaStudioUIUnitTests/AppShell/WorkspaceChromeTests.swift`, STATUS + append-only coordination; preserve all concurrent dirty hunks | clearing the shared project session never force-unwraps nil while SwiftUI tears down the workspace; stale outgoing bindings cannot resurrect a closed project; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-31 — presentation binding keeps the outgoing session readable during teardown and ignores stale writes after close; focused 10 + full Swift tests, native Xcode build, signed root rebuild, and launch passed; exact Home click could not be conclusively exercised through GUI automation |
 | Codex | Add native macOS workspace windows, tabs, and detach/merge controls beside Studio mode | `app/App/AnimaStudioApp.swift`, `app/Sources/AnimaStudioUI/AppShell/{AnimaStudioRootView,StudioWindowBehavior,WorkspaceChrome,StudioWorkspaceModel}.swift`, focused AppShell tests, STATUS + append-only coordination; preserve all concurrent dirty hunks | one shared project application session backs every native window; header window menu opens any applicable workspace as a new native tab or independent window, detaches the current tab, merges windows, toggles the tab bar, and selects adjacent tabs; each window keeps its own workspace presentation while project/session state is shared; tests/lint/native/root/sign/launch pass | released 2026-07-30 — focused 9 + full 368 XCTest/67 Swift Testing; lint; native build; signed root rebuild; launch PID 95568 |
 | Codex | Replace the misleading engine-time performance card with real renderer FPS and stabilize the interactive CAD render loop at 60 Hz | `app/Sources/AnimaCADViewport/{CADLiveTelemetry,CADPipelineViewport,CADMetalViewport,CADWebGPUViewport}.swift`, `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceView,Components/{ViewportPerformanceHUD,CADAppearancePanel,ViewportSidebarPanel}}.swift`, narrowly required Three.js/raw-WebGPU frame-report source/generated resources, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | compact and detailed performance surfaces consume one live presented-frame telemetry contract; WebGPU batches carry their measured interval; sampling remains live during pointer tracking; Metal reports completed GPU frames and targets a stable 60 Hz; the HUD distinguishes renderer FPS/frame time from AnimaCore playhead time; focused/full tests, lint, JS checks, native/root build/sign/launch pass | released 2026-07-30 — real GPU/browser frame telemetry, 60 Hz Metal policy, cached state/shadows; 366 XCTest + 67 Swift Testing, lint/JS/native/root/sign/launch pass |
 | Codex | Make CAD environment lighting controls authoritative, immediately live, and recoverable from an all-black rig | `app/Sources/AnimaStudioUI/{AppShell/StudioWorkspaceView,Components/CADAppearancePanel}.swift`, narrowly required Metal lighting helpers/shader under `app/Sources/AnimaCADViewport/CADMetalViewport.swift`, focused CAD/UI tests, STATUS + append-only coordination; preserve every concurrent dirty hunk | the Environment panel binds directly to the values consumed by the active viewport instead of maintaining duplicate property wrappers; changing ambient/key/fill/rim redraws immediately; reset restores the selected preset; an all-disabled warning is explicit; very dark imported materials retain CAD-readable dielectric response when lighting is enabled while all-zero lighting remains honestly black; focused/full tests, lint, native/root build/sign/launch pass | released 2026-07-30 — direct live bindings and preset reset; explicit all-lights-off warning; Metal/raw-WebGPU dark-material response and raw ambient uniform repaired; 366 XCTest + 66 Swift Testing, touched lint, runtime Metal construction, native/root build, signing, and packaged launch pass |
@@ -416,6 +419,31 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+- **2026-08-01 (Claude, drag/mate regression closed + next packets):** Root
+  causes found and fixed across a marathon session: (1) accidental
+  double-import left 7 parts sharing STEP files pairwise — the URL-keyed CAD
+  pipeline collapsed each pair (drags masked, mate picks ambiguous);
+  repaired the operator project through the engine, tree-selection now
+  disambiguates shared-source parts. (2) Part edits never reached the live
+  engine handle — added client `updatePart` + task-latest push (debounced
+  150 ms) with regression test `draggedPartTransformSurvivesPlayheadRefresh`.
+  (3) CAD renderers drew rest transforms only — resolved poses (mate
+  preview/commit, clips) now overlay the CAD transform map, so mate motion
+  is visible on Metal/WebGPU. (4) Drag perf 60→2 fps fixed: diag I/O
+  stripped, engine push debounced, shadow pre-pass settles 150 ms.
+  (5) RealityKit Assets preview disabled for STEP characters (operator
+  decision). (6) Segregation phase 1: movement + mate subsystems extracted
+  to dedicated files (`StudioWorkspaceModel+PartTransformEditing/
+  +MatePlacement`), model 3,471→2,969 lines; phase 2 = real controllers.
+  **Next packets (operator priorities):** (a) mate-connector inference
+  richness — illuminated candidate nodes (face center, edge midpoints,
+  corners, circle/cylinder centers), triad visualizer, Shift face-lock per
+  `Assembly_Mating_Architecture.md`; (b) transform-gizmo lock — the overlay
+  drifts against the rendered part during drags (suspect: crude
+  `metersPerPoint` screen→meter constant instead of camera-projected
+  deltas, plus pose-vs-rest divergence when a clip pose exists); (c) mate
+  rows in the navigator cannot be selected/deleted — selection-key mapping
+  audit.
 
 - **2026-07-29 (Codex, projected local-frame CAD manipulator):** Replaced the
   fixed screen-space triad and three circular icon buttons with a real
@@ -4531,3 +4559,38 @@ change needed in the Handoff log instead of inventing commands.
   the main pass (CADMetalViewport.swift:1110). Verified: 369 XCTest + 28
   Swift Testing green, root app rebuilt, relaunched with MTL_DEBUG_LAYER=1
   strict validation — no abort, operator confirmed correctly lit parts.
+- **2026-07-31 (Codex, isolated OCCT Mate Lab):** Added
+  `dev/OCCTMateLab/`, a standalone local TypeScript/Vite proof using
+  Replicad/OpenCascade.js in a worker and Three.js WebGPU with WebGL 2
+  fallback. It maps tessellated hits back to exact OCCT face hashes, extracts
+  analytic plane/cylinder/circle/edge/vertex connector frames, shows hover
+  candidates and triads, and applies the specified two-click Fastened
+  transform. Initial constraint handling rejects a second moving-side
+  constraint explicitly. Verification: 5 Vitest cases, TypeScript check,
+  production Vite build, two generated STEP probes (including a true
+  cylindrical face), and Safari OCCT/WebGPU worker readiness. The final
+  operator two-click walkthrough remains pending; production Swift and
+  AnimaCore sources were not touched.
+- **2026-07-31 (Codex, connector-first Mate Lab correction):** Split exact
+  topology inference, persistent mate connectors, and completed mates into
+  separate concepts. **Place Connector** now creates unlimited stable-ID,
+  Part-local marker/triad objects; **Fastened Mate** selects two existing
+  connectors on different Parts and stores both IDs before applying the
+  homogeneous transform. Repeated file imports append to the assembly and
+  stage each new STEP document beside existing geometry while preserving
+  multi-solid coordinates within a document. Added connector deletion guards
+  and two new deterministic state tests. Verification: 7 Vitest cases,
+  TypeScript check, production build, exact cylindrical STEP probe, and the
+  revised empty UI in Safari. Operator connector placement/mate walkthrough is
+  pending; production app/engine sources remain untouched.
+- **2026-07-31 (Codex, Mate Lab curved-import repair):** Root-caused the blank
+  import to one curved face throwing while `normalAt(center-of-mass)` was being
+  inferred, which rejected the entire imported Part after the picker reported
+  success. The worker now enumerates exact OCCT faces directly, derives plane
+  and cylinder frames from their analytic axes, and fault-isolates unsupported
+  faces and edges. One STEP document is one independently movable Part; import
+  separate STEP files for separate moving components. A real headless-browser
+  regression imported a cylindrical STEP plus a second STEP, rendered/listed
+  both, placed one connector on each, and applied one Fastened mate. Seven
+  tests, TypeScript check, and production build pass; production app/engine
+  sources remain untouched.
