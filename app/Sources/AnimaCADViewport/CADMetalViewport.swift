@@ -995,6 +995,21 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
 
   func set(partTransforms: [CADPartTransformPresentation]) {
     guard self.partTransforms != partTransforms else { return }
+    // TEMP renderer-side diagnostics (remove after the drag regression closes):
+    // what the GPU path actually receives when the model layer applies an edit.
+    let first = partTransforms.first.map {
+      "part\($0.partID)@[\($0.matrix.columns.3.x), \($0.matrix.columns.3.y), \($0.matrix.columns.3.z)]"
+    }
+    let line =
+      "\(Date().timeIntervalSince1970) RENDER-DIAG metal set transforms "
+      + "count=\(partTransforms.count) first=\(first ?? "none")\n"
+    if let data = line.data(using: .utf8),
+      let handle = FileHandle(forWritingAtPath: NSTemporaryDirectory() + "/anima-diag.log")
+    {
+      _ = try? handle.seekToEnd()
+      try? handle.write(contentsOf: data)
+      try? handle.close()
+    }
     self.partTransforms = partTransforms
     shadowNeedsUpdate = true
     writePartTransforms()

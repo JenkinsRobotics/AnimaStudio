@@ -112,6 +112,16 @@ struct AssetBuilderInspector: View {
     .padding(14)
   }
 
+  /// A STEP-backed character already has a live CAD 3D environment in the
+  /// 3D Modeling workspace. Mounting a second RealityKit scene beside it
+  /// duplicates rendering work and interfered with direct manipulation, so
+  /// the preview stays off for CAD assemblies (operator decision 2026-07-31).
+  private var characterIsSTEPBacked: Bool {
+    workspace.enginePartModelSources.values.contains {
+      ["step", "stp"].contains($0.fileURL.pathExtension.lowercased())
+    }
+  }
+
   private var previewPanel: some View {
     VStack(spacing: 0) {
       panelHeader(
@@ -123,7 +133,23 @@ struct AssetBuilderInspector: View {
 
       Divider()
 
-      ZStack(alignment: .bottomLeading) {
+      if characterIsSTEPBacked {
+        ContentUnavailableView {
+          Label("CAD assembly", systemImage: "cube.transparent")
+        } description: {
+          Text(
+            "This character renders live in the 3D Modeling workspace. The RealityKit preview is disabled for CAD assemblies."
+          )
+        }
+        .frame(minHeight: 220)
+      } else {
+        stagePreview
+      }
+    }
+  }
+
+  private var stagePreview: some View {
+    ZStack(alignment: .bottomLeading) {
         RobotPreviewView(
           rig: workspace.project.rig,
           engineResolvedPartPoses: workspace.engineResolvedPartPoses,
@@ -157,7 +183,6 @@ struct AssetBuilderInspector: View {
           .padding(10)
         }
       }
-    }
   }
 
   private var previewSubtitle: String {

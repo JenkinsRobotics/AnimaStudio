@@ -1047,9 +1047,6 @@ public struct CADPipelineViewport: View {
 
   private func beginDirectPartDrag(_ partID: Int) -> Bool {
     guard let sourceURL = sourceURL(forPartID: partID)?.standardizedFileURL else {
-      // TEMP drag diagnostics (remove after the regression is fixed).
-      NSLog(
-        "DRAG-DIAG partID=%d has no source URL | ranges=%d", partID, partIDRangesByURL.count)
       return false
     }
     // Every hit selects, even when that component is locked or constrained and
@@ -1058,15 +1055,7 @@ public struct CADPipelineViewport: View {
     guard
       editableSourceURLs.contains(sourceURL),
       let start = partRestTransformsBySourceURL[sourceURL]
-    else {
-      NSLog(
-        "DRAG-DIAG refused url=%@ editable=%d hasTransform=%d editableCount=%d transformCount=%d",
-        sourceURL.path,
-        editableSourceURLs.contains(sourceURL) ? 1 : 0,
-        partRestTransformsBySourceURL[sourceURL] != nil ? 1 : 0,
-        editableSourceURLs.count, partRestTransformsBySourceURL.count)
-      return false
-    }
+    else { return false }
     // Mouse-down selects the hit component before its transform starts
     // moving. Plain left-drag is therefore a single select-and-place gesture.
     directPartDragStart = start

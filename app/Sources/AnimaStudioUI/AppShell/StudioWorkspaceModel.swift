@@ -1786,16 +1786,14 @@ final class StudioWorkspaceModel {
       standardizedSource == nil || source.fileURL.standardizedFileURL == standardizedSource
     }
     // TEMP mate-mapping diagnostics (remove after the regression is fixed).
-    NSLog(
-      "MATE-DIAG pick partID=%d node=%@ sourceURL=%@ | engineSources=%d matches=%d selected=%@",
-      feature.partID, feature.nodeName,
-      standardizedSource?.path ?? "nil",
-      enginePartModelSources.count, sourceMatches.count,
-      selectedPartID.map(String.init(describing:)) ?? "nil")
+    StudioDiagLog.append(
+      "MATE-DIAG pick partID=\(feature.partID) node=\(feature.nodeName) "
+        + "sourceURL=\(standardizedSource?.path ?? "nil") "
+        + "engineSources=\(enginePartModelSources.count) matches=\(sourceMatches.count) "
+        + "selected=\(selectedPartID.map(String.init(describing:)) ?? "nil")")
     for (partID, source) in enginePartModelSources.prefix(3) {
-      NSLog(
-        "MATE-DIAG engine part=%@ url=%@", String(describing: partID),
-        source.fileURL.standardizedFileURL.path)
+      StudioDiagLog.append(
+        "MATE-DIAG engine part=\(partID) url=\(source.fileURL.standardizedFileURL.path)")
     }
     let exactNodeMatches = sourceMatches.filter { _, source in
       guard let modelNode = source.modelNode else { return false }
@@ -1804,8 +1802,10 @@ final class StudioWorkspaceModel {
     }
     let resolvedPartID: PartID? = {
       if exactNodeMatches.count == 1 { return exactNodeMatches.first?.key }
-      if sourceMatches.count == 1 { return sourceMatches.first?.key }
+      // The operator's tree selection disambiguates parts that share one
+      // source file (instanced geometry) before the single-match shortcut.
       if let selectedPartID, sourceMatches[selectedPartID] != nil { return selectedPartID }
+      if sourceMatches.count == 1 { return sourceMatches.first?.key }
       return nil
     }()
     guard let partID = resolvedPartID else {
@@ -3318,7 +3318,15 @@ final class StudioWorkspaceModel {
     guard let document = engineRigDocument,
       let name = enginePartName(for: id),
       let part = project.rig.parts.first(where: { $0.id == id })
-    else { return }
+    else {
+      // TEMP transform diagnostics (remove after the regression is fixed).
+      StudioDiagLog.append(
+        "XFORM-DIAG silent bail id=\(id) hasDoc=\(engineRigDocument != nil) "
+          + "engineName=\(enginePartName(for: id) ?? "nil") "
+          + "inLocalRig=\(project.rig.parts.contains { $0.id == id }) "
+          + "idMapCount=\(enginePartIDsByName.count)")
+      return
+    }
     do {
       engineRigDocument = try AnimaCoreRigDocumentEditor.settingPartTransform(
         named: name,
@@ -3336,6 +3344,9 @@ final class StudioWorkspaceModel {
       // the part back (the drag-reset regression).
       engineResolvedPartPoses.removeValue(forKey: id)
       documentEditRevision += 1
+      StudioDiagLog.append(
+        "XFORM-DIAG applied id=\(id) name=\(name) "
+          + "pos=[\(part.positionMeters.x), \(part.positionMeters.y), \(part.positionMeters.z)]")
       schedulePartTransformPush(id: id)
     } catch {
       animaCoreErrorMessage = error.localizedDescription
