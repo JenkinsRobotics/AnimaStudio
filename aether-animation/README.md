@@ -1,6 +1,6 @@
-# Open Animation Studio
+# Aether Animation
 
-The animatronics/animation product: import a character, define its movable
+The Aether ecosystem's animatronics/animation product: import a character, define its movable
 structure (mates on Aether's world), animate it on a timeline, preview it, and
 drive the same evaluated motion to physical hardware.
 

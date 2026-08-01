@@ -1,7 +1,7 @@
 # Open CAD Studio
 
 The CAD authoring product: create, place, edit, and constrain geometry in
-Aether's 3D world — the modeling counterpart to Open Animation Studio.
+Aether's 3D world — the modeling counterpart to Aether Animation.
 
 ## Ground rules (from day one, learned the hard way)
 

@@ -15,7 +15,7 @@ The three projects temporarily co-locate in this repo as sibling root
 folders and later split into their own repos:
 
 - `aether/` — Aether Core, the engine (product-free)
-- `open-animation-studio/` — the animatronics/animation product
+- `aether-animation/` — Aether Animation, the animatronics/animation product
 - `open-cad-studio/` — the CAD authoring product (started 2026-08-01)
 
 Later products (simulation, show control) sit on the same Aether engine. The
