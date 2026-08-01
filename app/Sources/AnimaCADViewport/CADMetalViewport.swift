@@ -265,6 +265,7 @@ public struct CADMetalViewport: View {
   @State private var hoveredFeature: CADViewportFeaturePick?
   @State private var lockedFeature: CADViewportFeaturePick?
   @State private var selectedFeatures: [CADViewportFeaturePick] = []
+  @State private var hoverCandidates: [CADConnectorMarker] = []
 
   public init(
     document: CADGeometryDocument?,
@@ -413,6 +414,7 @@ public struct CADMetalViewport: View {
           guard mateConnectorPickingEnabled, let document, let point else {
             hoveredFeature = nil
             lockedFeature = nil
+            hoverCandidates = []
             return
           }
           let viewProjection = CADViewportProjection.viewProjection(
@@ -432,6 +434,25 @@ public struct CADMetalViewport: View {
           } else {
             lockedFeature = nil
             hoveredFeature = inferred
+          }
+          // Illuminate every snappable candidate on the hovered face/node so
+          // the operator sees the full set before picking (Mate Lab parity).
+          if let illumination = CADMetalFeaturePicker.illuminationCandidates(
+            at: point, viewportSize: viewportSize, document: document,
+            viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
+            partTransforms: partTransforms)
+          {
+            hoverCandidates = illumination.candidates.map { candidate in
+              CADConnectorMarker(
+                partID: illumination.partID,
+                origin: candidate.origin,
+                xAxis: candidate.xAxis,
+                zAxis: candidate.zAxis,
+                isSelected: false,
+                isNode: true)
+            }
+          } else {
+            hoverCandidates = []
           }
         },
         beginDirectManipulation: { point, viewportSize in
@@ -472,6 +493,7 @@ public struct CADMetalViewport: View {
         hoveredFeature = nil
         lockedFeature = nil
         selectedFeatures.removeAll()
+        hoverCandidates = []
       }
     }
   }
@@ -479,7 +501,8 @@ public struct CADMetalViewport: View {
   /// The selected and hovered mate features as real in-scene triads.
   private var liveConnectorMarkers: [CADConnectorMarker] {
     guard mateConnectorPickingEnabled else { return [] }
-    var markers = selectedFeatures.map { feature in
+    var markers = hoverCandidates
+    markers += selectedFeatures.map { feature in
       CADConnectorMarker(
         partID: feature.partID,
         origin: SIMD3<Float>(feature.positionMeters),
@@ -572,6 +595,8 @@ struct CADConnectorMarker: Equatable {
   var xAxis: SIMD3<Float>
   var zAxis: SIMD3<Float>
   var isSelected: Bool
+  /// A small illuminated snap node (candidate) rather than a full triad.
+  var isNode: Bool = false
 }
 
 private struct MetalCanvas: NSViewRepresentable {
@@ -1069,6 +1094,22 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       }
       x = simd_normalize(x)
       let y = simd_cross(z, x)
+      if marker.isNode {
+        // Candidate node: a small neutral star, visibly snappable but
+        // subordinate to the full triad of the active pick.
+        let nodeLength = axisLength * 0.3
+        let nodeColor = SIMD4<Float>(0.20, 0.82, 1.0, 0.9)
+        appendReferenceLine(
+          from: origin - x * nodeLength, to: origin + x * nodeLength,
+          color: nodeColor, into: &vertices)
+        appendReferenceLine(
+          from: origin - y * nodeLength, to: origin + y * nodeLength,
+          color: nodeColor, into: &vertices)
+        appendReferenceLine(
+          from: origin - z * nodeLength, to: origin + z * nodeLength,
+          color: nodeColor, into: &vertices)
+        continue
+      }
       let emphasis: Float = marker.isSelected ? 1.3 : 1
       appendReferenceLine(
         from: origin, to: origin + x * axisLength * emphasis,

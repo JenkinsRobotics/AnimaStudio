@@ -97,104 +97,97 @@ enum CADMetalFeaturePicker {
       max(viewportSize.width, 1),
       max(viewportSize.height, 1)
     )
-    let edges = document.edges.filter { $0.assemblyNode == nodeIndex && $0.points.count > 1 }
+    // Discrete candidate snapping, ported from the OCCT Mate Lab: the
+    // cursor selects the nearest explicit candidate node (face center,
+    // circle center, edge midpoint, vertex) within its pixel threshold —
+    // never an arbitrary continuous point under the cursor.
+    let candidates = CADConnectorCandidateEngine.candidates(
+      nodeIndex: nodeIndex,
+      hitFaceID: hit.faceID,
+      hitNormal: hit.localNormal,
+      document: document)
 
-    var nearestVertex: (distance: Double, edge: CADEdge, point: SIMD3<Float>)?
-    var nearestEdge: (distance: Double, edge: CADEdge, point: SIMD3<Float>, tangent: SIMD3<Float>)?
-    var nearestAxis: (distance: Double, edge: CADEdge, point: SIMD3<Float>, axis: SIMD3<Float>)?
-
-    for edge in edges {
-      let endpoints = [edge.points.first, edge.points.last].compactMap { $0 }
-      for endpoint in endpoints {
-        guard
-          let projected = project(
-            endpoint, transform: hit.transform, viewProjection: viewProjection)
-        else { continue }
-        let distance = pixelDistance(projected, query, pixelScale: pixelScale)
-        if nearestVertex == nil || distance < nearestVertex!.distance {
-          nearestVertex = (distance, edge, endpoint)
-        }
-      }
-
-      for index in 0..<(edge.points.count - 1) {
-        let start = edge.points[index]
-        let end = edge.points[index + 1]
-        guard
-          let screenStart = project(
-            start, transform: hit.transform, viewProjection: viewProjection),
-          let screenEnd = project(end, transform: hit.transform, viewProjection: viewProjection)
-        else { continue }
-        let result = nearestPoint(
-          to: query, onSegmentFrom: screenStart, to: screenEnd, pixelScale: pixelScale)
-        let localPoint = simd_mix(start, end, SIMD3<Float>(repeating: Float(result.fraction)))
-        let tangent = normalized(end - start, fallback: SIMD3<Float>(1, 0, 0))
-        if nearestEdge == nil || result.distance < nearestEdge!.distance {
-          nearestEdge = (result.distance, edge, localPoint, tangent)
-        }
-      }
-
-      if edge.points.count >= 8,
-        let first = edge.points.first,
-        let last = edge.points.last
-      {
-        let extent = edge.points.reduce(Float.zero) { partial, value in
-          max(partial, simd_length(value - first))
-        }
-        if extent > 0, simd_distance(first, last) <= extent * 0.08 {
-          let center = edge.points.reduce(SIMD3<Float>.zero, +) / Float(edge.points.count)
-          if let screenCenter = project(
-            center, transform: hit.transform, viewProjection: viewProjection)
-          {
-            let distance = pixelDistance(screenCenter, query, pixelScale: pixelScale)
-            let radialA = edge.points[0] - center
-            let radialB = edge.points[edge.points.count / 4] - center
-            let axis = normalized(
-              simd_cross(radialA, radialB),
-              fallback: hit.localNormal)
-            if nearestAxis == nil || distance < nearestAxis!.distance {
-              nearestAxis = (distance, edge, center, axis)
-            }
-          }
-        }
+    var nearest: (distance: Double, candidate: CADConnectorCandidate)?
+    for candidate in candidates {
+      guard
+        let projected = project(
+          candidate.origin, transform: hit.transform, viewProjection: viewProjection)
+      else { continue }
+      let distance = pixelDistance(projected, query, pixelScale: pixelScale)
+      guard distance <= snapThresholdPixels(for: candidate.kind) else { continue }
+      if nearest == nil || distance < nearest!.distance {
+        nearest = (distance, candidate)
       }
     }
 
     let normal = normalized(hit.localNormal, fallback: SIMD3<Float>(0, 0, 1))
-    if let vertex = nearestVertex, vertex.distance <= 10 {
+    if let nearest {
+      let candidate = nearest.candidate
       return makePick(
-        partID: hit.partID, nodeName: nodeName, topologyID: vertex.edge.id,
-        kind: .vertex, position: vertex.point, primary: normal,
-        secondary: stableSecondary(for: normal), transform: hit.transform,
-        viewProjection: viewProjection)
-    }
-    if let axis = nearestAxis, axis.distance <= 12 {
-      return makePick(
-        partID: hit.partID, nodeName: nodeName, topologyID: axis.edge.id,
-        kind: .axis, position: axis.point, primary: axis.axis,
-        secondary: stableSecondary(for: axis.axis), transform: hit.transform,
-        viewProjection: viewProjection)
-    }
-    if let edge = nearestEdge, edge.distance <= 8 {
-      return makePick(
-        partID: hit.partID, nodeName: nodeName, topologyID: edge.edge.id,
-        kind: .edge, position: edge.point, primary: normal,
-        secondary: edge.tangent, transform: hit.transform,
-        viewProjection: viewProjection)
+        partID: hit.partID, nodeName: nodeName, topologyID: candidate.topologyID,
+        kind: pickKind(for: candidate.kind), position: candidate.origin,
+        primary: candidate.zAxis, secondary: candidate.xAxis,
+        transform: hit.transform, viewProjection: viewProjection)
     }
 
-    let face = document.faces.first {
-      $0.id == hit.faceID && $0.assemblyNode == nodeIndex
-    }
-    let faceCenter =
-      face.flatMap { value -> SIMD3<Float>? in
-        guard !value.positions.isEmpty else { return nil }
-        return value.positions.reduce(.zero, +) / Float(value.positions.count)
-      } ?? hit.localPoint
+    // No candidate within threshold: the hovered face itself, framed by its
+    // normal at its center, remains the fallback pick.
+    let center =
+      candidates.first(where: { $0.kind == .faceCenter })?.origin ?? hit.localPoint
     return makePick(
       partID: hit.partID, nodeName: nodeName, topologyID: hit.faceID,
-      kind: .face, position: faceCenter, primary: normal,
+      kind: .face, position: center, primary: normal,
       secondary: stableSecondary(for: normal), transform: hit.transform,
       viewProjection: viewProjection)
+  }
+
+  /// The complete candidate set for the hovered node/face, in part-local
+  /// space, for viewport illumination — every snappable node lights up so
+  /// the operator can see what is available before committing a pick.
+  static func illuminationCandidates(
+    at point: CGPoint,
+    viewportSize: CGSize,
+    document: CADGeometryDocument,
+    viewProjection: simd_float4x4,
+    hiddenPartIDs: Set<Int>,
+    partTransforms: [CADPartTransformPresentation]
+  ) -> (partID: Int, candidates: [CADConnectorCandidate])? {
+    guard
+      let hit = surfaceHit(
+        at: point,
+        viewportSize: viewportSize,
+        geometry: document.renderGeometry,
+        viewProjection: viewProjection,
+        hiddenPartIDs: hiddenPartIDs,
+        partTransforms: partTransforms
+      )
+    else { return nil }
+    return (
+      hit.partID,
+      CADConnectorCandidateEngine.candidates(
+        nodeIndex: hit.partID - 1,
+        hitFaceID: hit.faceID,
+        hitNormal: hit.localNormal,
+        document: document)
+    )
+  }
+
+  private static func snapThresholdPixels(for kind: CADConnectorCandidateKind) -> Double {
+    switch kind {
+    case .vertex: 10
+    case .circleCenter: 12
+    case .edgeMidpoint: 10
+    case .faceCenter: 14
+    }
+  }
+
+  private static func pickKind(for kind: CADConnectorCandidateKind) -> CADViewportFeatureKind {
+    switch kind {
+    case .faceCenter: .face
+    case .edgeMidpoint: .edge
+    case .vertex: .vertex
+    case .circleCenter: .axis
+    }
   }
 
   private static func surfaceHit(
