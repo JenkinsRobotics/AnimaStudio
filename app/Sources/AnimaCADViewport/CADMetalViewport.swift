@@ -361,18 +361,13 @@ public struct CADMetalViewport: View {
             modelDiagonalMeters: document.renderGeometry.bounds.diagonal,
             aspect: Float(max(viewportSize.width, 1) / max(viewportSize.height, 1)))
           if mateConnectorPickingEnabled {
-            let inferredFeature: CADViewportFeaturePick?
-            if let ids = pickService.pick(at: point, viewportSize: viewportSize) {
-              inferredFeature = CADMetalFeaturePicker.hoverResult(
-                pickedPartID: ids.partID, pickedFaceID: ids.faceID,
-                at: point, viewportSize: viewportSize, document: document,
-                viewProjection: viewProjection, partTransforms: partTransforms)?.pick
-            } else {
-              inferredFeature = CADMetalFeaturePicker.feature(
-                at: point, viewportSize: viewportSize, document: document,
-                viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
-                partTransforms: partTransforms)
-            }
+            let inferredFeature = pickService.pick(at: point, viewportSize: viewportSize)
+              .flatMap { ids in
+                CADMetalFeaturePicker.hoverResult(
+                  pickedPartID: ids.partID, pickedFaceID: ids.faceID,
+                  at: point, viewportSize: viewportSize, document: document,
+                  viewProjection: viewProjection, partTransforms: partTransforms)?.pick
+              }
             let feature = lockedFeature ?? inferredFeature
             if let feature {
               if let existing = selectedFeatures.firstIndex(where: {
@@ -388,14 +383,9 @@ public struct CADMetalViewport: View {
             }
             onPickFeature(feature)
           } else {
-            let partID =
-              pickService.pick(at: point, viewportSize: viewportSize)?.partID
-              ?? pickedPartID(
-                at: point,
-                viewportSize: viewportSize,
-                document: document,
-                viewProjection: viewProjection)
-            onPick(partID ?? 0, extendsSelection)
+            onPick(
+              pickService.pick(at: point, viewportSize: viewportSize)?.partID ?? 0,
+              extendsSelection)
           }
         },
         boxSelect: { selection, viewportSize, crossing, extendsSelection in
@@ -445,23 +435,15 @@ public struct CADMetalViewport: View {
           let now = CACurrentMediaTime()
           guard now - lastHoverHostTime >= 1.0 / 60.0 else { return }
           lastHoverHostTime = now
-          // GPU ID-buffer pick answers "which part/face" from the buffers
-          // the GPU already holds; the CPU raycast survives only as a
-          // fallback for the first frames before the renderer is attached.
-          let result: (
-            pick: CADViewportFeaturePick?, partID: Int, candidates: [CADConnectorCandidate]
-          )?
-          if let ids = pickService.pick(at: point, viewportSize: viewportSize) {
-            result = CADMetalFeaturePicker.hoverResult(
-              pickedPartID: ids.partID, pickedFaceID: ids.faceID,
-              at: point, viewportSize: viewportSize, document: document,
-              viewProjection: viewProjection, partTransforms: partTransforms)
-          } else {
-            result = CADMetalFeaturePicker.hoverResult(
-              at: point, viewportSize: viewportSize, document: document,
-              viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
-              partTransforms: partTransforms)
-          }
+          // GPU ID-buffer pick is the ONLY picker (operator direction:
+          // no CPU raycasting). No renderer yet -> no pick this event.
+          let result = pickService.pick(at: point, viewportSize: viewportSize)
+            .flatMap { ids in
+              CADMetalFeaturePicker.hoverResult(
+                pickedPartID: ids.partID, pickedFaceID: ids.faceID,
+                at: point, viewportSize: viewportSize, document: document,
+                viewProjection: viewProjection, partTransforms: partTransforms)
+            }
           if locksFeature {
             if lockedFeature == nil { lockedFeature = result?.pick }
             hoveredFeature = lockedFeature
@@ -484,15 +466,9 @@ public struct CADMetalViewport: View {
           }
         },
         beginDirectManipulation: { point, viewportSize in
-          guard !mateConnectorPickingEnabled, let document else { return false }
-          let partID =
-            pickService.pick(at: point, viewportSize: viewportSize)?.partID
-            ?? pickedPartID(
-              at: point,
-              viewportSize: viewportSize,
-              document: document,
-              viewProjection: viewProjection(for: document, viewportSize: viewportSize))
-          guard let partID else { return false }
+          guard !mateConnectorPickingEnabled, document != nil else { return false }
+          guard let partID = pickService.pick(at: point, viewportSize: viewportSize)?.partID
+          else { return false }
           return onBeginDirectPartDrag(partID)
         },
         updateDirectManipulation: onUpdateDirectPartDrag,

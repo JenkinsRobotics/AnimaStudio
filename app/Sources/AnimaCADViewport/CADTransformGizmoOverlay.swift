@@ -212,7 +212,7 @@ struct CADTransformGizmoOverlay: View {
         translationHandle(.y, geometry: geometry, color: .green)
         translationHandle(.z, geometry: geometry, color: .blue)
       }
-      .opacity(paintsHandles ? 1 : 0.06)
+      .opacity(paintsHandles ? 1 : 0.001)
 
       Circle()
         .fill(.ultraThickMaterial)
