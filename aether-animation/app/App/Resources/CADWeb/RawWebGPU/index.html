@@ -33,6 +33,8 @@
     let indexBuffer;
     let edgeBuffer;
     let gridBuffer;
+    let toolsBuffer;
+    let toolsVertexCount = 0;
     let indexCount = 0;
     let edgeVertexCount = 0;
     let gridVertexCount = 0;
@@ -414,6 +416,17 @@
         pitch = Math.max(-1.52, Math.min(1.52, pitch + deltaY * 0.006));
         reportCamera();
       },
+      setTools(value) {
+        toolsBuffer?.destroy();
+        toolsBuffer = undefined;
+        toolsVertexCount = 0;
+        const lines = value && value.lines;
+        if (!lines || !lines.length) return;
+        // Engine-drawn tool geometry (AetherViewport line list): 7 floats
+        // per vertex, matching the grid pipeline's position+color layout.
+        toolsBuffer = gpuBuffer(new Float32Array(lines), GPUBufferUsage.VERTEX);
+        toolsVertexCount = lines.length / 7;
+      },
       setViewDirection(direction) {
         if (!direction || direction.length < 3) return;
         const normalized = normalize(direction.slice(0, 3));
@@ -510,6 +523,11 @@
         pass.setPipeline(edgePipeline);
         pass.setVertexBuffer(0, edgeBuffer);
         pass.draw(edgeVertexCount);
+      }
+      if (toolsVertexCount) {
+        pass.setPipeline(gridPipeline);
+        pass.setVertexBuffer(0, toolsBuffer);
+        pass.draw(toolsVertexCount);
       }
       pass.end();
       device.queue.submit([encoder.finish()]);

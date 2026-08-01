@@ -22,6 +22,7 @@ public struct CADWebGPUViewport: NSViewRepresentable {
   public let partTransforms: [CADPartTransformPresentation]
   public let partAppearances: [CADPartAppearancePresentation]
   public let selectedPartOrigin: CADPartOriginPresentation?
+  public let transformGizmo: CADGizmoPresentation?
   public let onStatus: @MainActor (String) -> Void
   public let onFrameCount: @MainActor (Int, Double?) -> Void
   /// Reports the JS camera back so the ViewCube tracks free orbit and roll.
@@ -51,6 +52,7 @@ public struct CADWebGPUViewport: NSViewRepresentable {
     partTransforms: [CADPartTransformPresentation] = [],
     partAppearances: [CADPartAppearancePresentation] = [],
     selectedPartOrigin: CADPartOriginPresentation? = nil,
+    transformGizmo: CADGizmoPresentation? = nil,
     onStatus: @escaping @MainActor (String) -> Void = { _ in },
     onFrameCount: @escaping @MainActor (Int, Double?) -> Void = { _, _ in },
     onCameraOrientation:
@@ -78,6 +80,7 @@ public struct CADWebGPUViewport: NSViewRepresentable {
     self.partTransforms = partTransforms
     self.partAppearances = partAppearances
     self.selectedPartOrigin = selectedPartOrigin
+    self.transformGizmo = transformGizmo
     self.onStatus = onStatus
     self.onFrameCount = onFrameCount
     self.onCameraOrientation = onCameraOrientation
@@ -124,6 +127,7 @@ public struct CADWebGPUViewport: NSViewRepresentable {
     context.coordinator.set(partTransforms: partTransforms)
     context.coordinator.set(partAppearances: partAppearances)
     context.coordinator.set(selectedPartOrigin: selectedPartOrigin)
+    context.coordinator.set(transformGizmo: transformGizmo)
     context.coordinator.loadPage()
     return view
   }
@@ -140,6 +144,7 @@ public struct CADWebGPUViewport: NSViewRepresentable {
     context.coordinator.set(partTransforms: partTransforms)
     context.coordinator.set(partAppearances: partAppearances)
     context.coordinator.set(selectedPartOrigin: selectedPartOrigin)
+    context.coordinator.set(transformGizmo: transformGizmo)
   }
 
   @MainActor
@@ -339,6 +344,36 @@ public struct CADWebGPUViewport: NSViewRepresentable {
       }
     }
 
+    private var desiredGizmo: CADGizmoPresentation?
+    private var deliveredGizmo: CADGizmoPresentation?
+    private var hasDeliveredTools = false
+
+    func set(transformGizmo: CADGizmoPresentation?) {
+      desiredGizmo = transformGizmo
+      deliverToolsIfPossible()
+    }
+
+    /// In-world tools are engine geometry (AetherViewport); the page only
+    /// uploads the line list. Raw-WebGPU page only for now.
+    private func deliverToolsIfPossible() {
+      guard backend == .rawWebGPU, pageReady, let webView,
+        !hasDeliveredTools || desiredGizmo != deliveredGizmo
+      else { return }
+      do {
+        let payload = CADWebToolsPayload(
+          gizmo: desiredGizmo, markers: [], transformsByPartID: [:],
+          axisLength: 0.05)
+        let data = try JSONEncoder().encode(payload)
+        guard let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript(
+          "window.\(javaScriptObject).setTools(\(json));")
+        deliveredGizmo = desiredGizmo
+        hasDeliveredTools = true
+      } catch {
+        onStatus("Could not encode CAD tools: \(error.localizedDescription)")
+      }
+    }
+
     func set(partTransforms: [CADPartTransformPresentation]) {
       desiredPartTransforms = partTransforms
       deliverPartTransformsIfPossible()
@@ -494,6 +529,7 @@ public struct CADWebGPUViewport: NSViewRepresentable {
       deliverPartTransformsIfPossible()
       deliverPartAppearancesIfPossible()
       deliverSelectedPartOriginIfPossible()
+      deliverToolsIfPossible()
       if pendingClear {
         pendingClear = false
         deliveredIdentity = nil

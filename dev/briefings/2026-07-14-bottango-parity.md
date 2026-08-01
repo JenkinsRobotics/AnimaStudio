@@ -48,7 +48,7 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
-| Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | active 2026-08-01 |
+| Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | released 2026-08-01 — implemented v2 sketch graph/editor/migration; 34 tests/check/build/root-app rebuild pass; browser plugin bootstrap failed before local connection |
 | Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
 | Codex | Package Aether CAD as a clickable macOS web app with a CAD-sketch icon | `Aether CAD/Launcher/**`, `Aether CAD/Resources/**`, `Aether CAD/Scripts/build-macos-app.sh`, root `Aether CAD.app`, STATUS + append-only coordination only | one self-contained signed root app serves the production web bundle locally and hosts it in a dedicated WKWebView window; no npm/Vite terminal required at launch; icon retains the Aether/Anima family palette but uses sketch/constraint geometry; build, signature, launch, OCCT-ready browser state verified | released 2026-08-01 — root `Aether CAD.app`; signed native WKWebView wrapper; internal server restricted to 127.0.0.1; bundled production assets/OCCT WASM verified; family SVG/ICNS uses CAD sketch endpoints, constraints, construction geometry, and dimensions |
 | Codex | Rename Open CAD Studio to Aether CAD and prepare the Aether Core extraction seam | `Open CAD Studio/**` → `Aether CAD/**`, root/docs references + append-only coordination only; do not create or move code into a separate `Aether Core/` product yet | folder/package/window/docs consistently say Aether CAD; an explicit app↔core facade and extraction manifest define CAD-document/evaluation/topology/mate ownership without duplicating implementations; UI/viewport depend on the facade; existing Part/STEP/mate flows and tests/check/build/browser smoke remain green | released 2026-08-01 — root app/package/window/docs renamed Aether CAD; new files use `aether-part` with legacy migration; one `aether-core.ts` facade + extraction manifest; Core/CAD/Animation responsibilities documented; 29 tests/check/build and live create/rebuild/save/reopen shell pass |
@@ -347,6 +347,8 @@ change needed in the Handoff log instead of inventing commands.
 | Codex | DH articulated-arm Swift UI: engine-backed joint jog/FK, end-effector IK target, arm inspector | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/ArticulatedArmControlsView.swift` (new), `app/Sources/RealityKitViewport/{RobotPreviewView,ArmIKTarget}.swift`, `app/Scripts/embed-animacore-helper.sh`, corresponding Swift tests, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | no Swift kinematics; decode `kinematic_chain`; FK/IK bridge integration; native-unit conversion; reachable/unreachable UI; bundled NumPy dependency; recursive lint + Swift tests + native build/root app launch | released 2026-07-16 (240 XCTest + 20 Swift Testing; Xcode/root app build + deep sign; bundled bridge hello includes FK/IK and NumPy 2.4.6 imports) |
 
 | Claude | Aether restructure 1 (per Jonathan live): AetherKernel/AetherKernelShim/AetherViewport extracted from AnimaCAD* (rename at border), Swift relocated as `aether-animation/AetherKit`, and `app/` moved to `aether-animation/app/` | `aether-animation/AetherKit/**` (new), `aether-animation/app/**` (moved from `app/`), `aether-core/README.md`, `aether-animation/README.md`, `AGENTS.md` paths, `.github/workflows/ci.yml`, briefing/mailbox | `cd app && swift build && swift test` (378 XCTest + 72 ST) + `.venv/bin/pytest animacore/tests` (1178) + root app build | in progress 2026-08-01 |
+
+| Claude | WebGPU tool-port 1: in-world tool geometry (gizmo/triads/snap nodes) neutralized from CADMetalViewport into AetherViewport + WebGPU payload | `aether-animation/AetherKit/Sources/AetherViewport/**` (new tool-geometry files + payload), `aether-animation/AetherKit/Tests/AetherCoreTests/**`, `aether-animation/app/Sources/AnimaCADViewport/{CADMetalViewport,CADWebGPUViewport}.swift`, `aether-animation/app/App/Resources/CADWeb/RawWebGPU/index.html`, briefing/mailbox | AetherKit + app suites green (378+68+Kit 9), tool meshes pinned by deterministic tests, WebGPU page renders tools | released 2026-08-01 |
 
 ## Requests
 
@@ -4693,6 +4695,21 @@ change needed in the Handoff log instead of inventing commands.
   from the currently shipped plain-JSON `.cadpart` slice. No container or
   multi-view functionality is represented as shipped; documentation diff
   checks pass.
+- **2026-08-01 (Codex, persistent 2D Sketch workflow):** Shipped the first
+  actual Sketch-editing loop in Aether CAD rather than another numeric-only
+  placeholder. New Part/Sketch now asks for Top/Front/Right plane, enters a
+  dedicated white orthographic canvas with the Origin and grid, supports rough
+  center-rectangle dragging plus Construction, Horizontal, Vertical, Origin
+  Coincident, width, and height controls, and reports live degrees of freedom
+  using blue under-defined / black fully defined geometry. `.cadpart` v2 stores
+  the structured constraint/dimension graph; v1 rectangle files migrate to an
+  equivalent fully defined graph with stable IDs. Finish uses the existing
+  Aether Core facade and OCCT evaluator to rebuild the exact Body. Added pure
+  deterministic sketch/migration tests and updated feature-tree truth/docs.
+  Verification: TypeScript check, 34/34 Vitest cases, production Vite build,
+  and rebuilt/ad-hoc-signed root `Aether CAD.app`. Browser-control bootstrap
+  failed inside the installed plugin before connecting to localhost, so no new
+  visual-automation claim is made. Claim released.
 - **2026-08-01 (Claude, Aether restructure 1):** Executed the Aether Core
   buildout brief with Jonathan's live correction (**no Swift in Core**;
   Swift is Aether Animation code). Moves, all `git mv` (history kept):
@@ -4717,3 +4734,24 @@ change needed in the Handoff log instead of inventing commands.
   in-world tool GEOMETRY (gizmo/triads) still lives inside
   CADMetalViewport — its neutralization into AetherViewport is the
   WebGPU-tool-port packet (open item, unchanged).
+- **2026-08-01 (Claude, WebGPU tool-port 1):** In-world tool GEOMETRY is
+  now engine-owned. New `AetherViewport/CADToolGeometry.swift`:
+  `CADToolVertex` + `CADGizmoPresentation`/`CADConnectorMarker` (moved
+  from the Metal file, now public) + `gizmoLineVertices` /
+  `connectorMarkerLineVertices` — the arrows/barbs/rings/plane-tab and
+  triad/snap-star line lists ported verbatim, including enabled/disabled
+  and selection-emphasis color policy. Metal's `rebuildGizmoBuffer`/
+  `rebuildConnectorMarkerBuffer` are now thin uploads of the shared
+  vertices. **WebGPU**: new `CADWebToolsPayload` (7-float line vertices
+  matching the page's grid pipeline layout); `CADWebGPUViewport` gained a
+  `transformGizmo` input with a change-gated `setTools` delivery
+  (raw-WebGPU page); the raw page draws the list with its existing
+  blended line pipeline after edges; the pipeline viewport now passes the
+  same gizmo presentation to BOTH renderer branches. 5 behavior-pinning
+  tests (vertex counts, tip positions, grey-out, 1.4× primary arm, 1.3×
+  selection emphasis, node star color/size, part-transform carry).
+  Verified: AetherKit 9/9, app 378 XCTest + 68 ST. NOT yet verified
+  visually in the running WKWebView (no headless harness for the page) —
+  first run of the Raw WebGPU renderer with a selection will show it.
+  Next slices: connector-marker STATE for the web (feature hover/pick is
+  Metal-side today), then gizmo interaction parity (drag handles) on web.

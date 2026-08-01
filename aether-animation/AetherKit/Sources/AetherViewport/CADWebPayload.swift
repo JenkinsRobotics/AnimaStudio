@@ -1,5 +1,6 @@
 import AetherKernel
 import Foundation
+import simd
 
 public struct CADWebGeometryPayload: Encodable {
   struct Batch: Encodable {
@@ -145,4 +146,37 @@ public struct CADWebNavigationPayload: Encodable {
     zoomMultiplier = configuration.zoomMultiplier
     reversesWheelZoom = configuration.reversesWheelZoom
   }
+}
+
+/// In-world tool geometry for the web renderer: the gizmo and connector
+/// triads flattened into the line pipeline's vertex format
+/// (position xyz + rgba, 7 floats per vertex, two vertices per line).
+public struct CADWebToolsPayload: Encodable {
+  public let lines: [Float]
+
+  public init(
+    gizmo: CADGizmoPresentation?,
+    markers: [CADConnectorMarker],
+    transformsByPartID: [Int: simd_float4x4],
+    axisLength: Float
+  ) {
+    var vertices: [CADToolVertex] = []
+    if let gizmo {
+      vertices += CADToolGeometry.gizmoLineVertices(gizmo)
+    }
+    vertices += CADToolGeometry.connectorMarkerLineVertices(
+      markers: markers, transformsByPartID: transformsByPartID,
+      axisLength: axisLength)
+    var flattened: [Float] = []
+    flattened.reserveCapacity(vertices.count * 7)
+    for vertex in vertices {
+      flattened.append(contentsOf: [
+        vertex.position.x, vertex.position.y, vertex.position.z,
+        vertex.color.x, vertex.color.y, vertex.color.z, vertex.color.w,
+      ])
+    }
+    lines = flattened
+  }
+
+  public var isEmpty: Bool { lines.isEmpty }
 }

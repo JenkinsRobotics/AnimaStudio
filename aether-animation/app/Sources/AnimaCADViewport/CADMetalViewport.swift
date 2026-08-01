@@ -590,19 +590,6 @@ private struct CADMateFeatureMarker: View {
   }
 }
 
-/// A mate-connector frame drawn as real world-space triad geometry. The
-/// origin/axes are part-local; the renderer applies the part's transform so
-/// the triad stays glued to its component through drags and camera moves.
-struct CADConnectorMarker: Equatable {
-  var partID: Int
-  var origin: SIMD3<Float>
-  var xAxis: SIMD3<Float>
-  var zAxis: SIMD3<Float>
-  var isSelected: Bool
-  /// A small illuminated snap node (candidate) rather than a full triad.
-  var isNode: Bool = false
-}
-
 /// Hands the GPU ID-buffer pick to the SwiftUI layer without exposing the
 /// renderer. The overlay's pointer handlers ask this service "what part/face
 /// is under the cursor" and the GPU answers from its retained ID buffers.
@@ -615,30 +602,6 @@ struct CADConnectorMarker: Equatable {
     guard scale > 0 else { return nil }
     return renderer.gpuPick(
       atDrawablePoint: CGPoint(x: point.x * scale, y: point.y * scale))
-  }
-}
-
-/// The transform tool as REAL world-space geometry: translate arrows,
-/// rotation rings, and plane tabs at the subject's frame, sized so the
-/// longest arm projects to the same pixels as the overlay's gesture zones.
-public struct CADGizmoPresentation: Equatable {
-  public var origin: SIMD3<Float>
-  public var xAxis: SIMD3<Float>
-  public var yAxis: SIMD3<Float>
-  public var zAxis: SIMD3<Float>
-  public var armLengthMeters: Float
-  public var isEnabled: Bool
-
-  public init(
-    origin: SIMD3<Float>, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>,
-    zAxis: SIMD3<Float>, armLengthMeters: Float, isEnabled: Bool
-  ) {
-    self.origin = origin
-    self.xAxis = xAxis
-    self.yAxis = yAxis
-    self.zAxis = zAxis
-    self.armLengthMeters = armLengthMeters
-    self.isEnabled = isEnabled
   }
 }
 
@@ -1137,67 +1100,9 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       gizmoVertexCount = 0
       return
     }
-    let arm = max(gizmo.armLengthMeters, 0.000_1)
-    let origin = gizmo.origin
-    let axes = [gizmo.xAxis, gizmo.yAxis, gizmo.zAxis]
-    let axisColors: [SIMD4<Float>] =
-      gizmo.isEnabled
-      ? [SIMD4(0.95, 0.26, 0.21, 1), SIMD4(0.30, 0.85, 0.39, 1), SIMD4(0.25, 0.55, 1.0, 1)]
-      : [SIMD4(0.62, 0.62, 0.66, 0.7), SIMD4(0.62, 0.62, 0.66, 0.7), SIMD4(0.62, 0.62, 0.66, 0.7)]
-    let planeColors: [SIMD4<Float>] =
-      gizmo.isEnabled
-      ? [SIMD4(0.95, 0.83, 0.20, 0.9), SIMD4(0.25, 0.85, 0.90, 0.9), SIMD4(0.72, 0.42, 0.95, 0.9)]
-      : [SIMD4(0.62, 0.62, 0.66, 0.5), SIMD4(0.62, 0.62, 0.66, 0.5), SIMD4(0.62, 0.62, 0.66, 0.5)]
-    var vertices: [ReferenceVertex] = []
-
-    for (index, axis) in axes.enumerated() {
-      let color = axisColors[index]
-      let tip = origin + axis * arm
-      appendReferenceLine(from: origin, to: tip, color: color, into: &vertices)
-      // Arrowhead: four short barbs angled back from the tip.
-      let side = axes[(index + 1) % 3]
-      let up = axes[(index + 2) % 3]
-      let back = tip - axis * arm * 0.14
-      for direction in [side, -side, up, -up] {
-        appendReferenceLine(
-          from: tip, to: back + direction * arm * 0.05, color: color, into: &vertices)
-      }
-      // Rotation ring around this axis, in the plane of the other two arms.
-      let first = axes[(index + 1) % 3]
-      let second = axes[(index + 2) % 3]
-      let radius = arm * 0.82
-      var previous: SIMD3<Float>?
-      for step in 0...48 {
-        let angle = Float(step) / 48 * 2 * .pi
-        let point = origin + first * (cos(angle) * radius) + second * (sin(angle) * radius)
-        if let previous {
-          appendReferenceLine(from: previous, to: point, color: color, into: &vertices)
-        }
-        previous = point
-      }
-    }
-
-    // Plane tabs: small parallelograms between each axis pair (XY, YZ, ZX).
-    let planes = [(0, 1), (1, 2), (2, 0)]
-    for (index, pair) in planes.enumerated() {
-      let a = axes[pair.0]
-      let b = axes[pair.1]
-      let color = planeColors[index]
-      let near: Float = 0.32
-      let far: Float = 0.55
-      let corners = [
-        origin + a * (arm * near) + b * (arm * near),
-        origin + a * (arm * far) + b * (arm * near),
-        origin + a * (arm * far) + b * (arm * far),
-        origin + a * (arm * near) + b * (arm * far),
-      ]
-      for cornerIndex in 0..<4 {
-        appendReferenceLine(
-          from: corners[cornerIndex], to: corners[(cornerIndex + 1) % 4],
-          color: color, into: &vertices)
-      }
-    }
-
+    // Tool shapes are engine-owned (AetherViewport); Metal only uploads.
+    let vertices = CADToolGeometry.gizmoLineVertices(gizmo)
+      .map { ReferenceVertex(position: $0.position, color: $0.color) }
     gizmoBuffer = makePrivateBuffer(vertices)
     gizmoVertexCount = vertices.count
   }
@@ -1208,58 +1113,13 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
       connectorMarkerVertexCount = 0
       return
     }
-    let axisLength = max(geometryDiagonal, 0.001) * 0.045
-    let transformsByPartID = Dictionary(
-      uniqueKeysWithValues: partTransforms.map { ($0.partID, $0.matrix) })
-    var vertices: [ReferenceVertex] = []
-    for marker in connectorMarkers {
-      let transform = transformsByPartID[marker.partID] ?? matrix_identity_float4x4
-      func world(_ v: SIMD3<Float>) -> SIMD3<Float> {
-        let p = transform * SIMD4(v, 1)
-        return SIMD3(p.x, p.y, p.z)
-      }
-      func rotated(_ v: SIMD3<Float>) -> SIMD3<Float> {
-        let p = transform * SIMD4(v, 0)
-        return SIMD3(p.x, p.y, p.z)
-      }
-      let origin = world(marker.origin)
-      var z = rotated(marker.zAxis)
-      if simd_length_squared(z) < 0.000_001 { z = SIMD3(0, 0, 1) }
-      z = simd_normalize(z)
-      var x = rotated(marker.xAxis)
-      x -= z * simd_dot(x, z)
-      if simd_length_squared(x) < 0.000_001 {
-        x = abs(z.y) < 0.9 ? simd_cross(SIMD3(0, 1, 0), z) : simd_cross(SIMD3(1, 0, 0), z)
-      }
-      x = simd_normalize(x)
-      let y = simd_cross(z, x)
-      if marker.isNode {
-        // Candidate node: a small neutral star, visibly snappable but
-        // subordinate to the full triad of the active pick.
-        let nodeLength = axisLength * 0.3
-        let nodeColor = SIMD4<Float>(0.20, 0.82, 1.0, 0.9)
-        appendReferenceLine(
-          from: origin - x * nodeLength, to: origin + x * nodeLength,
-          color: nodeColor, into: &vertices)
-        appendReferenceLine(
-          from: origin - y * nodeLength, to: origin + y * nodeLength,
-          color: nodeColor, into: &vertices)
-        appendReferenceLine(
-          from: origin - z * nodeLength, to: origin + z * nodeLength,
-          color: nodeColor, into: &vertices)
-        continue
-      }
-      let emphasis: Float = marker.isSelected ? 1.3 : 1
-      appendReferenceLine(
-        from: origin, to: origin + x * axisLength * emphasis,
-        color: SIMD4(0.95, 0.26, 0.21, 1), into: &vertices)
-      appendReferenceLine(
-        from: origin, to: origin + y * axisLength * emphasis,
-        color: SIMD4(0.30, 0.85, 0.39, 1), into: &vertices)
-      appendReferenceLine(
-        from: origin, to: origin + z * axisLength * 1.4 * emphasis,
-        color: SIMD4(0.25, 0.55, 1.0, 1), into: &vertices)
-    }
+    // Tool shapes are engine-owned (AetherViewport); Metal only uploads.
+    let vertices = CADToolGeometry.connectorMarkerLineVertices(
+      markers: connectorMarkers,
+      transformsByPartID: Dictionary(
+        uniqueKeysWithValues: partTransforms.map { ($0.partID, $0.matrix) }),
+      axisLength: max(geometryDiagonal, 0.001) * 0.045
+    ).map { ReferenceVertex(position: $0.position, color: $0.color) }
     connectorMarkerBuffer = makePrivateBuffer(vertices)
     connectorMarkerVertexCount = vertices.count
   }

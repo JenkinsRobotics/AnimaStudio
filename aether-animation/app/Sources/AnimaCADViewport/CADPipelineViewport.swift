@@ -1064,6 +1064,7 @@ public struct CADPipelineViewport: View {
         partTransforms: partTransformPresentations,
         partAppearances: partAppearancePresentations,
         selectedPartOrigin: selectedPartOrigin,
+        transformGizmo: metalGizmoPresentation(viewportSize: viewportSize),
         onStatus: { status = $0 },
         onFrameCount: { count, intervalSeconds in
           telemetry.recordFrames(count, intervalSeconds: intervalSeconds)
