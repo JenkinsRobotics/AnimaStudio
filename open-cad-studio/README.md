@@ -1,15 +1,15 @@
 # Open CAD Studio
 
 The CAD authoring product: create, place, edit, and constrain geometry in
-Core's 3D world — the modeling counterpart to Open Animation Studio.
+Aether's 3D world — the modeling counterpart to Open Animation Studio.
 
 ## Ground rules (from day one, learned the hard way)
 
 - **Kernel:** Open CASCADE, behind Core's shim boundary. We do not write a
   B-Rep kernel.
-- **Renderers:** the shared Metal + WebGPU contracts from Core. No
+- **Renderers:** the shared Metal + WebGPU contracts from Aether. No
   product-private render state.
-- **World model:** SceneCore entities with one stable ID space. No parallel
+- **World model:** AetherScene entities with one stable ID space. No parallel
   representations, no URL-keyed joins — the fragmentation that stalled
   Anima Studio's viewport work does not get rebuilt here.
 - **Viewport truth:** everything visible in the 3D viewport is real
