@@ -1,7 +1,7 @@
-# Aether
+# Aether Core
 
-The universal engine of the Aether ecosystem — the CAD, rendering, and
-scene core every end product shares. Product-free by definition: nothing
+**Aether Core** is the universal engine of the Aether ecosystem — the
+CAD, rendering, and scene core every end product shares. Product-free by definition: nothing
 in here may know a specific product, UI, or hardware brand exists.
 
 Everything baked into this engine carries the Aether identity as its
@@ -29,5 +29,5 @@ Aether, it is renamed into that identity (e.g. `AnimaCADViewport` →
 ## The one rule
 
 Aether is EXTRACTED from working products, never designed speculatively.
-A capability enters Aether only when a product needs it today. See
+A capability enters Aether Core only when a product needs it today. See
 `dev/docs/roadmap/Engine_Family_Architecture.md`.

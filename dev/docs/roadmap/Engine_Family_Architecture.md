@@ -5,15 +5,16 @@ agent plans against.
 
 ## The family: the Aether ecosystem
 
-**Aether** is the shared family name and the universal engine at its
-center — the CAD, rendering, and scene core every product consumes.
+**Aether** is the shared family name; **Aether Core** is the universal
+engine at its center — the CAD, rendering, and scene core every product
+consumes.
 Modules baked into the engine carry the Aether prefix (AetherScene,
 AetherViewport, AetherKernel); product-branded names (Anima*) stay in
 their products and are renamed into the Aether identity when extracted.
 The three projects temporarily co-locate in this repo as sibling root
 folders and later split into their own repos:
 
-- `aether/` — the Aether engine (product-free)
+- `aether/` — Aether Core, the engine (product-free)
 - `open-animation-studio/` — the animatronics/animation product
 - `open-cad-studio/` — the CAD authoring product (started 2026-08-01)
 
