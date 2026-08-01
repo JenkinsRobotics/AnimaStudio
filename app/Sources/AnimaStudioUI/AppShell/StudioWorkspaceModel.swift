@@ -136,8 +136,8 @@ final class StudioWorkspaceModel {
   @ObservationIgnored private var configuredProjectAssetURLs: [String: URL] = [:]
   @ObservationIgnored private var retainedProjectAccessURL: URL?
   /// Task-latest push of an edited part transform into the engine handle.
-  @ObservationIgnored private var enginePartTransformPushTask: Task<Void, Never>?
-  @ObservationIgnored private var enginePartTransformPushRevision = 0
+  @ObservationIgnored var enginePartTransformPushTask: Task<Void, Never>?
+  @ObservationIgnored var enginePartTransformPushRevision = 0
   @ObservationIgnored private var retainedLinkedAssetAccessURLs: [URL] = []
   var engineParts: [AnimaCorePartSummary] = []
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
@@ -164,18 +164,18 @@ final class StudioWorkspaceModel {
   var transparentComponentIDs: Set<PartID> = []
   var componentInspectorTab = ComponentInspectorTab.properties
   var matePlacement: MatePlacementSession?
-  private var storedSelectedFeature: MateConnectorCandidate?
-  @ObservationIgnored private let animaCoreClient: (any AnimaCoreServing)?
-  @ObservationIgnored private var animaCoreHandle: String?
-  @ObservationIgnored private var engineRigDocument: AnimaCoreJSONValue?
-  @ObservationIgnored private var engineRigIdentity: AnimaCoreRigIdentity?
+  var storedSelectedFeature: MateConnectorCandidate?
+  @ObservationIgnored let animaCoreClient: (any AnimaCoreServing)?
+  @ObservationIgnored var animaCoreHandle: String?
+  @ObservationIgnored var engineRigDocument: AnimaCoreJSONValue?
+  @ObservationIgnored var engineRigIdentity: AnimaCoreRigIdentity?
   @ObservationIgnored private var animaCoreEngineVersion: String?
   @ObservationIgnored private var engineEvaluation: AnimaCoreEvaluation?
-  @ObservationIgnored private var enginePartIDsByName: [String: PartID] = [:]
-  @ObservationIgnored private var engineClipName: String?
+  @ObservationIgnored var enginePartIDsByName: [String: PartID] = [:]
+  @ObservationIgnored var engineClipName: String?
   @ObservationIgnored private var engineFrameRequestRevision = 0
-  @ObservationIgnored private var matePreviewRequestRevision = 0
-  @ObservationIgnored private var matePreviewBaselinePartPoses: [PartID: EngineResolvedPartPose]?
+  @ObservationIgnored var matePreviewRequestRevision = 0
+  @ObservationIgnored var matePreviewBaselinePartPoses: [PartID: EngineResolvedPartPose]?
   @ObservationIgnored private var armRequestRevision = 0
   @ObservationIgnored private var manualCameraHistoryOrigin:
     (state: PreviewCameraState, projection: PreviewCameraProjection)?
@@ -726,20 +726,6 @@ final class StudioWorkspaceModel {
   func enginePart(for id: PartID) -> AnimaCorePartSummary? {
     guard let name = enginePartName(for: id) else { return nil }
     return engineParts.first { $0.name == name }
-  }
-
-  /// Renderer input for the part origin expressed in the assembly frame.
-  /// Values are the editable AnimaCore rest transform already projected into
-  /// `project.rig`; no pose or mate semantics are reconstructed here.
-  func cadPartRestTransform(for id: PartID) -> CADPartRestTransform? {
-    guard let part = project.rig.parts.first(where: { $0.id == id }) else { return nil }
-    return CADPartRestTransform(
-      positionMeters: [part.positionMeters.x, part.positionMeters.y, part.positionMeters.z],
-      rotationEulerRadians: [
-        part.rotationEulerRadians.x,
-        part.rotationEulerRadians.y,
-        part.rotationEulerRadians.z,
-      ])
   }
 
   func enginePartName(for id: PartID) -> String? {
@@ -1427,14 +1413,6 @@ final class StudioWorkspaceModel {
     }
   }
 
-  func canCreateMate(_ kind: MateCreationToolKind) -> Bool {
-    guard kind.supportsTwoConnectorAuthoring, canCreateRevoluteJoint else { return false }
-    if animaCoreHandle != nil {
-      return engineMateTypes.contains { $0.type == kind.engineTypeID }
-    }
-    return kind.hasLocalDraftAuthoringAction
-  }
-
   var mateCandidatePartIDs: Set<PartID> {
     guard let matePlacement else { return [] }
     guard !matePlacement.isSubmitting else { return [] }
@@ -1461,7 +1439,7 @@ final class StudioWorkspaceModel {
     return Set(eligible.map(\.id))
   }
 
-  private var connectedMateChildPartIDs: Set<PartID> {
+  var connectedMateChildPartIDs: Set<PartID> {
     var connected = Set(project.rig.joints.compactMap(\.childPartID))
     for mate in engineMates where !mate.isSuppressed {
       guard let childPart = mate.childPart,
@@ -1577,23 +1555,6 @@ final class StudioWorkspaceModel {
     selection = [.joint(joint.id)]
   }
 
-  func beginMatePlacement(_ kind: MateCreationToolKind) {
-    guard canCreateMate(kind) else { return }
-    if matePlacement != nil {
-      restoreCommittedPoseAfterMatePreview()
-    }
-    let connectedChildren = connectedMateChildPartIDs
-    let preferredPartID = selectedPartID.flatMap { partID in
-      !connectedChildren.contains(partID) && !isComponentLocked(partID) ? partID : nil
-    }
-    storedSelectedFeature = nil
-    matePreviewRequestRevision += 1
-    matePreviewBaselinePartPoses = engineResolvedPartPoses
-    matePlacement = MatePlacementSession(kind: kind, preferredPartID: preferredPartID)
-    isPlaying = false
-    showsCreationPalette = false
-  }
-
   /// Immediate toolbar actions that open nonmodal authoring surfaces. Part
   /// placement and Design tools remain armed because they require a canvas
   /// location; mates and relations must open as soon as their icon is chosen.
@@ -1614,64 +1575,6 @@ final class StudioWorkspaceModel {
     case .addPart, .designPlaceholder:
       return false
     }
-  }
-
-  func beginRevoluteMatePlacement() {
-    beginMatePlacement(.revolute)
-  }
-
-  func cancelMatePlacement() {
-    restoreCommittedPoseAfterMatePreview()
-    matePreviewBaselinePartPoses = nil
-    matePlacement = nil
-  }
-
-  /// Handles feature-pick events from the standing viewport interaction.
-  /// During mate placement, feature picks forward to the placement flow
-  /// unchanged and empty clicks are ignored, so placement keeps its
-  /// existing two-click semantics. Feature selection is allowed on locked
-  /// components: locks guard edits, and inspecting a feature edits nothing.
-  func selectMateConnector(_ event: ViewportPickEvent) {
-    switch event {
-    case .feature(let candidate):
-      if matePlacement != nil {
-        selectMateConnector(candidate)
-        return
-      }
-      guard project.rig.parts.contains(where: { $0.id == candidate.partID }) else { return }
-      storedSelectedFeature = candidate
-      selection = [.part(candidate.partID)]
-    case .clearFeature:
-      storedSelectedFeature = nil
-    case .clearAll:
-      guard matePlacement == nil else { return }
-      clearSelection()
-    }
-  }
-
-  func selectMateConnector(_ candidate: MateConnectorCandidate) {
-    guard var placement = matePlacement,
-      !isComponentLocked(candidate.partID)
-    else { return }
-
-    if placement.sourceCandidate == nil {
-      guard mateCandidatePartIDs.contains(candidate.partID) else { return }
-      placement.sourceCandidate = candidate
-      matePlacement = placement
-      selection = [.part(candidate.partID)]
-      return
-    }
-
-    guard let source = placement.sourceCandidate,
-      source.partID != candidate.partID,
-      mateCandidatePartIDs.contains(candidate.partID)
-    else { return }
-
-    placement.targetCandidate = candidate
-    placement.previewErrorMessage = nil
-    matePlacement = placement
-    selection = [.part(source.partID), .part(candidate.partID)]
-    requestMatePlacementPreview()
   }
 
   func confirmMatePlacement() {
@@ -1738,122 +1641,6 @@ final class StudioWorkspaceModel {
     matePlacement = placement
   }
 
-  func updateMatePlacementOptions(_ options: EngineMatePlacementOptions) {
-    guard var placement = matePlacement, !placement.isSubmitting else { return }
-    placement.options = options
-    placement.previewErrorMessage = nil
-    matePlacement = placement
-    requestMatePlacementPreview()
-  }
-
-  private func restoreCommittedPoseAfterMatePreview() {
-    matePreviewRequestRevision += 1
-    if let matePreviewBaselinePartPoses {
-      engineResolvedPartPoses = matePreviewBaselinePartPoses
-    }
-  }
-
-  /// Requests a canonical, non-mutating AnimaCore solve for the two selected
-  /// connector frames. Rapid option edits may queue actor calls, but revision
-  /// gating ensures only the newest result can reach the viewport.
-  private func requestMatePlacementPreview() {
-    guard animaCoreClient != nil, animaCoreHandle != nil,
-      var placement = matePlacement,
-      placement.sourceCandidate != nil,
-      placement.targetCandidate != nil,
-      !placement.isSubmitting
-    else { return }
-    placement.isPreviewing = true
-    placement.previewErrorMessage = nil
-    matePlacement = placement
-    matePreviewRequestRevision += 1
-    let revision = matePreviewRequestRevision
-    Task {
-      await previewEngineMate(placement, revision: revision)
-    }
-  }
-
-  /// Maps a renderer topology pick onto the canonical engine Part projection.
-  /// Exact geometry inference remains renderer-side; the resulting frame is
-  /// sent unchanged to AnimaCore when the operator confirms the mate.
-  func selectCADMateFeature(
-    _ feature: CADViewportFeaturePick,
-    sourceURL: URL?
-  ) {
-    guard matePlacement != nil else { return }
-    let standardizedSource = sourceURL?.standardizedFileURL
-    let sourceMatches = enginePartModelSources.filter { _, source in
-      standardizedSource == nil || source.fileURL.standardizedFileURL == standardizedSource
-    }
-    // TEMP mate-mapping diagnostics (remove after the regression is fixed).
-    StudioDiagLog.append(
-      "MATE-DIAG pick partID=\(feature.partID) node=\(feature.nodeName) "
-        + "sourceURL=\(standardizedSource?.path ?? "nil") "
-        + "engineSources=\(enginePartModelSources.count) matches=\(sourceMatches.count) "
-        + "selected=\(selectedPartID.map(String.init(describing:)) ?? "nil")")
-    for (partID, source) in enginePartModelSources.prefix(3) {
-      StudioDiagLog.append(
-        "MATE-DIAG engine part=\(partID) url=\(source.fileURL.standardizedFileURL.path)")
-    }
-    let exactNodeMatches = sourceMatches.filter { _, source in
-      guard let modelNode = source.modelNode else { return false }
-      return modelNode == feature.nodeName
-        || modelNode.split(separator: "/").last.map(String.init) == feature.nodeName
-    }
-    let resolvedPartID: PartID? = {
-      if exactNodeMatches.count == 1 { return exactNodeMatches.first?.key }
-      // The operator's tree selection disambiguates parts that share one
-      // source file (instanced geometry) before the single-match shortcut.
-      if let selectedPartID, sourceMatches[selectedPartID] != nil { return selectedPartID }
-      if sourceMatches.count == 1 { return sourceMatches.first?.key }
-      return nil
-    }()
-    guard let partID = resolvedPartID else {
-      animaCoreErrorMessage =
-        "That CAD feature could not be mapped to one character Part. Select the Part in the tree, then pick the feature again."
-      return
-    }
-    let kind: MateConnectorFeatureKind =
-      switch feature.kind {
-      case .face: .faceCenter
-      case .edge: .edgeMidpoint
-      case .vertex: .corner
-      case .axis: .axis
-      }
-    let label: String =
-      switch feature.kind {
-      case .face: "Face center"
-      case .edge: "Edge midpoint"
-      case .vertex: "Vertex"
-      case .axis: "Cylindrical axis"
-      }
-    selectMateConnector(
-      MateConnectorCandidate(
-        id: "cad-\(feature.kind.rawValue)-\(feature.topologyID)",
-        partID: partID,
-        displayName: "\(feature.nodeName) · \(label)",
-        featureKind: kind,
-        connector: MateConnectorDefinition(
-          originMeters: RigVector3(
-            x: feature.positionMeters.x,
-            y: feature.positionMeters.y,
-            z: feature.positionMeters.z
-          ),
-          primaryAxis: RigVector3(
-            x: feature.primaryAxis.x,
-            y: feature.primaryAxis.y,
-            z: feature.primaryAxis.z
-          ),
-          secondaryAxis: RigVector3(
-            x: feature.secondaryAxis.x,
-            y: feature.secondaryAxis.y,
-            z: feature.secondaryAxis.z
-          )
-        )
-      )
-    )
-  }
-
   private func wouldCreateMateCycle(childID: PartID, parentID: PartID) -> Bool {
     var currentID: PartID? = parentID
     var visited: Set<PartID> = []
@@ -1876,167 +1663,6 @@ final class StudioWorkspaceModel {
       currentID = partID(forEngineName: parentName)
     }
     return false
-  }
-
-  private func previewEngineMate(
-    _ placement: MatePlacementSession,
-    revision: Int
-  ) async {
-    guard let source = placement.sourceCandidate,
-      let target = placement.targetCandidate
-    else { return }
-    guard let animaCoreClient, let handle = animaCoreHandle else {
-      guard revision == matePreviewRequestRevision,
-        var current = matePlacement
-      else { return }
-      current.isPreviewing = false
-      matePlacement = current
-      return
-    }
-    guard
-      let movingPartName = enginePartName(for: source.partID),
-      let fixedPartName = enginePartName(for: target.partID)
-    else {
-      finishMatePreview(
-        revision: revision,
-        errorMessage: EngineMateAuthoringError.missingPartMapping.localizedDescription
-      )
-      return
-    }
-    guard
-      let type = engineMateTypes.first(where: {
-        $0.type == placement.kind.engineTypeID
-      })
-    else {
-      finishMatePreview(
-        revision: revision,
-        errorMessage: EngineMateAuthoringError.typeUnavailable(
-          placement.kind.title
-        ).localizedDescription
-      )
-      return
-    }
-
-    do {
-      let draft = try EngineMateAuthoring.makeDraft(
-        kind: placement.kind,
-        type: type,
-        movingPartName: movingPartName,
-        movingConnector: source,
-        fixedPartName: fixedPartName,
-        fixedConnector: target,
-        existingMateNames: Set(engineMates.map(\.name)),
-        options: placement.options
-      )
-      let pose = try await animaCoreClient.previewMate(
-        handle: handle,
-        joint: draft.document,
-        clip: engineClipName,
-        timeSeconds: playheadSeconds
-      )
-      guard revision == matePreviewRequestRevision,
-        handle == animaCoreHandle,
-        var current = matePlacement
-      else { return }
-      engineResolvedPartPoses = Self.previewPoses(
-        from: pose,
-        partIDsByEngineName: enginePartIDsByName
-      )
-      current.isPreviewing = false
-      current.previewErrorMessage = nil
-      matePlacement = current
-    } catch is CancellationError {
-      return
-    } catch {
-      finishMatePreview(
-        revision: revision,
-        errorMessage: error.localizedDescription
-      )
-    }
-  }
-
-  private func finishMatePreview(
-    revision: Int,
-    errorMessage: String
-  ) {
-    guard revision == matePreviewRequestRevision,
-      var current = matePlacement
-    else { return }
-    if let matePreviewBaselinePartPoses {
-      engineResolvedPartPoses = matePreviewBaselinePartPoses
-    }
-    current.isPreviewing = false
-    current.previewErrorMessage = errorMessage
-    matePlacement = current
-  }
-
-  private func authorEngineMate(
-    kind: MateCreationToolKind,
-    movingConnector: MateConnectorCandidate,
-    fixedConnector: MateConnectorCandidate,
-    options: EngineMatePlacementOptions = .init()
-  ) async {
-    guard let animaCoreClient, let handle = animaCoreHandle,
-      let movingPartName = enginePartName(for: movingConnector.partID),
-      let fixedPartName = enginePartName(for: fixedConnector.partID)
-    else {
-      animaCoreErrorMessage = EngineMateAuthoringError.missingPartMapping.localizedDescription
-      if var placement = matePlacement {
-        placement.isSubmitting = false
-        matePlacement = placement
-      }
-      return
-    }
-    guard let type = engineMateTypes.first(where: { $0.type == kind.engineTypeID }) else {
-      animaCoreErrorMessage =
-        EngineMateAuthoringError.typeUnavailable(kind.title).localizedDescription
-      if var placement = matePlacement {
-        placement.isSubmitting = false
-        matePlacement = placement
-      }
-      return
-    }
-
-    do {
-      let draft = try EngineMateAuthoring.makeDraft(
-        kind: kind,
-        type: type,
-        movingPartName: movingPartName,
-        movingConnector: movingConnector,
-        fixedPartName: fixedPartName,
-        fixedConnector: fixedConnector,
-        existingMateNames: Set(engineMates.map(\.name)),
-        options: options
-      )
-      let mutated = try await animaCoreClient.addMate(
-        handle: handle,
-        joint: draft.document
-      )
-      guard handle == animaCoreHandle, mutated.handle == handle else { return }
-
-      engineRigDocument = mutated.rigDocument
-      engineRigIdentity = mutated.rig.identity
-      engineParts = mutated.rig.parts
-      engineMates = mutated.rig.joints
-      engineRelations = mutated.rig.relations
-      engineParameters = mutated.rig.parameters
-      engineOutputs = mutated.rig.outputs
-      engineKinematicChain = mutated.rig.kinematicChain
-      matePreviewBaselinePartPoses = nil
-      matePlacement = nil
-      if let mate = engineMates.first(where: { $0.name == draft.name }) {
-        selection = [.joint(JointID(rawValue: mate.selectionKey))]
-      }
-      documentEditRevision += 1
-      animaCoreErrorMessage = nil
-      await refreshAnimaCoreFrameAtPlayhead()
-    } catch {
-      if var placement = matePlacement {
-        placement.isSubmitting = false
-        matePlacement = placement
-      }
-      animaCoreErrorMessage = error.localizedDescription
-    }
   }
 
   /// Applies presentation edits to one full-fidelity AnimaCore mate DTO.
@@ -2249,31 +1875,6 @@ final class StudioWorkspaceModel {
     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedName.isEmpty else { return }
     project.rig.parts[index].displayName = trimmedName
-  }
-
-  func setPartPosition(id: PartID, to positionMeters: RigVector3) {
-    guard !isComponentLocked(id), isPartRestTransformEditable(id),
-      positionMeters.x.isFinite, positionMeters.y.isFinite, positionMeters.z.isFinite,
-      let index = project.rig.parts.firstIndex(where: { $0.id == id })
-    else { return }
-    project.rig.parts[index].positionMeters = positionMeters
-    updateEnginePartTransform(id: id)
-  }
-
-  func setPartRotation(id: PartID, to rotationEulerRadians: RigVector3) {
-    guard !isComponentLocked(id), isPartRestTransformEditable(id),
-      rotationEulerRadians.x.isFinite, rotationEulerRadians.y.isFinite,
-      rotationEulerRadians.z.isFinite,
-      let index = project.rig.parts.firstIndex(where: { $0.id == id })
-    else { return }
-    project.rig.parts[index].rotationEulerRadians = rotationEulerRadians
-    updateEnginePartTransform(id: id)
-  }
-
-  func isPartRestTransformEditable(_ id: PartID) -> Bool {
-    guard let part = enginePart(for: id) else { return true }
-    if part.isGrounded { return false }
-    return !engineMates.contains { !$0.isSuppressed && $0.childPart == part.name }
   }
 
   func componentAppearance(for id: PartID) -> PreviewPartAppearance? {
@@ -2845,17 +2446,6 @@ final class StudioWorkspaceModel {
     return !partIDs.isEmpty && partIDs.allSatisfy(isComponentHidden)
   }
 
-  func isComponentGroupTransformEditable(_ id: UUID) -> Bool {
-    guard !isComponentGroupLocked(id) else { return false }
-    let groupIDs = descendantComponentGroupIDs(of: id)
-    guard groupIDs.allSatisfy({ !isComponentGroupLocked($0) }) else { return false }
-    let partIDs = componentIDs(inGroupIncludingDescendants: id)
-    return !partIDs.isEmpty
-      && partIDs.allSatisfy {
-        !isComponentLocked($0) && isPartRestTransformEditable($0)
-      }
-  }
-
   func cadComponentGroupTransform(_ id: UUID) -> CADPartRestTransform? {
     guard let group = componentGroup(id: id) else { return nil }
     return CADPartRestTransform(
@@ -2908,44 +2498,6 @@ final class StudioWorkspaceModel {
       rotationEulerRadians.z,
     ]
     setComponentGroupTransform(id: id, to: transform)
-  }
-
-  func setComponentGroupTransform(id: UUID, to transform: CADPartRestTransform) {
-    guard isComponentGroupTransformEditable(id),
-      let groupIndex = componentGroups.firstIndex(where: { $0.id == id }),
-      let current = cadComponentGroupTransform(id)
-    else { return }
-    let delta = transform.matrix * simd_inverse(current.matrix)
-    let childGroupIDs = descendantComponentGroupIDs(of: id).subtracting([id])
-    let updatedChildTransforms = Dictionary(
-      uniqueKeysWithValues: childGroupIDs.compactMap { childID in
-        cadComponentGroupTransform(childID).map {
-          (childID, $0.applyingAssemblyDelta(delta))
-        }
-      })
-    let updatedPartTransforms = Dictionary(
-      uniqueKeysWithValues: componentIDs(inGroupIncludingDescendants: id).compactMap { partID in
-        cadPartRestTransform(for: partID).map {
-          (partID, $0.applyingAssemblyDelta(delta))
-        }
-      })
-
-    componentGroups[groupIndex].positionMeters = Self.rigVector(transform.positionMeters)
-    componentGroups[groupIndex].rotationEulerRadians =
-      Self.rigVector(transform.rotationEulerRadians)
-    for (childID, childTransform) in updatedChildTransforms {
-      guard let childIndex = componentGroups.firstIndex(where: { $0.id == childID }) else {
-        continue
-      }
-      componentGroups[childIndex].positionMeters = Self.rigVector(childTransform.positionMeters)
-      componentGroups[childIndex].rotationEulerRadians =
-        Self.rigVector(childTransform.rotationEulerRadians)
-    }
-    for (partID, partTransform) in updatedPartTransforms {
-      setPartPosition(id: partID, to: Self.rigVector(partTransform.positionMeters))
-      setPartRotation(id: partID, to: Self.rigVector(partTransform.rotationEulerRadians))
-    }
-    documentEditRevision += 1
   }
 
   func setComponentGroupHidden(_ id: UUID, hidden: Bool) {
@@ -3007,7 +2559,7 @@ final class StudioWorkspaceModel {
       z: positions.reduce(0) { $0 + $1.z } / count)
   }
 
-  private func descendantComponentGroupIDs(of id: UUID) -> Set<UUID> {
+  func descendantComponentGroupIDs(of id: UUID) -> Set<UUID> {
     var result: Set<UUID> = []
     func append(_ groupID: UUID) {
       guard result.insert(groupID).inserted else { return }
@@ -3288,7 +2840,7 @@ final class StudioWorkspaceModel {
     )
   }
 
-  private static func previewPoses(
+  static func previewPoses(
     from resolvedPose: AnimaCoreResolvedPose,
     partIDsByEngineName: [String: PartID]
   ) -> [PartID: EngineResolvedPartPose] {
@@ -3309,86 +2861,9 @@ final class StudioWorkspaceModel {
     path.split(separator: ".", maxSplits: 1).first.map(String.init)
   }
 
-  private static func rigVector(_ values: [Double]) -> RigVector3 {
+  static func rigVector(_ values: [Double]) -> RigVector3 {
     guard values.count == 3 else { return RigVector3() }
     return RigVector3(x: values[0], y: values[1], z: values[2])
-  }
-
-  private func updateEnginePartTransform(id: PartID) {
-    guard let document = engineRigDocument,
-      let name = enginePartName(for: id),
-      let part = project.rig.parts.first(where: { $0.id == id })
-    else {
-      // TEMP transform diagnostics (remove after the regression is fixed).
-      StudioDiagLog.append(
-        "XFORM-DIAG silent bail id=\(id) hasDoc=\(engineRigDocument != nil) "
-          + "engineName=\(enginePartName(for: id) ?? "nil") "
-          + "inLocalRig=\(project.rig.parts.contains { $0.id == id }) "
-          + "idMapCount=\(enginePartIDsByName.count)")
-      return
-    }
-    do {
-      engineRigDocument = try AnimaCoreRigDocumentEditor.settingPartTransform(
-        named: name,
-        positionMeters: [part.positionMeters.x, part.positionMeters.y, part.positionMeters.z],
-        rotationEulerRadians: [
-          part.rotationEulerRadians.x,
-          part.rotationEulerRadians.y,
-          part.rotationEulerRadians.z,
-        ],
-        in: document
-      )
-      // Dropping the stale pose keeps direct manipulation responsive; the
-      // engine handle is then updated asynchronously below so any later
-      // playhead refresh resolves the EDITED transform instead of snapping
-      // the part back (the drag-reset regression).
-      engineResolvedPartPoses.removeValue(forKey: id)
-      documentEditRevision += 1
-      StudioDiagLog.append(
-        "XFORM-DIAG applied id=\(id) name=\(name) "
-          + "pos=[\(part.positionMeters.x), \(part.positionMeters.y), \(part.positionMeters.z)]")
-      schedulePartTransformPush(id: id)
-    } catch {
-      animaCoreErrorMessage = error.localizedDescription
-    }
-  }
-
-  /// Pushes one part's edited canonical entry into the live engine handle via
-  /// `update_part`. Task-latest: rapid drag updates cancel the prior push so
-  /// only the newest transform reaches the engine.
-  private func schedulePartTransformPush(id: PartID) {
-    enginePartTransformPushRevision += 1
-    let revision = enginePartTransformPushRevision
-    enginePartTransformPushTask?.cancel()
-    enginePartTransformPushTask = Task { [weak self] in
-      await self?.pushPartTransformToEngine(id: id, revision: revision)
-    }
-  }
-
-  /// Awaits the in-flight `update_part` push. Tests use this to make the
-  /// asynchronous drag → engine handoff deterministic.
-  func flushPendingEnginePartTransformPush() async {
-    await enginePartTransformPushTask?.value
-  }
-
-  private func pushPartTransformToEngine(id: PartID, revision: Int) async {
-    guard let animaCoreClient, let handle = animaCoreHandle,
-      let document = engineRigDocument,
-      let name = enginePartName(for: id)
-    else { return }
-    do {
-      let partDocument = try AnimaCoreRigDocumentEditor.partDocument(
-        named: name, from: document)
-      _ = try await animaCoreClient.updatePart(handle: handle, part: partDocument)
-      // The local engineRigDocument already carries this edit; adopting the
-      // response here could clobber a mate/relation commit that landed while
-      // the push was in flight, so success needs no further state change.
-    } catch is CancellationError {
-      return
-    } catch {
-      guard revision == enginePartTransformPushRevision else { return }
-      animaCoreErrorMessage = error.localizedDescription
-    }
   }
 
   private func reloadEditedEngineRig() async throws {
