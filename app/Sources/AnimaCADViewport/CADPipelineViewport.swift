@@ -817,6 +817,25 @@ public struct CADPipelineViewport: View {
     return partRestTransformsBySourceURL[sourceURL]
   }
 
+  /// Screen→world conversion for gizmo handle drags at the selected subject's
+  /// camera depth, matching the render projection — the previous
+  /// model-diagonal constant ignored zoom, so the part moved at a different
+  /// rate than the cursor and the gizmo felt disconnected from the model.
+  private func gizmoMetersPerPoint(viewportSize: CGSize) -> Double {
+    guard let subject = selectedSubjectTransform else { return 0.001 }
+    let origin = SIMD3<Float>(
+      Float(subject.positionMeters[0]),
+      Float(subject.positionMeters[1]),
+      Float(subject.positionMeters[2]))
+    let forwardValue = camera.target - camera.position
+    guard simd_length(forwardValue) > 0.000_001 else { return 0.001 }
+    let forward = simd_normalize(forwardValue)
+    let depth = max(Double(simd_dot(origin - camera.position, forward)), 0.001)
+    let verticalFieldOfViewRadians = 45.0 * .pi / 180
+    return 2 * depth * tan(verticalFieldOfViewRadians * 0.5)
+      / max(Double(viewportSize.height), 1)
+  }
+
   private var selectedGizmoTransform: CADPartRestTransform? {
     guard let subjectTransform = selectedSubjectTransform else { return nil }
     return CADSelectionGizmoPlacement.centeredTransform(
@@ -881,8 +900,7 @@ public struct CADPipelineViewport: View {
             viewportSize: geometry.size,
             label: primarySelectionTransformLabel,
             isEnabled: primaryPartTransformIsEditable,
-            metersPerPoint: Double(
-              max(document?.renderGeometry.bounds.diagonal ?? 1, 0.001) * 0.0015),
+            metersPerPoint: gizmoMetersPerPoint(viewportSize: geometry.size),
             onChange: setSelectedGizmoTransform
           )
           .position(
