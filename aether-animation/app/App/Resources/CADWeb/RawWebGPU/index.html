@@ -35,6 +35,13 @@
     let gridBuffer;
     let toolsBuffer;
     let toolsVertexCount = 0;
+    let pickPipeline;
+    let pickIDTexture;
+    let pickDepthTexture;
+    let pickReadBuffer;
+    let pickWidth = 0;
+    let pickHeight = 0;
+    let meshBatches = [];
     let indexCount = 0;
     let edgeVertexCount = 0;
     let gridVertexCount = 0;
@@ -164,6 +171,23 @@
       }
       @fragment fn gridFragment(input: GridOutput) -> @location(0) vec4f {
         return input.color;
+      }
+
+      struct PickOutput {
+        @builtin(position) position: vec4f,
+        @location(0) @interpolate(flat) partID: u32,
+      };
+      @vertex fn pickVertex(
+        @builtin(instance_index) instance: u32,
+        @location(0) position: vec3f
+      ) -> PickOutput {
+        var output: PickOutput;
+        output.position = projectedPosition(position);
+        output.partID = instance;
+        return output;
+      }
+      @fragment fn pickFragment(input: PickOutput) -> @location(0) u32 {
+        return input.partID;
       }
     `;
 
@@ -375,6 +399,63 @@
       multisampleView = multisampleTexture.createView();
     }
 
+    async function gpuPick(x, y) {
+      if (!indexCount || !meshBatches.length || !pickPipeline) return 0;
+      const width = canvas.width, height = canvas.height;
+      if (width < 1 || height < 1) return 0;
+      const px = Math.min(Math.max(Math.round(x), 0), width - 1);
+      const py = Math.min(Math.max(Math.round(y), 0), height - 1);
+      if (pickWidth !== width || pickHeight !== height) {
+        pickIDTexture?.destroy();
+        pickDepthTexture?.destroy();
+        pickIDTexture = device.createTexture({
+          size: [width, height], format: 'r32uint',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
+        });
+        pickDepthTexture = device.createTexture({
+          size: [width, height], format: 'depth24plus',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+        pickReadBuffer ??= device.createBuffer({
+          size: 256, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        });
+        pickWidth = width;
+        pickHeight = height;
+      }
+      writeUniforms(width, height);
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: pickIDTexture.createView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear', storeOp: 'store'
+        }],
+        depthStencilAttachment: {
+          view: pickDepthTexture.createView(), depthClearValue: 1,
+          depthLoadOp: 'clear', depthStoreOp: 'discard'
+        }
+      });
+      // Fragment work away from the cursor is wasted; scissor to the pixel.
+      pass.setScissorRect(px, py, 1, 1);
+      pass.setBindGroup(0, bindGroup);
+      pass.setPipeline(pickPipeline);
+      pass.setVertexBuffer(0, positionBuffer);
+      pass.setIndexBuffer(indexBuffer, 'uint32');
+      for (const batch of meshBatches) {
+        pass.drawIndexed(batch.indexCount, 1, batch.indexStart, 0, batch.assemblyNode + 1);
+      }
+      pass.end();
+      encoder.copyTextureToBuffer(
+        { texture: pickIDTexture, origin: { x: px, y: py } },
+        { buffer: pickReadBuffer, bytesPerRow: 256 },
+        [1, 1, 1]);
+      device.queue.submit([encoder.finish()]);
+      await pickReadBuffer.mapAsync(GPUMapMode.READ);
+      const partID = new Uint32Array(pickReadBuffer.getMappedRange())[0];
+      pickReadBuffer.unmap();
+      return partID;
+    }
+
     window.codexBenchRawWebGPU = {
       setTheme(value) {
         if (value) Object.assign(theme, value);
@@ -385,6 +466,7 @@
       },
       clearMesh() {
         destroyGeometry();
+        meshBatches = [];
         lastPositions = undefined;
         notice.textContent = 'Select one of your own STEP files';
         notice.style.display = 'grid';
@@ -399,6 +481,7 @@
         indexBuffer = gpuBuffer(decoded.indices, GPUBufferUsage.INDEX);
         if (decoded.edges.length) edgeBuffer = gpuBuffer(decoded.edges, GPUBufferUsage.VERTEX);
         indexCount = decoded.indices.length;
+        meshBatches = payload.batches || [];
         edgeVertexCount = decoded.edges.length / 3;
         lastPositions = decoded.positions;
         fitPositions(decoded.positions);
@@ -469,7 +552,14 @@
       }
     });
     addEventListener('mouseup', event => {
-      if (event.button === 0 && !mouseMoved && indexCount) selected = !selected;
+      if (event.button === 0 && !mouseMoved && indexCount) {
+        const ratio = canvas.width / Math.max(canvas.clientWidth, 1);
+        const rect = canvas.getBoundingClientRect();
+        const extend = event.shiftKey || event.metaKey;
+        gpuPick((event.clientX - rect.left) * ratio, (event.clientY - rect.top) * ratio)
+          .then(partID => send({ type: 'pick', partID, extend }))
+          .catch(() => {});
+      }
       dragMode = undefined;
       lastPoint = undefined;
     });
@@ -630,6 +720,21 @@
         },
         multisample: { count: 4 }
       });
+      // Picking is a GPU task: parts render their IDs into an offscreen
+      // R32Uint target and one pixel is read back — the CPU never walks
+      // triangles to answer "what is under the cursor".
+      pickPipeline = device.createRenderPipeline({
+        layout,
+        vertex: {
+          module, entryPoint: 'pickVertex', buffers: [
+            { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] }
+          ]
+        },
+        fragment: { module, entryPoint: 'pickFragment', targets: [{ format: 'r32uint' }] },
+        primitive: { topology: 'triangle-list', cullMode: 'back' },
+        depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' }
+      });
+
       device.lost.then(info => send({
         type: 'error', message: `Raw WebGPU device lost: ${info.message || info.reason}`
       }));

@@ -350,6 +350,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | WebGPU tool-port 1: in-world tool geometry (gizmo/triads/snap nodes) neutralized from CADMetalViewport into AetherViewport + WebGPU payload | `aether-animation/AetherKit/Sources/AetherViewport/**` (new tool-geometry files + payload), `aether-animation/AetherKit/Tests/AetherCoreTests/**`, `aether-animation/app/Sources/AnimaCADViewport/{CADMetalViewport,CADWebGPUViewport}.swift`, `aether-animation/app/App/Resources/CADWeb/RawWebGPU/index.html`, briefing/mailbox | AetherKit + app suites green (378+68+Kit 9), tool meshes pinned by deterministic tests, WebGPU page renders tools | released 2026-08-01 |
 
+| Claude | WebGPU tool-port 2: GPU ID-buffer part picking on the raw WebGPU page (foundation for web feature/connector state) | `aether-animation/app/App/Resources/CADWeb/RawWebGPU/index.html`, briefing | page JS syntax-checked; pick protocol matches the coordinator contract | released 2026-08-01 |
+
 ## Requests
 
 - **Codex → Claude (2026-07-29, animatronics critical-path follow-on):**
@@ -4755,3 +4757,18 @@ change needed in the Handoff log instead of inventing commands.
   first run of the Raw WebGPU renderer with a selection will show it.
   Next slices: connector-marker STATE for the web (feature hover/pick is
   Metal-side today), then gizmo interaction parity (drag handles) on web.
+- **2026-08-01 (Claude, WebGPU tool-port 2 — GPU pick on web):** The raw
+  WebGPU page had NO real picking (a local demo toggle). It now implements
+  the ID-buffer contract: `pickVertex`/`pickFragment` WGSL render each
+  geometry batch's `assemblyNode + 1` into an offscreen R32Uint target
+  (per-batch `firstInstance` carries the ID — zero extra buffers), depth
+  tested, scissored to the cursor pixel, one-pixel readback via mapAsync;
+  click sends `{type:'pick', partID, extend}` exactly as the coordinator
+  already expects (shift/cmd = extend). Batches are retained at loadMesh
+  for the pick pass. The demo `selected` toggle is gone. Follow-ups now
+  unblocked, in order: selection tint on the raw page (needs a
+  setPartState path), face IDs in the web geometry payload → RG32Uint
+  pick → `CADConnectorCandidateEngine` hover flow on web (connector
+  marker STATE), then web gizmo drag parity. Verified: JS syntax (node
+  --check); protocol match by inspection; not yet exercised in a live
+  WKWebView — same caveat as tool-port 1, first Raw WebGPU run proves it.
