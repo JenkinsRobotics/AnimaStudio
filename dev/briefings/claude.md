@@ -77,6 +77,21 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-08-01 (Aether restructure 1, per Jonathan live): Core is Swift-free.
+  `AnimaCAD`/`AnimaCADShim` → `aether-animation/AetherKit` as
+  `AetherKernel`+`AetherKernelShim` (C symbols `aether_kernel_*`);
+  renderer-neutral viewport contracts → `AetherViewport` (camera state,
+  connector candidate engine, themes, navigation config, WebGPU payloads);
+  **`app/` moved to `aether-animation/app/`**. App's `AnimaCADViewport`
+  target keeps only concrete renderers + `@_exported` re-exports, so
+  Codex's imports compile unchanged. CI/AGENTS.md/build-script paths
+  updated; full baseline re-verified (AetherKit 4, app 378+68 = old 72 ST
+  split, pytest 1178, root-app script). **Codex heads-up:** build/test
+  from `aether-animation/app/` now; `import AnimaCAD` is
+  `import AetherKernel` (or lean on the AnimaCADViewport re-export).
+  Gizmo/triad geometry neutralization into AetherViewport = the WebGPU
+  tool-port packet, unclaimed.
+
 - 2026-07-31 (mate-bridge audit — Task 5 IN item closed): Verified the
   requested surface exists end-to-end at HEAD: bridge verbs `preview_mate`/
   `add_mate`/`update_mate`/`remove_mate`/`add_part`/`update_part`/

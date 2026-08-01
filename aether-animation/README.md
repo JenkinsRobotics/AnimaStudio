@@ -1,15 +1,29 @@
 # Aether Animation
 
-The Aether ecosystem's animatronics/animation product: import a character, define its movable
-structure (mates on Aether's world), animate it on a timeline, preview it, and
-drive the same evaluated motion to physical hardware.
+The Aether ecosystem's unified motion, avatars, and animatronics product:
+import a character, define its movable structure, animate it on a timeline,
+preview it, and route the same evaluated trajectories to physical hardware.
+It also maps face/body performance capture to 2D and 3D avatar blendshapes and
+supports real-time puppetry.
 
 ## Current reality
 
-This product exists today as the app at `/app/` (Swift, macOS) plus the
-engine at `/animacore/`. It migrates into this folder as the Core split
-solidifies; until then, active development continues in place and this
-folder holds product-specific planning and any new product-only modules.
+The Swift macOS app now lives here (moved 2026-08-01, per Jonathan):
 
-Product-specific = timelines, show control, hardware panels, character
-library UX. Anything two products need belongs in `/aether-core/`.
+- `app/` — the product application (formerly the repo-root `app/`;
+  build/test from `aether-animation/app/`).
+- `AetherKit/` — the product's **native Swift engine seam**: the
+  `AetherKernel` OCCT bridge (C++ shim + Swift wrapper) and the
+  `AetherViewport` renderer-neutral contracts (camera state, connector
+  candidate engine, themes, navigation bindings, WebGPU entity payloads).
+  Swift is product code — it binds Aether Core, it is not Aether Core.
+  The platform-universal engine (OCCT/WASM kernel, web renderer core,
+  Python semantics) consolidates in `/aether-core/` per its README.
+
+The Python semantics engine remains at `/animacore/` (canonical) until its
+move into Core is scheduled.
+
+Product-specific = timelines, show control, performance capture, avatar and
+blendshape mapping, character-library UX, hardware panels, output buses, and
+raw device adapters. Mathematical state/evaluation shared by multiple products
+belongs in `/aether-core/`.

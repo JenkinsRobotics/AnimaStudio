@@ -48,6 +48,15 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | active 2026-08-01 |
+| Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
+| Codex | Package Aether CAD as a clickable macOS web app with a CAD-sketch icon | `Aether CAD/Launcher/**`, `Aether CAD/Resources/**`, `Aether CAD/Scripts/build-macos-app.sh`, root `Aether CAD.app`, STATUS + append-only coordination only | one self-contained signed root app serves the production web bundle locally and hosts it in a dedicated WKWebView window; no npm/Vite terminal required at launch; icon retains the Aether/Anima family palette but uses sketch/constraint geometry; build, signature, launch, OCCT-ready browser state verified | released 2026-08-01 — root `Aether CAD.app`; signed native WKWebView wrapper; internal server restricted to 127.0.0.1; bundled production assets/OCCT WASM verified; family SVG/ICNS uses CAD sketch endpoints, constraints, construction geometry, and dimensions |
+| Codex | Rename Open CAD Studio to Aether CAD and prepare the Aether Core extraction seam | `Open CAD Studio/**` → `Aether CAD/**`, root/docs references + append-only coordination only; do not create or move code into a separate `Aether Core/` product yet | folder/package/window/docs consistently say Aether CAD; an explicit app↔core facade and extraction manifest define CAD-document/evaluation/topology/mate ownership without duplicating implementations; UI/viewport depend on the facade; existing Part/STEP/mate flows and tests/check/build/browser smoke remain green | released 2026-08-01 — root app/package/window/docs renamed Aether CAD; new files use `aether-part` with legacy migration; one `aether-core.ts` facade + extraction manifest; Core/CAD/Animation responsibilities documented; 29 tests/check/build and live create/rebuild/save/reopen shell pass |
+| Codex | Add the production CAD shell to Aether CAD | `Aether CAD/**`, STATUS + append-only coordination only; production Swift/AnimaCore lanes untouched | compact document header + functional grouped tool ribbon; left rail/browser separates reference geometry, Sketch/Extrude/Body history, and mate data; reference planes are real viewport geometry; interactive camera ViewCube mirrors orbit and selects standard views; existing Part/STEP/connector/mate flows remain live; tests/check/build/browser visual pass | released 2026-08-01 — grouped functional ribbon; one Items/Sketch/Mates rail; working filter + origin/principal planes; orbit-synchronized six-face ViewCube; 27 tests/check/build and create/revise/save/reopen shell browser pass |
+| Codex | Promote OCCT Mate Lab into root Aether CAD and ship native Part authoring v1 | `dev/OCCTMateLab/**` → `Aether CAD/**`, narrowly required root/docs/coordination references only; production Swift/AnimaCore lanes untouched | root web CAD app preserves STEP assembly/mating proof; versioned editable Part file; rectangle Sketch → Extrude exact OCCT rebuild; feature tree; New/Open/Save Part; deterministic document/evaluator tests plus build and browser save/reopen walkthrough | released 2026-08-01 — root app + `.cadpart` v1; stable Sketch/Extrude history; exact OCCT rebuild; combined Items tree; New/Open/Save controls; 23 tests/check/build; real create/revise/download/reopen browser pass |
+| Codex | Extend OCCT Mate Lab feature-aware connector snapping | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | exact cylindrical OD/ID surfaces expose trimmed axis start/center/end anchors; circular edges retain exact centers; edge/vertex frames follow their feature direction; spatial duplicates are suppressed; tests/check/build/browser probe pass | released 2026-08-01 — modular exact-topology/frame/inference/visual layers; cylinder/bore and cone axis stations; circle/ellipse/sphere/torus centers; tangent edge frames; semantic de-duplication; STEP-document Items tree with collapse/select/visibility; 18 tests/check/build and live 2-Part/2-connector/1-mate pass |
+| Codex | Make OCCT Mate Lab snap nodes flat and precise | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | candidate nodes are compact 2D sketches in the exact face plane and no longer obscure nearby topology; active XYZ connector remains distinct; tests/check/build/browser visual pass | released 2026-08-01 — tiny face-aligned instanced discs replace world-space spheres; active XYZ frame unchanged; live 2-Part/2-connector/1-mate pass, 7 tests/check/build pass |
+| Codex | Refine OCCT Mate Lab candidate and connector visualization | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | inferred topology candidates render as subtle white CAD snap dots; hovered candidate and saved connector show an exact Part-local RGB triad at the anchor; markers remain readable and attached through Part transforms; tests/check/build/browser walkthrough pass | released 2026-08-01 — instanced white/dark-rim snap dots, Part-local XYZ arrow gizmo + origin ring, narrower non-blocking authoring card; live 2-Part/2-connector/1-mate browser pass, 7 tests/check/build pass |
 | Codex | Correct OCCT Mate Lab assembly import and connector-first authoring | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | repeated and multi-file imports remain distinct visible Parts; operator may create unlimited persistent mate connectors on exact OCCT candidates; Fastened mates select two existing connectors on different Parts and reference their stable IDs; connector markers follow Part transforms; focused tests/check/build and browser smoke | released 2026-07-31 — connector registry + separate mate draft; persistent Part-local marker/triad; multi-file append with per-document assembly placement; 7 tests/check/build and cylindrical STEP probe pass; revised empty UI loads in Safari; operator connector/mate walkthrough pending |
 | Codex | Repair curved STEP import and prove the complete browser authoring flow | `dev/OCCTMateLab/**`, STATUS + append-only coordination only; do not touch production Swift/backend lanes | a failed analytic face never discards the imported Part; a curved STEP and second STEP render and appear in the tree; connector placement + Fastened mating pass through the actual browser UI | released 2026-07-31 — raw OCCT face enumeration, exact plane/cylinder axes, per-face/edge fault isolation, pointer-transparent tool card; live browser regression reaches 2 Parts / 2 connectors / 1 mate; 7 tests/check/build pass |
 | Claude | Viewport appearance layers — Background/Environment/Object panel + gradient bg + solid shadow floor + perceptual lighting sliders (Jonathan-approved design, cross-lane authorized 2026-07-31) | `app/Sources/AnimaCADViewport/{CADViewportTheme,CADMetalViewport,CADPipelineViewport,CADWebPayload,CADWebGPUViewport}.swift`, `app/App/Resources/CADWeb/ThreeJSWeb/**` + `dev/Codex Bench/web/threejs/src/app.js` regen, `app/App/Resources/CADWeb/RawWebGPU/index.html`, `app/Sources/AnimaStudioUI/Components/CADAppearancePanel.swift`, `app/Sources/AnimaStudioUI/Settings/StudioPreferenceKeys.swift`, narrow wiring in `app/Sources/AnimaStudioUI/AppShell/StudioWorkspaceView.swift`, tests under `app/Tests/**`, `dev/docs/roadmap/Viewport_Appearance_Layers.md`, STATUS + coordination | design doc acceptance: three-section panel, 4 floor modes, off→nominal→4x sliders live on Metal + Three.js WebGPU, color-only raw WebGPU; swift build/test + JS build/copy + root app + live walkthrough | released 2026-07-31 — 376 XCTest + Swift Testing green, lint clean, JS rebuilt+copied, root app launches under MTL_DEBUG_LAYER=1; operator visual walkthrough pending. Note: Three.js build source now lives under dev/archive/Codex Bench/web/threejs (post-archive) — production bundle builds from there; consider relocating under app/ |
@@ -336,6 +345,8 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | Engine live-posing overrides: `dof_overrides` in `evaluate_pose`, `dof_values` param on bridge `evaluate`/`resolve_pose` (additive) | `animacore/rig.py`, `animacore/bridge.py`, `animacore/tests/test_bridge.py` | `.venv/bin/ruff check animacore` + `.venv/bin/pytest animacore/tests -q` | released 2026-07-29 (1171 passed +7 new; overrides merge over clip/neutral, relations still run, driven DOF stay driven, out-of-limit overrides reported never clamped, unknown path → bad_request) |
 | Claude | Unity front-end package (per Jonathan: self-contained in `unity/`, racing the Swift app): workspace shell (Assets · 3D Modeling · Animate · Show · Hardware), engine-backed mate authoring, clip playback + live DOF posing, standalone macOS build | `unity/**` | batchmode `BuildAll` compiles + builds `Builds/AnimaStudio.app`; player launch loads `pan_tilt_head` through the engine (Player.log marker); add_mate→pose→remove_mate flow proven against `handle_request` | released 2026-07-29 |
 | Codex | DH articulated-arm Swift UI: engine-backed joint jog/FK, end-effector IK target, arm inspector | `app/Sources/AnimaCoreClient/{AnimaCoreBridgeModels,AnimaCoreClient}.swift`, `app/Sources/AnimaStudioUI/AppShell/{StudioWorkspaceModel,StudioWorkspaceView}.swift`, `app/Sources/AnimaStudioUI/Components/InspectorView.swift`, `app/Sources/AnimaStudioUI/Workspaces/Rig/ArticulatedArmControlsView.swift` (new), `app/Sources/RealityKitViewport/{RobotPreviewView,ArmIKTarget}.swift`, `app/Scripts/embed-animacore-helper.sh`, corresponding Swift tests, `dev/docs/reality/STATUS.md`, `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | no Swift kinematics; decode `kinematic_chain`; FK/IK bridge integration; native-unit conversion; reachable/unreachable UI; bundled NumPy dependency; recursive lint + Swift tests + native build/root app launch | released 2026-07-16 (240 XCTest + 20 Swift Testing; Xcode/root app build + deep sign; bundled bridge hello includes FK/IK and NumPy 2.4.6 imports) |
+
+| Claude | Aether restructure 1 (per Jonathan live): AetherKernel/AetherKernelShim/AetherViewport extracted from AnimaCAD* (rename at border), Swift relocated as `aether-animation/AetherKit`, and `app/` moved to `aether-animation/app/` | `aether-animation/AetherKit/**` (new), `aether-animation/app/**` (moved from `app/`), `aether-core/README.md`, `aether-animation/README.md`, `AGENTS.md` paths, `.github/workflows/ci.yml`, briefing/mailbox | `cd app && swift build && swift test` (378 XCTest + 72 ST) + `.venv/bin/pytest animacore/tests` (1178) + root app build | in progress 2026-08-01 |
 
 ## Requests
 
@@ -4594,3 +4605,115 @@ change needed in the Handoff log instead of inventing commands.
   both, placed one connector on each, and applied one Fastened mate. Seven
   tests, TypeScript check, and production build pass; production app/engine
   sources remain untouched.
+- **2026-08-01 (Codex, Mate Lab connector visualization):** Replaced the cyan
+  candidate cloud with lightweight instanced white CAD snap dots and a subtle
+  dark rim. The hovered exact candidate and every saved connector now render a
+  Part-local red-X/green-Y/blue-Z arrow gizmo with an origin ring; the saved
+  frame remains attached through the Fastened transform. Narrowed the
+  pointer-transparent authoring card so the active frame remains visible.
+  Verification: seven tests, TypeScript check, production build, and a live
+  browser flow reaching two Parts, two connectors, and one mate.
+- **2026-08-01 (Codex, precise flat snap nodes):** Replaced zoom-sensitive
+  world-space candidate spheres with tiny 2D discs transformed by each exact
+  connector frame, so the markers lie on and foreshorten with the B-Rep face.
+  The full candidate set remains two instanced draw calls, while the selected
+  anchor keeps its larger XYZ frame. Verification: seven tests, TypeScript
+  check, production build, and the asserted 2-Part/2-connector/1-mate browser
+  workflow.
+- **2026-08-01 (Codex, exact feature inference + maintainable CAD groundwork):**
+  Split Mate Lab into explicit OCCT topology, pure frame/inference, appearance,
+  connector-visual, mate-state/solve, worker, viewport, and application-shell
+  modules and documented their one-way dependency contract. Trimmed
+  cylinders/bores and cones expose start/center/end axis stations; analytic
+  circle/ellipse/sphere/torus centers and tangent-oriented edge/vertex frames
+  share spatial de-duplication policy. Added a functional Items tree grouping
+  Parts beneath unique STEP-document imports with collapse, select, and
+  visibility behavior; its pure projection is ready to grow Sketch/Extrude
+  feature nodes without coupling the renderer to history state. Verification:
+  18 Vitest cases, TypeScript check, Vite production build, exact cylinder and
+  sphere browser diagnostics, and 2-Part/2-connector/1-Fastened-mate browser
+  workflow. Production Swift/AnimaCore files remained untouched; claim
+  released.
+- **2026-08-01 (Codex, Aether CAD promotion + Part authoring v1):**
+  Promoted the exact-topology browser proof into root `Aether CAD/` and
+  retained its STEP assembly/connector/mate capabilities. Added a versioned,
+  deterministic `.cadpart` contract with stable IDs and a real editable
+  center-rectangle Sketch → New Extrude history. The worker rebuilds the exact
+  OCCT Body on create, parameter revision, and reopen; the unified Items tree
+  shows Sketch 1, Extrude 1, and Body 1. New/Open/Save Part controls are live,
+  with a documented example file and dedicated persistence/evaluator/tree
+  modules. Verification: TypeScript check, 23 Vitest tests, Vite production
+  build, and a headless WebGPU browser pass that creates, revises, downloads,
+  reopens, and rebuilds `Long-Bracket.cadpart`. Production Swift/AnimaCore
+  lanes remained untouched; claim released.
+- **2026-08-01 (Codex, Aether CAD shell):** Added the functional
+  CAD-shell elements requested from the Onshape reference without copying its
+  branding. File commands now live in a compact document header; typed
+  Sketch/Create/Assembly/Inspect groups drive the existing Part, STEP,
+  connector, mate, Items, and Fit commands. A shared left rail switches the
+  browser between Items, editable Sketch/Extrude parameters, and assembly
+  connectors/mates. Items includes a filter and real origin/Top/Front/Right
+  viewport geometry controls. The six-face CSS ViewCube mirrors the Three.js
+  camera quaternion and selects standard camera views; Home fits isometric.
+  Verification: TypeScript check, 27 Vitest tests, production Vite build, and
+  a 1440×900 headless-browser shell + Part create/revise/save/reopen pass.
+- **2026-08-01 (Codex, Aether product boundary):** Renamed the root web CAD
+  product and package to `Aether CAD/` / `aether-cad`, including its visible
+  window identity and current documentation. Added `src/aether-core.ts` as the
+  sole app-facing semantic facade while keeping the working OCCT/WASM
+  implementation embedded. `AETHER_CORE_EXTRACTION.md` now records the future
+  mechanical move: Aether Core owns the supported OCCT build/C++-WASM seam,
+  exact B-Rep, parametric DAG, 2D/3D constraints, stable IDs, deterministic
+  evaluation, and STEP/IGES contracts; Aether CAD owns browser UX and WebGPU
+  presentation; Aether Animation owns puppetry, timelines, avatars, and raw
+  hardware routing. No duplicate evaluator or second engine was introduced.
+  New Part files identify as `aether-part`; provisional `open-cad-part` files
+  migrate on open without changing stable IDs. Verification: TypeScript check,
+  29 Vitest tests, production Vite build, and
+  a live browser create/rebuild/download/reopen plus shell-control pass.
+- **2026-08-01 (Codex, clickable Aether CAD macOS app):** Added a small native
+  AppKit/WebKit launcher which bundles the Vite production output, serves it
+  from an ephemeral `127.0.0.1` port, and opens a dedicated resizable macOS
+  window with no address bar or terminal dependency. The build script compiles
+  the launcher, embeds HTML/JS/CSS/OCCT WASM, derives a complete `.icns` from a
+  project-native SVG, ad-hoc signs the bundle, and installs `Aether CAD.app` at
+  repository root. The icon retains the Anima/Aether gradient family but
+  renders the A as a constrained CAD sketch with endpoints, construction
+  lines, and dimension arrows. Verification: clean web build and launcher
+  compile, strict deep signature, visible native window, localhost-only
+  listener, Aether CAD HTML response, and OCCT WASM `application/wasm` response.
+- **2026-08-01 (Codex, unified Aether workspace format law):** Defined the
+  planned `.aether` format as one deterministic Aether Core graph with Part,
+  Assembly, Drawing, Animation, and Show views rather than independent semantic
+  files. The graph and optional operation history are authoritative; OCCT
+  B-Rep snapshots, WebGPU meshes, thumbnails, and editor presentation are
+  disposable/hash-gated derivatives. The contract records stable IDs,
+  explicit-unit fields, deterministic ZIP rules, shared CAD-mate/Animation-DOF
+  identity, realistic licensed-format exclusions, and a parity-gated migration
+  from the currently shipped plain-JSON `.cadpart` slice. No container or
+  multi-view functionality is represented as shipped; documentation diff
+  checks pass.
+- **2026-08-01 (Claude, Aether restructure 1):** Executed the Aether Core
+  buildout brief with Jonathan's live correction (**no Swift in Core**;
+  Swift is Aether Animation code). Moves, all `git mv` (history kept):
+  `app/Sources/AnimaCAD` + `AnimaCADShim` → **`aether-animation/AetherKit`**
+  targets `AetherKernel`/`AetherKernelShim` (C symbols `anima_cad_*` →
+  `aether_kernel_*`, header/module renamed — product names out of the
+  seam); renderer-neutral viewport contracts → **`AetherViewport`**
+  (CameraState, ConnectorCandidateEngine, LightingScale, WebPayload —
+  made public at the module border, ViewportTheme — vestigial AppKit
+  import dropped, and NavigationConfiguration extracted from the AppKit
+  overlay into its own file). **`app/` → `aether-animation/app/`** as the
+  product home. App keeps an `AnimaCADViewport` target holding only
+  concrete renderers (Metal/RealityKit/WebGPU hosts, AppKit overlays,
+  gizmo SwiftUI, telemetry) with `@_exported` re-exports so existing
+  imports keep resolving during the split. `aether-core/` is Swift-free
+  again (README states the language boundary); the C++/WASM OCCT
+  consolidation into Core rides the Aether CAD extraction gate.
+  References updated: CI `working-directory`, AGENTS.md verification
+  paths, both product READMEs, PartModelSourceReloadTests repo-root
+  depth. **Verified**: AetherKit 4/4; app 378 XCTest + 68 ST (+4 moved =
+  the 72 baseline); pytest 1178; root-app script rerun. Known gap: the
+  in-world tool GEOMETRY (gizmo/triads) still lives inside
+  CADMetalViewport — its neutralization into AetherViewport is the
+  WebGPU-tool-port packet (open item, unchanged).

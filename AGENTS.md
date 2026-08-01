@@ -31,7 +31,7 @@ The current goal is Bottango-level capability, working straight down
   (`animacore/`), the wire protocol and its simulator, `.anima`
   loading/execution, and the microcontroller firmware
   (`firmware/`, when it exists).
-- **Codex — Swift app GUI** (`app/`), plus planning + review across
+- **Codex — Swift app GUI** (`aether-animation/app/`), plus planning + review across
   both lanes: reviews commits/diffs, sequences the next checklist
   slices, assigns tasks.
 - Planning is teamwork — either agent may propose; disagreements get a
@@ -149,14 +149,14 @@ themselves. A commit without a handoff entry is incomplete multi-agent work.
 
 ## Verification
 
-Swift package (Studio), from `app/`:
+Swift package (Studio), from `aether-animation/app/`:
 
 ```bash
 swift format lint --recursive App AppUITests Sources Tests Package.swift
 swift test
 ```
 
-Native Xcode app, from `app/`:
+Native Xcode app, from `aether-animation/app/`:
 
 ```bash
 xcodegen generate
