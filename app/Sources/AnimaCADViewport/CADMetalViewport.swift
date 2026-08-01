@@ -250,6 +250,7 @@ public struct CADMetalViewport: View {
   public let referenceGeometry: CADWorkspaceReferenceGeometry
   public let partTransforms: [CADPartTransformPresentation]
   public let partAppearances: [CADPartAppearancePresentation]
+  public let transformGizmo: CADGizmoPresentation?
   public let selectedPartOrigin: CADPartOriginPresentation?
   public let mateConnectorPickingEnabled: Bool
   public let onFrame: @MainActor @Sendable () -> Void
@@ -282,6 +283,7 @@ public struct CADMetalViewport: View {
       visibility: .init(), modelDiagonalMeters: 1),
     partTransforms: [CADPartTransformPresentation] = [],
     partAppearances: [CADPartAppearancePresentation] = [],
+    transformGizmo: CADGizmoPresentation? = nil,
     selectedPartOrigin: CADPartOriginPresentation? = nil,
     mateConnectorPickingEnabled: Bool = false,
     onFrame: @escaping @MainActor @Sendable () -> Void = {},
@@ -308,6 +310,7 @@ public struct CADMetalViewport: View {
     self.referenceGeometry = referenceGeometry
     self.partTransforms = partTransforms
     self.partAppearances = partAppearances
+    self.transformGizmo = transformGizmo
     self.selectedPartOrigin = selectedPartOrigin
     self.mateConnectorPickingEnabled = mateConnectorPickingEnabled
     self.onFrame = onFrame
@@ -332,6 +335,7 @@ public struct CADMetalViewport: View {
         partAppearances: partAppearances,
         selectedPartOrigin: selectedPartOrigin,
         connectorMarkers: liveConnectorMarkers,
+        transformGizmo: transformGizmo,
         pickService: pickService,
         onFrame: onFrame, onError: onError)
       CADMouseInputOverlay(
@@ -638,6 +642,30 @@ struct CADConnectorMarker: Equatable {
   }
 }
 
+/// The transform tool as REAL world-space geometry: translate arrows,
+/// rotation rings, and plane tabs at the subject's frame, sized so the
+/// longest arm projects to the same pixels as the overlay's gesture zones.
+public struct CADGizmoPresentation: Equatable {
+  public var origin: SIMD3<Float>
+  public var xAxis: SIMD3<Float>
+  public var yAxis: SIMD3<Float>
+  public var zAxis: SIMD3<Float>
+  public var armLengthMeters: Float
+  public var isEnabled: Bool
+
+  public init(
+    origin: SIMD3<Float>, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>,
+    zAxis: SIMD3<Float>, armLengthMeters: Float, isEnabled: Bool
+  ) {
+    self.origin = origin
+    self.xAxis = xAxis
+    self.yAxis = yAxis
+    self.zAxis = zAxis
+    self.armLengthMeters = armLengthMeters
+    self.isEnabled = isEnabled
+  }
+}
+
 private struct MetalCanvas: NSViewRepresentable {
   let document: CADGeometryDocument?
   let camera: CADCameraState
@@ -651,6 +679,7 @@ private struct MetalCanvas: NSViewRepresentable {
   let partAppearances: [CADPartAppearancePresentation]
   let selectedPartOrigin: CADPartOriginPresentation?
   let connectorMarkers: [CADConnectorMarker]
+  let transformGizmo: CADGizmoPresentation?
   let pickService: CADMetalPickService
   let onFrame: @MainActor @Sendable () -> Void
   let onError: @MainActor @Sendable (String) -> Void
@@ -694,6 +723,7 @@ private struct MetalCanvas: NSViewRepresentable {
     coordinator.renderer?.set(partAppearances: partAppearances)
     coordinator.renderer?.set(selectedPartOrigin: selectedPartOrigin)
     coordinator.renderer?.set(connectorMarkers: connectorMarkers)
+    coordinator.renderer?.set(transformGizmo: transformGizmo)
   }
 
   @MainActor final class Coordinator {
@@ -847,6 +877,9 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   private var connectorMarkers: [CADConnectorMarker] = []
   private var connectorMarkerBuffer: MTLBuffer?
   private var connectorMarkerVertexCount = 0
+  private var transformGizmo: CADGizmoPresentation?
+  private var gizmoBuffer: MTLBuffer?
+  private var gizmoVertexCount = 0
   private var lastUniforms: Uniforms?
   private var pickIDTexture: MTLTexture?
   private var pickDepthTexture: MTLTexture?
@@ -1114,6 +1147,83 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     guard self.connectorMarkers != connectorMarkers else { return }
     self.connectorMarkers = connectorMarkers
     rebuildConnectorMarkerBuffer()
+  }
+
+  func set(transformGizmo: CADGizmoPresentation?) {
+    guard self.transformGizmo != transformGizmo else { return }
+    self.transformGizmo = transformGizmo
+    rebuildGizmoBuffer()
+  }
+
+  private func rebuildGizmoBuffer() {
+    guard let gizmo = transformGizmo else {
+      gizmoBuffer = nil
+      gizmoVertexCount = 0
+      return
+    }
+    let arm = max(gizmo.armLengthMeters, 0.000_1)
+    let origin = gizmo.origin
+    let axes = [gizmo.xAxis, gizmo.yAxis, gizmo.zAxis]
+    let axisColors: [SIMD4<Float>] =
+      gizmo.isEnabled
+      ? [SIMD4(0.95, 0.26, 0.21, 1), SIMD4(0.30, 0.85, 0.39, 1), SIMD4(0.25, 0.55, 1.0, 1)]
+      : [SIMD4(0.62, 0.62, 0.66, 0.7), SIMD4(0.62, 0.62, 0.66, 0.7), SIMD4(0.62, 0.62, 0.66, 0.7)]
+    let planeColors: [SIMD4<Float>] =
+      gizmo.isEnabled
+      ? [SIMD4(0.95, 0.83, 0.20, 0.9), SIMD4(0.25, 0.85, 0.90, 0.9), SIMD4(0.72, 0.42, 0.95, 0.9)]
+      : [SIMD4(0.62, 0.62, 0.66, 0.5), SIMD4(0.62, 0.62, 0.66, 0.5), SIMD4(0.62, 0.62, 0.66, 0.5)]
+    var vertices: [ReferenceVertex] = []
+
+    for (index, axis) in axes.enumerated() {
+      let color = axisColors[index]
+      let tip = origin + axis * arm
+      appendReferenceLine(from: origin, to: tip, color: color, into: &vertices)
+      // Arrowhead: four short barbs angled back from the tip.
+      let side = axes[(index + 1) % 3]
+      let up = axes[(index + 2) % 3]
+      let back = tip - axis * arm * 0.14
+      for direction in [side, -side, up, -up] {
+        appendReferenceLine(
+          from: tip, to: back + direction * arm * 0.05, color: color, into: &vertices)
+      }
+      // Rotation ring around this axis, in the plane of the other two arms.
+      let first = axes[(index + 1) % 3]
+      let second = axes[(index + 2) % 3]
+      let radius = arm * 0.82
+      var previous: SIMD3<Float>?
+      for step in 0...48 {
+        let angle = Float(step) / 48 * 2 * .pi
+        let point = origin + first * (cos(angle) * radius) + second * (sin(angle) * radius)
+        if let previous {
+          appendReferenceLine(from: previous, to: point, color: color, into: &vertices)
+        }
+        previous = point
+      }
+    }
+
+    // Plane tabs: small parallelograms between each axis pair (XY, YZ, ZX).
+    let planes = [(0, 1), (1, 2), (2, 0)]
+    for (index, pair) in planes.enumerated() {
+      let a = axes[pair.0]
+      let b = axes[pair.1]
+      let color = planeColors[index]
+      let near: Float = 0.32
+      let far: Float = 0.55
+      let corners = [
+        origin + a * (arm * near) + b * (arm * near),
+        origin + a * (arm * far) + b * (arm * near),
+        origin + a * (arm * far) + b * (arm * far),
+        origin + a * (arm * near) + b * (arm * far),
+      ]
+      for cornerIndex in 0..<4 {
+        appendReferenceLine(
+          from: corners[cornerIndex], to: corners[(cornerIndex + 1) % 4],
+          color: color, into: &vertices)
+      }
+    }
+
+    gizmoBuffer = makePrivateBuffer(vertices)
+    gizmoVertexCount = vertices.count
   }
 
   private func rebuildConnectorMarkerBuffer() {
@@ -1473,6 +1583,14 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
         encoder.setVertexBuffer(connectorMarkerBuffer, offset: 0, index: 0)
         encoder.drawPrimitives(
           type: .line, vertexStart: 0, vertexCount: connectorMarkerVertexCount)
+      }
+      if let gizmoBuffer, gizmoVertexCount > 0 {
+        // The transform tool draws over the model (no depth test) so its
+        // handles are never buried inside the geometry they move.
+        encoder.setDepthStencilState(backgroundDepthState)
+        encoder.setVertexBuffer(gizmoBuffer, offset: 0, index: 0)
+        encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: gizmoVertexCount)
+        encoder.setDepthStencilState(edgeDepthState)
       }
     }
     encoder.endEncoding()

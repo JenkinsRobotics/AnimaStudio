@@ -817,6 +817,27 @@ public struct CADPipelineViewport: View {
     return partRestTransformsBySourceURL[sourceURL]
   }
 
+  /// The transform tool as world geometry for the Metal renderer, sized so
+  /// its longest arm projects at the overlay's 72 pt gesture length.
+  private func metalGizmoPresentation(viewportSize: CGSize) -> CADGizmoPresentation? {
+    guard backend == .metalKit, let subject = selectedSubjectTransform else { return nil }
+    let matrix = subject.matrix
+    func column(_ index: Int) -> SIMD3<Float> {
+      let c = matrix[index]
+      let v = SIMD3(c.x, c.y, c.z)
+      return simd_length_squared(v) > 0.000_001 ? simd_normalize(v) : SIMD3(0, 0, 0)
+    }
+    return CADGizmoPresentation(
+      origin: SIMD3(matrix.columns.3.x, matrix.columns.3.y, matrix.columns.3.z),
+      xAxis: column(0),
+      yAxis: column(1),
+      zAxis: column(2),
+      armLengthMeters: Float(
+        CADGizmoProjectedGeometry.targetAxisLength
+          * gizmoMetersPerPoint(viewportSize: viewportSize)),
+      isEnabled: primaryPartTransformIsEditable)
+  }
+
   /// Screen→world conversion for gizmo handle drags at the selected subject's
   /// camera depth, matching the render projection — the previous
   /// model-diagonal constant ignored zoom, so the part moved at a different
@@ -890,7 +911,7 @@ public struct CADPipelineViewport: View {
   public var body: some View {
     GeometryReader { geometry in
       ZStack {
-        renderer
+        rendererView(viewportSize: geometry.size)
         if let selectedGizmoTransform,
           let projectedFrame = selectedGizmoProjection(in: geometry.size)
         {
@@ -901,6 +922,7 @@ public struct CADPipelineViewport: View {
             label: primarySelectionTransformLabel,
             isEnabled: primaryPartTransformIsEditable,
             metersPerPoint: gizmoMetersPerPoint(viewportSize: geometry.size),
+            paintsHandles: backend != .metalKit,
             onChange: setSelectedGizmoTransform
           )
           .position(
@@ -993,7 +1015,7 @@ public struct CADPipelineViewport: View {
   }
 
   @ViewBuilder
-  private var renderer: some View {
+  private func rendererView(viewportSize: CGSize) -> some View {
     switch backend {
     case .metalKit:
       CADMetalViewport(
@@ -1005,6 +1027,7 @@ public struct CADPipelineViewport: View {
         referenceGeometry: workspaceReferenceGeometry,
         partTransforms: partTransformPresentations,
         partAppearances: partAppearancePresentations,
+        transformGizmo: metalGizmoPresentation(viewportSize: viewportSize),
         selectedPartOrigin: selectedPartOrigin,
         mateConnectorPickingEnabled: mateConnectorPickingEnabled,
         onFrame: recordFrame,

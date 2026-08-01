@@ -188,6 +188,10 @@ struct CADTransformGizmoOverlay: View {
   let label: String
   let isEnabled: Bool
   let metersPerPoint: Double
+  /// False when the renderer draws the REAL world-space gizmo (Metal): the
+  /// 2D handles then keep only their gesture surfaces, near-invisible, so
+  /// what the operator sees is the in-environment tool, not a screen decal.
+  var paintsHandles: Bool = true
   let onChange: @MainActor @Sendable (CADPartRestTransform) -> Void
 
   var body: some View {
@@ -195,17 +199,20 @@ struct CADTransformGizmoOverlay: View {
       projectedFrame: projectedFrame,
       viewportSize: viewportSize)
     ZStack {
-      planeHandle(.xy, geometry: geometry, color: .yellow)
-      planeHandle(.yz, geometry: geometry, color: .cyan)
-      planeHandle(.zx, geometry: geometry, color: .purple)
+      Group {
+        planeHandle(.xy, geometry: geometry, color: .yellow)
+        planeHandle(.yz, geometry: geometry, color: .cyan)
+        planeHandle(.zx, geometry: geometry, color: .purple)
 
-      rotationHandle(.x, geometry: geometry, color: .red)
-      rotationHandle(.y, geometry: geometry, color: .green)
-      rotationHandle(.z, geometry: geometry, color: .blue)
+        rotationHandle(.x, geometry: geometry, color: .red)
+        rotationHandle(.y, geometry: geometry, color: .green)
+        rotationHandle(.z, geometry: geometry, color: .blue)
 
-      translationHandle(.x, geometry: geometry, color: .red)
-      translationHandle(.y, geometry: geometry, color: .green)
-      translationHandle(.z, geometry: geometry, color: .blue)
+        translationHandle(.x, geometry: geometry, color: .red)
+        translationHandle(.y, geometry: geometry, color: .green)
+        translationHandle(.z, geometry: geometry, color: .blue)
+      }
+      .opacity(paintsHandles ? 1 : 0.06)
 
       Circle()
         .fill(.ultraThickMaterial)
