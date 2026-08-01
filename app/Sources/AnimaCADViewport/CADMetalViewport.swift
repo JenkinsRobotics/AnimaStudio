@@ -266,6 +266,7 @@ public struct CADMetalViewport: View {
   @State private var lockedFeature: CADViewportFeaturePick?
   @State private var selectedFeatures: [CADViewportFeaturePick] = []
   @State private var hoverCandidates: [CADConnectorMarker] = []
+  @State private var lastHoverHostTime: CFTimeInterval = 0
 
   public init(
     document: CADGeometryDocument?,
@@ -424,27 +425,28 @@ public struct CADMetalViewport: View {
             cameraDistance: camera.distance,
             modelDiagonalMeters: document.renderGeometry.bounds.diagonal,
             aspect: Float(max(viewportSize.width, 1) / max(viewportSize.height, 1)))
-          let inferred = CADMetalFeaturePicker.feature(
+          // Coalesce hover to display rate: mouse events can outpace 60 Hz
+          // and each evaluation raycasts the full assembly on the CPU.
+          let now = CACurrentMediaTime()
+          guard now - lastHoverHostTime >= 1.0 / 60.0 else { return }
+          lastHoverHostTime = now
+          // ONE raycast yields both the snapped pick and the illumination
+          // set (Mate Lab parity: see every snappable node before picking).
+          let result = CADMetalFeaturePicker.hoverResult(
             at: point, viewportSize: viewportSize, document: document,
             viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
             partTransforms: partTransforms)
           if locksFeature {
-            if lockedFeature == nil { lockedFeature = inferred }
+            if lockedFeature == nil { lockedFeature = result?.pick }
             hoveredFeature = lockedFeature
           } else {
             lockedFeature = nil
-            hoveredFeature = inferred
+            hoveredFeature = result?.pick
           }
-          // Illuminate every snappable candidate on the hovered face/node so
-          // the operator sees the full set before picking (Mate Lab parity).
-          if let illumination = CADMetalFeaturePicker.illuminationCandidates(
-            at: point, viewportSize: viewportSize, document: document,
-            viewProjection: viewProjection, hiddenPartIDs: hiddenPartIDs,
-            partTransforms: partTransforms)
-          {
-            hoverCandidates = illumination.candidates.map { candidate in
+          if let result {
+            hoverCandidates = result.candidates.map { candidate in
               CADConnectorMarker(
-                partID: illumination.partID,
+                partID: result.partID,
                 origin: candidate.origin,
                 xAxis: candidate.xAxis,
                 zAxis: candidate.zAxis,

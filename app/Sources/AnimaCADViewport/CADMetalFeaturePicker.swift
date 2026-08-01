@@ -106,6 +106,32 @@ enum CADMetalFeaturePicker {
       hitFaceID: hit.faceID,
       hitNormal: hit.localNormal,
       document: document)
+    return pick(
+      from: candidates, hit: hit, at: point, viewportSize: viewportSize,
+      document: document, viewProjection: viewProjection)
+  }
+
+  private static func pick(
+    from candidates: [CADConnectorCandidate],
+    hit: SurfaceHit,
+    at point: CGPoint,
+    viewportSize: CGSize,
+    document: CADGeometryDocument,
+    viewProjection: simd_float4x4
+  ) -> CADViewportFeaturePick? {
+    let nodeIndex = hit.partID - 1
+    let nodeName =
+      document.nodes.indices.contains(nodeIndex)
+      ? document.nodes[nodeIndex].name
+      : "Part \(hit.partID)"
+    let query = SIMD2<Double>(
+      point.x / max(viewportSize.width, 1),
+      1 - point.y / max(viewportSize.height, 1)
+    )
+    let pixelScale = SIMD2<Double>(
+      max(viewportSize.width, 1),
+      max(viewportSize.height, 1)
+    )
 
     var nearest: (distance: Double, candidate: CADConnectorCandidate)?
     for candidate in candidates {
@@ -141,17 +167,18 @@ enum CADMetalFeaturePicker {
       viewProjection: viewProjection)
   }
 
-  /// The complete candidate set for the hovered node/face, in part-local
-  /// space, for viewport illumination — every snappable node lights up so
-  /// the operator can see what is available before committing a pick.
-  static func illuminationCandidates(
+  /// One hover evaluation: a single surface raycast produces BOTH the
+  /// snapped pick and the full illumination candidate set. Hover runs per
+  /// mouse event over dense assemblies, so the triangle raycast must not be
+  /// paid twice (it was — and read as dropped frames next to the Mate Lab).
+  static func hoverResult(
     at point: CGPoint,
     viewportSize: CGSize,
     document: CADGeometryDocument,
     viewProjection: simd_float4x4,
     hiddenPartIDs: Set<Int>,
     partTransforms: [CADPartTransformPresentation]
-  ) -> (partID: Int, candidates: [CADConnectorCandidate])? {
+  ) -> (pick: CADViewportFeaturePick?, partID: Int, candidates: [CADConnectorCandidate])? {
     guard
       let hit = surfaceHit(
         at: point,
@@ -162,14 +189,15 @@ enum CADMetalFeaturePicker {
         partTransforms: partTransforms
       )
     else { return nil }
-    return (
-      hit.partID,
-      CADConnectorCandidateEngine.candidates(
-        nodeIndex: hit.partID - 1,
-        hitFaceID: hit.faceID,
-        hitNormal: hit.localNormal,
-        document: document)
-    )
+    let candidates = CADConnectorCandidateEngine.candidates(
+      nodeIndex: hit.partID - 1,
+      hitFaceID: hit.faceID,
+      hitNormal: hit.localNormal,
+      document: document)
+    let pick = pick(
+      from: candidates, hit: hit, at: point, viewportSize: viewportSize,
+      document: document, viewProjection: viewProjection)
+    return (pick, hit.partID, candidates)
   }
 
   private static func snapThresholdPixels(for kind: CADConnectorCandidateKind) -> Double {
