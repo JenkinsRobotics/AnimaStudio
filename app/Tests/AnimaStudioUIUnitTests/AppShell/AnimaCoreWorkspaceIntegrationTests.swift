@@ -806,6 +806,56 @@ struct AnimaCoreWorkspaceIntegrationTests {
     """
   }
 
+  @Test
+  func draggedPartTransformSurvivesPlayheadRefresh() async throws {
+    let repositoryRoot = try repositoryRootURL()
+    let client = AnimaCoreClient(
+      configuration: .python(
+        executableURL: repositoryRoot.appendingPathComponent(".venv/bin/python"),
+        repositoryRootURL: repositoryRoot
+      )
+    )
+    let workspace = StudioWorkspaceModel(
+      animaCoreClient: client,
+      resolvesDefaultAnimaCoreClient: false
+    )
+    let characterURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "drag-transform-\(UUID().uuidString).character.anima"
+    )
+    try """
+    anima_version: "2.0"
+    type: character
+    identity:
+      name: drag_transform
+      display_name: Drag Transform
+    parts:
+      chassis: {}
+      wheel: {}
+    """.write(to: characterURL, atomically: true, encoding: .utf8)
+    defer {
+      try? FileManager.default.removeItem(at: characterURL)
+      Task { await workspace.shutdownAnimaCore() }
+    }
+
+    await workspace.importAnimaCharacter(from: characterURL)
+    let wheel = try #require(workspace.partID(forEngineName: "wheel"))
+
+    // The viewport drag path: guarded setter writes the rest transform.
+    workspace.setPartPosition(id: wheel, to: RigVector3(x: 0.4, y: 0, z: 0.25))
+    await workspace.flushPendingEnginePartTransformPush()
+
+    // Any later playhead refresh re-resolves poses from the live engine
+    // handle. The dragged position must survive it — this is the regression
+    // where parts snapped back after a drag.
+    await workspace.refreshAnimaCoreFrameAtPlayhead()
+
+    let pose = try #require(workspace.engineResolvedPartPoses[wheel])
+    #expect(abs(pose.positionMeters.x - 0.4) < 0.000_1)
+    #expect(abs(pose.positionMeters.z - 0.25) < 0.000_1)
+    let part = try #require(workspace.project.rig.parts.first { $0.id == wheel })
+    #expect(abs(part.positionMeters.x - 0.4) < 0.000_1)
+  }
+
   private func repositoryRootURL() throws -> URL {
     var candidate = URL(fileURLWithPath: #filePath)
     for _ in 0..<8 {

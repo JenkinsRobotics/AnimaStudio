@@ -261,6 +261,20 @@ public enum AnimaCoreRigDocumentEditor {
   /// Inspector editors use this as their mutation base, then submit the
   /// resulting joint through `update_mate`. This preserves additive engine
   /// fields that an older Swift summary may not understand.
+  /// One part's full document entry (the `update_part` bridge DTO). The
+  /// entry carries its own `name` key, matching the joint twin below.
+  public static func partDocument(
+    named partName: String,
+    from document: AnimaCoreJSONValue
+  ) throws -> AnimaCoreJSONValue {
+    let root = try rootObject(document)
+    let parts = try objectArray(root, key: "parts")
+    guard let part = parts.first(where: { stringValue($0["name"]) == partName }) else {
+      throw AnimaCoreRigDocumentEditingError.unknownPart(partName)
+    }
+    return .object(part)
+  }
+
   public static func jointDocument(
     identifiedBy identifier: String,
     from document: AnimaCoreJSONValue

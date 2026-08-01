@@ -149,6 +149,20 @@ public actor AnimaCoreClient {
     )
   }
 
+  /// Replaces one part's canonical fields in the rig held by `handle` —
+  /// the viewport-drag path for a FREE part's rest transform. The part
+  /// document is the full entry (including `name`) from the rig DTO.
+  public func updatePart(
+    handle: String,
+    part: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad {
+    _ = try await start()
+    return try request(
+      method: "update_part",
+      params: PartMutationParameters(handle: handle, part: part)
+    )
+  }
+
   /// Removes an existing mate from the canonical rig held by `handle`.
   public func removeMate(
     handle: String,
@@ -438,6 +452,10 @@ public protocol AnimaCoreServing: Actor {
     handle: String,
     name: String
   ) async throws -> AnimaCoreCharacterLoad
+  func updatePart(
+    handle: String,
+    part: AnimaCoreJSONValue
+  ) async throws -> AnimaCoreCharacterLoad
   func relationTypes() async throws -> AnimaCoreRelationTypeCatalog
   func addRelation(
     handle: String,
@@ -533,6 +551,11 @@ private struct MatePreviewParameters: Encodable {
 private struct RemoveMateParameters: Encodable {
   let handle: String
   let name: String
+}
+
+private struct PartMutationParameters: Encodable {
+  let handle: String
+  let part: AnimaCoreJSONValue
 }
 
 private struct RelationMutationParameters: Encodable {

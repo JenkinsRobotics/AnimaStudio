@@ -135,6 +135,9 @@ final class StudioWorkspaceModel {
   @ObservationIgnored private var configuredEditorMetadata: CharacterEditorMetadata?
   @ObservationIgnored private var configuredProjectAssetURLs: [String: URL] = [:]
   @ObservationIgnored private var retainedProjectAccessURL: URL?
+  /// Task-latest push of an edited part transform into the engine handle.
+  @ObservationIgnored private var enginePartTransformPushTask: Task<Void, Never>?
+  @ObservationIgnored private var enginePartTransformPushRevision = 0
   @ObservationIgnored private var retainedLinkedAssetAccessURLs: [URL] = []
   var engineParts: [AnimaCorePartSummary] = []
   var engineMateTypes: [AnimaCoreMateTypeSummary] = []
@@ -1782,6 +1785,18 @@ final class StudioWorkspaceModel {
     let sourceMatches = enginePartModelSources.filter { _, source in
       standardizedSource == nil || source.fileURL.standardizedFileURL == standardizedSource
     }
+    // TEMP mate-mapping diagnostics (remove after the regression is fixed).
+    NSLog(
+      "MATE-DIAG pick partID=%d node=%@ sourceURL=%@ | engineSources=%d matches=%d selected=%@",
+      feature.partID, feature.nodeName,
+      standardizedSource?.path ?? "nil",
+      enginePartModelSources.count, sourceMatches.count,
+      selectedPartID.map(String.init(describing:)) ?? "nil")
+    for (partID, source) in enginePartModelSources.prefix(3) {
+      NSLog(
+        "MATE-DIAG engine part=%@ url=%@", String(describing: partID),
+        source.fileURL.standardizedFileURL.path)
+    }
     let exactNodeMatches = sourceMatches.filter { _, source in
       guard let modelNode = source.modelNode else { return false }
       return modelNode == feature.nodeName
@@ -3315,12 +3330,52 @@ final class StudioWorkspaceModel {
         ],
         in: document
       )
-      // The retained engine handle still contains the pre-edit pose. Falling
-      // back to this character-space rest transform keeps direct manipulation
-      // responsive; Save validates/serializes the edited DTO through AnimaCore.
+      // Dropping the stale pose keeps direct manipulation responsive; the
+      // engine handle is then updated asynchronously below so any later
+      // playhead refresh resolves the EDITED transform instead of snapping
+      // the part back (the drag-reset regression).
       engineResolvedPartPoses.removeValue(forKey: id)
       documentEditRevision += 1
+      schedulePartTransformPush(id: id)
     } catch {
+      animaCoreErrorMessage = error.localizedDescription
+    }
+  }
+
+  /// Pushes one part's edited canonical entry into the live engine handle via
+  /// `update_part`. Task-latest: rapid drag updates cancel the prior push so
+  /// only the newest transform reaches the engine.
+  private func schedulePartTransformPush(id: PartID) {
+    enginePartTransformPushRevision += 1
+    let revision = enginePartTransformPushRevision
+    enginePartTransformPushTask?.cancel()
+    enginePartTransformPushTask = Task { [weak self] in
+      await self?.pushPartTransformToEngine(id: id, revision: revision)
+    }
+  }
+
+  /// Awaits the in-flight `update_part` push. Tests use this to make the
+  /// asynchronous drag → engine handoff deterministic.
+  func flushPendingEnginePartTransformPush() async {
+    await enginePartTransformPushTask?.value
+  }
+
+  private func pushPartTransformToEngine(id: PartID, revision: Int) async {
+    guard let animaCoreClient, let handle = animaCoreHandle,
+      let document = engineRigDocument,
+      let name = enginePartName(for: id)
+    else { return }
+    do {
+      let partDocument = try AnimaCoreRigDocumentEditor.partDocument(
+        named: name, from: document)
+      _ = try await animaCoreClient.updatePart(handle: handle, part: partDocument)
+      // The local engineRigDocument already carries this edit; adopting the
+      // response here could clobber a mate/relation commit that landed while
+      // the push was in flight, so success needs no further state change.
+    } catch is CancellationError {
+      return
+    } catch {
+      guard revision == enginePartTransformPushRevision else { return }
       animaCoreErrorMessage = error.localizedDescription
     }
   }
