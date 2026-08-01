@@ -84,3 +84,15 @@ Inspection is not verification. Before shipping a user-facing flow
 change, run it start to finish as the operator would — launch the app,
 click the flow, watch the servo move. Don't ship on "the code looks
 right."
+
+## Viewport elements are real 3D geometry
+
+Anything the operator sees inside the 3D viewport — connector triads,
+gizmos, snap indicators, reference frames — is world-space geometry
+rendered by the engine and carried by the transforms of what it
+annotates. Screen-space decals that imitate 3D (fixed-direction axis
+icons, fake isometric triads) are forbidden; a 2D overlay may carry
+only flat chrome such as labels and rings (per Jonathan, 2026-08-01,
+after a screen-space connector triad shipped unflagged). If a
+screen-space shortcut is ever unavoidable, it must be surfaced to the
+operator as a compromise, never silently shipped.

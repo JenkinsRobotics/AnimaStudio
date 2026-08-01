@@ -328,6 +328,7 @@ public struct CADMetalViewport: View {
         partTransforms: partTransforms,
         partAppearances: partAppearances,
         selectedPartOrigin: selectedPartOrigin,
+        connectorMarkers: liveConnectorMarkers,
         onFrame: onFrame, onError: onError)
       CADMouseInputOverlay(
         navigation: navigation,
@@ -475,6 +476,29 @@ public struct CADMetalViewport: View {
     }
   }
 
+  /// The selected and hovered mate features as real in-scene triads.
+  private var liveConnectorMarkers: [CADConnectorMarker] {
+    guard mateConnectorPickingEnabled else { return [] }
+    var markers = selectedFeatures.map { feature in
+      CADConnectorMarker(
+        partID: feature.partID,
+        origin: SIMD3<Float>(feature.positionMeters),
+        xAxis: SIMD3<Float>(feature.secondaryAxis),
+        zAxis: SIMD3<Float>(feature.primaryAxis),
+        isSelected: true)
+    }
+    if let hoveredFeature {
+      markers.append(
+        CADConnectorMarker(
+          partID: hoveredFeature.partID,
+          origin: SIMD3<Float>(hoveredFeature.positionMeters),
+          xAxis: SIMD3<Float>(hoveredFeature.secondaryAxis),
+          zAxis: SIMD3<Float>(hoveredFeature.primaryAxis),
+          isSelected: false))
+    }
+    return markers
+  }
+
   private func viewProjection(
     for document: CADGeometryDocument,
     viewportSize: CGSize
@@ -519,19 +543,15 @@ private struct CADMateFeatureMarker: View {
 
   var body: some View {
     VStack(spacing: 4) {
+      // The triad itself is real world-space geometry drawn by the
+      // renderer; this overlay carries only the ring and the label.
       ZStack {
         Circle()
-          .fill((isSelected ? Color.purple : Color.orange).opacity(0.2))
+          .fill((isSelected ? Color.purple : Color.orange).opacity(0.18))
           .frame(width: 25, height: 25)
         Circle()
           .stroke(isSelected ? Color.purple : Color.orange, lineWidth: 2)
           .frame(width: 13, height: 13)
-        connectorAxis(feature.screenXAxis)
-          .stroke(.red, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-        connectorAxis(feature.screenYAxis)
-          .stroke(.green, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-        connectorAxis(feature.screenZAxis)
-          .stroke(.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
       }
       .frame(width: 38, height: 38)
       Text(title)
@@ -541,26 +561,17 @@ private struct CADMateFeatureMarker: View {
         .background(.regularMaterial, in: Capsule())
     }
   }
+}
 
-  private func connectorAxis(_ direction: SIMD2<Double>) -> Path {
-    Path { path in
-      let center = CGPoint(x: 19, y: 19)
-      let endpoint = CGPoint(
-        x: center.x + direction.x * 16,
-        y: center.y + direction.y * 16
-      )
-      path.move(to: center)
-      path.addLine(to: endpoint)
-      path.addEllipse(
-        in: CGRect(
-          x: endpoint.x - 1.75,
-          y: endpoint.y - 1.75,
-          width: 3.5,
-          height: 3.5
-        )
-      )
-    }
-  }
+/// A mate-connector frame drawn as real world-space triad geometry. The
+/// origin/axes are part-local; the renderer applies the part's transform so
+/// the triad stays glued to its component through drags and camera moves.
+struct CADConnectorMarker: Equatable {
+  var partID: Int
+  var origin: SIMD3<Float>
+  var xAxis: SIMD3<Float>
+  var zAxis: SIMD3<Float>
+  var isSelected: Bool
 }
 
 private struct MetalCanvas: NSViewRepresentable {
@@ -575,6 +586,7 @@ private struct MetalCanvas: NSViewRepresentable {
   let partTransforms: [CADPartTransformPresentation]
   let partAppearances: [CADPartAppearancePresentation]
   let selectedPartOrigin: CADPartOriginPresentation?
+  let connectorMarkers: [CADConnectorMarker]
   let onFrame: @MainActor @Sendable () -> Void
   let onError: @MainActor @Sendable (String) -> Void
 
@@ -615,6 +627,7 @@ private struct MetalCanvas: NSViewRepresentable {
     coordinator.renderer?.set(partTransforms: partTransforms)
     coordinator.renderer?.set(partAppearances: partAppearances)
     coordinator.renderer?.set(selectedPartOrigin: selectedPartOrigin)
+    coordinator.renderer?.set(connectorMarkers: connectorMarkers)
   }
 
   @MainActor final class Coordinator {
@@ -764,6 +777,9 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
   private var floorGridVertexCount = 0
   private var floorPlaneBuffer: MTLBuffer?
   private var floorPlaneVertexCount = 0
+  private var connectorMarkers: [CADConnectorMarker] = []
+  private var connectorMarkerBuffer: MTLBuffer?
+  private var connectorMarkerVertexCount = 0
   /// While transforms stream (drag), the shadow pass waits for this host
   /// time so the depth pre-pass does not re-render the assembly per tick.
   private var shadowSettleHostTime: CFTimeInterval = 0
@@ -1013,6 +1029,61 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
     writePartAppearances()
   }
 
+  /// Mate-connector frames are REAL world-space geometry, not screen decals:
+  /// triad lines built in the part's local frame and carried by its transform
+  /// so they track drags, camera moves, and zoom exactly like the model.
+  func set(connectorMarkers: [CADConnectorMarker]) {
+    guard self.connectorMarkers != connectorMarkers else { return }
+    self.connectorMarkers = connectorMarkers
+    rebuildConnectorMarkerBuffer()
+  }
+
+  private func rebuildConnectorMarkerBuffer() {
+    guard !connectorMarkers.isEmpty else {
+      connectorMarkerBuffer = nil
+      connectorMarkerVertexCount = 0
+      return
+    }
+    let axisLength = max(geometryDiagonal, 0.001) * 0.045
+    let transformsByPartID = Dictionary(
+      uniqueKeysWithValues: partTransforms.map { ($0.partID, $0.matrix) })
+    var vertices: [ReferenceVertex] = []
+    for marker in connectorMarkers {
+      let transform = transformsByPartID[marker.partID] ?? matrix_identity_float4x4
+      func world(_ v: SIMD3<Float>) -> SIMD3<Float> {
+        let p = transform * SIMD4(v, 1)
+        return SIMD3(p.x, p.y, p.z)
+      }
+      func rotated(_ v: SIMD3<Float>) -> SIMD3<Float> {
+        let p = transform * SIMD4(v, 0)
+        return SIMD3(p.x, p.y, p.z)
+      }
+      let origin = world(marker.origin)
+      var z = rotated(marker.zAxis)
+      if simd_length_squared(z) < 0.000_001 { z = SIMD3(0, 0, 1) }
+      z = simd_normalize(z)
+      var x = rotated(marker.xAxis)
+      x -= z * simd_dot(x, z)
+      if simd_length_squared(x) < 0.000_001 {
+        x = abs(z.y) < 0.9 ? simd_cross(SIMD3(0, 1, 0), z) : simd_cross(SIMD3(1, 0, 0), z)
+      }
+      x = simd_normalize(x)
+      let y = simd_cross(z, x)
+      let emphasis: Float = marker.isSelected ? 1.3 : 1
+      appendReferenceLine(
+        from: origin, to: origin + x * axisLength * emphasis,
+        color: SIMD4(0.95, 0.26, 0.21, 1), into: &vertices)
+      appendReferenceLine(
+        from: origin, to: origin + y * axisLength * emphasis,
+        color: SIMD4(0.30, 0.85, 0.39, 1), into: &vertices)
+      appendReferenceLine(
+        from: origin, to: origin + z * axisLength * 1.4 * emphasis,
+        color: SIMD4(0.25, 0.55, 1.0, 1), into: &vertices)
+    }
+    connectorMarkerBuffer = makePrivateBuffer(vertices)
+    connectorMarkerVertexCount = vertices.count
+  }
+
   private func writePartAppearances() {
     guard let partAppearanceBuffer, partSlotCount > 0 else { return }
     let pointer = partAppearanceBuffer.contents().bindMemory(
@@ -1224,6 +1295,11 @@ private final class MetalRenderer: NSObject, MTKViewDelegate, @unchecked Sendabl
         encoder.setVertexBuffer(selectedPartOriginBuffer, offset: 0, index: 0)
         encoder.drawPrimitives(
           type: .line, vertexStart: 0, vertexCount: selectedPartOriginVertexCount)
+      }
+      if let connectorMarkerBuffer, connectorMarkerVertexCount > 0 {
+        encoder.setVertexBuffer(connectorMarkerBuffer, offset: 0, index: 0)
+        encoder.drawPrimitives(
+          type: .line, vertexStart: 0, vertexCount: connectorMarkerVertexCount)
       }
     }
     encoder.endEncoding()
