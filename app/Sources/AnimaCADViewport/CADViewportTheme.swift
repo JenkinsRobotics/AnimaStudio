@@ -235,8 +235,25 @@ public struct CADViewportTheme: Codable, Identifiable, Hashable, Sendable {
     fill: ([0.9, 0.5, 1], 1_400, [-0.8, 0.2, 0.4]),
     rim: ([0.4, 1, 0.9], 2_600, [0.1, 0.5, -0.9]))
 
+
+  /// The OCCT Mate Lab's browser environment (operator-requested port,
+  /// 2026-08-01): light cool-gray studio, steel-blue parts, slate edges,
+  /// bright hemisphere-style lighting, cyan/orange selection accents.
+  public static let mateLab = theme(
+    "Mate Lab", roughness: 0.56, metallic: 0.05, edge: 0.80,
+    model: [0.475, 0.663, 0.761, 1], background: [0.949, 0.961, 0.973],
+    edgeColor: [0.114, 0.204, 0.259], selection: [1.0, 0.675, 0.224],
+    edgeSelection: [0.20, 0.816, 1.0],
+    key: ([1, 1, 1], 4_600, [0.40, 1, 0.55]),
+    fill: ([0.725, 0.863, 1.0], 1_800, [-0.70, 0.35, 0.45]),
+    rim: ([1, 1, 1], 800, [0.05, 0.45, -0.85]),
+    ambient: 0.34,
+    floor: [0.796, 0.831, 0.863],
+    floorGrid: true,
+    solidFloor: false)
+
   public static let all: [Self] = [
     .studioBlue, .showroom, .technical, .workshop, .solidWorks,
-    .onshape, .fusion360, .blueprint, .clay, .midnight, .unity,
+    .onshape, .fusion360, .blueprint, .clay, .midnight, .unity, .mateLab,
   ]
 }
