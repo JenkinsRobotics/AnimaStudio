@@ -29,3 +29,36 @@ test("scrim click and close button both close; body click does not", () => {
   fireEvent.click(screen.getByLabelText("Close"));
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+test("Escape closes regardless of where focus is", () => {
+  const onClose = vi.fn();
+  render(
+    <Dialog open title="T" onClose={onClose}>
+      body
+    </Dialog>
+  );
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test("focus moves into the dialog on open and Tab cycles within it", () => {
+  render(
+    <Dialog
+      open
+      title="T"
+      onClose={() => {}}
+      actions={<button type="button">OK</button>}
+    >
+      body
+    </Dialog>
+  );
+  // First focusable (the Close button) receives focus on open.
+  expect(document.activeElement).toBe(screen.getByLabelText("Close"));
+  // Tab from the last focusable wraps to the first.
+  screen.getByText("OK").focus();
+  fireEvent.keyDown(document, { key: "Tab" });
+  expect(document.activeElement).toBe(screen.getByLabelText("Close"));
+  // Shift+Tab from the first wraps to the last.
+  fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+  expect(document.activeElement).toBe(screen.getByText("OK"));
+});

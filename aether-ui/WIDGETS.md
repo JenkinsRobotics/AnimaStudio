@@ -44,13 +44,13 @@ Definition of done for a core widget:
 | Tree | **v2** | full | full | flagship — see above |
 | Button / IconButton | v1 | yes | basic | needs: focus ring spec |
 | Ribbon (+Group/Tool) | v1 | yes | basic | needs: overflow scroll spec, keyboard |
-| Tabs | v1 | yes | none | needs: keyboard (←/→), pins |
-| Rail | v1 | yes | none | needs: pins |
+| Tabs | **v2** | yes | full | ←/→ wrap + Home/End, roving tabindex, selection follows focus |
+| Rail | v1 | yes | full | label/pressed/click pinned |
 | DockPanel / PanelHeading | v1 | yes | none | needs: collapse spec (rail chevron) |
 | TextField | v1 | yes | none | needs: invalid state, unit suffix spec |
-| Dialog | v1 | yes | yes | needs: focus trap, Escape pin |
+| Dialog | **v2** | yes | full | document-level Escape, focus trap + wrap, focus returns to opener |
 | StatusBar / StatusDot | v1 | yes | none | trivial |
-| ViewportCanvas | v1 | yes | none | mount/teardown pin wanted |
+| ViewportCanvas | v1 | yes | full | mount-once/teardown pinned |
 | Timeline / DopeSheet | — | — | — | not started; Swift `UIDevTimelineDesignB` + demo `Timeline.swift` are the references |
 
 Work the matrix top to bottom; a row is done when all three columns are
