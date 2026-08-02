@@ -4858,3 +4858,22 @@ change needed in the Handoff log instead of inventing commands.
   the in-progress remainder of the web-rebuild-2 claim. Codex onboarding
   prompt for aether-ui/aether-core appended to their mailbox IN
   (codex.md deliberately left uncommitted — carries their edits).
+- **2026-08-01 (Claude, widget conformance — Tree v2 flagship):** Per
+  Jonathan: every incorporation of a list tree has been a different
+  half-build; core widgets must be finished ONCE and behave identically
+  everywhere. Established **`aether-ui/WIDGETS.md`** — the conformance
+  contract (spec → gallery scenario → RTL pin → apps stay dumb) with a
+  status matrix over all core widgets. **Tree v2** is the flagship: one
+  definitive implementation with single/⌘-toggle/⇧-range selection over
+  the visible order, disclosure-without-select, controlled OR
+  uncontrolled expansion, full keyboard navigation (↑↓→← Home End
+  Enter/Space, roving tabindex), built-in filter (keeps ancestors,
+  auto-reveals collapsed matches), hover-revealed row actions that never
+  select, dimmed + disabled rows, onActivate/onContextMenu, empty state.
+  9 behavior pins (13 total in the package); gallery exercises the whole
+  spec; both consumers (gallery + aether-animation/web) moved to the
+  richer (ids, mode) selection contract; launcher bundle rebuilt.
+  Deferred with named APIs: inline rename, drag re-parent,
+  virtualization. Next rows in the matrix: Tabs keyboard+pins, Dialog
+  focus trap, Ribbon overflow/keyboard, then the Timeline/DopeSheet
+  widget (references: demo `Timeline.swift`, Swift `UIDevTimelineDesignB`).

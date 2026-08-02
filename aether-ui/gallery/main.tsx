@@ -33,9 +33,12 @@ const sampleTree: TreeNode[] = [
     badge: "3",
     icon: "▣",
     children: [
-      { id: "base", label: "base", icon: "▫" },
+      {
+        id: "base", label: "base", icon: "▫",
+        actions: [{ id: "hide", label: "Hide", icon: "👁" }],
+      },
       { id: "yoke", label: "yoke", icon: "▫" },
-      { id: "head", label: "head", icon: "▫" },
+      { id: "head", label: "head (suppressed)", icon: "▫", dimmed: true },
     ],
   },
   {
@@ -76,6 +79,7 @@ function Gallery() {
   const [armedTool, setArmedTool] = useState<string | null>("revolute");
   const [activeRail, setActiveRail] = useState("tree");
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set(["yoke"]));
+  const [treeFilter, setTreeFilter] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("my_robot");
 
@@ -168,17 +172,33 @@ function Gallery() {
             ))}
           </Rail>
           <DockPanel title="Items" width={230}>
+            <div style={{ padding: "8px 10px" }}>
+              <TextField
+                placeholder="Filter"
+                value={treeFilter}
+                onChange={(event) => setTreeFilter(event.target.value)}
+              />
+            </div>
             <Tree
               nodes={sampleTree}
               selectedIDs={selection}
-              onSelect={(id, extend) =>
+              filter={treeFilter}
+              onSelect={(ids, mode) =>
                 setSelection((current) => {
-                  const next = extend ? new Set(current) : new Set<string>();
-                  if (current.has(id) && extend) next.delete(id);
-                  else next.add(id);
+                  if (mode === "single") return new Set(ids);
+                  if (mode === "range") return new Set(ids);
+                  const next = new Set(current);
+                  for (const id of ids) {
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                  }
                   return next;
                 })
               }
+              onAction={(node, action) => console.log("action", node, action)}
+              onActivate={(id) => console.log("activate", id)}
+              onContextMenu={(id, x, y) => console.log("context", id, x, y)}
+              emptyState="no matches"
             />
           </DockPanel>
           <div style={{ flex: 1, background: "var(--aether-color-bg-shell)" }}>

@@ -133,15 +133,25 @@ export function App() {
   }, [playing, activeClip, dofs]);
 
   // ---- selection -------------------------------------------------------
-  const select = useCallback((id: string, extend: boolean) => {
-    setSelection((current) => {
-      const next = extend ? new Set(current) : new Set<string>();
-      if (current.has(id) && extend) next.delete(id);
-      else next.add(id);
-      viewportRef.current?.setSelection(next);
-      return next;
-    });
-  }, []);
+  const select = useCallback(
+    (ids: readonly string[], mode: "single" | "toggle" | "range") => {
+      setSelection((current) => {
+        let next: Set<string>;
+        if (mode === "toggle") {
+          next = new Set(current);
+          for (const id of ids) {
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+          }
+        } else {
+          next = new Set(ids);
+        }
+        viewportRef.current?.setSelection(next);
+        return next;
+      });
+    },
+    []
+  );
 
   // ---- project tree ----------------------------------------------------
   const treeNodes = useMemo<TreeNode[]>(() => {
@@ -179,7 +189,8 @@ export function App() {
   }, [rig]);
 
   const onTreeSelect = useCallback(
-    (id: string, extend: boolean) => {
+    (ids: readonly string[], mode: "single" | "toggle" | "range") => {
+      const id = ids[ids.length - 1] ?? "";
       if (id.startsWith("clip:")) {
         const name = id.slice(5);
         const clip = rig?.clips.find((candidate) => candidate.name === name);
@@ -191,7 +202,10 @@ export function App() {
         return;
       }
       if (id.startsWith("#") || id.startsWith("mate:")) return;
-      select(id, extend);
+      const partIDs = ids.filter(
+        (entry) => !entry.startsWith("#") && !entry.startsWith("mate:") &&
+          !entry.startsWith("clip:"));
+      select(partIDs, mode);
     },
     [rig, requestPose, select]
   );
@@ -249,7 +263,7 @@ export function App() {
               return () => {};
             }
             viewport.setPickHandler((name, extend) => {
-              if (name) select(name, extend);
+              if (name) select([name], extend ? "toggle" : "single");
               else {
                 setSelection(new Set());
                 viewport?.setSelection(new Set());

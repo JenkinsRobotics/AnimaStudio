@@ -140,11 +140,11 @@
   border-bottom-color: var(--aether-color-selection-edge);
 }
 
-/* Tree.tsx */
+/* Tree.tsx — THE tree (WIDGETS.md spec v2) */
 .aui-tree { font-family: var(--aether-font-family); }
 .aui-tree-row {
   display: grid;
-  grid-template-columns: 14px 18px minmax(0, 1fr) auto;
+  grid-template-columns: 14px 18px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--aether-space-2);
   width: 100%;
@@ -157,16 +157,32 @@
   font-size: var(--aether-font-size-label);
   cursor: pointer;
 }
-.aui-tree-row:hover { background: var(--aether-color-bg-row-hover); color: var(--aether-color-text); }
+.aui-tree-row:hover:not(:disabled) { background: var(--aether-color-bg-row-hover); color: var(--aether-color-text); }
+.aui-tree-row:focus-visible {
+  outline: 1px solid var(--aether-color-border-focus);
+  outline-offset: -1px;
+}
 .aui-tree-row--selected {
   background: var(--aether-color-bg-selected);
   color: white;
   box-shadow: inset 2px 0 var(--aether-color-selection-edge);
 }
+.aui-tree-row--dimmed { opacity: 0.45; }
+.aui-tree-row:disabled { opacity: 0.3; cursor: default; }
 .aui-tree-disclosure { color: var(--aether-color-text-faint); font-size: 9px; }
 .aui-tree-icon { color: var(--aether-color-accent-icon); }
-.aui-tree-children { padding-left: 17px; }
+.aui-tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aui-tree-badge { color: var(--aether-color-text-faint); font-size: var(--aether-font-size-caption); }
+.aui-tree-actions { display: none; gap: 4px; }
+.aui-tree-row:hover .aui-tree-actions,
+.aui-tree-row:focus-visible .aui-tree-actions { display: inline-flex; }
+.aui-tree-action { color: var(--aether-color-text-faint); font-size: 11px; }
+.aui-tree-action:hover { color: var(--aether-color-text); }
+.aui-tree-empty {
+  padding: var(--aether-space-5);
+  color: var(--aether-color-text-faint);
+  font-size: var(--aether-font-size-label);
+}
 
 /* DockPanel.tsx */
 .aui-dock-panel {
