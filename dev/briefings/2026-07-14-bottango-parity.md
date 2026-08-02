@@ -48,6 +48,7 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Migrate Aether CAD chrome to the shared React UI standard with a Shapr3D-inspired workspace | `Aether CAD/{package.json,package-lock.json,index.html,src/main.ts,src/style.css}`, new `Aether CAD/src/react/**` and focused shell tests, STATUS + append-only coordination only; consume `aether-ui/**` read-only and do not touch Claude's active claim | React owns a compact document header, left Items browser, floating center-edge tool rails, right History browser, and responsive panel chrome while the OCCT worker and one persistent Three.js/WebGPU viewport retain all current Part/STEP/Sketch/Connector/Mate behavior; tests/check/build/root-app rebuild and launch pass | in progress 2026-08-01 |
 | Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | released 2026-08-01 — implemented v2 sketch graph/editor/migration; 34 tests/check/build/root-app rebuild pass; browser plugin bootstrap failed before local connection |
 | Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
 | Codex | Package Aether CAD as a clickable macOS web app with a CAD-sketch icon | `Aether CAD/Launcher/**`, `Aether CAD/Resources/**`, `Aether CAD/Scripts/build-macos-app.sh`, root `Aether CAD.app`, STATUS + append-only coordination only | one self-contained signed root app serves the production web bundle locally and hosts it in a dedicated WKWebView window; no npm/Vite terminal required at launch; icon retains the Aether/Anima family palette but uses sketch/constraint geometry; build, signature, launch, OCCT-ready browser state verified | released 2026-08-01 — root `Aether CAD.app`; signed native WKWebView wrapper; internal server restricted to 127.0.0.1; bundled production assets/OCCT WASM verified; family SVG/ICNS uses CAD sketch endpoints, constraints, construction geometry, and dimensions |
@@ -351,6 +352,8 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | WebGPU tool-port 1: in-world tool geometry (gizmo/triads/snap nodes) neutralized from CADMetalViewport into AetherViewport + WebGPU payload | `aether-animation/AetherKit/Sources/AetherViewport/**` (new tool-geometry files + payload), `aether-animation/AetherKit/Tests/AetherCoreTests/**`, `aether-animation/app/Sources/AnimaCADViewport/{CADMetalViewport,CADWebGPUViewport}.swift`, `aether-animation/app/App/Resources/CADWeb/RawWebGPU/index.html`, briefing/mailbox | AetherKit + app suites green (378+68+Kit 9), tool meshes pinned by deterministic tests, WebGPU page renders tools | released 2026-08-01 |
 
 | Claude | WebGPU tool-port 2: GPU ID-buffer part picking on the raw WebGPU page (foundation for web feature/connector state) | `aether-animation/app/App/Resources/CADWeb/RawWebGPU/index.html`, briefing | page JS syntax-checked; pick protocol matches the coordinator contract | released 2026-08-01 |
+
+| Claude | aether-ui bootstrap: root design-system package (tokens from Aether CAD baseline + one-React-widget-per-file library + UIDev-style gallery + RTL pins) and the UI framework decision record | `aether-ui/**` (new), `dev/docs/roadmap/UI_Framework_Decision.md` (new), briefing/mailbox | `npm test` + `tsc --noEmit` + gallery `vite build` green | in progress 2026-08-01 |
 
 ## Requests
 
@@ -4772,3 +4775,24 @@ change needed in the Handoff log instead of inventing commands.
   marker STATE), then web gizmo drag parity. Verified: JS syntax (node
   --check); protocol match by inspection; not yet exercised in a live
   WKWebView — same caveat as tool-port 1, first Raw WebGPU run proves it.
+- **2026-08-01 (Claude, aether-ui bootstrap):** Per Jonathan (root
+  `aether-ui/`, widgets migrated one-per-file, UIDev-style reusable
+  gallery) and the accepted React pivot — decision recorded in
+  `dev/docs/roadmap/UI_Framework_Decision.md` (React+TS+Vite family-wide;
+  three UI tiers: Core never; aether-ui shared product-free widgets; apps
+  compose; tokens framework-neutral; viewport imperative; Next.js
+  rejected). Package `@aether/ui`: `tokens/tokens.json` + `tokens.css`
+  (baseline EXTRACTED from `Aether CAD/src/style.css` — the design
+  system's default theme IS the CAD app's look; CAD sources untouched),
+  12 widgets one file each (Button, IconButton, Ribbon/Group/Tool,
+  Rail/RailButton, Tabs, Tree, DockPanel, PanelHeading, TextField,
+  Dialog, StatusBar/StatusDot, ViewportCanvas — the persistent imperative
+  mount), `widgets.css` consuming only token variables, UIDev-style
+  gallery (`npm run gallery`). Verified: tsc clean, 7 RTL behavior pins
+  green (tree select/extend/disclosure, dialog scrim/close, disabled
+  ribbon tool), gallery `vite build` + headless-Chrome screenshot
+  reviewed (all widgets render in the CAD language; canvas mount
+  animates). Gotcha logged: RTL auto-cleanup needs vitest `globals:
+  true`. Next: CAD lane adopts widgets strangler-style (toolbar → items
+  tree first); Animation web app scaffolds on the same package; my
+  engine websocket transport packet remains queued.

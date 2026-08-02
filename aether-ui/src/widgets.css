@@ -1,0 +1,270 @@
+/* Aether widget styles. Consumes ONLY token variables (tokens.css).
+   One block per widget, matching the one-widget-per-file source layout. */
+
+/* Button.tsx */
+.aui-button {
+  appearance: none;
+  border: 1px solid var(--aether-color-border-control);
+  border-radius: var(--aether-radius-button);
+  padding: 8px 11px;
+  background: var(--aether-color-bg-control);
+  color: var(--aether-color-text-soft);
+  font-family: var(--aether-font-family);
+  font-size: var(--aether-font-size-body);
+  font-weight: var(--aether-font-weight-strong);
+  cursor: pointer;
+  transition: 120ms ease;
+}
+.aui-button:hover:not(:disabled) {
+  background: var(--aether-color-bg-control-hover);
+  border-color: var(--aether-color-border-control-hover);
+}
+.aui-button--primary,
+.aui-button--active {
+  background: var(--aether-color-accent);
+  border-color: var(--aether-color-border-focus);
+  color: white;
+}
+.aui-button:disabled { opacity: 0.35; cursor: default; }
+
+/* IconButton.tsx */
+.aui-icon-button {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border: 1px solid var(--aether-color-border-control);
+  border-radius: var(--aether-radius-control);
+  background: var(--aether-color-bg-control);
+  color: var(--aether-color-text-soft);
+  cursor: pointer;
+}
+.aui-icon-button:hover:not(:disabled) {
+  border-color: var(--aether-color-border-control-hover);
+  background: var(--aether-color-bg-control-hover);
+  color: white;
+}
+.aui-icon-button:disabled { opacity: 0.35; cursor: default; }
+
+/* Ribbon.tsx */
+.aui-ribbon {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-panel);
+}
+.aui-ribbon-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: max-content;
+  padding: var(--aether-space-3) 12px var(--aether-space-2);
+  border-right: 1px solid var(--aether-color-border);
+}
+.aui-ribbon-group:first-child { border-left: 1px solid var(--aether-color-border); }
+.aui-ribbon-group-buttons { display: flex; align-items: flex-start; gap: var(--aether-space-2); }
+.aui-ribbon-group-label {
+  text-align: center;
+  color: var(--aether-color-text-faint);
+  font-size: var(--aether-font-size-micro);
+  font-weight: 760;
+  letter-spacing: var(--aether-font-letter-caps);
+  text-transform: uppercase;
+}
+.aui-ribbon-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--aether-space-1);
+  min-width: 53px;
+  border: 0;
+  border-radius: var(--aether-radius-control);
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--aether-color-text-dim);
+  font-family: var(--aether-font-family);
+  font-size: var(--aether-font-size-caption);
+  cursor: pointer;
+}
+.aui-ribbon-tool:hover:not(:disabled) { background: var(--aether-color-bg-hover); color: white; }
+.aui-ribbon-tool--active { background: var(--aether-color-accent-strong); color: white; }
+.aui-ribbon-tool:disabled { opacity: 0.28; cursor: default; }
+.aui-ribbon-tool-icon { color: var(--aether-color-accent-icon); font-size: 22px; line-height: 23px; }
+.aui-ribbon-tool--active .aui-ribbon-tool-icon { color: white; }
+
+/* Rail.tsx */
+.aui-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--aether-space-2);
+  width: var(--aether-size-rail);
+  padding-top: var(--aether-space-4);
+  border-right: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-rail);
+}
+.aui-rail-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--aether-radius-control);
+  background: transparent;
+  color: var(--aether-color-text-dim);
+  font-size: 17px;
+  cursor: pointer;
+}
+.aui-rail-button:hover { background: var(--aether-color-bg-hover); color: var(--aether-color-text); }
+.aui-rail-button--active { background: var(--aether-color-accent-strong); color: white; }
+
+/* Tabs.tsx */
+.aui-tabs { display: flex; align-items: center; gap: var(--aether-space-2); }
+.aui-tab {
+  border: 0;
+  border-radius: var(--aether-radius-control) var(--aether-radius-control) 0 0;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--aether-color-text-dim);
+  font-family: var(--aether-font-family);
+  font-size: var(--aether-font-size-label);
+  font-weight: var(--aether-font-weight-strong);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.aui-tab:hover { color: var(--aether-color-text); }
+.aui-tab--active {
+  color: var(--aether-color-text);
+  border-bottom-color: var(--aether-color-selection-edge);
+}
+
+/* Tree.tsx */
+.aui-tree { font-family: var(--aether-font-family); }
+.aui-tree-row {
+  display: grid;
+  grid-template-columns: 14px 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--aether-space-2);
+  width: 100%;
+  border: 0;
+  border-radius: var(--aether-radius-row);
+  padding: 6px var(--aether-space-3);
+  background: transparent;
+  color: var(--aether-color-text-dim);
+  text-align: left;
+  font-size: var(--aether-font-size-label);
+  cursor: pointer;
+}
+.aui-tree-row:hover { background: var(--aether-color-bg-row-hover); color: var(--aether-color-text); }
+.aui-tree-row--selected {
+  background: var(--aether-color-bg-selected);
+  color: white;
+  box-shadow: inset 2px 0 var(--aether-color-selection-edge);
+}
+.aui-tree-disclosure { color: var(--aether-color-text-faint); font-size: 9px; }
+.aui-tree-icon { color: var(--aether-color-accent-icon); }
+.aui-tree-children { padding-left: 17px; }
+.aui-tree-badge { color: var(--aether-color-text-faint); font-size: var(--aether-font-size-caption); }
+
+/* DockPanel.tsx */
+.aui-dock-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-panel);
+}
+.aui-dock-panel-body { min-height: 0; overflow: auto; }
+
+/* PanelHeading.tsx */
+.aui-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--aether-space-5) 14px 8px;
+  color: var(--aether-color-text-dim);
+  font-family: var(--aether-font-family);
+  font-size: var(--aether-font-size-label);
+  font-weight: 750;
+  letter-spacing: var(--aether-font-letter-caps);
+  text-transform: uppercase;
+}
+
+/* TextField.tsx */
+.aui-text-field {
+  width: 100%;
+  border: 1px solid var(--aether-color-border-control);
+  border-radius: var(--aether-radius-field);
+  padding: 7px 8px;
+  outline: 0;
+  background: var(--aether-color-bg-inset);
+  color: var(--aether-color-text);
+  font-family: var(--aether-font-family);
+  font-size: 11px;
+}
+.aui-text-field:focus {
+  border-color: var(--aether-color-border-focus);
+  box-shadow: 0 0 0 2px rgba(43, 156, 243, 0.12);
+}
+
+/* Dialog.tsx */
+.aui-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 8, 11, 0.55);
+  z-index: 100;
+}
+.aui-dialog {
+  min-width: 300px;
+  max-width: 90vw;
+  border: 1px solid var(--aether-color-border);
+  border-radius: 10px;
+  background: var(--aether-color-bg-panel);
+  color: var(--aether-color-text);
+  font-family: var(--aether-font-family);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+.aui-dialog-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--aether-color-border);
+  font-size: var(--aether-font-size-body);
+  font-weight: var(--aether-font-weight-strong);
+}
+.aui-dialog-body { padding: 13px 14px; font-size: 11px; }
+.aui-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--aether-space-3);
+  padding: 11px 14px;
+  border-top: 1px solid var(--aether-color-border);
+}
+
+/* StatusBar.tsx */
+.aui-status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--aether-space-3);
+  height: var(--aether-size-statusbar);
+  padding: 0 12px;
+  border-top: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-bar);
+  color: var(--aether-color-text-dim);
+  font-family: var(--aether-font-family);
+  font-size: 11px;
+}
+.aui-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--aether-color-warn); }
+.aui-status-dot--ok { background: var(--aether-color-ok); }
+.aui-status-dot--error { background: var(--aether-color-error); }
+.aui-status-dot--busy { animation: aui-pulse 1s infinite; }
+@keyframes aui-pulse { 50% { opacity: 0.35; } }
+
+/* ViewportCanvas.tsx */
+.aui-viewport-canvas { position: relative; min-width: 0; min-height: 0; }
+.aui-viewport-canvas > canvas { display: block; width: 100%; height: 100%; }
