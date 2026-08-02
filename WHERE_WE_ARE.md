@@ -63,12 +63,72 @@ widgets:
    the web app yet (import currently lives in the CAD lane).
 3. **Hardware / Show workspaces** — not built; need the engine
    session/output verbs (Codex's queued packet).
-4. **`animacore` → `aether_core` rename** — Codex asked for an atomic
-   Python package rename (see `dev/briefings/claude.md` IN, 2026-08-01).
-   Do this as one sweep when ready.
+4. **Fold the engine into one polyglot Aether Core** — see the
+   Architecture decision below. This supersedes the old "just rename
+   `animacore`" note. Big, cross-lane, atomic — plan + coordinate with
+   Codex, don't big-bang it.
 5. Smaller widget deferrals are listed at the bottom of
    `aether-ui/WIDGETS.md` (keyframe drag, panel drag-reorder, chrome-shape
    presets, curves view, etc.).
+
+## Architecture decision — one polyglot Aether Core (Jonathan, 2026-08-01)
+
+**There is ONE shared foundation: Aether Core.** Everything shared lives
+in it — geometry, KI/IK solvers, mates, kinematics, all the semantic
+math. It is **multi-language by design**: each subsystem is written in
+the **best language for the job**, and **performance is a first-class
+requirement**. This is not a rewrite-everything-into-one-language plan.
+
+What "best language + performance" means concretely:
+
+- **Geometry kernel** → C++ (OCCT), used as **WASM** in the browser.
+  Already best-in-class — adopt, never rebuild. (Codex's `aether-core` TS
+  side wraps this.)
+- **Hot numeric kernel** — forward kinematics, IK/DH solvers, mate/pose
+  resolution, clip evaluation — is the real-time, per-frame path. The
+  performance-right home for this is a **compiled systems language
+  (Rust, leading candidate)** that compiles to **both WASM and native
+  from one source**. Payoff: the browser runs FK/IK/eval **in-process
+  (no bridge round-trip per frame)**, and hardware/offline runs the
+  **same** code natively at full speed. One implementation, two targets.
+- **Orchestration / IO / hardware transport / serialization / project
+  management** — not perf-critical; stay in the **ergonomic** language
+  (Python today; pyserial + the mature engine live here).
+
+Where that leaves the HTTP bridge: it is **not** a compromise to remove —
+it's Aether Core's own internal transport between its native/Python side
+and its TS/browser side. "Multiple languages" *requires* something like
+it, because the language halves can't call each other in-process. As the
+hot kernel moves to Rust→WASM, the bridge stops being on the interactive
+hot path (preview runs locally) and is used for save/validate/hardware.
+
+Target shape:
+
+```
+aether-core/
+  ts/        geometry+render bindings: OCCT(WASM), WebGPU, Part/sketch, STEP   (Codex)
+  rust/      the numeric kernel: FK, IK/DH, mate+pose resolution, eval → WASM + native   (planned)
+  python/    orchestration, hardware (pyserial), .anima IO, bridge   (was animacore/)
+  README.md  why this core is multi-language
+```
+
+Migration is **phased and parity-gated, never big-bang**:
+
+1. Fold `animacore/` in as `aether-core/python/` (atomic rename, one
+   sweep; coordinate with Codex who owns `aether-core/`). Answers Codex's
+   standing rename request.
+2. Carve the hot numeric kernel to Rust **behind the existing Python
+   API**, with the current **~1180 Python tests as the conformance
+   oracle** — the Rust kernel must match them before anything flips.
+3. Ship the Rust kernel as WASM into the web apps so the preview/pose
+   loop is local (kills the per-frame round-trip), and as a native lib
+   for hardware/offline.
+
+**Cross-language seam to get right:** the mate / connector / joint data
+model. TS geometry produces connector frames; the numeric kernel
+consumes them. Per Codex's rule this is **one stable-ID Core entity**
+shared across all three languages — that shared shape is the real design
+work, more than the file moves.
 
 ## Uncommitted in the tree (not mine — leave for their owners)
 
