@@ -6,7 +6,9 @@ import {
   Button,
   Dialog,
   DockPanel,
+  DocumentBar,
   IconButton,
+  LayoutPresetButton,
   PanelHeading,
   Rail,
   RailButton,
@@ -19,8 +21,9 @@ import {
   TextField,
   Tree,
   ViewportCanvas,
+  WorkspaceShell,
 } from "../src/index";
-import type { TreeNode } from "../src/index";
+import type { LayoutPreset, TreeNode } from "../src/index";
 
 // The UIDev-style widget gallery: every shared widget on one page, with
 // live state, so design changes are reviewed here before any app ships
@@ -74,6 +77,137 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function WorkspaceDemo() {
+  // Deep link for design review: gallery/#layout=floating|docked|canvas
+  const [preset, setPreset] = useState<LayoutPreset>(() => {
+    const requested = new URLSearchParams(location.hash.slice(1)).get("layout");
+    return requested === "floating" || requested === "canvas"
+      ? requested
+      : "docked";
+  });
+  const [tab, setTab] = useState("modeling");
+  const [tool, setTool] = useState<string | null>("revolute");
+  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set(["yoke"]));
+
+  const toolbar = (
+    <Ribbon>
+      <RibbonGroup label="Mate">
+        {["fastened", "revolute", "slider"].map((id) => (
+          <RibbonTool
+            key={id}
+            icon={id === "revolute" ? "↻" : id === "slider" ? "↔" : "▣"}
+            label={id[0].toUpperCase() + id.slice(1)}
+            active={tool === id}
+            onClick={() => setTool(tool === id ? null : id)}
+          />
+        ))}
+      </RibbonGroup>
+    </Ribbon>
+  );
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: 620,
+        border: "1px solid var(--aether-color-border)",
+        borderRadius: 8,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <DocumentBar
+        leading={
+          <>
+            <IconButton label="Home">⌂</IconButton>
+            <strong style={{ fontSize: 12 }}>demo_project</strong>
+            <span style={{ color: "var(--aether-color-ok)", fontSize: 10 }}>
+              SAVED
+            </span>
+          </>
+        }
+        center={
+          <Tabs
+            tabs={[
+              { id: "assets", label: "Assets" },
+              { id: "modeling", label: "3D Modeling" },
+              { id: "animate", label: "Animate" },
+            ]}
+            activeID={tab}
+            onSelect={setTab}
+          />
+        }
+        trailing={<LayoutPresetButton preset={preset} onChange={setPreset} />}
+      />
+      <WorkspaceShell
+        preset={preset}
+        style={{ flex: 1, minHeight: 0 }}
+        toolbar={toolbar}
+        leftPanels={[
+          {
+            id: "parts",
+            title: "Parts",
+            icon: "▣",
+            content: (
+              <Tree
+                nodes={sampleTree}
+                selectedIDs={selection}
+                onSelect={(ids) => setSelection(new Set(ids))}
+              />
+            ),
+          },
+          {
+            id: "mates",
+            title: "Mates",
+            icon: "⛓",
+            content: (
+              <div style={{ padding: 12, fontSize: 11, color: "var(--aether-color-text-dim)" }}>
+                pan · revolute
+                <br />
+                tilt · revolute
+              </div>
+            ),
+          },
+        ]}
+        rightPanels={[
+          {
+            id: "inspector",
+            title: "Inspector",
+            icon: "☰",
+            content: (
+              <div style={{ display: "grid", gap: 8, padding: 12 }}>
+                <TextField unit="mm" defaultValue="12.5" />
+                <TextField unit="deg" defaultValue="30" />
+              </div>
+            ),
+          },
+        ]}
+        defaultOpenLeft={["parts"]}
+        defaultOpenRight={["inspector"]}
+        statusBar={
+          <StatusBar>
+            <StatusDot kind="ok" />
+            Engine ready · layout: {preset}
+          </StatusBar>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            placeItems: "center",
+            height: "100%",
+            color: "var(--aether-color-text-faint)",
+            fontSize: 12,
+          }}
+        >
+          viewport canvas — flip the layout with the ❏/▥/⛶ button above
+        </div>
+      </WorkspaceShell>
+    </div>
+  );
+}
+
 function Gallery() {
   const [activeTab, setActiveTab] = useState("modeling");
   const [armedTool, setArmedTool] = useState<string | null>("revolute");
@@ -103,6 +237,10 @@ function Gallery() {
           file; product-free by rule.
         </span>
       </header>
+
+      <Section title="Workspace shell — document bar, sidebars, floating panels, layout presets">
+        <WorkspaceDemo />
+      </Section>
 
       <Section title="Buttons">
         <Button>Default</Button>

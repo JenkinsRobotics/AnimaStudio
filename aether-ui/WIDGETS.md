@@ -51,6 +51,10 @@ Definition of done for a core widget:
 | Dialog | **v2** | yes | full | document-level Escape, focus trap + wrap, focus returns to opener |
 | StatusBar / StatusDot | v1 | yes | none | trivial |
 | ViewportCanvas | v1 | yes | full | mount-once/teardown pinned |
+| WorkspaceShell | **v1** | full | full | app-window chrome ported from Swift `StudioWorkspaceScaffold`: docked / floating / canvas presets, rail-toggled panel stacks both sides, tear-off floating panels (drag, clamp, restack near home edge), canvas edge hot-zone reveal. Deferred: drag-reorder of stacked panels, panels-on-outer-edge option, chrome shape presets |
+| FloatingPanel | v1 | yes | via shell | draggable by header; also standalone for short-lived tools |
+| DocumentBar | v1 | yes | none | 48px top row: leading/trailing clusters + window-centered tabs. Deferred: responsive breakpoint collapse (1320/1060/880) |
+| LayoutPresetButton | v1 | yes | yes | the studio button — cycles floating → docked → canvas. Deferred: dropdown menu listing all modes |
 | Timeline / DopeSheet | — | — | — | not started; Swift `UIDevTimelineDesignB` + demo `Timeline.swift` are the references |
 
 Work the matrix top to bottom; a row is done when all three columns are

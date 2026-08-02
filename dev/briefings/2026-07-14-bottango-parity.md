@@ -48,6 +48,7 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
+| Codex | Extract the first production TypeScript Aether Core package from Aether CAD without creating a second evaluator | `aether-core/{package.json,package-lock.json,tsconfig.json,src/**}` excluding Claude-owned `aether-core/README.md`; `Aether CAD/{package.json,package-lock.json,src/{domain,sketch-constraints,part-document,part-file,cad-frame-math,topology-inference,math,aether-core}.ts}` and focused tests; STATUS + append-only coordination only | `@aether/core` has no DOM, React, Three.js, or product dependencies in its semantic modules; deterministic Part/sketch documents, serialization, topology inference, and pure connector/mate transforms move behind one package; Aether CAD consumes compatibility adapters with byte/transform parity; future OCCT/render/physics adapters remain internal Core modules, not new top-level packages; Core tests plus CAD test/check/build pass | in progress 2026-08-01 |
 | Codex | Migrate Aether CAD chrome to the shared React UI standard with a Shapr3D-inspired workspace | `Aether CAD/{package.json,package-lock.json,index.html,tsconfig.app.json,src/{main,react-main,viewer,viewport-appearance}.ts*}`, new `Aether CAD/src/react/**` and focused shell tests, STATUS + append-only coordination only; consume `aether-ui/**` read-only and do not touch Claude's active claim | React owns a compact document header, left Items browser, floating center-edge tool rails, right History browser, and responsive panel chrome while the OCCT worker and one persistent Three.js/WebGPU viewport retain all current Part/STEP/Sketch/Connector/Mate behavior; tests/check/build/root-app rebuild and launch pass | released 2026-08-01 — React/Shapr shell shipped on `@aether/ui`; 36 tests/check/build/root-app sign/launch and native visual review pass |
 | Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | released 2026-08-01 — implemented v2 sketch graph/editor/migration; 34 tests/check/build/root-app rebuild pass; browser plugin bootstrap failed before local connection |
 | Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
@@ -4892,3 +4893,23 @@ change needed in the Handoff log instead of inventing commands.
   rebuilt. Matrix remaining: DockPanel collapse spec, then the big
   Timeline/DopeSheet widget (blocked on engine clip-CRUD verbs — the
   queued Codex mailbox packet).
+- **2026-08-01 (Claude, workspace chrome port — per Jonathan's "missing
+  so much from the legacy swift" review):** Ported the app-window chrome
+  from the archived Swift `StudioWorkspaceScaffold`/`StudioLayoutPreset`
+  into aether-ui. **WorkspaceShell**: the three studio layout presets —
+  docked (classic 3-pane), floating (chrome floats over a full-bleed
+  canvas: centered ribbon capsule, edge rails, panel cards), canvas
+  (chrome hidden behind 16px edge hot-zones with pill handles, hover
+  reveals) — with rail-toggled per-side panel stacks and tear-off
+  floating panels (drag by header, clamped, restack when dragged near
+  the home edge). **FloatingPanel** (also standalone), **DocumentBar**
+  (48px top row, window-centered tabs), **LayoutPresetButton** (the
+  studio button, cycles floating→docked→canvas exactly like the Swift
+  `cyclePreset`). Gallery gained a full app-window demo at the top
+  (deep-linkable: `#layout=floating|canvas`); all three presets
+  screenshot-verified. 28 aether-ui tests green. Deferred, named in
+  WIDGETS.md: stacked-panel drag-reorder, panels-on-outer-edge, chrome
+  shape presets, document-bar responsive breakpoints, layout dropdown
+  menu. Full legacy-chrome inventory (catalog of all 21 UIDev sections,
+  variant boards, detached-window rules) captured from the archive for
+  the remaining porting queue.

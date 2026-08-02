@@ -13,3 +13,14 @@ export { TextField, type TextFieldProps } from "./TextField";
 export { Dialog, type DialogProps } from "./Dialog";
 export { StatusBar, StatusDot, type StatusKind } from "./StatusBar";
 export { ViewportCanvas, type ViewportCanvasProps } from "./ViewportCanvas";
+export {
+  WorkspaceShell,
+  FloatingPanel,
+  LayoutPresetButton,
+  nextLayoutPreset,
+  type LayoutPreset,
+  type WorkspacePanel,
+  type WorkspaceShellProps,
+  type FloatingPanelProps,
+} from "./WorkspaceShell";
+export { DocumentBar, type DocumentBarProps } from "./DocumentBar";

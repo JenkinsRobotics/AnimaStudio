@@ -201,6 +201,156 @@
   font-size: var(--aether-font-size-label);
 }
 
+/* DocumentBar.tsx — 48px top app-window row */
+.aui-document-bar {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 48px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-bar);
+  font-family: var(--aether-font-family);
+  color: var(--aether-color-text);
+}
+.aui-document-bar-cluster { display: flex; align-items: center; gap: var(--aether-space-3); z-index: 1; }
+.aui-document-bar-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.aui-document-bar-center > * { pointer-events: auto; }
+
+/* WorkspaceShell.tsx — app-window chrome (docked / floating / canvas) */
+.aui-shell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--aether-color-bg-app);
+  font-family: var(--aether-font-family);
+}
+.aui-shell-body { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.aui-shell-row { display: flex; flex: 1; min-width: 0; }
+.aui-shell-side { display: flex; align-items: stretch; background: var(--aether-color-bg-panel); }
+.aui-shell-side--right { border-left: 1px solid var(--aether-color-border); }
+.aui-shell-side:first-child { border-right: 1px solid var(--aether-color-border); }
+.aui-shell-side--right .aui-rail { border-right: 0; border-left: 1px solid var(--aether-color-border); }
+.aui-shell-stack { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.aui-shell-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.aui-shell-toolbar { border-bottom: 1px solid var(--aether-color-border); }
+.aui-shell-center { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--aether-color-bg-shell); }
+
+.aui-shell-panel { display: flex; flex-direction: column; min-height: 0; }
+.aui-shell-panel + .aui-shell-panel { border-top: 1px solid var(--aether-color-border); }
+.aui-shell-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px 5px;
+  color: var(--aether-color-text-dim);
+  font-size: var(--aether-font-size-label);
+  font-weight: 750;
+  letter-spacing: var(--aether-font-letter-caps);
+  text-transform: uppercase;
+}
+.aui-shell-panel-body { min-height: 0; overflow: auto; }
+
+/* Floating chrome: adaptive panel fill + border + shadow (never a
+   translucent material — it reads wrong over a dark 3D canvas). */
+.aui-float {
+  background: color-mix(in srgb, var(--aether-color-bg-panel) 92%, transparent);
+  border: 1px solid var(--aether-color-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.aui-float > .aui-rail { border-right: 0; background: transparent; padding-bottom: var(--aether-space-2); }
+
+.aui-shell-fltoolbar {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.aui-shell-fltoolbar > .aui-float { pointer-events: auto; }
+.aui-shell-fltoolbar .aui-ribbon { border-bottom: 0; background: transparent; }
+.aui-shell-fledge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  pointer-events: none;
+}
+.aui-shell-fledge > * { pointer-events: auto; }
+.aui-shell-fledge--left { left: 0; }
+.aui-shell-fledge--right { right: 0; }
+.aui-shell-flstack { display: flex; flex-direction: column; gap: 10px; max-height: 85%; overflow-y: auto; }
+.aui-shell-flstack .aui-shell-panel { background: transparent; }
+
+/* Canvas preset: 16px hot zones with a hint handle; hover reveals. */
+.aui-shell-edge { position: absolute; display: flex; z-index: 5; }
+.aui-shell-edge--top { top: 0; left: 0; right: 0; min-height: 16px; justify-content: center; }
+.aui-shell-edge--left { top: 0; bottom: 0; left: 0; min-width: 16px; align-items: center; }
+.aui-shell-edge--right { top: 0; bottom: 0; right: 0; min-width: 16px; align-items: center; }
+.aui-shell-handle {
+  background: color-mix(in srgb, var(--aether-color-text-faint) 42%, transparent);
+  border-radius: 99px;
+}
+.aui-shell-handle--top { width: 34px; height: 4px; margin-top: 5px; }
+.aui-shell-handle--left { width: 4px; height: 34px; margin-left: 5px; }
+.aui-shell-handle--right { width: 4px; height: 34px; margin-right: 5px; }
+
+/* FloatingPanel (torn-off or standalone tool) */
+.aui-float-panel {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  max-height: 70%;
+  background: color-mix(in srgb, var(--aether-color-bg-panel) 92%, transparent);
+  border: 1px solid var(--aether-color-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.aui-float-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px 5px;
+  color: var(--aether-color-text-dim);
+  font-size: var(--aether-font-size-label);
+  font-weight: 750;
+  letter-spacing: var(--aether-font-letter-caps);
+  text-transform: uppercase;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.aui-float-panel-header:active { cursor: grabbing; }
+.aui-float-panel-body { min-height: 0; overflow: auto; }
+.aui-float-panel-actions { display: inline-flex; gap: 4px; }
+.aui-float-panel-action {
+  border: 0;
+  padding: 2px 3px;
+  background: transparent;
+  color: var(--aether-color-text-faint);
+  font-size: 11px;
+  cursor: pointer;
+}
+.aui-float-panel-action:hover { color: var(--aether-color-text); }
+
 /* DockPanel.tsx */
 .aui-dock-panel {
   display: flex;
