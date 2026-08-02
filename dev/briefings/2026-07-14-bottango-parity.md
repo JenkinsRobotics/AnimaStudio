@@ -355,6 +355,8 @@ change needed in the Handoff log instead of inventing commands.
 
 | Claude | aether-ui bootstrap: root design-system package (tokens from Aether CAD baseline + one-React-widget-per-file library + UIDev-style gallery + RTL pins) and the UI framework decision record | `aether-ui/**` (new), `dev/docs/roadmap/UI_Framework_Decision.md` (new), briefing/mailbox | `npm test` + `tsc --noEmit` + gallery `vite build` green | in progress 2026-08-01 |
 
+| Claude | Aether Animation web rebuild 1 (per Jonathan): engine HTTP bridge (`animacore/httpbridge.py` + tests), `aether-animation/web/` React app on @aether/ui (shell, engine-posed viewport, tree, Animate sliders/clips), Swift app + AetherKit archived to `aether-animation/archive/` | `animacore/httpbridge.py` (new), `animacore/tests/test_httpbridge.py` (new), `aether-animation/web/**` (new), `aether-animation/archive/**` (moved), `.github/workflows/ci.yml`, `AGENTS.md`, READMEs, briefing/mailbox | pytest green incl. http bridge; web `tsc`+`vite build`; live end-to-end screenshot (engine → browser); archive intact via git mv | in progress 2026-08-01 |
+
 ## Requests
 
 - **Codex → Claude (2026-07-29, animatronics critical-path follow-on):**
@@ -4796,3 +4798,29 @@ change needed in the Handoff log instead of inventing commands.
   true`. Next: CAD lane adopts widgets strangler-style (toolbar → items
   tree first); Animation web app scaffolds on the same package; my
   engine websocket transport packet remains queued.
+- **2026-08-01 (Claude, Aether Animation web rebuild 1 + Swift archive):**
+  Per Jonathan (rebuild the animation app in React; archive the Swift UI).
+  **Engine:** `animacore/httpbridge.py` — the stdio protocol served over
+  local HTTP (`POST /rpc` → `handle_request`, `GET /assets/**` read-only
+  under root with traversal confinement, `POST /files/save` confined
+  writes for browser Save; stdlib only, `ponytail:` request/response until
+  hardware streaming needs push). +3 tests → **1181 passed**.
+  **Web app** `aether-animation/web/`: React on `@aether/ui` — typed
+  engine client, persistent imperative Three.js viewport (engine-posed
+  parts, OBJ-or-box, orbit/pan/zoom, raycast pick `ponytail:` until the
+  GPU ID pick migrates with the shared renderer), Project tree
+  (Instances/Mate features/Clips), live DOF pose sliders, clip transport,
+  Save via `serialize_character` + `/files/save`. Three.js and animacore
+  are both RH Y-up — transforms pass through unchanged (the Unity z-flip
+  is not needed here). **Verified live end-to-end**: engine + built app +
+  headless Chrome (SwiftShader WebGL) — screenshot shows the real
+  pan-tilt rig loaded over HTTP, sliders from engine DOF schemas, status
+  green. Robustness fix found by that harness: a failed WebGL context now
+  degrades to a dead viewport instead of blanking the app.
+  **Archive:** `aether-animation/{app,AetherKit}` → `aether-animation/
+  archive/{swift-app,AetherKit}` (git mv, pair still cross-resolves;
+  archive README states it is a frozen behavior reference). CI swift job
+  replaced with aether-ui + web builds; AGENTS.md verification section
+  rewritten; product README updated. **Codex:** the Swift lane is closed
+  for new work — UI work continues in React on @aether/ui; the Swift app
+  remains the behavior reference for porting workspaces.

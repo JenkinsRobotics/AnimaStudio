@@ -149,21 +149,24 @@ themselves. A commit without a handoff entry is incomplete multi-agent work.
 
 ## Verification
 
-Swift package (Studio), from `aether-animation/app/`:
+Web UI (Aether UI design system), from `aether-ui/`:
 
 ```bash
-swift format lint --recursive App AppUITests Sources Tests Package.swift
-swift test
+npm test && npm run typecheck && npm run build
 ```
 
-Native Xcode app, from `aether-animation/app/`:
+Aether Animation web app, from `aether-animation/web/` (the engine HTTP
+bridge must be running for manual testing:
+`.venv/bin/python -m animacore.httpbridge`):
 
 ```bash
-xcodegen generate
-xcodebuild -project AnimaStudio.xcodeproj -scheme AnimaStudio \
-  -derivedDataPath /tmp/AnimaStudioDerived CODE_SIGNING_ALLOWED=NO build
-./Scripts/build-root-app.sh
+npm run build   # tsc --noEmit + vite build
+npm run dev     # live app on http://localhost:5178
 ```
+
+The Swift app is ARCHIVED at `aether-animation/archive/` (2026-08-01) —
+do not build it in CI; treat it as the behavior reference for the web
+rebuild.
 
 Python (AnimaCore engine), from the repo root:
 

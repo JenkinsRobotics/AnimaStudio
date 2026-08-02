@@ -8,17 +8,16 @@ supports real-time puppetry.
 
 ## Current reality
 
-The Swift macOS app now lives here (moved 2026-08-01, per Jonathan):
+The product is being REBUILT as a web app (per Jonathan, 2026-08-01):
 
-- `app/` — the product application (formerly the repo-root `app/`;
-  build/test from `aether-animation/app/`).
-- `AetherKit/` — the product's **native Swift engine seam**: the
-  `AetherKernel` OCCT bridge (C++ shim + Swift wrapper) and the
-  `AetherViewport` renderer-neutral contracts (camera state, connector
-  candidate engine, themes, navigation bindings, WebGPU entity payloads).
-  Swift is product code — it binds Aether Core, it is not Aether Core.
-  The platform-universal engine (OCCT/WASM kernel, web renderer core,
-  Python semantics) consolidates in `/aether-core/` per its README.
+- `web/` — the Aether Animation React app: `@aether/ui` widgets + a
+  persistent Three.js viewport, driving the canonical Python engine over
+  the animacore HTTP bridge (`python -m animacore.httpbridge`). The
+  engine stays the single semantic authority; the app is chrome.
+- `archive/` — the previous Swift application (`swift-app/`) and its
+  native engine seam (`AetherKit/`), frozen as the behavior reference.
+  A native Swift shell remains a future option; it would re-consume the
+  same tokens (`aether-ui/tokens/tokens.json`) and engine.
 
 The Python semantics engine remains at `/animacore/` (canonical) until its
 move into Core is scheduled.

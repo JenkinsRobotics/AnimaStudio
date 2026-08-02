@@ -1,0 +1,30 @@
+/* App-level layout only; widget styling comes from @aether/ui. */
+html, body, #root { width: 100%; height: 100%; margin: 0; }
+body {
+  background: var(--aether-color-bg-app);
+  color: var(--aether-color-text);
+  font-family: var(--aether-font-family);
+  overflow: hidden;
+}
+.app-shell { display: grid; grid-template-rows: var(--aether-size-topbar) 1fr auto; height: 100vh; }
+.app-topbar {
+  display: flex; align-items: center; gap: 18px; padding: 0 14px;
+  border-bottom: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-bar);
+}
+.app-brand { font-size: 13px; letter-spacing: 0.04em; }
+.app-topbar-spacer { flex: 1; }
+.app-body { display: flex; min-height: 0; }
+.app-viewport { flex: 1; background: var(--aether-color-bg-shell); }
+.pose-panel { display: grid; gap: 9px; padding: 11px 12px; }
+.pose-row { display: grid; grid-template-columns: 1fr; gap: 3px; }
+.pose-label { color: var(--aether-color-text-dim); font-size: 10px; }
+.pose-value { color: var(--aether-color-text-faint); font-size: 9px; }
+.app-transport {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  border-top: 1px solid var(--aether-color-border);
+  background: var(--aether-color-bg-bar);
+}
+.app-scrub { width: 320px; }
+.app-time { color: var(--aether-color-text-dim); font-size: 11px; min-width: 240px; }
+.app-transport .aui-status-bar { border-top: 0; margin-left: auto; background: transparent; }
