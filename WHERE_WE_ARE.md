@@ -1,14 +1,26 @@
 # Where we are — Aether Animation rebuild
 
-_Snapshot for pausing development · 2026-08-01_
+_Snapshot · development PAUSED 2026-08-01._
 
-## TL;DR
+## ▶ NEXT FOCUS (when we resume)
 
-The Swift animation app is being rebuilt as a **web app** (React + TS +
+**Consolidate everything shared into one polyglot Aether Core.** The
+animation engine's math — KI/IK solvers, mates, kinematics — folds into
+Aether Core alongside the geometry side; each subsystem in the best
+language for the job, performance first. Full plan + reasoning in the
+**Architecture decision** section below. First concrete step: coordinate
+with Codex (who owns `aether-core/`), then fold `animacore/` in as
+`aether-core/python/` as one atomic sweep. Everything else in the
+pick-up list waits behind this.
+
+## TL;DR (current state)
+
+The Swift animation app has been rebuilt as a **web app** (React + TS +
 Vite) on a **shared widget library** (`aether-ui/`), talking to the
 **Python engine** (`animacore/`) over an HTTP bridge. The rebuilt app is
-**launchable now** with the full authoring chrome. Remaining work is
-mostly **engine verbs** (clip editing, hardware), not UI.
+**launchable now** with the full authoring chrome. Remaining feature
+work is mostly **engine verbs** (clip editing, hardware), not UI — but
+per the Next Focus above, the **Aether Core consolidation comes first**.
 
 ## How to launch it (double-click, no terminal)
 
@@ -53,20 +65,21 @@ widgets:
 - **Timeline dope sheet** (Animate): per-DOF keyframe tracks from the
   clip, adaptive ruler, scrub, play/pause. Live posing through the engine.
 
-## What's NOT done yet (pick up here)
+## What's NOT done yet (pick up here — in priority order)
 
-1. **Engine clip-CRUD verbs** — the timeline is **read-only** until the
-   engine can add/move/delete keyframes. This is the next task and it
-   unblocks real animation editing. (Codex requested this; see
-   `dev/briefings/claude.md` IN.)
-2. **Assets workspace** — tab exists but STEP/mesh import isn't wired in
+1. **▶ Consolidate into one polyglot Aether Core** — THE next focus. Fold
+   the engine's math (KI/IK solvers, mates, kinematics) into Aether Core;
+   best language per subsystem, performance first. See the Architecture
+   decision below. Supersedes the old "just rename `animacore`" note.
+   Big, cross-lane, atomic — plan + coordinate with Codex, don't
+   big-bang it. First step: fold `animacore/` in as `aether-core/python/`.
+2. **Engine clip-CRUD verbs** — the timeline is **read-only** until the
+   engine can add/move/delete keyframes. Unblocks real animation editing.
+   (Codex requested this; see `dev/briefings/claude.md` IN.)
+3. **Assets workspace** — tab exists but STEP/mesh import isn't wired in
    the web app yet (import currently lives in the CAD lane).
-3. **Hardware / Show workspaces** — not built; need the engine
+4. **Hardware / Show workspaces** — not built; need the engine
    session/output verbs (Codex's queued packet).
-4. **Fold the engine into one polyglot Aether Core** — see the
-   Architecture decision below. This supersedes the old "just rename
-   `animacore`" note. Big, cross-lane, atomic — plan + coordinate with
-   Codex, don't big-bang it.
 5. Smaller widget deferrals are listed at the bottom of
    `aether-ui/WIDGETS.md` (keyframe drag, panel drag-reorder, chrome-shape
    presets, curves view, etc.).
