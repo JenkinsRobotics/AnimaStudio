@@ -2,9 +2,13 @@
 // single semantic authority: this file carries requests and DTOs, never
 // animation/mate meaning.
 
+// Dev (vite on :5178) talks to the bridge on :8787; when the bridge
+// itself serves the built app (the launcher), everything is same-origin.
 export const ENGINE_URL =
   (import.meta.env.VITE_ENGINE_URL as string | undefined) ??
-  "http://127.0.0.1:8787";
+  (window.location.port === "5178"
+    ? "http://127.0.0.1:8787"
+    : window.location.origin);
 
 export interface DofSummary {
   path: string;
@@ -70,11 +74,11 @@ async function rpc<T>(method: string, params: object): Promise<T> {
 
 export function assetURL(characterPath: string, model: string): string {
   const directory = characterPath.split("/").slice(0, -1).join("/");
-  return `${ENGINE_URL}/assets/${directory}/${model}`;
+  return `${ENGINE_URL}/workspace/${directory}/${model}`;
 }
 
 export async function fetchCharacterText(path: string): Promise<string> {
-  const response = await fetch(`${ENGINE_URL}/assets/${path}`);
+  const response = await fetch(`${ENGINE_URL}/workspace/${path}`);
   if (!response.ok) throw new Error(`could not read ${path}`);
   return response.text();
 }
@@ -106,4 +110,53 @@ export async function saveFile(path: string, text: string): Promise<void> {
     body: JSON.stringify({ path, text }),
   });
   if (!response.ok) throw new Error("save failed");
+}
+
+export interface MateTypeSchema {
+  type: string;
+  label: string;
+  category: string;
+  dofs: { name: string; kind: string; unit: string; axis: string }[];
+  universal_controls: string[];
+}
+
+export function mateTypes() {
+  return rpc<{ mate_types: MateTypeSchema[] }>("mate_types", {});
+}
+
+export interface ConnectorDTO {
+  part: string;
+  origin_m: [number, number, number];
+  primary_axis: [number, number, number];
+  secondary_axis: [number, number, number];
+}
+
+export interface MateJointDTO {
+  name: string;
+  type: string;
+  parent_part: string;
+  child_part: string;
+  dofs: { name: string; kind: string }[];
+  controls: {
+    connectors: { a: ConnectorDTO; b: ConnectorDTO };
+    flip_primary_axis: boolean;
+    secondary_axis_rotation_deg: number;
+    simulation_connection: boolean;
+    offset?: { enabled: boolean; translation_m: [number, number, number] };
+  };
+}
+
+export function previewMate(handle: string, joint: MateJointDTO) {
+  return rpc<{ parts: Record<string, PartTransform> }>("preview_mate", {
+    handle,
+    joint,
+  });
+}
+
+export function addMate(handle: string, joint: MateJointDTO) {
+  return rpc<{ handle: string; rig: RigSummary }>("add_mate", { handle, joint });
+}
+
+export function removeMate(handle: string, name: string) {
+  return rpc<{ handle: string; rig: RigSummary }>("remove_mate", { handle, name });
 }

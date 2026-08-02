@@ -48,7 +48,7 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
-| Codex | Migrate Aether CAD chrome to the shared React UI standard with a Shapr3D-inspired workspace | `Aether CAD/{package.json,package-lock.json,index.html,src/main.ts,src/style.css}`, new `Aether CAD/src/react/**` and focused shell tests, STATUS + append-only coordination only; consume `aether-ui/**` read-only and do not touch Claude's active claim | React owns a compact document header, left Items browser, floating center-edge tool rails, right History browser, and responsive panel chrome while the OCCT worker and one persistent Three.js/WebGPU viewport retain all current Part/STEP/Sketch/Connector/Mate behavior; tests/check/build/root-app rebuild and launch pass | in progress 2026-08-01 |
+| Codex | Migrate Aether CAD chrome to the shared React UI standard with a Shapr3D-inspired workspace | `Aether CAD/{package.json,package-lock.json,index.html,tsconfig.app.json,src/{main,react-main,viewer,viewport-appearance}.ts*}`, new `Aether CAD/src/react/**` and focused shell tests, STATUS + append-only coordination only; consume `aether-ui/**` read-only and do not touch Claude's active claim | React owns a compact document header, left Items browser, floating center-edge tool rails, right History browser, and responsive panel chrome while the OCCT worker and one persistent Three.js/WebGPU viewport retain all current Part/STEP/Sketch/Connector/Mate behavior; tests/check/build/root-app rebuild and launch pass | released 2026-08-01 — React/Shapr shell shipped on `@aether/ui`; 36 tests/check/build/root-app sign/launch and native visual review pass |
 | Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | released 2026-08-01 — implemented v2 sketch graph/editor/migration; 34 tests/check/build/root-app rebuild pass; browser plugin bootstrap failed before local connection |
 | Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
 | Codex | Package Aether CAD as a clickable macOS web app with a CAD-sketch icon | `Aether CAD/Launcher/**`, `Aether CAD/Resources/**`, `Aether CAD/Scripts/build-macos-app.sh`, root `Aether CAD.app`, STATUS + append-only coordination only | one self-contained signed root app serves the production web bundle locally and hosts it in a dedicated WKWebView window; no npm/Vite terminal required at launch; icon retains the Aether/Anima family palette but uses sketch/constraint geometry; build, signature, launch, OCCT-ready browser state verified | released 2026-08-01 — root `Aether CAD.app`; signed native WKWebView wrapper; internal server restricted to 127.0.0.1; bundled production assets/OCCT WASM verified; family SVG/ICNS uses CAD sketch endpoints, constraints, construction geometry, and dimensions |
@@ -356,6 +356,8 @@ change needed in the Handoff log instead of inventing commands.
 | Claude | aether-ui bootstrap: root design-system package (tokens from Aether CAD baseline + one-React-widget-per-file library + UIDev-style gallery + RTL pins) and the UI framework decision record | `aether-ui/**` (new), `dev/docs/roadmap/UI_Framework_Decision.md` (new), briefing/mailbox | `npm test` + `tsc --noEmit` + gallery `vite build` green | in progress 2026-08-01 |
 
 | Claude | Aether Animation web rebuild 1 (per Jonathan): engine HTTP bridge (`animacore/httpbridge.py` + tests), `aether-animation/web/` React app on @aether/ui (shell, engine-posed viewport, tree, Animate sliders/clips), Swift app + AetherKit archived to `aether-animation/archive/` | `animacore/httpbridge.py` (new), `animacore/tests/test_httpbridge.py` (new), `aether-animation/web/**` (new), `aether-animation/archive/**` (moved), `.github/workflows/ci.yml`, `AGENTS.md`, READMEs, briefing/mailbox | pytest green incl. http bridge; web `tsc`+`vite build`; live end-to-end screenshot (engine → browser); archive intact via git mv | in progress 2026-08-01 |
+
+| Claude | Web rebuild 2: mate authoring in aether-animation/web (ribbon mate tools, connector picking with ghost/pick triads, Onshape dialog card, Solve=preview_mate, add/remove_mate with rig refresh) | `aether-animation/web/src/**`, briefing | tsc+build green; engine flow revalidated via /rpc; screenshot of modeling workspace | in progress 2026-08-01 |
 
 ## Requests
 
@@ -4824,3 +4826,35 @@ change needed in the Handoff log instead of inventing commands.
   rewritten; product README updated. **Codex:** the Swift lane is closed
   for new work — UI work continues in React on @aether/ui; the Swift app
   remains the behavior reference for porting workspaces.
+- **2026-08-01 (Codex, Aether CAD React/Shapr shell):** Migrated the root CAD
+  product chrome to React 19 and the shared `@aether/ui` package without
+  remounting or duplicating the imperative OCCT/Three.js viewport. The new
+  shell provides the compact document header, functional Items/Modeling/
+  Assembly browsers, Shapr-style floating mode and authoring rails, viewport
+  HUD controls, and a collapsible History panel populated from real Part
+  features, imports, and mates. Existing command IDs remain the compatibility
+  seam, so New/Open/Save/STEP/Sketch/connector/mate/fit behavior continues
+  through the existing controller while React owns layout and presentation.
+  Default viewport presentation is now a dark CAD stage with subdued grid and
+  edge colors. Verification: TypeScript check, 12 Vitest files / 36 tests,
+  production Vite build, rebuilt/ad-hoc-signed root app, packaged launch, and
+  native screenshot review. `aether-ui/**` was consumed read-only.
+- **2026-08-01 (Claude, web rebuild 2a — launcher + one-port serving +
+  connector groundwork):** Per Jonathan ("a launched app like Aether CAD
+  has"). `animacore/httpbridge.py` gains `--app <dist>` static serving
+  with SPA fallback (one port, same-origin, no CORS); repo-file route
+  renamed `/assets/` → `/workspace/` to clear Vite's `/assets` namespace
+  (web client + tests updated; `ENGINE_URL` is same-origin when served by
+  the bridge, `127.0.0.1:8787` under the vite dev server).
+  **`aether-animation/Launcher/`** — WKWebView shell (Aether CAD.app
+  pattern) that ALSO spawns the engine (`--port 8791 --app web/dist`) and
+  supervises it; `build-launcher.sh` assembles the gitignored
+  **`Aether Animation.app`** at repo root (vite build → swiftc → ad-hoc
+  sign). Verified: bridge tests green, `/` serves the app, `/rpc` answers
+  hello, headless same-origin screenshot shows the full app with a green
+  engine status. Viewport mate-authoring groundwork landed
+  (`setConnectorMode`, ghost + placed screen-constant triads, part-local
+  connector frames; engine client mate verbs typed) — the dialog UI is
+  the in-progress remainder of the web-rebuild-2 claim. Codex onboarding
+  prompt for aether-ui/aether-core appended to their mailbox IN
+  (codex.md deliberately left uncommitted — carries their edits).

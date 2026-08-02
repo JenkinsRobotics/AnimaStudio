@@ -3,17 +3,22 @@
 Web front-ends (Aether Animation web) cannot spawn a stdio subprocess, so
 this serves the SAME ``handle_request`` protocol over local HTTP:
 
-    POST /rpc          {id, method, params}  →  bridge response envelope
-    GET  /assets/<path>                       →  files under --root
-                                                 (character assets for the
-                                                 viewport; read-only)
-    POST /files/save   {path, text}           →  write a text file under
-                                                 --root (Save support —
-                                                 browsers cannot write the
-                                                 workspace themselves)
+    POST /rpc             {id, method, params} →  bridge response envelope
+    GET  /workspace/<path>                      →  files under --root
+                                                   (character assets for the
+                                                   viewport; read-only)
+    POST /files/save      {path, text}          →  write a text file under
+                                                   --root (Save support —
+                                                   browsers cannot write the
+                                                   workspace themselves)
+    GET  /<anything else>                       →  the built web app when
+                                                   --app <dist> is given
+                                                   (index.html fallback), so
+                                                   one port serves app +
+                                                   engine with no CORS.
 
-Run: ``python -m animacore.httpbridge [--port 8787] [--root <dir>]``
-(root defaults to the repository checkout containing this package).
+Run: ``python -m animacore.httpbridge [--port 8787] [--root <dir>]
+[--app <dist dir>]`` (root defaults to the repository checkout).
 
 # ponytail: plain request/response over ThreadingHTTPServer, stdlib only —
 # no websockets dependency until live streaming (hardware preview) needs
@@ -40,7 +45,8 @@ def _safe_join(root: Path, relative: str) -> Path | None:
     return candidate if candidate.is_relative_to(root.resolve()) else None
 
 
-def make_handler(session: Session, lock: threading.Lock, root: Path):
+def make_handler(session: Session, lock: threading.Lock, root: Path,
+                 app_dir: Path | None = None):
     class BridgeHandler(BaseHTTPRequestHandler):
         # Local development server; the web app runs on another port.
         def _cors(self) -> None:
@@ -65,15 +71,24 @@ def make_handler(session: Session, lock: threading.Lock, root: Path):
             self.end_headers()
 
         def do_GET(self) -> None:  # noqa: N802
-            if not self.path.startswith("/assets/"):
-                self._reply(404, {"error": "unknown path"})
+            if self.path.startswith("/workspace/"):
+                target = _safe_join(root, self.path[len("/workspace/"):])
+                if target is None or not target.is_file():
+                    self._reply(404, {"error": "not found"})
+                    return
+                self._reply(200, target.read_bytes(),
+                            content_type="application/octet-stream")
                 return
-            target = _safe_join(root, self.path[len("/assets/"):])
-            if target is None or not target.is_file():
-                self._reply(404, {"error": "not found"})
-                return
-            self._reply(200, target.read_bytes(),
-                        content_type="application/octet-stream")
+            if app_dir is not None:
+                relative = self.path.split("?", 1)[0].lstrip("/") or "index.html"
+                target = _safe_join(app_dir, relative)
+                if target is None or not target.is_file():
+                    target = app_dir / "index.html"  # SPA fallback
+                if target.is_file():
+                    self._reply(200, target.read_bytes(),
+                                content_type=_content_type(target))
+                    return
+            self._reply(404, {"error": "unknown path"})
 
         def do_POST(self) -> None:  # noqa: N802
             length = int(self.headers.get("Content-Length", "0"))
@@ -109,11 +124,23 @@ def make_handler(session: Session, lock: threading.Lock, root: Path):
     return BridgeHandler
 
 
-def serve(port: int = 8787, root: Path | None = None) -> ThreadingHTTPServer:
+_CONTENT_TYPES = {
+    ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
+    ".json": "application/json", ".svg": "image/svg+xml",
+    ".wasm": "application/wasm", ".png": "image/png",
+}
+
+
+def _content_type(path: Path) -> str:
+    return _CONTENT_TYPES.get(path.suffix, "application/octet-stream")
+
+
+def serve(port: int = 8787, root: Path | None = None,
+          app_dir: Path | None = None) -> ThreadingHTTPServer:
     """Build the server (caller decides threading/serve_forever)."""
     session = Session()
     lock = threading.Lock()
-    handler = make_handler(session, lock, root or _REPO_ROOT)
+    handler = make_handler(session, lock, root or _REPO_ROOT, app_dir)
     return ThreadingHTTPServer(("127.0.0.1", port), handler)
 
 
@@ -121,8 +148,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--root", type=Path, default=_REPO_ROOT)
+    parser.add_argument("--app", type=Path, default=None,
+                        help="built web app (dist) to serve at /")
     arguments = parser.parse_args()
-    server = serve(arguments.port, arguments.root)
+    server = serve(arguments.port, arguments.root, arguments.app)
     print(f"animacore http bridge on http://127.0.0.1:{arguments.port} "
           f"(root: {arguments.root})")
     server.serve_forever()

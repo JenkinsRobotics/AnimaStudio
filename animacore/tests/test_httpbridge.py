@@ -47,9 +47,9 @@ def test_rpc_round_trip_and_session_persistence(server):
 
 def test_asset_get_serves_and_confines(server):
     base, _ = server
-    with urllib.request.urlopen(base + "/assets/assets/probe.obj") as response:
+    with urllib.request.urlopen(base + "/workspace/assets/probe.obj") as response:
         assert response.read() == b"v 0 0 0\n"
-    for escape in ("/assets/../pyproject.toml", "/assets/%2e%2e/x"):
+    for escape in ("/workspace/../pyproject.toml", "/workspace/%2e%2e/x"):
         try:
             urllib.request.urlopen(base + escape)
             raised = False
