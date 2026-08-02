@@ -4877,3 +4877,18 @@ change needed in the Handoff log instead of inventing commands.
   virtualization. Next rows in the matrix: Tabs keyboard+pins, Dialog
   focus trap, Ribbon overflow/keyboard, then the Timeline/DopeSheet
   widget (references: demo `Timeline.swift`, Swift `UIDevTimelineDesignB`).
+- **2026-08-01 (Claude, widget conformance rows 2-3):** Continued down
+  the WIDGETS.md matrix after the Tree flagship. Tabs v2 (←/→ wrap +
+  Home/End, roving tabindex, selection follows focus), Dialog v2
+  (document-level Escape, focus trap with Tab/Shift-Tab wrap, focus
+  returns to the opener, aria-modal), Ribbon v2 (←/→ across groups
+  skipping disabled tools, wrap), TextField v2 (`invalid` →
+  aria-invalid + error border; `unit` suffix for mm/deg/s), shared
+  keyboard-only focus ring across all interactive widgets, and a
+  border-box sizing rule (screenshot review caught unit fields
+  overflowing their declared width — fixed family-wide). Pins for
+  Rail and ViewportCanvas (mount-once/teardown). aether-ui suite now
+  23 tests, tsc clean, gallery screenshot-verified, launcher bundle
+  rebuilt. Matrix remaining: DockPanel collapse spec, then the big
+  Timeline/DopeSheet widget (blocked on engine clip-CRUD verbs — the
+  queued Codex mailbox packet).

@@ -214,6 +214,14 @@ function Gallery() {
           placeholder="Assembly name"
           style={{ width: 200 }}
         />
+        <TextField unit="mm" defaultValue="12.5" style={{ width: 110 }} />
+        <TextField
+          unit="deg"
+          defaultValue="400"
+          invalid
+          title="Invalid: exceeds the joint limit"
+          style={{ width: 110 }}
+        />
         <Button primary onClick={() => setDialogOpen(true)}>
           Open dialog
         </Button>

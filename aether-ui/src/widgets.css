@@ -1,6 +1,23 @@
 /* Aether widget styles. Consumes ONLY token variables (tokens.css).
    One block per widget, matching the one-widget-per-file source layout. */
 
+/* Every widget sizes border-box so declared widths are real widths. */
+[class^="aui-"],
+[class*=" aui-"] {
+  box-sizing: border-box;
+}
+
+/* Shared focus ring — every interactive widget shows the same
+   keyboard-only ring (WIDGETS.md: identical everywhere). */
+.aui-button:focus-visible,
+.aui-icon-button:focus-visible,
+.aui-ribbon-tool:focus-visible,
+.aui-rail-button:focus-visible,
+.aui-tab:focus-visible {
+  outline: 1px solid var(--aether-color-border-focus);
+  outline-offset: 1px;
+}
+
 /* Button.tsx */
 .aui-button {
   appearance: none;
@@ -223,6 +240,23 @@
 .aui-text-field:focus {
   border-color: var(--aether-color-border-focus);
   box-shadow: 0 0 0 2px rgba(43, 156, 243, 0.12);
+}
+.aui-text-field--invalid,
+.aui-text-field--invalid:focus {
+  border-color: var(--aether-color-error);
+  box-shadow: 0 0 0 2px rgba(255, 90, 98, 0.12);
+}
+.aui-text-field-wrap { position: relative; display: inline-block; }
+.aui-text-field-wrap > .aui-text-field { padding-right: 34px; }
+.aui-text-field-unit {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--aether-color-text-faint);
+  font-family: var(--aether-font-family);
+  font-size: var(--aether-font-size-caption);
+  pointer-events: none;
 }
 
 /* Dialog.tsx */
