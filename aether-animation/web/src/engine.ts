@@ -33,10 +33,17 @@ export interface PartSummary {
   grounded: boolean;
 }
 
+export interface ClipKeyframe {
+  time_s: number;
+  interpolation: string;
+  values: Record<string, number>;
+}
+
 export interface ClipSummary {
   name: string;
   duration_s: number;
   loop: boolean;
+  keyframes: ClipKeyframe[];
 }
 
 export interface RigSummary {

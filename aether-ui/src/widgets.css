@@ -234,7 +234,8 @@
   background: var(--aether-color-bg-app);
   font-family: var(--aether-font-family);
 }
-.aui-shell-body { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.aui-shell-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.aui-shell-area { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .aui-shell-row { display: flex; flex: 1; min-width: 0; }
 .aui-shell-side { display: flex; align-items: stretch; background: var(--aether-color-bg-panel); }
 .aui-shell-side--right { border-left: 1px solid var(--aether-color-border); }
@@ -350,6 +351,111 @@
   cursor: pointer;
 }
 .aui-float-panel-action:hover { color: var(--aether-color-text); }
+
+/* Timeline.tsx — dope-sheet */
+.aui-timeline {
+  display: flex;
+  min-height: 0;
+  background: var(--aether-color-bg-panel);
+  border-top: 1px solid var(--aether-color-border);
+  font-family: var(--aether-font-family);
+}
+.aui-timeline-side {
+  display: flex;
+  flex-direction: column;
+  width: 168px;
+  border-right: 1px solid var(--aether-color-border);
+}
+.aui-timeline-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--aether-space-3);
+  height: 34px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--aether-color-border);
+}
+.aui-timeline-clock {
+  color: var(--aether-color-text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.aui-timeline-label {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  color: var(--aether-color-text-dim);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aui-timeline-lanes {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.aui-timeline-ruler {
+  position: relative;
+  height: 34px;
+  border-bottom: 1px solid var(--aether-color-border);
+}
+.aui-timeline-tick {
+  position: absolute;
+  bottom: 3px;
+  transform: translateX(2px);
+  color: var(--aether-color-text-faint);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--aether-color-border);
+  padding-left: 3px;
+  height: 14px;
+}
+.aui-timeline-row {
+  position: relative;
+  height: 26px;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--aether-color-border) 45%, transparent);
+}
+.aui-timeline-key {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--aether-color-accent-icon);
+  border: 1px solid var(--aether-color-bg-panel);
+  cursor: pointer;
+}
+.aui-timeline-key--selected {
+  background: white;
+  outline: 1px solid var(--aether-color-accent);
+}
+.aui-timeline-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--aether-color-accent);
+  pointer-events: none;
+}
+.aui-timeline-playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  border: 5px solid transparent;
+  border-top-color: var(--aether-color-accent);
+}
+.aui-timeline-empty {
+  flex: 1;
+  padding: var(--aether-space-5);
+  color: var(--aether-color-text-faint);
+  font-size: var(--aether-font-size-label);
+}
 
 /* DockPanel.tsx */
 .aui-dock-panel {

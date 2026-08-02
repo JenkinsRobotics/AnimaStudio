@@ -144,6 +144,8 @@ export interface WorkspaceShellProps {
   rightPanels?: readonly WorkspacePanel[];
   defaultOpenLeft?: readonly string[];
   defaultOpenRight?: readonly string[];
+  /** Bottom editor strip under the canvas (dope sheet, curves, log). */
+  bottom?: ReactNode;
   statusBar?: ReactNode;
   style?: CSSProperties;
   /** The center canvas/viewport. */
@@ -159,7 +161,7 @@ type Edge = "top" | "left" | "right";
 
 export function WorkspaceShell(props: WorkspaceShellProps) {
   const {
-    preset, toolbar, statusBar, style, children,
+    preset, toolbar, bottom, statusBar, style, children,
     leftPanels = [], rightPanels = [],
   } = props;
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -403,8 +405,9 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 
   return (
     <div className="aui-shell" style={style}>
-      <div className="aui-shell-body" ref={bodyRef}>
-        {preset === "docked" ? (
+      <div className="aui-shell-body">
+        <div className="aui-shell-area" ref={bodyRef}>
+          {preset === "docked" ? (
           <div className="aui-shell-row">
             {leftPanels.length ? (
               <div className="aui-shell-side">
@@ -435,14 +438,16 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
               </div>
             ) : null}
           </div>
-        ) : (
-          <>
-            <div className="aui-shell-center">{children}</div>
-            {overlayChrome(preset === "canvas")}
-          </>
-        )}
-        {tornLayer("left")}
-        {tornLayer("right")}
+          ) : (
+            <>
+              <div className="aui-shell-center">{children}</div>
+              {overlayChrome(preset === "canvas")}
+            </>
+          )}
+          {tornLayer("left")}
+          {tornLayer("right")}
+        </div>
+        {bottom}
       </div>
       {statusBar}
     </div>

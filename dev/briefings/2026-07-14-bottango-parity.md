@@ -48,7 +48,7 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
-| Codex | Extract the first production TypeScript Aether Core package from Aether CAD without creating a second evaluator | `aether-core/{package.json,package-lock.json,tsconfig.json,src/**}` excluding Claude-owned `aether-core/README.md`; `Aether CAD/{package.json,package-lock.json,src/{domain,sketch-constraints,part-document,part-file,cad-frame-math,topology-inference,math,aether-core}.ts}` and focused tests; STATUS + append-only coordination only | `@aether/core` has no DOM, React, Three.js, or product dependencies in its semantic modules; deterministic Part/sketch documents, serialization, topology inference, and pure connector/mate transforms move behind one package; Aether CAD consumes compatibility adapters with byte/transform parity; future OCCT/render/physics adapters remain internal Core modules, not new top-level packages; Core tests plus CAD test/check/build pass | in progress 2026-08-01 |
+| Codex | Extract the first production TypeScript Aether Core package from Aether CAD without creating a second evaluator | `aether-core/{ARCHITECTURE.md,package.json,package-lock.json,tsconfig.json,src/**}` excluding Claude-owned `aether-core/README.md`; `Aether CAD/{AETHER_CORE_EXTRACTION.md,package.json,package-lock.json,src/{domain,sketch-constraints,part-document,part-file,cad-frame-math,topology-inference,math,aether-core,exact-topology,part-geometry,occt-part-evaluator,occt.worker,worker-client}.ts}` and focused tests; STATUS + append-only coordination only | `@aether/core` has no React or Three.js dependency and its semantic modules remain DOM-free; deterministic Part/sketch documents, serialization, topology inference, pure connector/mate transforms, OCCT/WASM startup, exact topology, STEP import, and Part evaluation move behind one package; Aether CAD consumes compatibility adapters with byte/transform parity; future render/physics adapters remain internal Core modules, not new top-level packages; Core tests plus CAD test/check/build pass | in progress 2026-08-01 |
 | Codex | Migrate Aether CAD chrome to the shared React UI standard with a Shapr3D-inspired workspace | `Aether CAD/{package.json,package-lock.json,index.html,tsconfig.app.json,src/{main,react-main,viewer,viewport-appearance}.ts*}`, new `Aether CAD/src/react/**` and focused shell tests, STATUS + append-only coordination only; consume `aether-ui/**` read-only and do not touch Claude's active claim | React owns a compact document header, left Items browser, floating center-edge tool rails, right History browser, and responsive panel chrome while the OCCT worker and one persistent Three.js/WebGPU viewport retain all current Part/STEP/Sketch/Connector/Mate behavior; tests/check/build/root-app rebuild and launch pass | released 2026-08-01 — React/Shapr shell shipped on `@aether/ui`; 36 tests/check/build/root-app sign/launch and native visual review pass |
 | Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | released 2026-08-01 — implemented v2 sketch graph/editor/migration; 34 tests/check/build/root-app rebuild pass; browser plugin bootstrap failed before local connection |
 | Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
@@ -4913,3 +4913,26 @@ change needed in the Handoff log instead of inventing commands.
   menu. Full legacy-chrome inventory (catalog of all 21 UIDev sections,
   variant boards, detached-window rules) captured from the archive for
   the remaining porting queue.
+- **2026-08-01 (Claude, full web-app migration — "zero missing UI
+  elements" mandate):** The rebuilt Aether Animation web app now carries
+  the complete Swift-app chrome, all on @aether/ui: DocumentBar (brand,
+  character, engine dot; window-centered workspace tabs Assets /
+  3D Modeling / Animate; Save + the studio layout button), WorkspaceShell
+  with all three layout presets (persisted to localStorage), left rail
+  panels Character / Parts / Mates / Clips, right rail Inspector
+  (context-sensitive part/mate details + Remove mate) / Pose (DOF
+  sliders), per-workspace ribbon (Modeling: all 8 kinematic mate tools
+  from `mate_types` + Remove; Animate: pose reset; Assets: reload/save),
+  the **mate authoring dialog** (closing the "Web rebuild 2" claim:
+  armed tool → viewport connector picks with ghost/placed triads →
+  flip + secondary reorientation → Solve = `preview_mate` → ✓ =
+  `add_mate` with rig refresh), and the **Timeline dope-sheet** as the
+  Animate bottom editor (new aether-ui `Timeline` widget: labeled
+  tracks, keyframe diamonds, adaptive ruler, scrub, transport; fed by
+  the clip keyframes already in `load_character`). New app files per the
+  subsystem-segregation rule: `MateDialog.tsx`, `TimelinePanel.tsx`,
+  `PosePanel.tsx`. Deep links `?workspace=…&clip=…`. Viewport rehydrates
+  after preset-switch remounts. Verified live against the bridge
+  (modeling + animate screenshots). aether-ui: 32 tests; web tsc clean;
+  both launcher .apps rebuilt. Keyframe EDITING stays read-only until
+  the engine clip-CRUD packet (Codex's queued request — next).

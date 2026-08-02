@@ -19,6 +19,7 @@ import {
   StatusDot,
   Tabs,
   TextField,
+  Timeline,
   Tree,
   ViewportCanvas,
   WorkspaceShell,
@@ -208,6 +209,30 @@ function WorkspaceDemo() {
   );
 }
 
+function TimelineDemo() {
+  const [timeS, setTimeS] = useState(0.8);
+  const [playing, setPlaying] = useState(false);
+  const [selected, setSelected] = useState<{ trackID: string; index: number } | null>(null);
+  return (
+    <div style={{ width: 640, border: "1px solid var(--aether-color-border)", borderRadius: 8, overflow: "hidden" }}>
+      <Timeline
+        tracks={[
+          { id: "pan", label: "pan.rotation", keyframes: [{ timeS: 0 }, { timeS: 1 }, { timeS: 2 }] },
+          { id: "tilt", label: "tilt.rotation", keyframes: [{ timeS: 0 }, { timeS: 0.5 }, { timeS: 2 }] },
+          { id: "jaw", label: "jaw.open", keyframes: [{ timeS: 0.25 }, { timeS: 1.4 }] },
+        ]}
+        durationS={2}
+        timeS={timeS}
+        onSeek={setTimeS}
+        playing={playing}
+        onTogglePlay={() => setPlaying((current) => !current)}
+        selected={selected}
+        onSelectKeyframe={(trackID, index) => setSelected({ trackID, index })}
+      />
+    </div>
+  );
+}
+
 function Gallery() {
   const [activeTab, setActiveTab] = useState("modeling");
   const [armedTool, setArmedTool] = useState<string | null>("revolute");
@@ -378,6 +403,10 @@ function Gallery() {
         >
           Name: {name || "(untitled)"}
         </Dialog>
+      </Section>
+
+      <Section title="Timeline (dope sheet)">
+        <TimelineDemo />
       </Section>
 
       <Section title="Status bar">

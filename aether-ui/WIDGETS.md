@@ -55,7 +55,7 @@ Definition of done for a core widget:
 | FloatingPanel | v1 | yes | via shell | draggable by header; also standalone for short-lived tools |
 | DocumentBar | v1 | yes | none | 48px top row: leading/trailing clusters + window-centered tabs. Deferred: responsive breakpoint collapse (1320/1060/880) |
 | LayoutPresetButton | v1 | yes | yes | the studio button — cycles floating → docked → canvas. Deferred: dropdown menu listing all modes |
-| Timeline / DopeSheet | — | — | — | not started; Swift `UIDevTimelineDesignB` + demo `Timeline.swift` are the references |
+| Timeline / DopeSheet | **v1** | yes | full | labeled tracks, keyframe diamonds, adaptive ruler, scrub/playhead, transport, keyframe select. Deferred until engine clip-CRUD: keyframe drag/add/delete, curves view |
 
 Work the matrix top to bottom; a row is done when all three columns are
 full. Contributions (either agent) follow the same definition of done.

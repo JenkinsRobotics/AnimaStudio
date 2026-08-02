@@ -24,3 +24,4 @@ export {
   type FloatingPanelProps,
 } from "./WorkspaceShell";
 export { DocumentBar, type DocumentBarProps } from "./DocumentBar";
+export { Timeline, type TimelineProps, type TimelineTrack } from "./Timeline";

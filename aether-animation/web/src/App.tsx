@@ -1,37 +1,71 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
-  DockPanel,
+  DocumentBar,
+  LayoutPresetButton,
+  Ribbon,
+  RibbonGroup,
+  RibbonTool,
   StatusBar,
   StatusDot,
   Tabs,
   Tree,
   ViewportCanvas,
+  WorkspaceShell,
 } from "@aether/ui";
-import type { StatusKind, TreeNode } from "@aether/ui";
+import type { LayoutPreset, StatusKind, TreeNode, WorkspacePanel } from "@aether/ui";
 import {
+  addMate,
   fetchCharacterText,
   loadCharacter,
+  mateTypes,
+  removeMate,
   resolvePose,
   saveFile,
   serializeCharacter,
 } from "./engine";
-import type { ClipSummary, DofSummary, RigSummary } from "./engine";
+import type {
+  ClipSummary,
+  ConnectorDTO,
+  MateTypeSchema,
+  RigSummary,
+} from "./engine";
+import { previewMate } from "./engine";
 import { AnimationViewport } from "./viewport";
+import { MateDialog, draftToJoint } from "./MateDialog";
+import type { MateDraft } from "./MateDialog";
+import { TimelinePanel } from "./TimelinePanel";
+import { PosePanel } from "./PosePanel";
+import type { DofState } from "./PosePanel";
 
 const DEFAULT_CHARACTER = "examples/pan_tilt_head.character.anima";
+const PRESET_KEY = "aether.layoutPreset";
 
-interface DofState extends DofSummary {
-  shown: number;
-  touched: boolean;
-}
+const TOOL_GLYPHS: Record<string, string> = {
+  fastened: "▣",
+  revolute: "↻",
+  prismatic: "↔",
+  cylindrical: "⌀",
+  planar: "▱",
+  ball: "●",
+  pin_slot: "⌖",
+  parallel: "∥",
+};
 
 export function App() {
   const viewportRef = useRef<AnimationViewport | null>(null);
   const [status, setStatus] = useState("connecting to engine…");
   const [statusKind, setStatusKind] = useState<StatusKind>("busy");
-  const [workspace, setWorkspace] = useState("animate");
+  // Deep links for review: ?workspace=assets|modeling|animate&clip=<name>
+  const [workspace, setWorkspace] = useState(
+    () => new URLSearchParams(location.search).get("workspace") ?? "modeling"
+  );
+  const [preset, setPreset] = useState<LayoutPreset>(() => {
+    const stored = localStorage.getItem(PRESET_KEY);
+    return stored === "floating" || stored === "canvas" ? stored : "docked";
+  });
   const [rig, setRig] = useState<RigSummary | null>(null);
+  const rigRef = useRef<RigSummary | null>(null);
   const [rawRig, setRawRig] = useState<unknown>(null);
   const handleRef = useRef<string | null>(null);
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
@@ -42,50 +76,74 @@ export function App() {
   const [timeS, setTimeS] = useState(0);
   const poseBusy = useRef(false);
   const poseDirty = useRef(false);
+  const [mateSchemas, setMateSchemas] = useState<MateTypeSchema[]>([]);
+  const [mateDraft, setMateDraft] = useState<MateDraft | null>(null);
+  const mateDraftRef = useRef<MateDraft | null>(null);
+  const [mateBusy, setMateBusy] = useState(false);
 
-  // ---- engine boot -----------------------------------------------------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const text = await fetchCharacterText(DEFAULT_CHARACTER);
-        const loaded = await loadCharacter(text);
-        if (cancelled) return;
-        handleRef.current = loaded.handle;
-        setRig(loaded.rig);
-        setRawRig(loaded.rig);
-        setDofs(
-          loaded.rig.joints.flatMap((joint) =>
-            joint.dofs.map((dof) => ({
-              ...dof,
-              shown: dof.neutral ?? 0,
-              touched: false,
-            }))
-          )
-        );
-        await viewportRef.current?.setParts(loaded.rig.parts, DEFAULT_CHARACTER);
-        poseDirty.current = true;
-        setStatus(
-          `${loaded.rig.identity.display_name ?? loaded.rig.identity.name} — ` +
-            `${loaded.rig.parts.length} parts · ${loaded.rig.joints.length} mates`
-        );
-        setStatusKind("ok");
-      } catch (error) {
-        setStatus(`engine unavailable: ${(error as Error).message} — ` +
-          "run: .venv/bin/python -m animacore.httpbridge");
-        setStatusKind("error");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const choosePreset = useCallback((next: LayoutPreset) => {
+    localStorage.setItem(PRESET_KEY, next);
+    setPreset(next);
   }, []);
 
-  // ---- pose loop (coalesced; one request in flight) --------------------
   const requestPose = useCallback(() => {
     poseDirty.current = true;
   }, []);
 
+  const adoptRig = useCallback(async (loadedRig: RigSummary, raw: unknown) => {
+    rigRef.current = loadedRig;
+    setRig(loadedRig);
+    setRawRig(raw);
+    setDofs(
+      loadedRig.joints.flatMap((joint) =>
+        joint.dofs.map((dof) => ({
+          ...dof,
+          shown: dof.neutral ?? 0,
+          touched: false,
+        }))
+      )
+    );
+    await viewportRef.current?.setParts(loadedRig.parts, DEFAULT_CHARACTER);
+    poseDirty.current = true;
+    setStatus(
+      `${loadedRig.identity.display_name ?? loadedRig.identity.name} — ` +
+        `${loadedRig.parts.length} parts · ${loadedRig.joints.length} mates · ` +
+        `${loadedRig.clips.length} clips`
+    );
+    setStatusKind("ok");
+  }, []);
+
+  // ---- engine boot -----------------------------------------------------
+  const boot = useCallback(async () => {
+    try {
+      setStatus("connecting to engine…");
+      setStatusKind("busy");
+      const text = await fetchCharacterText(DEFAULT_CHARACTER);
+      const loaded = await loadCharacter(text);
+      handleRef.current = loaded.handle;
+      await adoptRig(loaded.rig, loaded.rig);
+      const types = await mateTypes();
+      setMateSchemas(types.mate_types.filter((schema) => schema.category === "kinematic"));
+      const clipParam = new URLSearchParams(location.search).get("clip");
+      if (clipParam) {
+        const clip = loaded.rig.clips.find((entry) => entry.name === clipParam);
+        if (clip) setActiveClip(clip);
+      }
+    } catch (error) {
+      setStatus(
+        `engine unavailable: ${(error as Error).message} — ` +
+          "run: .venv/bin/python -m animacore.httpbridge"
+      );
+      setStatusKind("error");
+    }
+  }, [adoptRig]);
+
+  useEffect(() => {
+    void boot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- pose loop (coalesced; one request in flight) --------------------
   useEffect(() => {
     let cancelled = false;
     let lastTick = performance.now();
@@ -146,68 +204,134 @@ export function App() {
         } else {
           next = new Set(ids);
         }
-        viewportRef.current?.setSelection(next);
+        viewportRef.current?.setSelection(
+          new Set([...next].filter((id) => !id.includes(":")))
+        );
         return next;
       });
     },
     []
   );
 
-  // ---- project tree ----------------------------------------------------
-  const treeNodes = useMemo<TreeNode[]>(() => {
-    if (!rig) return [];
-    return [
-      {
-        id: "#instances",
-        label: "Instances",
-        badge: String(rig.parts.length),
-        children: rig.parts.map((part) => ({
-          id: part.name,
-          label: part.name + (part.grounded ? " ⏚" : ""),
-        })),
-      },
-      {
-        id: "#mates",
-        label: "Mate features",
-        badge: String(rig.joints.length),
-        children: rig.joints.map((joint) => ({
-          id: `mate:${joint.name}`,
-          label: `${joint.name} · ${joint.type}`,
-        })),
-      },
-      {
-        id: "#clips",
-        label: "Clips",
-        badge: String(rig.clips.length),
-        children: rig.clips.map((clip) => ({
-          id: `clip:${clip.name}`,
-          label: `${clip.name} · ${clip.duration_s.toFixed(2)}s` +
-            (clip.loop ? " ⟳" : ""),
-        })),
-      },
-    ];
-  }, [rig]);
+  // ---- mate authoring --------------------------------------------------
+  const disarmMate = useCallback(() => {
+    mateDraftRef.current = null;
+    setMateDraft(null);
+    viewportRef.current?.setConnectorMode(false);
+    requestPose(); // restore the evaluated pose after any preview
+  }, [requestPose]);
 
-  const onTreeSelect = useCallback(
-    (ids: readonly string[], mode: "single" | "toggle" | "range") => {
-      const id = ids[ids.length - 1] ?? "";
-      if (id.startsWith("clip:")) {
-        const name = id.slice(5);
-        const clip = rig?.clips.find((candidate) => candidate.name === name);
-        setActiveClip((current) => (current?.name === name ? null : clip ?? null));
-        timeRef.current = 0;
-        setTimeS(0);
-        setPlaying(false);
-        requestPose();
-        return;
-      }
-      if (id.startsWith("#") || id.startsWith("mate:")) return;
-      const partIDs = ids.filter(
-        (entry) => !entry.startsWith("#") && !entry.startsWith("mate:") &&
-          !entry.startsWith("clip:"));
-      select(partIDs, mode);
+  const armMate = useCallback(
+    (schema: MateTypeSchema) => {
+      const draft: MateDraft = {
+        schema,
+        a: null,
+        b: null,
+        flipPrimaryAxis: false,
+        secondaryAxisRotationDeg: 0,
+      };
+      mateDraftRef.current = draft;
+      setMateDraft(draft);
+      viewportRef.current?.setConnectorMode(true, (pick) => {
+        const current = mateDraftRef.current;
+        if (!current) return;
+        const connector: ConnectorDTO = {
+          part: pick.part,
+          origin_m: pick.originM,
+          primary_axis: pick.primaryAxis,
+          secondary_axis: pick.secondaryAxis,
+        };
+        const next: MateDraft = current.a
+          ? { ...current, b: connector }
+          : { ...current, a: connector };
+        mateDraftRef.current = next;
+        setMateDraft(next);
+      });
     },
-    [rig, requestPose, select]
+    []
+  );
+
+  const updateDraft = useCallback((draft: MateDraft) => {
+    mateDraftRef.current = draft;
+    setMateDraft(draft);
+  }, []);
+
+  const mateName = useCallback(() => {
+    const base = mateDraftRef.current?.schema.type ?? "mate";
+    const existing = new Set(rigRef.current?.joints.map((joint) => joint.name));
+    let index = 1;
+    while (existing.has(`${base}_${index}`)) index += 1;
+    return `${base}_${index}`;
+  }, []);
+
+  const solveMate = useCallback(async () => {
+    const draft = mateDraftRef.current;
+    const handle = handleRef.current;
+    if (!draft || !handle) return;
+    const joint = draftToJoint(draft, mateName());
+    if (!joint) return;
+    setMateBusy(true);
+    try {
+      const pose = await previewMate(handle, joint);
+      viewportRef.current?.applyPose(pose.parts);
+      setStatus(`preview: ${joint.name}`);
+      setStatusKind("ok");
+    } catch (error) {
+      setStatus(`preview failed: ${(error as Error).message}`);
+      setStatusKind("warn");
+    } finally {
+      setMateBusy(false);
+    }
+  }, [mateName]);
+
+  const commitMate = useCallback(async () => {
+    const draft = mateDraftRef.current;
+    const handle = handleRef.current;
+    if (!draft || !handle) return;
+    const joint = draftToJoint(draft, mateName());
+    if (!joint) return;
+    setMateBusy(true);
+    try {
+      const result = await addMate(handle, joint);
+      handleRef.current = result.handle;
+      await adoptRig(result.rig, result.rig);
+      disarmMate();
+    } catch (error) {
+      setStatus(`create mate failed: ${(error as Error).message}`);
+      setStatusKind("warn");
+    } finally {
+      setMateBusy(false);
+    }
+  }, [adoptRig, disarmMate, mateName]);
+
+  const deleteMate = useCallback(
+    async (name: string) => {
+      const handle = handleRef.current;
+      if (!handle) return;
+      try {
+        const result = await removeMate(handle, name);
+        handleRef.current = result.handle;
+        await adoptRig(result.rig, result.rig);
+        setSelection(new Set());
+      } catch (error) {
+        setStatus(`remove mate failed: ${(error as Error).message}`);
+        setStatusKind("warn");
+      }
+    },
+    [adoptRig]
+  );
+
+  // ---- clips -----------------------------------------------------------
+  const chooseClip = useCallback(
+    (name: string) => {
+      const clip = rigRef.current?.clips.find((entry) => entry.name === name);
+      setActiveClip((current) => (current?.name === name ? null : clip ?? null));
+      timeRef.current = 0;
+      setTimeS(0);
+      setPlaying(false);
+      requestPose();
+    },
+    [requestPose]
   );
 
   // ---- save ------------------------------------------------------------
@@ -217,38 +341,290 @@ export function App() {
       const { text } = await serializeCharacter(rawRig);
       await saveFile(DEFAULT_CHARACTER, text);
       setStatus("saved " + DEFAULT_CHARACTER);
+      setStatusKind("ok");
     } catch (error) {
       setStatus(`save failed: ${(error as Error).message}`);
       setStatusKind("warn");
     }
   }, [rawRig]);
 
-  return (
-    <div className="app-shell">
-      <header className="app-topbar">
-        <strong className="app-brand">◆ AETHER ANIMATION</strong>
-        <Tabs
-          tabs={[
-            { id: "assets", label: "Assets" },
-            { id: "modeling", label: "3D Modeling" },
-            { id: "animate", label: "Animate" },
-          ]}
-          activeID={workspace}
-          onSelect={setWorkspace}
+  // ---- panels ----------------------------------------------------------
+  const partNodes = useMemo<TreeNode[]>(
+    () =>
+      rig?.parts.map((part) => ({
+        id: part.name,
+        label: part.name,
+        icon: "▫",
+        badge: part.grounded ? "⏚" : undefined,
+        dimmed: part.suppressed,
+      })) ?? [],
+    [rig]
+  );
+  const mateNodes = useMemo<TreeNode[]>(
+    () =>
+      rig?.joints.map((joint) => ({
+        id: `mate:${joint.name}`,
+        label: `${joint.name} · ${joint.type}`,
+        icon: "⛓",
+      })) ?? [],
+    [rig]
+  );
+  const clipNodes = useMemo<TreeNode[]>(
+    () =>
+      rig?.clips.map((clip) => ({
+        id: `clip:${clip.name}`,
+        label: `${clip.name} · ${clip.duration_s.toFixed(2)}s${clip.loop ? " ⟳" : ""}`,
+        icon: "▷",
+        badge: clip.name === activeClip?.name ? "●" : undefined,
+      })) ?? [],
+    [rig, activeClip]
+  );
+
+  const selectedMate = useMemo(() => {
+    const id = [...selection].find((entry) => entry.startsWith("mate:"));
+    if (!id) return null;
+    return rig?.joints.find((joint) => joint.name === id.slice(5)) ?? null;
+  }, [selection, rig]);
+  const selectedPart = useMemo(() => {
+    const id = [...selection].find((entry) => !entry.includes(":"));
+    if (!id) return null;
+    return rig?.parts.find((part) => part.name === id) ?? null;
+  }, [selection, rig]);
+
+  const onDofChange = useCallback(
+    (index: number, value: number) => {
+      setDofs((current) =>
+        current.map((entry, entryIndex) =>
+          entryIndex === index ? { ...entry, shown: value, touched: true } : entry
+        )
+      );
+      requestPose();
+    },
+    [requestPose]
+  );
+  const onDofReset = useCallback(() => {
+    setDofs((current) =>
+      current.map((dof) => ({ ...dof, shown: dof.neutral ?? 0, touched: false }))
+    );
+    requestPose();
+  }, [requestPose]);
+
+  const inspector = (
+    <div className="inspector-panel">
+      {selectedMate ? (
+        <>
+          <div className="inspector-title">{selectedMate.name}</div>
+          <div className="inspector-row">type · {selectedMate.type}</div>
+          <div className="inspector-row">
+            {selectedMate.parent_part} → {selectedMate.child_part}
+          </div>
+          <div className="inspector-row">
+            DOF · {selectedMate.dofs.map((dof) => dof.path).join(", ") || "none"}
+          </div>
+          <Button onClick={() => deleteMate(selectedMate.name)}>Remove mate</Button>
+        </>
+      ) : selectedPart ? (
+        <>
+          <div className="inspector-title">{selectedPart.name}</div>
+          <div className="inspector-row">model · {selectedPart.model || "(none)"}</div>
+          <div className="inspector-row">
+            {selectedPart.grounded ? "grounded ⏚" : "free"}
+          </div>
+        </>
+      ) : (
+        <div className="inspector-row">select a part or mate</div>
+      )}
+    </div>
+  );
+
+  const characterPanel = (
+    <div className="inspector-panel">
+      <div className="inspector-title">
+        {rig ? rig.identity.display_name ?? rig.identity.name : "…"}
+      </div>
+      <div className="inspector-row">{DEFAULT_CHARACTER}</div>
+      <div className="inspector-row">
+        {rig
+          ? `${rig.parts.length} parts · ${rig.joints.length} mates · ${rig.clips.length} clips`
+          : "loading"}
+      </div>
+      <Button onClick={boot}>Reload character</Button>
+    </div>
+  );
+
+  const leftPanels: WorkspacePanel[] = [
+    {
+      id: "character",
+      title: "Character",
+      icon: "◆",
+      content: characterPanel,
+    },
+    {
+      id: "parts",
+      title: "Parts",
+      icon: "▣",
+      content: (
+        <Tree nodes={partNodes} selectedIDs={selection} onSelect={select} />
+      ),
+    },
+    {
+      id: "mates",
+      title: "Mates",
+      icon: "⛓",
+      content: (
+        <Tree
+          nodes={mateNodes}
+          selectedIDs={selection}
+          onSelect={select}
+          emptyState="no mates — arm a mate tool"
         />
-        <span className="app-topbar-spacer" />
-        <Button onClick={save} disabled={!rawRig}>
-          Save
-        </Button>
-      </header>
-      <div className="app-body">
-        <DockPanel title="Project" width="var(--aether-size-sidebar)">
-          <Tree
-            nodes={treeNodes}
-            selectedIDs={selection}
-            onSelect={onTreeSelect}
+      ),
+    },
+    {
+      id: "clips",
+      title: "Clips",
+      icon: "▷",
+      content: (
+        <Tree
+          nodes={clipNodes}
+          selectedIDs={new Set(activeClip ? [`clip:${activeClip.name}`] : [])}
+          onSelect={(ids) => {
+            const id = ids[ids.length - 1];
+            if (id?.startsWith("clip:")) chooseClip(id.slice(5));
+          }}
+          emptyState="no clips in this character"
+        />
+      ),
+    },
+  ];
+
+  const rightPanels: WorkspacePanel[] = [
+    { id: "inspector", title: "Inspector", icon: "☰", content: inspector },
+    {
+      id: "pose",
+      title: "Pose",
+      icon: "⚙",
+      content: <PosePanel dofs={dofs} onChange={onDofChange} onReset={onDofReset} />,
+    },
+  ];
+
+  // ---- ribbon ----------------------------------------------------------
+  const toolbar = (
+    <Ribbon>
+      {workspace === "modeling" ? (
+        <>
+          <RibbonGroup label="Mate">
+            {mateSchemas.map((schema) => (
+              <RibbonTool
+                key={schema.type}
+                icon={TOOL_GLYPHS[schema.type] ?? "◇"}
+                label={schema.label}
+                active={mateDraft?.schema.type === schema.type}
+                onClick={() =>
+                  mateDraft?.schema.type === schema.type
+                    ? disarmMate()
+                    : armMate(schema)
+                }
+              />
+            ))}
+          </RibbonGroup>
+          <RibbonGroup label="Edit">
+            <RibbonTool
+              icon="✕"
+              label="Remove"
+              disabled={!selectedMate}
+              onClick={() => selectedMate && deleteMate(selectedMate.name)}
+            />
+          </RibbonGroup>
+        </>
+      ) : workspace === "animate" ? (
+        <RibbonGroup label="Pose">
+          <RibbonTool icon="⟲" label="Reset" onClick={onDofReset} />
+        </RibbonGroup>
+      ) : (
+        <RibbonGroup label="Character">
+          <RibbonTool icon="⟳" label="Reload" onClick={() => void boot()} />
+          <RibbonTool icon="💾" label="Save" onClick={() => void save()} />
+        </RibbonGroup>
+      )}
+    </Ribbon>
+  );
+
+  // ---- shell -----------------------------------------------------------
+  return (
+    <div className="app-root">
+      <DocumentBar
+        leading={
+          <>
+            <strong className="app-brand">◆ AETHER</strong>
+            <span className="app-project">
+              {rig ? rig.identity.display_name ?? rig.identity.name : "…"}
+            </span>
+            <StatusDot kind={statusKind} />
+          </>
+        }
+        center={
+          <Tabs
+            tabs={[
+              { id: "assets", label: "Assets" },
+              { id: "modeling", label: "3D Modeling" },
+              { id: "animate", label: "Animate" },
+            ]}
+            activeID={workspace}
+            onSelect={setWorkspace}
           />
-        </DockPanel>
+        }
+        trailing={
+          <>
+            <Button onClick={save} disabled={!rawRig}>
+              Save
+            </Button>
+            <LayoutPresetButton preset={preset} onChange={choosePreset} />
+          </>
+        }
+      />
+      <WorkspaceShell
+        preset={preset}
+        style={{ flex: 1, minHeight: 0 }}
+        toolbar={toolbar}
+        leftPanels={leftPanels}
+        rightPanels={rightPanels}
+        defaultOpenLeft={["parts"]}
+        defaultOpenRight={["inspector"]}
+        bottom={
+          workspace === "animate" ? (
+            <TimelinePanel
+              clip={activeClip}
+              timeS={timeS}
+              playing={playing}
+              onSeek={(time) => {
+                timeRef.current = time;
+                setTimeS(time);
+                setPlaying(false);
+                requestPose();
+              }}
+              onTogglePlay={() => {
+                if (
+                  !playing &&
+                  activeClip &&
+                  timeRef.current >= activeClip.duration_s
+                ) {
+                  timeRef.current = 0;
+                }
+                setPlaying((current) => !current);
+              }}
+            />
+          ) : undefined
+        }
+        statusBar={
+          <StatusBar>
+            <StatusDot kind={statusKind} />
+            {status}
+            <span className="app-status-spacer" />
+            layout · {preset}
+          </StatusBar>
+        }
+      >
         <ViewportCanvas
           className="app-viewport"
           onMount={(canvas) => {
@@ -270,97 +646,33 @@ export function App() {
               }
             });
             viewportRef.current = viewport;
+            // Preset switches remount the canvas (the shell's docked and
+            // floating trees differ); rehydrate from the live rig.
+            const current = rigRef.current;
+            if (current) {
+              void viewport
+                .setParts(current.parts, DEFAULT_CHARACTER)
+                .then(() => {
+                  poseDirty.current = true;
+                });
+            }
             return () => {
               viewport?.dispose();
               viewportRef.current = null;
             };
           }}
         />
-        <DockPanel title="Pose" width={260}>
-          <div className="pose-panel">
-            {dofs.map((dof, index) => (
-              <label key={dof.path} className="pose-row">
-                <span className="pose-label">
-                  {(dof.touched ? "● " : "") + dof.path}
-                </span>
-                <input
-                  type="range"
-                  min={dof.min ?? (dof.neutral ?? 0) - Math.PI}
-                  max={dof.max ?? (dof.neutral ?? 0) + Math.PI}
-                  step={0.001}
-                  value={dof.shown}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
-                    setDofs((current) =>
-                      current.map((entry, entryIndex) =>
-                        entryIndex === index
-                          ? { ...entry, shown: value, touched: true }
-                          : entry
-                      )
-                    );
-                    requestPose();
-                  }}
-                />
-                <span className="pose-value">{dof.shown.toFixed(2)}</span>
-              </label>
-            ))}
-            {dofs.some((dof) => dof.touched) ? (
-              <Button
-                onClick={() => {
-                  setDofs((current) =>
-                    current.map((dof) => ({
-                      ...dof,
-                      shown: dof.neutral ?? 0,
-                      touched: false,
-                    }))
-                  );
-                  requestPose();
-                }}
-              >
-                Reset pose overrides
-              </Button>
-            ) : null}
-          </div>
-        </DockPanel>
-      </div>
-      <footer className="app-transport">
-        <Button
-          disabled={!activeClip}
-          onClick={() => {
-            if (!playing && activeClip &&
-                timeRef.current >= activeClip.duration_s) {
-              timeRef.current = 0;
-            }
-            setPlaying((current) => !current);
-          }}
-        >
-          {playing ? "❚❚" : "▶"}
-        </Button>
-        <input
-          className="app-scrub"
-          type="range"
-          min={0}
-          max={activeClip?.duration_s ?? 1}
-          step={0.001}
-          disabled={!activeClip}
-          value={timeS}
-          onChange={(event) => {
-            timeRef.current = Number(event.target.value);
-            setTimeS(timeRef.current);
-            setPlaying(false);
-            requestPose();
-          }}
-        />
-        <span className="app-time">
-          {activeClip
-            ? `${timeS.toFixed(2)} / ${activeClip.duration_s.toFixed(2)} s · ${activeClip.name}`
-            : "select a clip in the project tree"}
-        </span>
-        <StatusBar>
-          <StatusDot kind={statusKind} />
-          {status}
-        </StatusBar>
-      </footer>
+        {mateDraft ? (
+          <MateDialog
+            draft={mateDraft}
+            onChange={updateDraft}
+            onSolve={() => void solveMate()}
+            onCommit={() => void commitMate()}
+            onCancel={disarmMate}
+            busy={mateBusy}
+          />
+        ) : null}
+      </WorkspaceShell>
     </div>
   );
 }
