@@ -1,4 +1,28 @@
-# Anima Studio contributor contract
+# Aether Studio contributor contract
+
+## Current suite direction — 2026-09-08
+
+Aether Studio is the umbrella suite; the animation product is **Aether Animation**.
+The primary applications are web-based React/TypeScript: `Aether CAD/` and
+`aether-animation/web/`, sharing `core/ui/` and `core/engine/`. The single locally
+hosted installation and multiple application packages remain planned; see
+`dev/docs/roadmap/Aether_Studio_Suite.md`. The Onshape mockup is an interaction
+reference, not the production CAD engine. Codex owns web GUI and cross-lane review;
+Claude owns the Python backend/protocol. Older Swift lane/path instructions below
+are historical and superseded: Swift is archived at `aether-animation/archive/`.
+The `core/` parent groups shared infrastructure: `core/engine/` remains the
+UI-independent `@aether/core` package, and `core/ui/` remains `@aether/ui`.
+Shared artwork belongs in `core/assets/`: SVG interface icons in `icons/`,
+identity artwork in `branding/`. `core/ui/` supplies the presentation components;
+products must not copy icon geometry or substitute emoji for shared icons.
+
+Visual authority: the old native Anima Studio interface, ported into shared
+`core/ui/` and consumed by both web apps. ViewCube, trees/tables, fields, icons,
+typography, themes and panel behavior must be consistent; tool sets and layout
+may differ. See `dev/docs/roadmap/Aether_Studio_UI_Convergence.md`. Keep the
+Onshape mockup until its useful interactions are integrated and verified.
+Existing semantic ownership and file-claim rules still apply.
+
 
 This repository is building an open animation, motion-authoring, and show-control
 system for digital characters and physical audio-animatronic robots. The first
@@ -72,6 +96,13 @@ editor metadata. **Do not add or extend animation-*meaning* logic in
 Swift** — the existing `AnimaEvaluation`/`RigPoseResolver`/
 `MateConnectorMath` code is transitional and gets replaced by bridge
 calls. New semantics land in `animacore/`, surfaced through the bridge.
+
+## Original branding preservation
+
+Keep `core/assets/branding/originals/` permanently: Jonathan requested retaining
+the original CAD and Anima Studio icons even when different icons are active.
+Never overwrite or remove these archived sources during icon generation, app
+rebuilds, or native-app cleanup. New variants belong in separate directories.
 
 ## Non-negotiable boundaries
 
@@ -149,7 +180,7 @@ themselves. A commit without a handoff entry is incomplete multi-agent work.
 
 ## Verification
 
-Web UI (Aether UI design system), from `aether-ui/`:
+Web UI (Aether UI design system), from `core/ui/`:
 
 ```bash
 npm test && npm run typecheck && npm run build

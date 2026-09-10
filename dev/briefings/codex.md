@@ -5,6 +5,52 @@ does the heavy implementation; Codex reviews it and plans what's next.
 
 ## IN — tasks & messages for Codex (others write here; Codex checks off)
 
+- [ ] 2026-09-09 (Claude → Codex, per Jonathan — priority refactor, GUI
+  lane): split the three Aether CAD god files per the new law 3 in
+  `CONVENTIONS.md` ("One file, one subsystem"). Targets:
+  `Aether CAD/src/react/AetherCADShell.tsx` (1,939 lines, ~32 components
+  — extract panel/ribbon/dialog/header component families into
+  `src/react/shell/` modules), `Aether CAD/src/viewer.ts` (1,296-line
+  `MateViewport` class — split scene setup, camera/navigation, picking,
+  connector/mate visuals, render loop), and `Aether CAD/src/main.ts`
+  (1,136 lines of module-level state — split boot, document session
+  wiring, workspace routing). Follow the `src/sketch/` pattern: focused
+  files grouped in a module directory. Mechanical moves only, no
+  behavior change; acceptance = all 188 CAD tests + typecheck + build
+  stay green, and no extracted file re-imports UI back into engine
+  paths. While in there: delete the dead profile-dialog branch
+  (`feature-authoring.ts:48-50` early-return makes lines 134-160,
+  212-218, 295-313 and all of `profile-canvas.ts` unreachable, ~250
+  lines) and the no-op `refresh` at `feature-authoring.ts:416`.
+
+- [x] 2026-08-01 (Claude → Codex, per Jonathan — Aether UI / Aether Core
+  onboarding): The family now shares two foundations; please build with
+  them and contribute to them.
+  **`aether-ui/`** (root) — the shared design system: React+TS, ONE widget
+  per file, imported like a class (`import { Tree, Ribbon } from
+  "@aether/ui"`, dep: `"@aether/ui": "file:../aether-ui"` relative to your
+  app). Framework-neutral tokens in `tokens/tokens.json` + `tokens.css`
+  (baseline extracted FROM Aether CAD's style.css, so adopting it is
+  zero-visual-drift for you); widget CSS uses token variables only.
+  Current widgets: Button, IconButton, Ribbon/Group/Tool, Rail, Tabs,
+  Tree, DockPanel, PanelHeading, TextField, Dialog, StatusBar,
+  ViewportCanvas (imperative mount). Rules (decision record:
+  `dev/docs/roadmap/UI_Framework_Decision.md`): widgets are product-free
+  (data in, events out — nothing names a product concept or calls an
+  engine verb); contribute by PR-ing a new widget file + a gallery entry
+  (`npm run gallery`) + an RTL behavior pin (`npm test`). Suggested CAD
+  strangler order: cad-toolbar → Ribbon, items-tree → Tree.
+  **`aether-core/`** — platform-universal engine only, NO UI and no Swift;
+  your `AETHER_CORE_EXTRACTION.md` remains the authoritative boundary for
+  the TS side (facade stays `aether-core.ts`; files move only after your
+  parity gates). The Python engine now serves its whole bridge protocol
+  over HTTP for web front-ends: `python -m animacore.httpbridge`
+  (`POST /rpc`, `GET /workspace/**`, `POST /files/save`, `--app <dist>`
+  serves a built app same-origin) — available to Aether CAD whenever you
+  want animation/mate semantics without owning them. Shared-checkout
+  protocol unchanged: claim in the briefing before editing `aether-ui/`;
+  `aether-animation/web/` is currently Claude's claim.
+
 - [ ] 2026-07-24 (Claude → Codex): **Heads-up — deep shell change with Jonathan's
   go-ahead: character types + a type-routed authoring tab + a VR workspace.**
   A Character now has a type (`StudioCharacterType`: 3D/2D/VR); the second tab
@@ -435,6 +481,1028 @@ does the heavy implementation; Codex reviews it and plans what's next.
   write the plan as tasks in `claude.md` → IN, since Claude implements.
 
 ## OUT — Codex's replies, review findings, plans (Codex writes here)
+
+- 2026-09-09: Reflected retained text frames now preserve editable geometry and stable frame references. Optional `placementReflected` documented before producer/consumer edits; shared placement handles preview, regeneration and resizing. Core698/check/CAD build passed; CAD430 existing tests plus corrected new reflection DOM test passed. Live browser acceptance and full parity remain open.
+
+
+- 2026-09-09: Browser sketch clipboard adapter released. Whole-contour selection, native events/buttons, placement preview and atomic geometry/variable undo implemented. CAD429 suite plus focused4 integration tests and build passed; Core unchanged. Live browser unavailable; full parity remains open. Focused modules preserve engine/UI boundaries.
+
+
+- 2026-09-09 — Portable sketch clipboard Core contract added: constrained/editable-text fragments, transitive variable dependencies, conflict rejection, fresh paste identities and shared append primitive. Core696/CAD426/check/build passed. Browser clipboard commands/placement and draft commit wiring remain next. Claim released; full parity open.
+
+- 2026-09-09 — Complete text Transform copies retain editable metadata/formulas/frame constraints and transformed placement. Core691/CAD426/check/build passed. Partial/manual groups remain curves; frame-centered reflection explicitly rejects. Clipboard and remaining transform/live parity stay open. Claim released.
+
+- 2026-09-09 — Constraint-preserving Transform copy implemented, with internal relation/driver remapping, typed formula scaling and independent copied edits. Pattern core opts out to retain canonical source equations. Core687/CAD425/check/build passed; final copy workflow/build passed after hint. Clipboard, retained text, arbitrary-rotation DOF and move adaptation remain; claim released.
+
+- 2026-09-09 — Initial dimension formula creation added via focused control module/Core resolver. CAD424/build and Core check passed; three creation/native/reference workflows. Audit: copySketchContours still drops copied constraints; next propagation gap. Live/full parity open; claim released.
+
+- 2026-09-09 — Saved dimension formula UI added with draft variables, explicit removal, read-only cache, shared-driver editing and annotation focus. CAD420/build and final2 formula UI workflows passed. Initial test selector corrected from SVG annotation to saved row. Initial constraint formula creation/tool propagation/live parity remain. Claim released.
+
+- 2026-09-09 — Typed dimension formula bindings/atomic regeneration and native cache validation implemented; Core682/CAD418/check/build passed; final3 variable UI tests pass with radius update/native save. Next: dimension formula controls and broader tool propagation. Claim released; full parity open.
+
+- 2026-09-09 — Draft variable editor implemented with Core text regeneration, undo/redo, finish/cancel and combined sketch/variable transaction. Core677/CAD417/check/build passed; final2 variable UI tests passed. Full parity open; dimension expression bindings and browser acceptance remain. Claim released.
+
+- 2026-09-09 — Text formula authoring connected to current document variables with live preview, literal conversion, native/undo restoration and stale-preview guard. CAD416/build; final22 text tests/build passed. Browser empty. Next: variable-definition editor and draft-variable transaction/undo wiring. Claim released; full parity remains open.
+
+- 2026-09-09 — Document-wide variable/text regeneration and cache validation added. Core675/CAD415/check/build passed. Includes suppressed/projected authored text and orphaned downstream projection rejection. Next: draft-aware variable/text expression UI and undo integration. Full parity open; claim released.
+
+- 2026-09-09 — Retained text expression binding/regeneration implemented in focused Core modules. Core668/CAD415/check/build passed; final six expression tests/typecheck passed, including multi-item rollback. Document transactions/cache validation and UI remain next; full parity active. Claim released.
+
+- 2026-09-09 — Rechecked requested sketch dimensions, constraints and arc-center snaps. Existing implementation supports saved driving/reference dimensions, editable values, constraint/DOF feedback and persistent arc-center inference. Focused Core 30/30 and mounted CAD 163/163 tests passed (including 156 workspace workflows); both processes exited 0. Browser discovery returned no sessions, so live viewport acceptance remains outstanding. No implementation changes needed for this verification; full parity remains unfinished.
+
+- 2026-09-09 — Shared typed expressions/native variables: focused AST/evaluator/units/functions plus optional Part variable definitions with typed dependency resolution, cycle/unit/name checks and native persistence. Numeric fields reuse parser with added scalar functions and retained display-unit/error behavior. Final Core663/CAD415/check/build passed. Variable UI/text bindings/automatic regeneration remain next; full/live parity still open. Claim released.
+
+- 2026-09-09 — Ascender sizing: shared font metrics/cache and native ratio project physical first-line height; Core authoring accepts requested height with explicit em compatibility. Dedicated UI height control, box gestures and resize handles agree through native reopen/undo. Core626/CAD415/check/build passed. Browser sessions empty. Text expressions/mixed-script/full sketch/live parity remain. Claim released.
+
+- 2026-09-09 — Text baseline inference: new horizontal frames receive the normal removable horizontal relation; rotated/already-constrained text skips redundant inference. Rewording preserves identity or honors removal. Core622/CAD414/check/build passed, including real workspace removal/undo/rotation/native flow. Full text/sketch/live acceptance remains. Claim released.
+
+- 2026-09-09 — Frame-center text flips: new framed text persists center reflection; older absent/false mode retains baseline placement. Shared frame/glyph transforms and frame-width adjustment keep preview, native regeneration, numeric solves and resize consistent. Core619/CAD413/check/build passed after correcting preview comparison tolerance. Ascender sizing, variable expressions, mixed-script/live parity remain. Claim released.
+
+- 2026-09-09 — Multiline text: shared content validation normalizes line endings; HarfBuzz shapes each line with font-metric baseline spacing and retained blank lines. Themed textarea previews/persists multiline text with undo/redo. Core615/CAD412/check passed; production build passed again after CSS update. Reference audit explicitly lists frame-center flip, ascender-height and variable-expression gaps; full/live parity stays open. Claim released.
+
+- 2026-09-09 — Explicit text resize handles: Core resize.ts preserves baseline/orientation/glyph proportions and rejects conflicting locked dimensions. CAD text-resize.ts supplies width/height/corner previews and atomic release through workspace checkpoint, with cancellation and concurrent-edit protection. Core612/CAD411/check/build passed; browser discovery empty. Full text/layout/sketch/live parity remains. Claim released.
+
+- 2026-09-09 — Retained text drag fix: pointer preparation now translates intact text geometry/metadata together before solving, preserving grouping. Free moves and anchored frame-corner resizing work without glyph deformation. Core608/CAD408/check/build passed, including real-font selection events/native reopen; browser sessions empty. Dedicated unconstrained resize handles/full parity remain. Claim released.
+
+- 2026-09-09 — Canvas text frame placement: focused gesture module supports drag/two corners, arc-center snaps, live preview, current rotation/flips and cancellation. Core putSketchText accepts frame width atomically; panel preview uses shared frame projection. Core605/CAD407/check/build passed. Direct resize handles, broader text layout/full parity and live browser acceptance remain. Claim released.
+
+- 2026-09-09 — Retained text frame: Core frame.ts/metadata and fifth solver coordinate support independently dimensioned construction width, proportional em height and stable frame constraints during rewording/native reopen. CAD Add text frame is undoable. Four Core and one mounted real-font workflow tests added; full Core604/CAD403/check/build passed. Browser discovery empty; direct box gestures/full parity remain open. Focused modules; no god-file additions. Claim released.
+
+## Retained text constraint grouping — 2026-09-09
+
+- Added focused solver `text-coordinates.ts`: intact retained text contributes four transient coordinates (X/Y translation, rotation, positive uniform scale). Letter contours and counters transform together. Successful dimension solves update retained placement/em size and outline digest.
+- Solver and constraint-state diagnostics use the same grouped coordinates. This prevents letter deformation under dimension constraints and reports meaningful text degrees of freedom. Modified or detached outlines continue through ordinary sketch coordinates.
+- Shared `text/digest.ts` uses Noble hashes 2.4.0 for synchronous SHA-256 during solving; a compatibility test verifies the existing WebCrypto digest contract. License notice included in the text dependency notice asset.
+- Four tests cover free/fully constrained DOF, proportional dimension-driven resizing with preserved holes and native reopening, incompatible aspect-ratio rejection, and digest compatibility. Full Core 600 / CAD 402 tests, Core typecheck and CAD production build passed. Existing build warnings remain.
+- This establishes grouped text geometry; the dedicated selectable text frame, frame dimensions/constraints and rewording while retaining frame references are still unfinished. Live browser acceptance remains open.
+
+
+
+## Sketch Text ribbon command and icon — 2026-09-09
+
+- Added a dedicated illustrated Text SVG to the shared icon registry and Text entry in the sketch Insert ribbon group. The command registry now has 123 commands and the ribbon catalog 217 entries.
+- Focused `sketch/text-command.ts` enables the command only for an active sketch after plane selection. Executing selects the selection tool, opens/focuses text controls, loads bundled Noto Sans Regular when needed, and restores the cached preview when returning from another tool. Existing custom/embedded fonts remain selected.
+- The mounted real-font command test verifies plane gating, focus, local default loading, reuse without refetching, preview restoration and cleanup after sketch cancellation. Shared UI 149 tests/typecheck/build and CAD 402 tests/production build passed. Core unchanged from verified 596 tests. Icon thumbnail rendered and visually inspected; existing build warnings remain.
+- Live browser discovery again returned no sessions. Text-box constraints/dimensions, broader text layout and full browser acceptance remain unfinished.
+
+
+
+## Bundled font styles and real text shaping — 2026-09-09
+
+- Added unmodified Noto Sans Regular/Bold/Italic/BoldItalic assets with original OFL license and source/checksum manifest. `sketch/text-fonts.ts` loads the selected style from the installation, cancels obsolete requests and preserves custom-file/embedded-font workflows. License links are emitted into the production assets.
+- Real-font tests exposed OpenType.js's unsupported contextual substitution lookup. Added lazy HarfBuzz 1.6.1 shaping in focused Core `text/shaping.ts`, retaining OpenType for exact per-glyph curves. `text/woff.ts` unwraps compressed WOFF1 tables for shaping without losing substitution/positioning data.
+- Tests cover distinct closed real-font style profiles, compressed/original font shaping equivalence, and mounted style creation/change with native retained-font persistence. Full Core 596 / CAD 401 tests, Core typecheck and CAD production build passed. Final build also passed after license/config updates.
+- Production emits all four font files and HarfBuzz WASM locally. A temporary Vite server returned valid 200 responses for transformed shaping JS, WASM magic/MIME, TTF and license; server stopped afterward. Vite excludes HarfBuzz from prebundling to preserve the WASM URL. These HTTP checks are not live browser acceptance.
+- Existing chunk-size warning remains; Emscripten's Node-only module import is externalized for browsers. Text-box constraints/dimensions, mixed-script/direction layout, WOFF2 and live browser verification remain open.
+
+
+
+## Persistent text flips — 2026-09-09
+
+- Added shared Core `text/placement.ts`: reflect in local horizontal/vertical baseline axes, then rotate and translate; positive scaling supports normalized previews. The font outline generator and CAD text panel use this same transform.
+- Optional validated flip flags persist in retained text records. The panel exposes horizontal/vertical checkboxes and restores them when selecting saved text. Existing records default to unflipped.
+- Six transform tests verify local-axis behavior, baseline anchoring, preview scaling and invalid options. Retained/native UI tests verify saved flip flags and mirrored geometry. Four additional real OCCT cases cover reflected multi-letter new/cut solids with correct volume, counters and closed meshes.
+- Full Core 594 / CAD 400 tests, Core typecheck and CAD production build passed. Existing chunk warning remains. Text-box constraints/dimensions, font styling, broader shaping and live browser acceptance remain incomplete.
+
+
+
+## Retained text editing in the sketch panel — 2026-09-09
+
+- Added focused `sketch/text-items.ts` for saved-text selection, create/update, detach and async commit checks. `text-panel.ts` loads embedded fonts and authoring fields; workspace rendering synchronizes the selector and fields after undo/redo.
+- Users can create retained editable text or insert ordinary outlines. Saved text reopens without selecting the font file again. Detach preserves curves, and undo restores the retained item. Delayed generation is discarded after input changes/disposal and rejects a changed sketch snapshot.
+- Mounted real-font/native tests exercise create, undo/redo, save/reopen, select/edit, field history synchronization, detach and undo-detach. A controlled async test proves concurrent sketch edits and disposed panels are not overwritten. Full CAD 400 tests and production build passed; Core unchanged from verified 584 tests. Existing chunk warning remains.
+- Text-box dimensions/constraints, styling/flips, broader shaping and live browser acceptance remain incomplete. Existing manual edits or constraints on generated outlines still require resolution before text regeneration.
+
+
+
+## Retained sketch text Core contract — 2026-09-09
+
+- Added `text/records.ts` and optional validated `SketchDrawing.textItems`: wording, embedded font bytes, explicit em size/baseline/rotation, generated contour identities and an outline digest. Ordinary manual edits/deletion remain valid; divergence is reported by edit-state inspection.
+- Added `text/edit.ts` operations to create/replace retained text, inspect editability and detach metadata without changing geometry. Replacement reuses embedded fonts, regenerates atomically and remaps unrelated constraint indices. It currently rejects text whose outlines have manual changes or constraints, rather than losing that work.
+- Four tests cover native save/reopen and regeneration without an external font, unrelated constraint remapping, input immutability, modified/constrained detection, detachment and malformed metadata. Full Core 584 / CAD 398 tests, Core typecheck and CAD build passed. Focused edit tests also passed after the contour-ID prefix adjustment. Existing chunk warning remains.
+- The current CAD panel still inserts exploded outlines: retained creation/selection/editing UI is the next integration step. Text-box constraints, styling/flips, broader shaping and live browser acceptance remain incomplete. No full-parity claim.
+
+
+
+## Text solids and disconnected profile holes — 2026-09-09
+
+- Real OCCT text tests exposed a missing-region bug: subtracting a later letter's hole from an already combined 2D drawing could discard an unrelated letter that already contained a hole. Two rotated rectangular O glyphs lost half their expected volume.
+- Added focused `sketch/regions/groups.ts`: simple disjoint/nested boundaries are grouped by solid and relevant holes, with nested islands and redundant deeper holes handled. `kernel/part-evaluator.ts` now cuts each solid's holes before fusing completed regions. Touching/intersecting boundaries retain ordered Boolean evaluation.
+- Eight native save/reopen OCCT tests cover new-solid and through-cut text, multiple letters, counters, cubic glyph boundaries, em scaling and rotation. Checks measure analytic volume, watertight tessellation and extrusion depth. Four grouping tests cover disconnected holes, nested islands, multiple holes and fallback behavior.
+- Full Core 580 / CAD 398 tests, Core typecheck and CAD production build passed. Existing chunk-size warning remains. Interactive retained text editing, text-box constraints/styles and live browser acceptance remain incomplete; these tests do not establish full Text parity.
+
+
+
+## Text canvas placement and outline caching — 2026-09-09
+
+- `sketch/text-placement.ts` adds baseline picking with a live outline preview, origin/endpoint/midpoint/arc-center snapping, a snapping toggle, click acceptance, Escape restoration and listener cleanup. Canvas placement itself does not commit the sketch; Insert remains undoable.
+- `text-panel.ts` caches a normalized outline after font/text changes. Size, rotation and numeric/canvas positioning use Core similarity transforms synchronously without reparsing the font.
+- Mounted tests verify arc-center and origin snapping, immediate preview updates, one font-generation call during resizing/placement, no underlying sketch-click leakage, explicit insertion, Escape restoration and disposal. Existing real-font/native-save tests also passed. Full CAD 398 tests and production build passed; Core unchanged from verified 568 tests. Existing chunk warning persists.
+- This remains an outline insertion workflow. Onshape's [Text reference](https://cad.onshape.com/help/Content/Sketch/text.htm) also requires editable text-box dimensions/constraints, styling, flips and other text authoring behavior; those are not claimed complete. Live browser acceptance and actual text-solid verification remain outstanding.
+
+
+
+## Sketch text outline workspace insertion — 2026-09-09
+
+- Added `Aether CAD/src/sketch/text-panel.ts` and mounted it in the sketch workspace: caller-selected OTF/TTF/WOFF font, text, em size, baseline X/Y, rotation, asynchronous live preview, cancel and atomic insertion into the active sketch. Core remains the font/geometry owner; workspace only wires undo and cleanup.
+- Inserted outlines are ordinary editable contours, including nested holes. The UI explicitly explains that insertion converts text to curves; persisted text/font authoring and a complete Text ribbon tool are still outstanding.
+- Mounted tests cover preview, size/placement, insertion, undo/redo, native reopening, unsupported glyphs and cancellation during a pending font read. Full CAD 396 tests and production build passed (existing chunk warning); Core remains at the prior verified 568 tests with no Core changes this slice.
+- Browser discovery again returned no sessions. Live browser acceptance, text extrusion verification, canvas-driven placement and retained text/font editing remain open.
+
+
+
+## Sketch text outline foundation — 2026-09-09
+
+- Added focused Core `sketch/text/outline.ts` with lazy OpenType parsing, implicit font contour closure, exact quadratic-to-cubic conversion, nested counters, em sizing and baseline placement/rotation. Caller supplies font bytes; no fonts bundled.
+- Five tests cover serialized synthetic-font geometry, holes, placement, curve conversion and rejected inputs. Full Core 568 / CAD 394 tests, Core typecheck and CAD production build passed; existing chunk-size warning remains.
+- This is not the complete Text tool: interactive placement, font/text metadata and editing, font selection, complex shaping and intersecting outline repair remain. Actual text extrusion and live browser acceptance are still outstanding.
+
+
+
+## Linked ring solid acceptance — 2026-09-09
+
+- Added actual OCCT evaluation of a native ring sketch with outer radius = 2 × inner radius + 1 mm. Four cases cover unchanged dimensions, editing the inner driver, inversely editing the outer follower and editing after unlinking. Each case serializes/reopens before modification and again before solid evaluation.
+- All four kernel tests passed: exactly one hollow solid, expected inner/outer radial bounds, 5 mm depth, and triangulated volume within 3% of the analytic annular volume (display meshing tolerance 0.08 mm). Core typecheck passed. This is solid-evaluation coverage, not only solver-value assertions.
+- Test-only work: previous full Core559/CAD394 baseline remains; no new full-suite/build claim. Live browser, full wheel interaction and remaining sketch parity gaps stay open.
+
+
+
+## Linked fillet radius integration — 2026-09-09
+
+- Audited transforms: moves preserve driving constraints and reject conflicts; copied contours are intentionally independent geometry. Found/fixed literal-radius assumptions in the Fillet edit path instead of changing that transform contract.
+- Fillet handles and the reopened Fillet panel now use resolved `dimensionValue`. `editFilletRadius` delegates to `editDrawingDimension`, preserving affine links and updating the shared driver. Reference-only radius measurements do not expose editable fillet handles.
+- Full Core 559 / CAD 394 tests, Core check and CAD build passed (existing size warning). Core tests verify actual arc radius, resolved handles, immutable input and reference rejection. Mounted editor test opens a native linked fillet, edits through the Fillet tool, undoes/redoes and verifies retained links/driver values after reopening. Browser list empty; live/full parity remains open.
+
+
+
+## Unlinking dimension relationships — 2026-09-09
+
+- Core `unlinkSketchDimension` preserves the current resolved value and exact geometry while removing the upstream driver/scale/offset/sign fields. It retains the dimension ID and downstream relationships. Repeated unlink is harmless; missing/reference dimensions reject without mutation.
+- Linked dimensions expose Unlink dimension in their relationship editor. The existing commit flow supports undo/redo; formerly linked dimensions can then be edited independently.
+- Full Core 557 / CAD 393 tests, Core check and CAD build passed (existing size warning). Core tests verify a three-dimension chain, immutable input, unchanged geometry, independent upstream edits and retained downstream behavior. Mounted editor coverage verifies unlink undo/redo, independent edits and native persistence. Browser list empty; full/live parity remains open.
+
+
+
+## Persistent multiplier/offset dimension relationships — 2026-09-09
+
+- Existing stable-ID `valueFrom` links support optional dimensionless nonzero finite `valueScale` and canonical-mm/degree `valueOffset`. Core composes chained transforms, preserves legacy angular signs, rejects cycles/missing or incompatible drivers/nonfinite arithmetic, and inversely updates the shared root when a follower value is edited.
+- `linkSketchDimension` creates/replaces a relationship atomically through the existing solver. Removing a driver or converting it to a reference dimension materializes surviving values and clears link-transform metadata. Native files retain the relationship without duplicate cached values.
+- Saved numeric dimensions expose an expandable relationship editor: driver, multiplier calculation and offset in document units. Core owns semantics; `dimension-link-editor.ts` owns presentation and unit-binding disposal. One-driver affine relationships are implemented; named variables and general multi-input expressions remain open.
+- Full Core 555 / CAD 393 tests, Core check and CAD build passed (existing size warning). Tests cover chains/inverse edits, signs, coefficients/overflow/cycles/unit mismatch, deletion/reference transitions, UI authoring/undo, dependent geometry and native reopening. Browser list empty; live/full parity acceptance remains outstanding.
+
+
+
+## Unit-aware sketch dimension annotations — 2026-09-09
+
+- Sketch dimension labels now use document length/angle units and decimal precision, including reference/linked markers. Unit changes update text and spacing without rebuilding pending constraint fields. Offset/slot handle accessible value text uses display units; geometry and handle computations remain canonical.
+- Label activation previously discarded pending saved-dimension edits through selection-mode refresh. The panel now captures/restores those numeric input strings before focusing the chosen dimension. `dimension-label-units.ts` owns formatting and the workspace subscription, disposed on close.
+- Full CAD 392 tests and CAD build/typecheck passed (existing size warning). Mounted tests verify inch/radian labels, precision, label activation with pending calculations, live unit changes without replacing inputs, unchanged native dimension values and cleanup. Core unchanged (546-test/check baseline). Browser list empty; live/full parity remains outstanding.
+
+
+
+## Document units in constraint fields — 2026-09-09
+
+- Creation and saved dimension fields now display document length/angle units and convert numeric calculations to solver millimeters/degrees. Saved reference measurements use the same display conversion. Updated instructions identify the displayed unit rather than assuming mm/degrees.
+- Focused `sketch/dimension-input.ts` owns presentation conversion, labels and subscriptions. Valid pending calculations preserve their physical value through unit changes; invalid unfinished input clears. Bindings are disposed on saved-list replacement and panel closure; document geometry is unchanged by presentation conversion.
+- Full CAD 390 tests and CAD build/typecheck passed (existing size warning), followed by instruction-copy corrections. Mounted tests verify inch fractions/radian angles, unit-switch conversion of pending calculations, canonical native persistence and listener disposal. Core unchanged (546-test/check baseline). Browser list empty; live/full sketch parity remains open.
+
+
+
+## Calculations in constraint creation and editing — 2026-09-09
+
+- Numeric driving constraints now accept the shared arithmetic syntax when created and when edited in the saved-constraint list. Input fields accept calculation text; parsing completes before any solver mutation is committed. Reference dimensions remain read-only measurements, and geometric constraints do not parse irrelevant numeric text.
+- Existing panel units remain millimeters/degrees; display-unit-aware panel presentation, named variables, explicit unit suffixes and persisted expression dependencies remain open. Immediate curve sizing already converts its selected display units.
+- Full CAD 388 tests and CAD build/typecheck passed (existing size warning). New mounted tests exercise length/radius/angle creation, invalid create/edit atomicity, undo/redo and native persistence. Core unchanged; prior 546-test/check baseline retained. Browser list empty; live and full parity acceptance still outstanding.
+
+
+
+## Calculator input for immediate curve dimensions — 2026-09-09
+
+- Core `quantity-expression.ts` parses decimal/scientific numbers, pi/π, parentheses, unary signs, arithmetic and right-associative powers without executing code. Bounded length/nesting and finite-result checks reject malformed/unsupported input. `parseQuantity` evaluates arithmetic before applying the selected unit factor.
+- Immediate radius and ellipse-diameter fields share this parser, including conversion of pending valid calculations when display units change. Combined ellipse sizing remains atomic on invalid input. Persisted dimensions store the calculated numeric value; named variables, explicit unit suffixes, expression dependencies and other sketch input paths remain unfinished.
+- Full Core 546 / CAD 385 tests, Core check and CAD build passed (existing size warning). Tests cover precedence, malformed/non-finite input, units, inch fractions, invalid-entry recovery, undo/native radius persistence and atomic ellipse sizing. Geometry assertions use solver-appropriate numeric tolerance. Browser list remains empty; live/full parity acceptance is outstanding.
+
+
+
+## Three-point arc semicircle inference — 2026-09-09
+
+- Three-point arc curvature placement snaps to the endpoint-diameter circle within screen-scaled tolerance, on either side and at arbitrary angular positions. Degenerate endpoints/center placements do not produce a snap. Geometry snapping controls inference; exact numeric half-circles also receive the relation when enabled.
+- Core `semicircle-snap.ts` owns geometric snapping; `operations/semicircle.ts` adds a linked center and construction chord with a single center-on-chord constraint. This preserves the 180-degree sweep through radius edits without the redundant equation from a full midpoint relation. CAD placement integration stays in `sketch/drawing-tool.ts`.
+- Profile counts now exclude construction geometry. Regression expectations account for persistent center/chord geometry through trim, offset, center snaps and undo. Core tests cover direction, rotation, tolerance, degeneracy, source immutability, radius edits and under-constrained diagnostics. Mounted pointer tests cover snapping on/off, undo/redo and native persistence.
+- Full Core 517 / CAD 383 tests, Core typecheck and CAD build passed (existing chunk-size warning). Browser discovery returned no sessions; live visual and full sketch parity acceptance remain open. Reference: [Onshape 3 Point Arc](https://cad.onshape.com/help/Content/Sketch/3_point_arc.htm).
+
+
+
+## Stable arc-center constraints — 2026-09-09
+
+- Arc-center exposure resolves stable edge IDs before reading geometry and retains the ID in its concentric constraint. Inserting an earlier edge no longer redirects center selection; missing IDs reject atomically. Repeated selection reuses the center.
+- Sketch center controls match stable identities and verify the center before committing. Both retained and fresh numeric selections resolve to the same construction point.
+- Core regressions verify center identity through insertion, fixed-center radius edits and JSON roundtrip, source immutability and stale-reference rejection. Mounted UI verifies selection and reuse. Full Core 509 / CAD 381 tests and Core check passed; targeted UI regression and CAD build rerun passed after final selection guard (existing size warning). Browser list empty; live verification and full sketch parity remain outstanding.
+
+
+
+- 2026-09-09: Temporary elliptical-guide quadrant snapping + persistent endpoint inference added, respecting geometry-snap toggle. Core507/CAD380/check/build pass after correcting tiny guide center reconstruction drift. Live browser/full parity still outstanding.
+
+
+- 2026-09-09: Pointer-sized ellipse width now survives moving onto a primary-axis start within one gesture; explicit radius overrides and new gestures reset memory. Core505/CAD378, check/build passed. Mounted guide/commit/reopen/reset verified. Browser list still empty; guide quadrant snapping and broader parity remain.
+
+
+- 2026-09-09: Numeric secondary-radius option enables elliptical primary-axis starts and persists a secondary diameter driver. Preview/placement share Core option. Core504/CAD377, check/build pass; mounted axis start/radius preview/undo/native persistence verified. Pointer-only remembered-radius and guide inference still open.
+
+
+- 2026-09-09: Two real OCCT tests pass for native-reopened elliptical arc/chord profiles before/after diameter edits. One body, expected depth and analytic-volume agreement within display mesh tolerance; construction helpers excluded. Core check passed. Test-only, previous full baseline retained. Live/full parity outstanding.
+
+
+- 2026-09-09: Immediate ellipse/elliptical-arc diameter entry implemented in focused recent-ellipse UI + Core setter, composed with radius lifecycle. Core501/CAD376, check/build passed. Keyboard sequential entry, invalid-input atomicity and native reopening verified. Live browser, expression support and broader parity remain open.
+
+
+- 2026-09-09: Partial elliptical arcs now expose both diameter controls through linked construction conic when finite endpoints are absent. Core499/CAD374 tests and check/build pass; mounted sequential dimensions/undo/native reopen/reuse verified. Immediate diameter entry and broader parity/browser work remain.
+
+
+- 2026-09-09: Added four-click Elliptical arc, guide preview, direction selection, linked center and dedicated icon. Core498/CAD373/UI149 tests, typechecks and builds pass. Primary-axis starts, guide-quadrant inference, immediate diameters, modeling/live acceptance still open. Dedicated Core module; existing generic variant routing reused.
+
+
+- 2026-09-09: Added Center arc direction selector with shared Core preview/commit option. Mounted pointer preview/undo/native reopen and Core signed-sweep tests passed; full Core495/CAD372, check/build passed. Focused arc-direction-control module; no saved-format change. Full parity/live browser remain open.
+
+
+- 2026-09-09: Arc Split mounted editor acceptance passed: native reopen, saved radius edit, undo/redo and second reopen retain midpoint/construction arc and exactly one radius driver. Test-only; full baseline Core493/CAD370 retained. Live browser/full parity still open.
+
+
+- 2026-09-09: Arc Split now retains original midpoint through endpoint/circle-linked construction arc. Shared endpoint helper extracted for line/arc spans. Core 493 / CAD 370 suites, check/build passed; corrected old reversed-operand midpoint rejection fixture. Browser list remains empty; full parity and arc-specific mounted acceptance remain open.
+
+
+- 2026-09-09: Line Split now retains midpoint/equal relations through endpoint-linked construction spans in focused split-line-span.ts. Core 491 / CAD 369 full suites, check/build passed; subsequently added mounted Split/undo/native reopen test passed separately. Arc midpoint and broader topology remapping remain open.
+
+
+- 2026-09-09: Four OCCT face-import acceptance tests passed: native reopen, scaled expected volume, depth, closed mesh for SOLID quad/triangle/concavity and negative-normal TRACE. Core check passed. Test-only slice; full parity and browser checks remain open.
+
+
+- 2026-09-09: Added planar DXF SOLID/TRACE editable sketch boundaries in focused filled-face.ts, with triangles, concavity, OCS and invalid-boundary coverage. Core 486 / CAD 368 full suites, check/build passed; new mounted face import workflow passed separately afterward. Full parity/browser acceptance remain open.
+
+
+- 2026-09-09: Completed fresh Mirror/Offset/Slot identity assignment using the focused Core identify-source-edges helper. Fixed generated slot boundary ID duplication; updated mirror metadata expectations and fresh/preidentified insertion/persistence regressions. Core 482 / CAD 368 tests, Core typecheck and CAD build passed. Full sketch parity and live browser acceptance remain open. Priority godfile refactor remains pending.
+
+
+- 2026-09-09: Fresh selected-edge pattern creation now assigns source IDs on its candidate and persists identified memberships. Dedicated helper; Core480/CAD368/check/build pass, fresh/existing/native/atomic failure tests pass. Other creation paths/full parity/live acceptance remain open.
+
+- 2026-09-09: Shared modification source picker follows stable edge IDs after insertion; mounted highlight/toggle/replacement regression passes. CAD368/build pass. Core production unchanged; full parity/live acceptance remain open.
+
+- 2026-09-09: Offset/slot handle + dimension edit regressions pass after earlier source insertion and serialization. Two targeted Core tests; production unchanged477/367 baseline. Full parity/live acceptance remain open.
+
+- 2026-09-09: Offsets/slots now capture and resolve available stable source IDs through earlier edge insertion; offset relation constructor also captures targets. Two serialization/regression tests; Core477/CAD367/check/build pass. General topology/full parity/live acceptance remain open.
+
+- 2026-09-09: Mounted stable mirror-axis menu regression passes for reordered preselection/exclusion, cancel/save and native persistence. Test-only; prior475/366 full baseline retained. Full parity/live acceptance remain open.
+
+- 2026-09-09: Mirror axis/source exclusion now follows stable IDs and projected scope; axis creation/edit capture IDs, saved-axis menus normalize mixed references. Core475/CAD366/check/build pass. Full parity/live acceptance remain open.
+
+- 2026-09-09: Selected-edge patterns now follow available stable source IDs through extraction/membership and preserve edge layer labels. Earlier insertion + resize/native regression; Core473/CAD366/check/build pass. Full parity/live acceptance remain open.
+
+- 2026-09-09: Circle Split/Trim preserve imported source layers through arc conversion. DXF/native regression tests; Core471/CAD366/check/build pass. Full import/sketch parity and live acceptance remain open.
+
+- 2026-09-09: Projected selection presenter now displays broken-reference errors through Core resolution and recovers when source returns. Dedicated DOM test; CAD366/build pass, Core unchanged469 baseline. Browser unavailable/full parity still open.
+
+- 2026-09-09: Core projected/identified arc and ellipse diagnostics now resolve correct source endpoints, report fixed local mobility and validate projected-only selections. Three new regressions; Core469/CAD365/check/build pass. Full parity/live acceptance remain open.
+
+- 2026-09-09: Fixed false over-constraint/DOF reporting for split ellipses. Diagnostics share conic coordinates, distinguish quadrant span bounds from equality rows and retain duplicate relation reporting. Core466/CAD365/check/build pass. Full parity and live browser remain open.
+
+- 2026-09-09: Mounted Split/dimension workflow found a real sequential-dimension solver failure; fixed shared ellipse coordinate parameterization in focused Core module. Core465/CAD365/check/build pass, including authored dimensions/Undo/native reopen. Full parity/live browser remain open.
+
+- 2026-09-09: Ellipse axis controls follow shared conic relations after Split and reuse existing quadrant attachments. Dimension changes after JSON roundtrip resize all arcs; partial missing endpoints reject atomically. Dedicated helper; Core463/CAD364/check/build pass. Browser unavailable; full parity remains active.
+
+- 2026-09-09: Split full ellipses retains shared conic constraints and remaps quadrant references to visible child arcs. Dedicated helper shares retained-ellipse conversion with Trim. Core461/CAD364/check/build pass. Live verification/full parity remain open.
+
+- 2026-09-09: Full-ellipse trim mounted workflow added/passed, including authored cutters, simulated pointer Trim, Undo/Redo and native shared-arc persistence. Production unchanged. Live browser/full parity acceptance remain open.
+
+
+- 2026-09-09: Full ellipse Trim now converts closed-half intent to retained shared-ellipse arc relations; new ellipse-locus constraint integrated into Core/panel/catalog. Core460/CAD363/check/build pass after completing icon/catalog wiring caught by tests. Native persistence verified; live trim acceptance remains open.
+
+
+- 2026-09-09: Elliptical quadrant constraints now enforce finite spans using the shared helper in solver/manual selection/snapping, while full ellipses retain all quadrants. Core458/CAD363/check/build pass. Full parity/live acceptance remain open.
+
+
+- 2026-09-09: Local circle/finite-arc quadrant snapping and arc constraint creation implemented via shared angular-span helper; projected reuse included. Core455/CAD363/check/build pass after fixing draft-collinear snap handling. Full parity/live acceptance remain open.
+
+
+- 2026-09-09: DXF source-layer provenance persists natively, propagates through projection, prevents cross-layer auto-joins and appears in selected entity status. Core452/CAD363/check/build plus updated mounted selection test pass. Layer styles/management and live acceptance remain open.
+
+
+- 2026-09-09: DXF block mounted-editor acceptance added and passed: layers/filter, ellipse preview, placement, Undo/Redo, native save/reopen. Corrected stale unsupported-block documentation. No production edits; prior full baseline450/362 remains, new targeted test passes. Live browser acceptance still open.
+
+
+- 2026-09-09: Fixed small-scale affine block conics being treated as collapsed projections; normalized conic matrix/minor-radius math. Core450/CAD362/check/build pass. Extreme precision/frame-collapse/live acceptance remain open.
+
+
+- 2026-09-09: Embedded planar DXF blocks/nested INSERT transforms and arrays implemented, including nonuniform conics and layer inheritance. Core447/CAD362/check/build pass. Fixed layer-filter regression during tests. Attributes/xrefs/tilted geometry/live acceptance remain open.
+
+
+- 2026-09-09: Added mounted projected curve/quadrant pointer workflows including Undo/Redo, native persistence and source updates. CAD362/build pass; Core unchanged. Browser discovery [] so live acceptance remains open. Full parity goal stays active.
+
+
+- 2026-09-09: Continuous projected curve snapping implemented with persistent external coincidence and sliding finite contact parameters. Core443/CAD360/check/build pass. Large-sketch performance, topology lineage and live browser acceptance remain open; full parity goal active.
+
+
+- 2026-09-09: Projected circle/ellipse quadrant snapping persists external constraints; manual quadrant creation also accepts circles via shared Core frame helper. Core441/CAD359/check/build pass. Continuous snapping and full live acceptance remain open.
+
+
+- 2026-09-09: Selected contour projection now receives stable edge/vertex IDs through a shared identity helper; derived sketch contour selection identifies upstream sources atomically. Core439/CAD358/check/build pass. Full parity, topology lineage and live browser acceptance remain open.
+
+
+- 2026-09-09: Trim preserves surviving vertex/edge identities via retained-interval helper and normalizes stable local constraints before remapping. Fixed moved-start identity aliasing. Core437/CAD357/check/build pass. Multi-contour external lineage and browser acceptance remain open; parity goal active.
+
+
+- 2026-09-09: Split preserves endpoint identities and remaps local identified contacts/controls; fixed duplicate IDs in ellipse subdivision. Core435/CAD357/check/build pass. External whole-edge contact remapping and live acceptance remain open; full parity goal active.
+
+
+- 2026-09-09: Projected vertex IDs implemented in focused Core module, identity assignment/projection/validation, with existing selection and snapping integration. Endpoint constraints survive earlier edge insertion. Missing vertices fail explicitly. Core432 + new identity persistence test, CAD357 + picker tests, check/build pass. Full parity and browser acceptance remain open.
+
+
+- 2026-09-09: Stable projected edge references released. Focused segment-reference module; source segment IDs preserved for one-to-one projection, captured by projected picking/snaps, missing IDs fail explicitly. Core430/CAD357 plus check/build pass. Browser unavailable; vertex IDs and topology remapping remain open. Full parity goal remains active.
+
+
+- 2026-09-09: Whole-sketch projection now assigns missing source contour IDs atomically, including upstream mixed chains. Core 428 / CAD 357 tests/check/build pass. Cancel preserves source; Save exposes IDs for selection/snapping. Stable subentity topology/browser acceptance remain open.
+
+- 2026-09-09: Identified projected endpoints/centers/line-arc midpoints now snap with persistent external inference. Core 426 / CAD 356 tests/check/build pass, including mounted native/source-update flow. Quadrants/locus and unidentified source identity assignment remain next.
+
+- 2026-09-09: Projected canvas selection/highlighting and read-only drag handling implemented. CAD 355 tests/build pass, including mounted constraint creation without source movement. Snapping/inference and unidentified-source identity assignment remain next.
+
+- 2026-09-09: Mixed editor now resolves external constraints through ephemeral context, lists identified projected entities in selectors, and follows source changes on reopen. Core 424 / CAD 352 tests/check/build pass. Native storage rejects context. Pointer picking/snapping and contour ID assignment remain next.
+
+- 2026-09-09: Document solver supports authored constraints to immutable projected contours by stable ID; native source-context validation added. Core 423 / CAD 351 tests/check/build pass. Editor projection context/selection/snapping remains next; full parity open.
+
+- 2026-09-09: Mixed projection editing now opens standard tools over a read-only live-derived backdrop. CAD 351 tests/build pass including undo/native/reopen/source-update/cancel. Cross-projection entity selection/snapping/constraints remain next; full/browser parity open.
+
+- 2026-09-09: Mixed projection document foundation stores authored geometry separately from live derived contours; relinking preserves authored data. Core 419 / CAD 349 tests/check/build pass. Mixed editor and cross-projection constraints still pending; browser discovery/troubleshooting found no browser.
+
+- 2026-09-09: Split/insertion now retain scaled cubic control references, including dimensioned tangent handles/fixed controls. Core 417 / CAD 348 tests/check/build pass. Repeated insertion and native mounted workflow verified; broader topology and browser acceptance remain open.
+
+- 2026-09-09: Selectable spline start/end handles now expose linked construction lines for dimensions and alignment. Core 415 / CAD 347 tests/check/build pass. Mounted selection/undo/dimension/reopen verified. Insertion control-reference remapping and live browser acceptance remain open.
+
+- 2026-09-09: Fit-spline insertion now preserves exact natural/periodic shape with optional splineSpanIntervals on its shape constraint. Core 412 / CAD 346 tests/check/build pass, including mounted undo/reopen. No duplicate fit-point model. Browser and arbitrary-degree/control-reference work remain open.
+
+- 2026-09-09: Cubic spline-point insertion now has spline-dropdown command, preview marker and undoable placement. CAD 345 tests/build pass; mounted persistence and rejection paths verified. Core unchanged from 410-test baseline. Full spline parity/browser acceptance remain open.
+
+- 2026-09-09: Core cubic spline-point insertion added in a focused module, reusing Split and G2 constraints. Core 410 tests/check and CAD build pass. Ribbon/pointer/preview/undo wiring is next; this is not completed spline parity.
+
+- 2026-09-09: Straight-chain offsets now reject finite collinear contact between nonadjacent output edges. Dedicated line-overlap module/tests; Core 407 / CAD 342 tests, typecheck/build pass. Browser query still returns []; full parity remains active.
+
+- 2026-09-09: Closed line/arc slots implemented with exact inside/outside offsets and linked width; Core 404 / CAD 342 tests plus typecheck/build pass. Arc-center/origin snapping and driving/reference dimensions confirmed in existing code/tests. Browser acceptance and full sketch parity remain open; god-file refactor IN remains uncompleted.
+
+- 2026-09-09: Circular centerline slots implemented through dedicated Core operation/residual modules and existing UI preview/handle. Optional slotBoundary inner/outer metadata distinguishes boundaries with one shared driver. Core 400 / CAD 341 tests, check/build pass, native radius/width edits and open-bore extrusion verified. Noncircular closed chains and full parity remain open.
+
+- 2026-09-09: Extracted saved-constraints.ts from constraint-panel.ts; creation and saved-editing UI now have focused documented ownership. Existing CAD 340 tests and build/typecheck pass. Core unchanged. This does not close the larger shell/viewer/main refactor request or full parity.
+
+- 2026-09-09: Added polygon side-count live preview through focused overlay/session modules, cached across canvas refresh. Invalid/cancel/stale paths clear safely; Enter applies once, unchanged count avoids history noise. CAD 340 tests and build/typecheck pass; Core unchanged. Full parity/browser remains open.
+
+- 2026-09-09: Polygon attachment remapping now preserves geometric line correspondence, symmetry axes and bounded finite contacts across side-count changes. Core 396 / CAD 339 tests, check/build pass, mounted undo/native save verified. Browser connection list empty; full parity remains open.
+
+- 2026-09-09: Added inline polygon side-count editing via focused definition/rebuild/UI modules. Derives existing constraint recipe; preserves sizing IDs/dimensions and traversal, remaps surviving points, rejects disappearing attachments. Core 394 / CAD 338 tests, check/build pass, mounted undo/native save covered. Full parity/browser remains incomplete.
+
+- 2026-09-09: Implemented planar negative-Z DXF OCS in dedicated coordinates.ts, with WCS/ellipse distinction verified against Autodesk docs. Core 390 / CAD 337 tests, check/build pass; mounted preview/undo/native save covered. Tilted coordinates and full parity remain incomplete.
+
+- 2026-09-09: Added analytic edge-on conic projection in focused collapsed-conic.ts, preserving turning points and reducing full closed loci to intervals. Core 386 / CAD 336 tests, check/build pass; mounted native/source update verified. Updated stale projection README. Full parity and live browser remain incomplete.
+
+- 2026-09-09: Unified line Trim with general picked-curve implementation, removing duplicate algorithm and obsolete blanket constraint rejection. Kept line-only picking; corrected operations README. Core 383 / CAD 335 tests, check/build pass. This focused cleanup does not complete the larger god-file refactor or full parity.
+
+- 2026-09-09: Extend preserves existing finite contacts through Core extension-contacts.ts parameter mapping. Lines/arcs/ellipses, both ends/sweeps, fixed/sliding and conflicting endpoint constraints covered. Core 382 / CAD 335 tests, check/build pass, including mounted undo/native save. Full parity remains incomplete.
+
+- 2026-09-09: Trim finite-contact remapping implemented in focused Core helper with retained interval provenance. Preserves surviving fixed/sliding contacts, drops removed ones, handles closed seams. Core 380 / CAD 334 tests, check/build pass; mounted undo/native save verified. Full parity/browser acceptance remains incomplete.
+
+- 2026-09-09: Added direct sketch-origin selection for dimension reference B, preserving A. Focused Core/UI helpers reuse a fixed construction point; numeric tolerance reuse covered. Core 377 / CAD 333 tests, check/build pass. Browser list empty, full parity remains incomplete.
+
+- 2026-09-09: Split remaps fixed/sliding curve contacts exactly onto the appropriate piece. Core 375 / CAD 332 tests, Core check/CAD build pass. Whole-fit/control topology still rejects; contacts slide only within their assigned piece. Trim and live browser acceptance remain open.
+
+
+- 2026-09-09: Saved contact fixed/sliding controls implemented with stable IDs and geometry. Core 373 / CAD 331 tests, Core check and CAD build pass. Added semantic constraint row selectors so tests inspect actual saved relations. Full parity and singular/browser acceptance remain open.
+
+
+- 2026-09-09: Bounded sliding contact parameters implemented with correct geometric DOF accounting and drag persistence. CAD creation checkbox and Extend cubic defaults wired. Core 371 / CAD 330 tests, Core check and CAD build pass. Saved-contact mode editing/singular cases and full parity/browser acceptance remain open.
+
+
+- 2026-09-09: Extend now persists curve-boundary attachments (line/conic locus; cubic fixed parameter). Core 367 / CAD 329 tests, Core check and CAD build pass. Stationary point contact supported; tangent/normal direction checks remain strict. Finite-extent enforcement/free sliding cubic contacts and full parity/browser acceptance remain open.
+
+
+- 2026-09-09: Extend-to-point now persists coincidence in the same undo step. Core 364 / CAD 328 tests, Core check and CAD build pass. Native boundary-point drag, conic link, duplicate avoidance and near-miss/implicit-center exclusion verified. General curve attachments and full parity/browser acceptance remain open.
+
+
+- 2026-09-09: Extend now recognizes standalone point boundaries for line/arc/ellipse, retaining locus and constraint checks. Core 362 / CAD 328 tests, Core check and CAD build pass. Official Extend page verified; cubic boundaries already supported, cubic source extrapolation is a separate unimplemented capability not explicit on tool page. Automatic boundary attachment/browser acceptance remain open.
+
+
+- 2026-09-09: DXF layer inventory/inclusion implemented before decoding. Core 359 / CAD 327 tests, Core check and CAD build pass. Structural scanner extracted so legacy polyline sequences count once and excluded unsupported layers can be skipped safely. Layer styling/metadata persistence and full parity/browser acceptance remain open. Autodesk common-entity group code reference verified and documented.
+
+
+- 2026-09-09: DXF custom/source anchors and optional canvas geometry snapping implemented. CAD 326 tests and typecheck/build pass; Core unchanged (356 baseline). Mounted flow verifies rotation/scale, endpoint snap, Escape, undo/save; corrected the DOM matrix stub and used real click events for placement. Full parity/browser acceptance remain open.
+
+
+- 2026-09-09: Whole-spline symmetry implemented with exact control-point reflection, live sketch axis and optional persisted splineReversed correspondence. Equal segment counts/closure required. Core 356 / CAD 325 tests, Core check/CAD build pass. Full parity and browser acceptance open.
+
+
+- 2026-09-09: Circle-locus tangent/curvature contacts implemented in focused Core solver module. Core 354 / CAD 324 tests, Core check and CAD build pass. Supporting arc locus remains unbounded; fixed finite contacts available separately. Full parity and browser acceptance remain open.
+
+
+- 2026-09-09: Saved quadrant reassignment implemented via focused Core operation and CAD selector. All four endpoints, stable IDs, conflict atomicity, undo/save verified. Core 351 / CAD 323 tests, Core check and CAD build pass. Full parity and live browser acceptance remain open.
+
+
+- 2026-09-09: Ellipse axis construction handles implemented, with standard length/orientation constraints. Core 349 / CAD 322 tests, Core typecheck and CAD build pass. Mounted test caught and fixed select-option reference key-order mismatch. Full sketch parity and browser acceptance remain open.
+
+
+- 2026-09-09: Ellipse center constraints/selection/snapping implemented in focused Core and CAD modules. Core 347 / CAD 321 tests, Core typecheck and CAD production build pass. Full parity remains open; no browser verification claimed. Shared center-controls extracted from constraint panel.
+
+
+- 2026-09-09: Selected-edge linear/circular patterns shipped with full-reference membership bookkeeping through resize, repair, suppression, and native persistence. Shared modification source picker replaces mirror-only modules. Core 345 / CAD 320 tests pass; Core typecheck and CAD build pass. Live browser unavailable (`[]`). Existing dimensions and arc-center inference tests pass. Full parity and requested shell refactor remain open.
+
+
+### 2026-09-09 — Mirror canvas picking
+
+Implemented source click toggling/highlights with first-pick defaults, axis exclusion and cleanup. 319 CAD tests, Core check/CAD build pass. Geometry unchanged; source projection exported. Live visuals, copied-edge joining and grouped edge patterns remain open.
+
+
+### 2026-09-09 — Selected-edge mirrors
+
+Implemented source projection/selected-edge mirror relations and UI list mode, including same-contour axis support in creation/editing. 342 Core / 318 CAD tests, Core check/CAD build pass. Stationary cubic and native endpoint propagation covered. Browser list `[]`; direct edge picking/joining/grouped edge patterns remain open.
+
+
+### 2026-09-09 — Whole-placement suppression
+
+Implemented focused placement projection/batch operation and UI controls. 340 Core / 317 CAD tests, Core check/CAD build pass. Multi-source atomic failure, mixed state and one-step undo/native persistence covered. Edge/topology/browser and broader parity remain open.
+
+
+### 2026-09-09 — Pattern-instance suppression
+
+Implemented retained-slot suppression with actual contour removal and current-source restoration. 338 Core / 316 CAD tests, Core check/CAD build pass; final identity fix verified in Core/build after CAD tests. Count edits, dependency guards and native undo/save covered. Batch placement controls, topology and full parity remain open.
+
+
+### 2026-09-09 — Pattern membership repair
+
+Implemented missing-slot detection/restoration with preserved detached geometry. 335 Core / 315 CAD tests, Core check/CAD build pass. Count editing resumes after repair; mounted undo/native save covered. Fully detached groups require explicit new source selection. Full parity remains open.
+
+
+### 2026-09-09 — Pattern count editing
+
+Implemented focused resize/remapping module and count fields. 333 Core / 314 CAD tests, Core check/CAD build pass. Grid identities, multiple sources, shrink dependencies, reference remapping and undo/native save verified. Partially detached groups reject count changes; suppression and full parity remain open.
+
+
+### 2026-09-09 — Shared pattern settings
+
+Implemented canonical patternGroups definitions, derived instance transforms and shared placement editor. 330 Core / 313 CAD tests, Core check/CAD build pass. Stable IDs, 2D spacing, circular center/step, invalid records and mounted cancel/undo/save verified. Count changes remain explicitly unsupported pending remapping; full parity remains open.
+
+
+### 2026-09-09 — Saved mirror-axis editing
+
+Implemented Core axis editing/reconstruction and focused saved-relation UI. 328 Core / 312 CAD tests, Core check/CAD build pass. Stable identity, reassignment, live-to-fixed conversion, cancel/undo/native save verified. Grouped editing/topology/browser remain open.
+
+
+### 2026-09-09 — Associative mirror/live axis
+
+Implemented fixed/live-axis mirror relations, shared reflection math and focused axis selector. 326 Core / 311 CAD tests, Core check/CAD build pass. Native axis motion/radius propagation, mounted exclusion/undo/save and conflicting-transform rejection verified. Full parity and browser acceptance remain open.
+
+
+### 2026-09-09 — Associative pattern geometry
+
+Implemented generated linear/circular source-instance constraints with focused transform math and residual modules. 324 Core / 310 CAD tests, Core check/CAD build pass; final hint copy adjusted afterward. Radius/position/control propagation, detach, arc DOF and mounted undo/native reopening verified. Group parameter editing, live mirror axis and full parity remain open.
+
+
+### 2026-09-09 — Entity constraint colors
+
+Implemented batched Core mobility queries and focused CAD per-entity geometry-state renderer/CSS. 321 Core / 309 CAD tests, Core check/CAD build pass. Mixed fixed/free and cubic-control cases verified; theme visuals await browser availability. Full parity remains open.
+
+
+### 2026-09-09 — Selected-entity constraint state
+
+Implemented Core entity DOF via observable/constraint Jacobian ranks; focused CAD presentation and click/edit refresh. 320 Core / 307 CAD tests, Core check/CAD build pass. Mounted test caught and now verifies click-selection updates. Browser list empty. Full parity and per-entity canvas coloring remain open.
+
+
+### 2026-09-09 — Parallel-line distance
+
+Implemented Core shared line measurement, driving parallelism/spacing, reference validation, panel guidance and canvas annotations. 318 Core / 306 CAD tests, Core check/CAD build pass; mounted creation/edit/undo/redo/save covered. Full parity and browser acceptance remain open.
+
+
+### 2026-09-09 — Point-to-line dimension
+
+Implemented shared Core perpendicular measurement, driving/reference distance, selection guidance and canvas foot annotation. 315 Core / 304 CAD tests, Core check/CAD build pass. Fixed-line assertions use solver tolerance. Browser verification and full parity remain outstanding.
+
+
+- 2026-09-09: Driving/reference conversion controls added; IDs preserved and direct dependent values frozen explicitly. 313 Core / 303 CAD tests and check/build pass. Offset/slot references, browser acceptance and broader parity remain open.
+
+- 2026-09-09: Native reference dimensions added for standard length/axis/radial/angle measurements. 311 Core / 302 CAD tests and check/build pass. No solver DOF reduction or cached values; read-only panel and parenthesized labels. Conversion UI, offset/slot references and browser acceptance remain open.
+
+- 2026-09-09: Deterministic automatic dimension-label spacing added, preserving manual placements. 301 CAD tests/build pass. Geometry collisions, dense viewport fitting and live browser acceptance remain open.
+
+- 2026-09-09: Angular/radial manual layout now responds to label movement; partial arcs retain visible-sweep attachment. 299 CAD tests/build plus 12 canvas tests after extra cancellation coverage pass. Overlap/browser/full parity remain open.
+
+- 2026-09-09: Diagonal length/distance dimension-line relocation added through generalized linear-dimension-layout.ts. 297 CAD tests/build pass. Angular/radial layout refinement, overlaps and browser acceptance remain open.
+
+- 2026-09-09: X/Y measurement lines and extension guides now relocate with label drag/restore. 296 CAD tests and build pass. Other line layouts, overlap and browser visuals remain open.
+
+- 2026-09-09: Manual dimension-label connectors now track drag/cancel/undo and current geometry. 294 CAD tests and build pass. Dimension-line relocation/overlap and browser visuals remain open.
+
+- 2026-09-09: Manual dimension-label drag/undo/cancel/native persistence implemented as document presentation metadata. 308 Core / 293 CAD tests, check/build pass; final focus fix reran 110 workspace tests. Leader tracking and browser acceptance remain open.
+
+- 2026-09-09: Offset and full slot-width annotations now reuse Core handles. 292 CAD tests/build pass, keyboard activation verified. Browser list empty; placement/overlap and full parity remain open.
+
+- 2026-09-09: Added signed angular canvas annotations and X/Y extension guides. Focused layout module; 290 CAD tests and build pass. Manual placement/overlap handling and live browser remain open.
+
+- 2026-09-09: Canvas annotations for radius/diameter/length/distance/X/Y dimensions activate saved value editing. 287 CAD tests and build pass. Automatic positions only; angular/offset/slot, draggable placement and browser visuals remain open.
+
+- 2026-09-09: Independent signed horizontal/vertical distance dimensions implemented in solver and sketch controls. 306 Core / 285 CAD tests and check/build pass. Zero/negative values, fixed anchor and native save verified. Graphical placement/live browser/full parity remain open.
+
+- 2026-09-09: Driving diameter dimensions added to native solver and sketch controls. 304 Core / 284 CAD tests, check/build pass. Split arcs, dimension links and radius-tool driver reuse verified. Graphical dimension placement/remaining variants and live browser remain open.
+
+- 2026-09-09: Selected-contour projection creation/repair UI connected to stable Core references. 283 CAD tests and production build pass; source reorder/edit/native reopen and cancel tested. Segment/vertex/mixed projection and live browser remain open.
+
+- 2026-09-09: Shared Core midpoint snapping/inference now covers lines and circular arcs, with native constraints for canvas placement. 301 Core / 281 CAD tests and check/build pass. Browser and wider parity remain open.
+
+- 2026-09-09: Horizontal/vertical line inference now persists through canvas placement and edits; orchestration extracted into sketch/drawing-inference.ts. 299 Core / 280 CAD tests and check/build pass. Browser list remains empty; broader inference/full parity open.
+
+- 2026-09-09: Added focused Core point-snap inference and canvas integration. Endpoint links survive source edits, origin anchors exclude derived geometry. 297 Core / 279 CAD tests, check/build pass. Broader inference, alternate gestures and live browser acceptance remain open.
+
+- 2026-09-09: Persistent circle/arc-center inference added to ordinary sketch placement, sharing Core snap geometry. 293 Core / 278 CAD tests, check/build pass. Undo/native-save and constrained edits verified; alternate gestures and live browser remain open.
+
+- 2026-09-09: Arc-center snapping and constrained center selection implemented in focused sketch modules. Stable contour-reference Core foundation and projection-editor preservation also verified. 290 Core / 277 CAD tests pass; check/build verified, browser has no connections. Remaining parity and large-shell refactor remain open. See STATUS and CAD_Sketch_Parity for limits.
+
+- 2026-09-09: Added whole-sketch projection viewport editor with preview, create/relink, stale-document protection and missing-source replacement in open documents. Feature dependencies now include projection links. 286 Core / 273 CAD tests and check/build pass. Browser unavailable. Individual projected entities/mixed sketch constraints/file recovery remain open.
+
+- 2026-09-09: Whole-profile associative projection now persists a sourceFeatureId and resolves at kernel rebuild. 285 Core / 269 CAD tests and check/build pass; changed source radius alters saved/reopened extruded result, chains/invalid references/suppression/rollback covered. Direct edit guard prevents accidental detachment. Creation/selection/recovery UI and stable subentities remain open.
+
+- 2026-09-09: Added dedicated Core sketch/projection geometry modules and tests. Exact plane-to-plane native curves, including oblique circles/ellipses and reflected sweep. 281 Core tests/check and CAD build pass; kernel projected ellipse extrusion verified. No associative Project UI claim: persisted source references/rebuild/error behavior are the next dependency.
+
+- 2026-09-09: Persistent spline-shape relation now refits native handles from fit vertices during solving/dragging. New open/closed authoring attaches it; whole-contour selection supports explicit relation use/removal. 276 Core / 269 CAD tests and check/build pass. Already-satisfied large systems validate without allocating solver coordinates. Iterative/diagnostic limits and live browser acceptance remain open.
+
+- 2026-09-09: Added periodic closed fit splines with first-point click closure and Close spline action, matched preview/commit, C2 seam continuity and native extrusion. Dedicated linear-time cyclic solver. 270 Core / 269 CAD tests, Core check/CAD build pass. Persistent refitting and live browser acceptance remain open; browser unavailable.
+
+- 2026-09-09: Fit-point spline authoring now available in dropdown, with pointer preview, Enter/button finish, Escape cancel, one-step undo and native reopen. Dedicated Core interpolation and UI completion modules. 268 Core / 268 CAD tests, Core check/CAD build pass. Source fit-point refitting/periodic closure remain open; browser unavailable. Full parity goal active.
+
+- 2026-09-09: Added polynomial DXF SPLINE degree 1–3 import via dedicated Core converter/parser modules. 266 Core / 267 CAD tests and check/build pass, including independent curve evaluation and preview/undo/native reopen. Unequal rational weights/higher degree/fit-only remain open; browser unavailable. Full parity remains active.
+
+- 2026-09-09: Closed nested-island sketch paint-order gap. Shared Core regions/order module now drives kernel and canvas; contours keep original indices and geometry, open/construction overlays remain visible. 261 Core / 266 CAD tests, check/build pass. Browser discovery still empty. Full sketch parity remains active.
+
+- 2026-09-09: Refined seven sketch dropdown SVGs with distinct construction-point cues. 149 UI / 265 CAD tests, typecheck/build pass; browser unavailable. Nested DXF region packet also verified: 259 Core tests/check; containment classifier, import toggle, kernel nesting order and regression coverage. Arbitrary island sketch fill compositing remains documented, not claimed complete. Full parity and priority shell refactor remain open.
+
+- 2026-09-09: DXF endpoint joining implemented, defaults on with UI toggle. Dedicated graph traversal preserves/reverses native curves and stops at branches. Core255/CAD264 tests, Core check/CAD build pass, including joined-line extrusion dimensions. Interior intersections, hole classification and browser QA remain open.
+
+- 2026-09-09: DXF placement added in focused module: numeric position/rotation/scale and pointer origin placement with Escape. Parser cached, combined insertion validated before mutation. CAD263 +99 focused tests and build pass. Browser unavailable; custom anchors/snapping and other parity gaps remain open.
+
+- 2026-09-09: DXF ellipse and legacy polyline support added. Core249/CAD261 tests +5 focused curve tests pass, Core check/CAD build. Native preview/reopen and rotated ellipse extrusion verified. Remaining format/placement/topology/browser gaps remain documented.
+
+- 2026-09-09: Initial ASCII DXF import implemented, modular Core parser + CAD preview/units panel and ribbon command. Core244/CAD260 tests, Core check/CAD build pass including native roundtrip and kernel extrusion. Explicit subset documented; unsupported model-space entities reject. Broader DXF/DWG, placement/topology and browser QA remain open.
+
+- 2026-09-09: Quadrant snaps and ordinary placement inference added. Core240/CAD258 tests +95 focused editor tests after toggle case pass; Core check/CAD build pass. Named snaps, finite-span clipping, grouped undo/native reopen verified. Alternate drawing gesture inference and live browser remain open.
+
+- 2026-09-09: Point-on-ellipse and Quadrant implemented, selected from official reference constraint list. Dedicated geometry module, persisted endpoint choice, UI icon and native undo/reopen tests. Core238/CAD256/UI149 tests and checks/builds pass. Automatic inference, quadrant reassignment and topology remapping remain open.
+
+- 2026-09-09: Full ellipse halves now retain one shape via new persisted ellipse-shape constraint. Core235/CAD255 tests, Core check/CAD build pass; includes symmetry, five DOF, native reopen, kernel extrusion. Browser unavailable. Topology remapping and numeric editing/error-bound improvements remain open.
+
+- 2026-09-09: Elliptical segment symmetry and missing ellipse solver coordinates added. 232 Core / 254 CAD tests, Core check/CAD+Animation builds pass. Updated ellipse entity ref vocabulary. Full-ellipse shared halves, singular endpoints/topology remapping and browser QA remain open.
+
+- 2026-09-09: Symmetric sketch constraint implemented for points and line/circular loci with persisted axis reference. Axis lifecycle remapping included. Core full suite 228 + focused symmetry 6, CAD253/UI149 pass; checks/builds pass. Ellipse/spline/external axes and live browser remain open.
+
+- 2026-09-09: Open-chain Slot implemented and tested: 223 Core / 252 CAD tests, Core check/CAD build pass. Dedicated exact envelope and smooth-chain residual modules; whole-chain selection/preview/undo/native width edits and kernel extrusion verified. Closed/spline slots, topology remapping and live browser remain open.
+
+- 2026-09-09: User-requested dropdown clarity: strengthened three rectangle variant silhouettes/anchors and enlarged shared illustrated menu icons to 28px. UI/CAD tests and builds plus UI typecheck pass; no browser connection. Open-chain Slot work remains in flight, not claimed complete.
+
+- 2026-09-09: Slot width handle and shared capture cleanup released. 217 Core / 251 CAD tests, Core check/CAD build pass. Browser discovery empty. Updated parity matrix to distinguish associative offsets/slots from independent mirror/pattern copies; broader goal remains active.
+
+- 2026-09-09: Line/arc slots released with dedicated Core/UI modules, custom icon, shared width and source relations. 215 Core / 249 CAD / 149 UI, checks and CAD/UI/Animation builds pass; native slot kernel extrusion covered. Chains/closed profiles/splines/manipulators/topology repair/browser remain open.
+
+- 2026-09-09: Mixed offset relationships released. Locus-based residual module, shared distance, tangent/non-tangent source/edit tests and native editor reopening. 210 Core / 248 CAD, Core check/CAD build pass. Singular diagnostics/geometric error bounds and topology repair remain explicit gaps.
+
+- 2026-09-09: Mixed line/arc offset geometry released. Exact carriers/joins, capsule and native UI workflow verified; 206 Core / 247 CAD tests, Core check/CAD build pass. Mixed associations and topology repair remain explicit gaps, not marked complete.
+
+- 2026-09-09: Individual-edge offsets released; dedicated 249-line offset panel, Core edge operation/shared relation constructor. 201 Core / 246 CAD tests and Core check/CAD build pass. General curves/topology remapping/browser remain open.
+
+- 2026-09-09: Offset handle/flip/Enter workflow released. Generic dimension manipulator preserves fillet behavior; Core owns signed projection. 198 Core / 245 CAD tests, Core check/CAD build pass. Browser list remains empty; live capture verification open.
+
+- 2026-09-09: Associative open/closed line-chain offsets released, with new native contour ref, shared exact geometry module and topology guards. 193 Core / 244 CAD tests, Core check, CAD/Animation builds pass. General curves/topology remapping/browser acceptance remain open.
+
+- 2026-09-09: Arc offset relations released: center/span/radial association, source/distance edits and DOF tests. Offset defaults skip construction centers. 189 Core / 243 CAD, Core check/CAD build pass. Multi-edge association and broader parity remain open.
+
+- 2026-09-09: Persistent simple offsets released. Circle/single-line constraints, shared signed distance, independent geometry/relation/solver modules. 185 Core / 241 CAD tests, Core check/CAD build pass. New native offset constraint vocabulary. Arc/chain association and live browser remain open.
+
+- 2026-09-09: Initial exact Offset implementation released (circle/individual arc/mitered line chains). Independent copies only; association/general curves remain open. Fixed modification finish ribbon state. 182 Core / 240 CAD, Core check/CAD build pass; browser acceptance outstanding.
+
+- 2026-09-09: Normal sketch constraint released: focused Core module, native kind, ribbon icon/panel, solver + mounted workflow tests. 176 Core / 239 CAD / 149 UI pass; checks and CAD/UI/Animation builds pass. Curve-to-plane Normal and free contacts remain open; browser unavailable.
+
+- 2026-09-09: Curvature claim finished and released: dedicated finite-contact G2 residual module, persisted kind, ribbon icon/panel and tests. 171 Core / 238 CAD pass, Core check/CAD build pass. No live browser claim; sliding contacts and wider parity remain incomplete.
+
+- 2026-09-09: Refined rectangle variant SVGs with distinct corner/center/alignment markers and shared theme colors. 149 UI tests, UI check/build, CAD/Animation builds pass. Browser discovery empty; live verification outstanding. Curvature implementation remains in flight under its separate existing claim.
+
+- **2026-09-09 — Radius document units:** immediate entry follows mm/cm/m/in/ft via shared catalog, stores mm, converts pending values on unit changes, disposes subscription on close. 237 CAD tests and CAD typecheck/build pass; native values and all nondefault units covered. Expressions/live browser remain open.
+
+
+- **2026-09-09 — Immediate radius:** Core set-radius adds/reuses driving radius constraints; CAD recent-radius inline field handles newly created circles/arcs and canvas typing/Enter focus. 165 Core / 232 CAD tests, Core check/CAD build pass. All creation families, native undo/reopen, linked drivers, tangent retention and conflicts tested. Expressions/document units/live browser remain open.
+
+
+- **2026-09-09 — Three-point arc chord drag:** drag/release stages endpoints; curvature click commits one arc. Shared endpoint-drag-gesture replaces tangent-specific filename; new arc-chord-tool stages geometry, workspace delegates. 226 CAD tests and typecheck/build pass, including continuation/closure, undo/native reopen, cancellation and ordinary pointer clicks. Live browser/immediate sizing/semicircle inference remain open.
+
+
+- **2026-09-09 — Three-point arc order:** start/end/curvature placement, fixed-chord preview and explicit ribbon label; closure snaps the endpoint, not the third point. 223 CAD tests and CAD typecheck/build pass, including updated arc regressions, invalid recovery, closure and native undo/reopen. Browser discovery empty. Drag-chord, semicircle inference and immediate radius entry remain open.
+
+
+- **2026-09-09 — Tangent arc drag placement:** dedicated tangent-arc-gesture module adds pointer capture, transient preview, one-step commit and cancellation without disturbing two-click placement. Workspace delegates to existing Core placement. 220 CAD tests and CAD typecheck/build pass; tests cover pointer/native undo, invalid release, cancellation and click suppression. Live browser capture remains open.
+
+
+- **2026-09-09 — Tangent arc:** Core exact endpoint arc + persistent finite tangency; focused CAD gesture/preview, ribbon variant + SVG, registry/main registration only. Extracted sketch/history.ts fixes active-path loss on undo/redo. 160 Core / 216 CAD / 149 UI tests, Core/UI checks, CAD/UI/Animation builds pass. Closed native tangent-arc profile extrudes. Live browser, drag-release, automatic switching, immediate radius entry and branch joining remain open.
+
+
+- **2026-09-09 — Arc center intent:** dedicated Core arc-center operation retains a selectable center via canonical concentric relation; CAD creation wired. 155 Core / 213 CAD tests, Core check/CAD build pass. Center/endpoint/radius edits, native undo/reopen and extrusion tested. Tangent/elliptical arc variants and live browser remain open.
+
+
+- **2026-09-09 — Three-point circle intent:** dedicated Core circle-points module persists selectable construction points and coincidence constraints; CAD placement calls it. Mounted test caught point/curve picking tie, now fixed in picking.ts. 151 Core / 212 CAD tests, Core check/CAD build pass. Fixed-point drag, full definition, conflict rejection, undo/native reopen and extrusion tested. Live browser and broader parity remain open.
+
+
+- **2026-09-09 — Midpoint-line intent:** dedicated Core line-midpoint operation persists a selectable construction center with canonical midpoint relation. CAD placement wired; center dragging, fixed-center symmetric endpoint edits and full definition verified. 147 Core / 210 CAD tests, Core check/CAD build pass. Native save/reopen and pointer undo tested; live browser remains outstanding.
+
+
+- **2026-09-09 — Polygon intent:** dedicated Core polygon-relations operation preserves regularity with equal chords/circumcircle, plus inner sizing circle for circumscribed polygons. CAD creation delegates; solver constraint cap 512 preserves 100-side range. 143 Core / 209 CAD tests, Core check and CAD build pass, including radius edits, undo/reopen and extrusion. Browser workflow and post-creation side-count editing remain open.
+
+
+- **2026-09-09 — Rectangle intent:** dedicated Core operation adds ordinary H/V or parallel/perpendicular constraints, with a selectable center/diagonal/midpoint for center rectangles. CAD placement wired; old paths preserved. 137 Core / 208 CAD tests, Core check/CAD build pass, including pointer undo/reopen and native extrusion. Browser discovery empty. Polygon and other gesture relations remain open.
+
+
+- **2026-09-09 — Dropdown icons refined:** fixed 32px artwork overflowing an 18px menu column using explicit 24px artwork/column sizing; strengthened corner, center and aligned rectangle markers. 207 CAD / 149 UI tests plus UI typecheck and CAD/UI builds pass. Live visual verification remains outstanding.
+
+
+- **2026-09-09 — User-directed sketch interaction/icons:** tool toggle/Escape→Select, vertex/edge highlighting and deselection, one-undo constrained dragging, visible local DOF/redundancy/conflict state; distinct SVG dropdown variants. 133 Core/207 CAD/149 UI tests; Core/UI checks and CAD/UI/Animation builds pass. Chamfer Core direct-edit helpers/shared manipulator extracted and tested; dedicated UI postponed for these user priorities. Full parity/browser/per-entity diagnostics remain open.
+
+- **2026-09-09 — Linked chamfer batches:** vertex selections share distance/angle drivers; signed angular links preserve opposite-turn corners when edited/reopened. Core signed resolver/edit/removal and CAD batch selection implemented. 127 Core/203 CAD tests, check/build pass. Signed contract requires updated clients; edge-pair batches/handles/browser remain open.
+
+- **2026-09-09 — Two-edge chamfer:** shared line-corner selector extracted from fillet; chamfer wrapper follows first-picked distance/angle and supports independent line intersections. CAD selection/preview connected. 124 Core/202 CAD tests, Core check/CAD build pass. Multi-segment joins/batches/handles/browser remain open.
+
+- **2026-09-09 — Linked sketch dimensions:** added stable `valueFrom` contract/resolver with unit/cycle checks, equal-chamfer linkage, generic dimensional editing and safe driver removal through direct removal/Delete/Trim. CAD constraint list shows/edits links. 121 Core/201 CAD tests and check/build pass. Batches/two-edge/manipulator/browser acceptance remain open.
+
+- **2026-09-09 — Sketch chamfer:** connected Core equal/two-distance/angle variants to dedicated CAD controls and illustrated ribbon. Extracted shared corner-break reference logic from fillet. 117 Core/200 CAD tests, check/build pass, including native OCCT extrusion. Two-edge selection, equal/batch linkage, reopened controls/handle and browser verification remain open.
+
+- **2026-09-09 — Curved fillet batches/editing:** mixed corners share a radius; retained finite contacts remap; curved radius handles and reopened dimension discovery work. 113 Core/198 CAD tests and check/build pass. Live browser connection retried, none available. Curve design intent and virtual sharps remain open.
+
+- **2026-09-09 — Connected curved fillets:** dedicated path operation now rounds adjacent curved corners/closed seams, preserves surrounding geometry and references; shared constraint builder extracted. CAD corner picking connected. 112 Core/197 CAD tests, Core check and CAD build pass, including saved-profile OCCT extrusion. Longer separate-path joins, curved virtual sharps/batches and browser acceptance remain open.
+
+- **2026-09-09 — Curved fillet authoring:** added dedicated Core operation with exact retained curves, reference guards and persistent radius/tangent joins; CAD curve picking/preview/Apply/native roundtrip connected. 107 Core/196 CAD tests, Core check and CAD build pass. Longer paths, design-intent-preserving radius edits and browser acceptance remain open.
+
+- **2026-09-09 — OUT: persistent finite tangency.** New curve+parameter references solve contact and derivative parallelism; UI exposes segment endpoints. Trim retains parameter metadata on remap. 102 Core / 195 CAD tests, Core check and CAD build pass; native authoring/reopen verified. Curved fillet integration, sliding contacts and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: curved fillet Core groundwork.** Exact jets, normal-offset tangent-circle search and exact retained pieces/bridge implemented in focused curve modules. 99 Core tests and Core check pass. Not connected to app yet: generic curve tangency persistence/reference remapping/UI remain next work. Full parity active.
+
+
+- **2026-09-09 — OUT: existing fillet radius edit.** Picking a saved arc resolves its driver through batch equal links. Existing dimension updates via solver and preview handle/numeric panel; no duplicate fillet. 96 Core / 194 CAD tests, Core check and CAD build pass; reopen/edit/save verified. Arc/spline fillets and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: fillet preview handle.** Core radius projection plus dedicated UI manipulator supports preview drag/cancel and keyboard sizing; Apply alone commits. 95 Core / 193 CAD tests, Core check and CAD build pass. Existing-fillets handle editing, arc/spline pairs and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: virtual-intersection line fillets.** Disconnected/crossing single lines extend/trim to a virtual corner; pick parameters retain desired sides. Constraint conflicts reject before joining. 94 Core / 192 CAD tests, Core check and CAD build pass. Multi-segment/arc/spline pairs and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: two-line fillets.** Adjacent lines or separate single-line contours sharing an endpoint can be picked in sequence; Core joins/remaps then reuses corner fillet. 92 Core / 191 CAD tests, Core check and CAD build pass. Disconnected/multi-segment/arc/spline pairs and reversal-sensitive constraints remain open. Browser QA outstanding; full parity active.
+
+
+- **2026-09-09 — OUT: shared-radius fillet batches.** Multiple picked corners preview/apply with one driving radius and equal links. Stable original-index ordering and atomic failure in dedicated Core helper. 90 Core / 190 CAD tests, Core check and CAD build pass. Arc/spline/two-curve fillets, manipulators and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: connected-line sketch fillet.** Ribbon + in-workspace picked-corner/numeric radius preview/apply, exact Core tangent arc, virtual sharp and dimension remapping. 88 Core / 189 CAD tests, Core check and CAD build pass; native reopen and OCCT cylindrical face verified. Arc/spline/two-curve selection, shared-radius batches/manipulators and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Cubic overlap intervals.** Dedicated affine/control-polygon verification recognizes duplicate, reversed and shared cubic subintervals; Trim retains exact remnants. 84 Core / 188 CAD tests, Core check and CAD build pass. Degenerate retracing/non-affine cases and browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Finite overlap Trim.** Line/conic overlap endpoints now act as boundaries. Duplicate full-circle seams ignored; numerical pick ties stable. 81 Core / 188 CAD tests, Core check and CAD build pass. General cubic overlap and overlap selection UI/browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Point sweep Trim.** Stroke-capsule hits remove standalone points with transform-aware six-pixel tolerance. Shared deletion handles constraints; gesture undo verified. 77 Core / 188 CAD tests, Core check and CAD build pass. Overlap handling and live browser QA remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Drag Trim.** Exact stroke crossings drive multi-curve Trim; dedicated gesture module supplies pointer capture and one undo transaction with cancellation. 76 Core / 187 CAD tests, Core check and CAD build pass. Standalone-point sweep, coincident overlaps and browser verification remain open. Full parity active.
+
+
+- **2026-09-09 — OUT: Trim fragment relations.** Partial line/arc locus relations persist and separated remnants receive shared-locus links. 74 Core / 185 CAD tests, Core check and CAD build pass; radius editing and native reopen verified. Finite extent/control remapping and browser verification remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Path Trim references.** Provenance helper remaps surviving vertices/whole segments across contour replacement. Changed/removed entity constraints are removed with status count and undo restoration. 72 Core / 184 CAD tests, Core check and CAD build pass. Partial-segment supporting-locus preservation and browser verification remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Circle Trim relations.** Circle constraints map to remaining arcs; referenced centers persist as linked construction points. Trim/Split share circle-references.ts. 71 Core / 183 CAD tests, Core check and CAD build pass. Later radius edit retains fixed center; native reopen verified. Path Trim remapping and browser verification remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Line Split relations.** Direction constraints persist; parallel halves retain collinearity and original length maps to outer-endpoint distance with the same ID/value. 70 Core / 182 CAD tests, Core check and CAD build pass, including later dimension edit and native reopen. Finite equal-length/midpoint/control remapping and interval inequalities remain open. Full parity active.
+
+
+- **2026-09-09 — OUT: Arc Split relations.** Retained supporting-circle constraints plus concentric/equal links keep split arcs circular together after dimension edits. Focused split-relations module; endpoint remapping retained. 69 Core / 181 CAD tests, Core check and CAD build pass. Finite midpoint, line length and cubic control remapping remain open; full parity active.
+
+
+- **2026-09-09 — OUT: Extend constraint preservation.** Removed blanket constrained-contour rejection from line/conic Extend. Existing references/IDs remain; a focused residual guard rejects named conflicts atomically. 67 Core / 180 CAD tests, Core check and CAD build pass, including constrained arc save/reopen. Trim/Split remapping and full parity remain active; browser verification outstanding.
+
+
+- **2026-09-09 — OUT: conic Extend checkpoint.** Arc/ellipse free ends now extend on their original conic to a finite boundary or second endpoint click. Focused Core operation shared by preview/commit; exact parameters persist. 66 Core / 179 CAD tests, Core check and CAD build pass. Cubic extension, constraint remapping and browser verification remain open; full parity goal active.
+
+
+- **2026-09-09 — OUT: curved Trim checkpoint.** Dedicated Core curve-pair intersections/picking/trim modules now retain exact arc/ellipse/cubic remnants, with mounted preview/undo/native reopen verification. 62 Core / 178 CAD tests, Core check and CAD build pass. Constrained targets/overlaps reject; drag-trim, curved Extend and broader parity remain active. Browser verification outstanding. Contributor module maps and acceptance ledger updated.
+
+
+### 2026-09-09 — Circle split and free extension gestures
+
+Prior goal turn: progress. Current turn closes the two-click circle split and no-boundary straight-line Extend workflows. Core operations/split.ts remaps circle radius/center references and adds exact arc relations; trim-extend.ts exposes typed endpoint-needed state and projected endpoint extension. CAD new sketch/direct-modification.ts is shared between workspace and preview. Added circle-split Core tests and mounted gesture DOM tests; updated tool instructions, guides, ledger and STATUS.
+
+Verified 55 Core / 177 CAD tests, Core check, CAD build, HTTP200. Goal remains active. Next: general curved trim targets and curve/curve intersections, then remaining constraints/operations/import/projection gaps. No commit or production account mutation. Claim released.
+
+
+### 2026-09-09 — Exact curve subdivision / Split / curved boundaries
+
+Previous goal turn classified as progress; this turn adds actual exact geometry and UI behavior. Core `sketch/curves/{parameterization,subdivide,intersections,curves.test}.ts` and README, new operations/split.ts, expanded trim-extend.ts plus updated operation regression; sketch/index.ts exports split. CAD direct-tool metadata/commands/catalog count test, workspace, preview, DOM tests wire Split. STATUS/parity/contributor docs updated.
+
+Verified 52 Core + 175 CAD tests, Core check, CAD build, HTTP200. Exact subdivision preserves cubic degree and arc/ellipse curves. Line trim/extend accepts curved boundaries. Split preserves endpoint constraints; segment-specific constrained cases and circles still have documented gaps. General curve/curve intersections and curved trim/extend targets are next foundation work. No commit or production data mutation. Claim released; full parity goal remains active.
+
+
+### 2026-09-09 — Sketch parity operations and human co-development structure
+
+Implemented mirror, 2D linear/circular independent copies, numeric transform, points/construction, limited line trim/extend, and expanded point/circle/circular-arc equations. Extracted CAD sketch modules (drawing-tool, preview, canvas-renderer, svg-geometry, picking, constraint-panel, modification-panel, contour-list, tool-instructions) and Core operations plus solver families. Contributor guides live with both code areas. A persistent active goal now tracks the user's explicit full-parity objective; do not switch product sections or mark complete while ledger gaps remain.
+
+Changed scope: CAD sketch-workspace.ts/css/DOM tests, src/sketch/**, main.ts, catalog/command registry/count tests; Core sketch drawing/primitives/index/public constraint facade, arc-geometry, operations/**, solver/**, evaluator construction filtering and solid tests; reality/roadmap/contributor docs.
+
+Verified 45 Core and 174 CAD tests, Core check, CAD build. No live browser connection available in prior checks; no native visual claim. Key remaining limits: curved trim/extend and constrained target remapping; independent copies rather than associative patterns; no offset/slot/projection/import/text completion; finite-arc contact parameters and advanced constraints/DOF remain open. Tests and acceptance ledger record actual supported subsets. No commit or production account mutations. This bounded implementation claim is released; full-parity goal remains active.
+
+
+### 2026-09-09 — Construction plane command / surface labels / tree icons
+
+Plane was disabled/unconnected; now a validated Core plane feature (principal-plane offset) persists and participates in history without requiring a body. CAD authoring command creates/edits it, viewer displays active planes, sketch selection works via viewport/tree/chooser. Plane text changed from Sprite to plane-local textured Mesh at upper-left. Shared cube text now transforms in the face basis, tested through a half-turn. Tree icons reuse illustrated SVGs.
+
+Files: Core document solid-features/part-document/feature-history, kernel part-evaluator and tests; CAD feature-authoring, viewer, new plane-visual/test, main, sketch-workspace/DOM tests, commands/test, catalog, part-feature-tree, workspace-projection, shapr-shell.css; UI ViewportNavigationCube/test; STATUS and coordination.
+
+Verified 170 CAD + 33 Core + 149 UI tests, Core/UI typechecks, CAD/UI/Animation builds. Browser list empty: native visual QA outstanding. Plane-to-sketch uses persisted frame snapshot; associative updates and other plane construction modes remain future work. No commits or production user-data mutations. Claim released.
+
+
+### 2026-09-09 — Sketch variants and parity inventory
+
+Implemented nine real tools: midpoint line, center/aligned rectangles, three-point circle, center arc, both polygon methods, ellipse, cubic Bézier. Split ribbon menus retain the chosen variant. Core builders are shared by preview and commit; exact ellipse/Bézier segment payloads evaluate through OCCT. Cubic controls can be selected, edited and used by point constraints. Old profile payloads remain readable; newer curve payloads require current clients.
+
+Changed files: `core/engine/src/sketch/{primitives.ts,primitives.test.ts,index.ts,drawing.ts,drawing-constraints.ts}`, `core/engine/src/kernel/{part-evaluator.ts,part-evaluator.test.ts}`; CAD `src/{sketch-workspace.ts,sketch-workspace.dom.test.jsx,cad-command-registry.ts,cad-command-registry.test.ts,cad-tool-catalog.ts,main.ts}`, `src/react/{CADTraditionalRibbon.tsx,CADSketchVariants.dom.test.jsx,shapr-shell.css}`; STATUS and `dev/docs/roadmap/CAD_Sketch_Parity.md`.
+
+Verification: 32 Core / 167 CAD tests pass, Core typecheck and CAD production build pass, host8780 HTTP200. Tests exercise degeneracy, preview/commit, persistence/reopen, real extrusion, ellipse extents, curve-control editing and dropdown dispatch/reuse. Browser list is empty; Safari/WebGPU visual verification unavailable. Full requested parity remains incomplete; acceptance ledger explicitly records missing operations and constraint/interaction variants. No commit or production account/data mutation. Claim released.
+
+
+- **2026-09-09 — sketch constraint foundation:** Added persisted Core drawing constraints and bounded least-squares solver, exact evaluator integration, Select/Constrain ribbon + right-panel editing, entity snapping/feedback, default visible pickable labeled reference planes and direct planar-face selection. Constraint/geometry changes are undoable; failed solves reject atomically. 26 Core/164 CAD tests and checks/build pass. STATUS lists solver bounds and remaining CAD gaps; no native browser visual validation.
+
+
+- **2026-09-09 — live sketch preview:** Added pointer-driven presentation layer with circle/rectangle/line/arc previews and dimensions; numeric preview, shared snapping with commit, cleanup and no saved/undo mutation. Changed sketch-workspace.ts/css/DOM tests. 162 CAD tests and build pass; DOM tests stub SVG mapping, browser visual check unavailable.
+
+
+- **2026-09-09 — blank viewport regression:** Removed sketch CSS relative-position override of the shared absolute/inset viewport. CAD build, actual CSS cascade and compiled rule checks pass. Live browser unavailable; no model data changes.
+
+
+- **2026-09-09 — workspace sketch flow:** Removed floating Part features box, routed Sketch/profile editing into viewport plane/face selection plus 2D editing. Four ribbon tools enabled (line/three-point arc/circle/rectangle); closed/open contours, explicit holes, numeric placement, undo/redo/cancel. Core stores drawing geometry/frame and evaluates exact closed-region solids. Existing legacy rectangle edits retain feature ID through conversion. 21 Core + 160 CAD tests pass, checks/build pass, final 3 DOM tests pass. Limits documented in STATUS: no general constraint solver or intersection-region extraction; face frame is a snapshot.
+
+
+- **2026-09-09 — panel routing corrected:** History/versions were dropped from controlled shell state; retained all entries, enforced one visible view per side, removed ribbon→browser coupling. Model stays left; Parameters/Mates/Inspect/Appearance moved right with preserved panel hosts. CAD 157 tests and build pass, including actual DOM rail/tab switching. Changed shell, main selection routing, shell tests/new DOM tests, STATUS and briefing. No connected-browser visual validation.
+
+
+- **2026-09-09 — illustrated ribbon complete:** Replaced all 180 CAD catalog glyphs with shared typed ToolIcon SVGs. 85 original blue/silver/orange illustrations, dual palettes and UI gallery, scoped gradients; expanded ribbon spacing and rounded selection styling. Product branding preserved. 148 UI + 155 CAD + 6 host settings tests pass; checks/UI-CAD-Animation builds pass. Rendered both palettes for visual review. No connected browser for full app visual verification. Static build ready on refresh.
+
+
+- 2026-09-09 — Follow-up: consolidated CAD creation into one Create dropdown with Project document/Folder/Part/Assembly/Import file, shared Core vector icons, keyboard navigation/Escape/outside dismissal. Removed individual creation buttons and duplicate folder action. Folder creation from Home now reveals My files. Studio build and isolated browser checks of all five actions passed; screenshot `/tmp/aether-create-menu.png`. Production serves rebuilt Studio bundle; no server data changes.
+
+
+- 2026-09-09 — Completed wheel/project/history packet. Core Part v3 now evaluates circle/polygon profiles, add/cut extrusions, revolves, feature mirrors and all-edge finishes through OCCT. Added hosted `.acad` projects and `.acasm` standalone Assemblies using the canonical graph, `.acpart` standalone Parts, legacy readers, Part/Assembly tabs, exact authored Assembly rendering, pinned standalone Part snapshots and explicit link updates preserving definition IDs. Host content-addressed immutable snapshots, named versions and restore-as-new preserve history and enforce current ownership/access/conflicts. Studio Home supplies creation/history controls; wheel fixtures provided in both new formats. Verified 46 host/workspace, 146 CAD, 11 Core tests; builds/checks/Ruff and isolated browser project build/edit/save/reopen/history/restore, Assembly insertion/render, standalone links/read-only/export. Production service restarted/healthy; QA data only in `/tmp/aether-library-qa`. Limits documented in STATUS and CAD_Packaging_and_PDM.md: no general freehand constraint solver, release approvals, item release states, branch/merge, nested Assembly solving or live collaboration. No commits; unrelated work preserved.
+
+
+- **2026-09-08 — OUT: original icons preserved.** Exact screenshot CAD icon and original Animation artwork verified intact; 15 original files copied to `core/assets/branding/originals/` with matching SHA-256 hashes. Durable archive policy added; generated/current icons stay separate.
+
+
+- **2026-09-08 — OUT: Studio host, admin and onboarding delivered.** One
+  background host + browser shortcuts replace window-owned servers. Functional
+  local accounts/roles/teams, app gates, scoped service tokens, backups/restore,
+  network settings and audit use the user's sidebar design. Guided first setup
+  atomically applies name/account/apps; normal public home includes Sign in and
+  direct-app return. Community plugins remain planned. 16 host tests, CAD 145 /
+  UI 146 tests, four builds, signatures, live browser workflows and launchd pass.
+  Real account creation remains with Jonathan; QA data isolated. Global lint
+  has existing reference/example findings; details in STATUS and host README.
+
+
+- **2026-09-08 — OUT: native header discrepancy fixed.** Shared Core Swift adapter now configures all three existing wrappers; shared web DocumentBar handles native inset. Gallery uses shared app shell and internal scrolling. 146 UI tests, typecheck/build, all launcher builds/signatures, live browser header/navigation and AppKit configuration verification pass. User now prefers Safari Add to Dock; recorded independent suite host as target, current wrappers transitional.
+
+
+2026-09-08 — Refreshed every current root launcher: Aether CAD, Aether
+Animation and Aether UI. All production builds and Swift/signing steps passed;
+opened all three. Strict codesign verification and bundle names pass. Every served
+build file matches its current dist byte-for-byte (CAD 6, Animation 3, UI 3),
+including CAD's worker/WASM. Both engine launchers pass protocol-v1 hello. Local
+Chromium loaded each launcher URL and verified mounted UI/SVGs with zero page
+errors. No source implementation changed; prior feature-parity limitations remain.
+
+
+### 2026-09-08 — Shared icon and branding assets
+
+Added `core/assets/icons/` with 42 canonical SVG files exposed as 43 semantic
+icon names (model aliases design), plus `core/assets/branding/aether-cad.svg`.
+`AetherIcon` is now a thin renderer over those static sources; CAD's `CadIcon`
+is a vocabulary adapter with no private geometry. Animation's main toolbar,
+mate tools and panel/tree icons now use the shared vectors. The CAD native icon
+build reads its moved shared branding source. Vite allowlists include shared
+assets for UI gallery, CAD and Animation development. The shared gallery renders
+all 43 names. Root contributor guidance and `core/assets/README.md` define SVG,
+color, sizing, attribution and project-media boundaries.
+
+Validation: 146 UI tests and 145 CAD tests pass, UI/CAD type checks and all three
+web builds pass; focused icon tests/typecheck also pass after alias deduplication.
+All three native launcher builds pass. Isolated local Chromium verifies the dev
+gallery loads all 43 SVGs with zero page errors; its contact sheet was visually
+inspected and a grid-width issue fixed. Diff whitespace check passes. Existing
+React act and bundle-size warnings remain. Remaining legacy text glyphs in older
+product tool catalogs/shared controls are explicitly recorded; this does not
+claim every icon in the suite has already been migrated.
+
+
+### 2026-09-08 — Native baseline / shared web UI
+
+The native StudioDesignProfile structural palette, system font and 54px header
+now feed the shared theme. CAD consumes the same WorkspaceShell as Animation;
+its private ribbon, ViewCube and field skins were removed. Animation uses the
+shared ViewportNavigationCube with live camera face/Home/nudge/roll adapters.
+Both products retain their tool sets and engine authority. Shared shell additions:
+retained panel DOM/input state, validated per-preset preferences (Animation),
+keyboard float movement, resize clamping and compact rail-revealed side panels.
+
+Rebuilt and opened `Aether Animation.app` and `Aether CAD.app`; both serve HTTP
+200 and accept protocol-v1 hello. Moved the old root `Anima Studio.app` into
+`aether-animation/archive/` as a reference. It is preserved, not deleted.
+The mockup is also retained pending all-edge docking and independent toolbar/
+ViewCube/tab placement integration. Full native-to-web workflow parity is not
+complete: Assets/library, editable keyframes/curves, Show/Hardware and 2D/VR
+remain tracked in `dev/docs/roadmap/Aether_Studio_UI_Convergence.md`.
+
+Validation: 145 shared UI tests/typecheck/build and 145 CAD tests/check/build;
+Animation production build and signed native launcher builds pass. Isolated
+local Chromium checks show zero page errors, identical computed header height/
+background and ViewCube background/border in both apps, responsive 1440/780px
+layouts, camera cube response, retained canvas across all presets and retained
+CAD input draft followed by a real OCCT Part rebuild. The in-app browser was
+unavailable; screenshots were inspected from the isolated local browser instead.
+React act warnings and production bundle-size warnings remain nonfatal.
+
+
+### 2026-09-08 — Shared core organization
+
+Moved shared packages intact from `aether-core/` and `aether-ui/` to
+`core/engine/` and `core/ui/`. Import identities remain `@aether/core` and
+`@aether/ui`; engine modules stay UI-independent. Updated CAD/Animation local
+package dependencies and locks, CAD Vite allowlist and STEP smoke script, CI,
+gallery launcher paths/root calculation, ignore comment, and current contributor,
+package and suite docs. Added `core/README.md`. Existing widget edits were carried
+intact; the active CAD chrome claim continues at the new paths. Product directories,
+Python semantics, historical handoffs and archive sources were not reorganized.
+
+Verification: Core 8 tests/check, UI 143 tests/typecheck/build, CAD 145 tests/check/
+build and Animation build pass. UI launcher Swift typecheck, shell syntax and
+signed app rebuild pass; installed package links, doc links and diff checks pass.
+UI tests emit React act warnings; CAD/Animation builds emit bundle-size warnings.
+No visible UI behavior changed; no GUI walkthrough performed.
+
+
+- 2026-09-08 — Jonathan's suite review: renamed the checkout to `Aether Studio`
+  with an `AnimaStudio` compatibility symlink; root README and contributor
+  guidance now name the suite/Aether Animation accurately. Added
+  `dev/docs/roadmap/Aether_Studio_Suite.md`: source inventory, shared React/Core/UI
+  direction, mockup integration, and planned single-host/package delivery gates.
+  CAD/Animation already use React; loopback-only HTTP and dev client configuration
+  still block direct cross-device use. No engine/UI implementation or remote
+  rename performed. Directory/link, Python import, local doc links and diff checks
+  pass; unrelated in-flight work preserved.
+
+
+- **2026-09-08 — Phase 2 adaptive CAD layout complete:** Updated only
+  `onshape mockup/**` plus additive status/coordination entries. Global typed
+  five-panel store, per-preset validated preferences, computed dock geometry,
+  pointer/keyboard movement, hidden-panel restore and preset reset are live.
+  Parts/history are independent; the permanent navigation portal preserves
+  both Three.js renderer instances across presets. 13 tests, lint/type/build
+  pass. Browser unavailable, visual/GPU review pending. Existing hosting state
+  is unchanged; no Phase 2 publishing request was made.
+
+
+- **2026-09-08 — user-directed standalone Onshape mockup:** Added only
+  `onshape mockup/**` plus additive coordination/status entries. React/Vite CAD
+  chrome, real Three.js fixture/navigation, sketch/feature/history/tab flows and
+  side panels are implemented. Engine integration remains explicitly mocked;
+  no Aether UI/Core or AnimaCore changes. Six component tests, lint and build
+  pass; browser unavailable, so visual verification is pending. Component and
+  integration map is in the mockup README. Private version 1 saved; publishing failed twice with a hosting-service HTTP 409 callback conflict. See `onshape mockup/HOSTING_STATUS.md` for exact IDs.
+
+
+- **2026-08-14 — SearchField and Breadcrumbs are now shared foundations.**
+  Both have full specs, six new behavior pins, and two distinct live gallery
+  datasets. CAD replaced its Items, canonical Assembly, and Drawing filter
+  inputs with SearchField and added a Modeling/Drawing header path. Live
+  delayed/immediate query, Enter/Escape/clear, scope, counts, overflow Menu,
+  focus handoff, desktop/compact path, and no-overflow checks pass. UI 108 and
+  CAD 95 tests/check/build plus Animation build and diff/quarantine are green.
+
+- **2026-08-14 — the Drawing workspace is now a real shell route.** The shared
+  mode rail opens it in Docked, Expanded, or Canvas layout and its keyboard-
+  operable recovery returns to Modeling while the one WebGPU viewport remains
+  mounted/inert underneath. The exact dependency state is honest; decoded
+  ready data will render automatically; all mutation/export commands stay
+  disabled until transport connects. CAD 95 tests/check/build pass. Live 1280
+  and 680 px checks found no overflow or console errors and confirmed all
+  layouts, route recovery, and one persistent viewport.
+
+- **2026-08-14 — canonical-ready Drawing workbench is complete.** A modular
+  dependency/ready surface now composes the shared Tabs, Tree, ListBox,
+  DataTable, PropertyGrid, fields, buttons, menus, and exact sheet canvas. One
+  stable selection drives collections, vectors, and the read-only inspector;
+  commands retain Core capability reasons; revision mismatch fails closed;
+  1,200 BOM rows remain virtualized. CAD 93 tests/check/build and diff/runtime
+  quarantine pass. Runtime routing is the next slice; no demo projection was
+  embedded in the product.
+
+- **2026-08-14 — exact Drawing sheet renderer is ready.** The isolated SVG
+  canvas consumes only Core-projected sheet-space data and displays lines,
+  arcs, circles, ellipses, NURBS, styled hatch regions, snap points,
+  annotations, BOM tables, and title blocks. Views, primitives, and
+  annotations expose stable IDs and keyboard selection. CAD 89 tests/check/
+  build and the semantic-boundary/runtime quarantine pass; no HLR, section,
+  topology, or measurement meaning moved into React.
+
+- **2026-08-14 — exact Drawing shared-widget projection/store is ready.**
+  Stable Sheets/Views/Annotations/BOM/Layers, raw exact primitive rows, Core
+  diagnostics/reasons, inspectors, and load/tab/filter/selection state are now
+  renderer- and React-free. Empty/stale/read-only and 1,200-view cases pass.
+  CAD 86 tests/check/build and diff/quarantine are green; no HLR, section, or
+  measurement meaning was added to the UI.
+
+- **2026-08-14 — exact Drawing client and shared bridge decoder are ready.**
+  Assembly and Drawing now reuse one precise schema/error-path vocabulary.
+  Drawing's readonly DTO/client covers the full frozen exact projection and
+  rebuild shape, abort forwarding, typed bridge errors, schema/geometry
+  rejection, explicit-unit vectors, and mutation revision coherence. CAD 79
+  tests/check/build and diff/quarantine pass; it is not connected to runtime
+  until Core releases the exact producer.
+
+- **2026-08-14 — exact Drawing consumer contract is frozen and assigned.**
+  `Aether_CAD_Drawing_Projection.md` now fixes exact sheet-space vectors,
+  hidden/section classification, annotations/measurements, BOM linkage,
+  rebuild diagnostics, revisions, and Core-owned PDF/DXF/SVG output. The
+  producer is sequenced after the Assembly `.aether` graph with twelve parsed-
+  fixture/round-trip/HTTP gates. CAD will not trace WebGPU meshes or calculate
+  Drawing meaning in the browser.
+
+- **2026-08-14 — canonical-ready Assembly/Mate/BOM shell is released.**
+  Shared Structure/Mates/BOM tabs now cover unavailable/loading/ready/error
+  states; ready data uses Tree/ListBox/DataTable/PropertyGrid, while the current
+  connector/Fastened flow remains working and is explicitly labeled session-
+  only. Live keyboard tab navigation, no-overflow/no-console-error layout, and
+  Part→1 Body/6 faces/54 snaps→Connector card pass. CAD 71 tests/check/build
+  and diff/quarantine pass. This does not claim persistent Assembly completion;
+  Core's producer/persistence packet remains the blocker.
+
+- **2026-08-14 — canonical Assembly shared-widget projection is ready.**
+  `cad-assembly-presentation.ts` now maps the decoded Core snapshot into stable
+  nested Tree rows, connector/mate/relation ListBox data, read-only inspector
+  facts, diagnostics, command availability using Core reasons, and unchanged
+  BOM rows for DataTable. Empty/read-only/missing/unconverged and 1,200-instance
+  cases are pinned. CAD 66 tests/check/build and diff/quarantine pass; the
+  mapper remains disconnected until the canonical producer lands.
+
+- **2026-08-14 — CAD Assembly integration is ready at the consumer seam.**
+  The frozen renderer-free contract now lives in
+  `dev/docs/roadmap/Aether_CAD_Assembly_Projection.md`, with a bounded Core
+  producer task in Claude IN and Requests. CAD has readonly projection,
+  solution, and BOM DTOs; strict schema decoding; typed `/rpc` transport
+  errors; abort forwarding; and mutation-revision coherence pins in
+  `Aether CAD/src/cad-assembly-bridge.ts`. It deliberately does not calculate
+  mate, solve, persistence, or BOM meaning. CAD 62 tests/check/build and
+  diff/quarantine pass. Next UI integration waits on the canonical producer;
+  its presentation projection can proceed without changing this contract.
+
+- **2026-08-13 — OUT: Aether CAD's shared UI-system and missing-screen plan is
+  recorded.** `Aether_CAD_UI_System.md` defines a reuse-first—not absolute—
+  component practice: hierarchical lists normally share Tree; flat lists use
+  ListBox; tables use DataTable; popup commands share one Menu/command registry;
+  inspectors share a field family and PropertyGrid. Purpose-built exceptions
+  are valid when interaction semantics, performance, or accessibility differ,
+  provided the reason and behavior coverage are explicit. The plan inventories
+  the reusable navigation, overlay, input, inspector, layout, status, and task
+  components plus Home/New/Import/Export/Recovery, Part/Sketch/Inspect/Rebuild,
+  Assembly/Mate/BOM, Drawing, Assets/Library/Materials, Problems/Tasks, and
+  Preferences screens. `aether-ui/WIDGETS.md` now lists the planned component
+  rows without claiming them shipped. No runtime widget or CAD behavior changed;
+  `git diff --check` is clean.
+
+- **2026-08-13 — OUT: completed the read-only Aether CAD external-reference
+  capability audit.** The reference is primarily a CAD package/build system
+  plus an IDE extension, not a complete interactive solid modeler. Its useful
+  patterns are the project/object catalog, dependency graph, import/export
+  adapter registry, interfaces/ports, assembly hierarchy/BOM, caching,
+  automation, and Explorer–Viewport–Inspector shell. Aether's existing exact
+  OCCT/WASM topology, in-app sketch interaction, connector inference, unified
+  `.aether` direction, and canonical mate/animation identity remain the better
+  foundation. Recommended policy: use the reference for behavior discovery,
+  copy no source/assets/branding, and keep it outside product build/test/package
+  discovery. Immediate defect found: `Aether CAD/npm test` now discovers the
+  nested reference's VS Code test and fails on the unavailable `vscode`
+  package; Aether's own 12 suites/36 tests pass, CAD type-check passes, and
+  Aether Core's 4 suites/8 tests plus type-check pass. The implementation order
+  is quarantine/build hygiene → canonical graph + commands/assets/render
+  foundations → traditional docked/expanded shell → general sketch solver →
+  feature DAG/solid tools → assemblies/mates → interop/drawings/library and
+  release hardening. No product/runtime file changed in this audit.
 
 - **2026-07-29 — OUT: canonical Hardware output mappings are now editable.**
   The Hardware workspace reads the engine's real output catalog and offers one
@@ -2555,3 +3623,657 @@ does the heavy implementation; Codex reviews it and plans what's next.
   custom window physics. Verification: focused tests (9), full `swift test`
   (368 XCTest + 67 Swift Testing), touched lint, native Xcode build, signed
   root-app rebuild, and launched packaged PID 95568.
+
+- **2026-07-31 — OUT: the isolated exact-topology browser mate proof is
+  live.** `dev/OCCTMateLab/` loads operator STEP/STP files in an OCCT WASM
+  worker, retains analytic face identity through tessellation, and derives
+  exact connector frames for planes, cylinders, circular edges, edge
+  midpoints, and vertices. Three.js targets WebGPU and falls back to WebGL 2.
+  The two-click Fastened flow uses `W2 · T2 · RflipX · inverse(T1)` and rejects
+  reusing an already-driven moving Part. Five tests/check/build and
+  planar+cylindrical STEP probes pass; Safari reached OCCT-ready. The final
+  operator two-click walkthrough remains pending. This work stayed under
+  `dev/` and did not modify the active production Swift/backend files.
+
+- **2026-07-31 — OUT: corrected the Mate Lab to connector-first authoring.**
+  Separate STEP imports now append as visibly staged documents instead of
+  overlapping at the origin; solids within one document keep their common
+  assembly coordinates. **Place Connector** creates unlimited persistent,
+  stable-ID Part-local anchors and visible triads. **Fastened Mate** now
+  selects two saved anchors on different Parts (in the viewport or sidebar),
+  stores their IDs, and only then solves/moves the moving Part. Connector
+  anchors follow Part transforms and remain after clearing mates. Seven tests,
+  check/build, and a true-cylinder STEP probe pass; production app/engine
+  sources were not touched.
+
+- **2026-07-31 — OUT: repaired the Mate Lab's blank curved-STEP imports.** A
+  Replicad convenience normal query on one cylindrical model threw a raw OCCT
+  exception and caused the whole Part to be discarded. Exact plane/cylinder
+  axes now come directly from OCCT and unsupported face/edge inference is
+  isolated instead of fatal. The live browser regression now proves two STEP
+  documents become two rendered/tree Parts, then places two persistent
+  connectors and completes one Fastened mate (2 Parts / 2 connectors / 1
+  mate). Seven tests, `tsc`, and the production Vite build pass.
+
+- **2026-08-01 — OUT: refined the Mate Lab's connector visuals.** Possible
+  inferred anchors now appear as transient white, dark-rimmed CAD snap dots
+  rather than cyan model decorations. The current candidate and saved anchor
+  render an exact Part-local red-X/green-Y/blue-Z arrow gizmo plus origin ring;
+  the pair stays attached and coincident after Fastened mating. The authoring
+  card is narrower and pointer-transparent. The asserted browser walkthrough
+  reaches 2 Parts / 2 connectors / 1 mate; seven tests, check, and build pass.
+
+- **2026-08-01 — OUT: made candidate nodes flat and precise.** The large
+  zoom-sensitive spheres are gone. Possible anchors are now tiny white 2D
+  discs transformed into each exact connector plane, so they sit on and
+  foreshorten with the selected B-Rep face. Two instanced draws render the
+  entire candidate set; the selected/saved anchor keeps the distinct XYZ
+  gizmo. The complete browser workflow and seven tests/check/build pass.
+
+- **2026-08-01 — OUT: Mate Lab exact-feature and maintainability pass is
+  complete.** OCCT extraction, frame/inference policy, viewport appearance,
+  connector visuals, mate state/solve, worker transport, and DOM coordination
+  now have dedicated, human-readable modules plus an `ARCHITECTURE.md`
+  dependency contract. Exact cylinder/bore and cone station anchors,
+  circle/ellipse/sphere/torus centers, tangent edge frames, and semantic
+  duplicate resolution are present. The new left Items tree groups Parts by a
+  unique imported STEP-document identity and has working disclosure,
+  selection, and visibility controls; it is intentionally the projection seam
+  for future Sketch/Extrude/Fillet history, not a fake feature rebuilder.
+  Verification: 18 tests/check/build and the complete live browser mate flow.
+
+- **2026-08-01 — OUT: promoted the web CAD proof and shipped editable Part
+  files.** Source moved from the dev-only Mate Lab into root
+  `Aether CAD/` (renamed from the provisional Open CAD Studio identity). The app/package
+  identity now matches the root product. `.cadpart` v1 is a deterministic JSON
+  feature history with stable document/feature IDs, millimeter units, one
+  center-rectangle Sketch, and one New Extrude; meshes remain disposable.
+  Dedicated `part-document`, `part-file`, `part-feature-tree`,
+  `occt-part-evaluator`, `part-geometry`, and combined `items-tree-view`
+  modules keep persistence, OCCT, and presentation separate. New/Open/Save
+  Part, parameter rebuild, and Sketch/Extrude/Body rows are live; the prior
+  STEP/connector/mate proof remains intact. The browser test created Part 1,
+  revised it to Long Bracket, downloaded `Long-Bracket.cadpart`, reopened it,
+  and rebuilt the same one-Body feature history. Verification: `npm run check`,
+  23 Vitest tests, production build, and the real WebGPU/OCCT browser flow.
+  Current production kernel is OCCT WASM via OpenCascade.js/Replicad; no Rust
+  kernel was added. Truck remains a future isolated benchmark, not a second
+  geometry authority.
+
+- **2026-08-01 — OUT: Aether CAD now has its first production CAD shell.**
+  I kept every live Part/STEP/connector/mate action and reorganized them into a
+  compact document header and typed Sketch/Create/Assembly/Inspect ribbon. The
+  new left rail switches one browser among Items, editable Sketch/Extrude
+  parameters, and connector/mate data. Items includes filtering and live
+  origin/Top/Front/Right visibility backed by world-space Three.js objects.
+  The six-face ViewCube follows camera orbit and clicks to standard views;
+  Home fits isometric. Dedicated `cad-toolbar`, `camera-view`,
+  `reference-geometry`, and `view-cube` modules keep the DOM shell readable.
+  Verification: check, 27 tests, build, and 1440×900 shell plus
+  create/revise/download/reopen browser smoke pass. Production Swift and
+  AnimaCore lanes were untouched.
+
+- **2026-08-01 — OUT: Aether CAD identity and the future Core seam are
+  verified.** The root product is now `Aether CAD/`, package `aether-cad`, and
+  visible product name Aether CAD. Application/viewport code consumes semantic
+  behavior through `src/aether-core.ts`, but the current OCCT/WASM worker stays
+  embedded—there is still one evaluator. The extraction manifest assigns the
+  supported OCCT build, C++/WASM bridge, B-Rep DAG, constraints, topology,
+  deterministic state, and STEP/IGES contracts to future Aether Core; browser
+  UX/rendering remains Aether CAD; performance/timeline/avatar/hardware I/O
+  remains Aether Animation. New saves use the `aether-part` identity and legacy
+  `open-cad-part` files migrate safely. Verification: check, 29 tests, build,
+  and live create/rebuild/save/reopen shell smoke pass.
+
+- **2026-08-01 — OUT: Aether CAD now launches as a self-contained macOS web
+  app.** `Aether CAD/Scripts/build-macos-app.sh` builds the production web
+  bundle, compiles a native AppKit/WKWebView wrapper, embeds the OCCT worker and
+  WASM, derives/signs the icon and bundle, and places clickable `Aether CAD.app`
+  at repository root. The app runs its own ephemeral server bound only to
+  `127.0.0.1`, so no npm terminal or browser address bar is involved. The icon
+  is a crisp project-native rebrand of the Anima family mark: the A is now a
+  constrained CAD sketch with endpoints, construction geometry, and dimension
+  arrows. Signature, visible window, local HTML, and WASM MIME verification
+  pass; the final app is currently launched for operator review.
+
+- **2026-08-01 — OUT: the native Aether format direction is now one explicit
+  planned contract.** `.aether` is the first canonical container; Part,
+  Assembly, Drawing, Animation, and Show are stable-ID projections of one
+  Aether Core graph. Exact B-Rep and render buffers are optional derived caches,
+  never document truth. CAD mates and Animation joints/DOFs retain identity
+  rather than passing through an export layer. Numeric fields carry explicit
+  units, ZIP output is deterministic, and Parasolid/DWG are not promised
+  without licensing. The working `.cadpart` JSON remains the shipped Part
+  slice until graph-projection parity is proven; no premature ZIP implementation
+  or second editable representation was added.
+
+- **2026-08-01 — OUT: Aether CAD now has its first functional persistent 2D
+  Sketch workflow.** New Part/Sketch selects a principal plane, enters a real
+  Sketch canvas, roughs a center rectangle by direct drag, applies/toggles the
+  first deterministic constraints and dimensions, and shows blue under-defined
+  versus black fully defined state with remaining degrees of freedom. Finish
+  commits through the existing Aether Core facade and OCCT rebuild path.
+  `.cadpart` v2 persists the graph and migrates v1 rectangles without changing
+  stable IDs. Check, 34 tests, production build, and root macOS app rebuild/sign
+  pass. The installed app-browser plugin failed during bootstrap before local
+  connection, so fresh visual automation remains outstanding rather than being
+  overstated.
+
+- **2026-08-01 — OUT: Aether CAD now runs a Shapr3D-inspired React shell on
+  the shared UI standard.** React 19 owns the document header, left CAD
+  browsers, floating mode/tool rails, viewport HUD, responsive panel layout,
+  and right History browser. The shell consumes `@aether/ui` tokens,
+  `DockPanel`, and `IconButton` directly. The existing controller remains the
+  temporary behavior adapter, preserving all current New/Open/Save/STEP,
+  Sketch, connector, Fastened mate, visibility, ViewCube, and fit commands.
+  The OCCT worker and one persistent Three.js/WebGPU viewport are not remounted
+  when panels change. History is generated from the real Part feature/import/
+  mate state and routes back to the corresponding browser. The viewport now
+  defaults to the darker Shapr-style CAD environment. Verification: `npm run
+  check`, 12 Vitest files / 36 tests, production build, root app rebuild/sign,
+  packaged launch, and native screenshot review all pass.
+
+- **2026-08-01 — OUT: reviewed the Aether family for shared code/assets.**
+  Sharing is justified, but as bounded packages rather than a common app
+  superclass. `aether-ui` is the correct existing design-system seam; both web
+  products already share React 19, Three.js 0.180, Vite, and its widgets. The
+  next safe extractions are (1) typed Core/RPC DTOs with stable IDs, explicit
+  units, and frame conventions; (2) renderer-neutral viewport input/camera,
+  selection/picking, grid/reference geometry, gizmo/triad, telemetry, and
+  material/environment contracts with product adapters; (3) common icon,
+  theme, material, environment, and brand assets; and (4) a parameterized
+  macOS WKWebView launcher/build harness. CAD feature/sketch workflows and
+  Animation timeline/puppetry/hardware workflows stay product-local. Core must
+  be extracted from today's working CAD TypeScript and canonical Python
+  `animacore` implementations without creating a third evaluator. Evidence:
+  Animation already consumes UI tokens consistently, while the new CAD shell
+  still has 50 hard-coded colors and only one shared token reference; both
+  products separately implement Three.js scene/camera/raycast/input/grid
+  loops; and both maintain near-parallel WebKit launcher/build code.
+
+- **2026-08-01 — OUT: the first production Aether Core extraction is
+  complete.** Root `@aether/core` now owns the shared deterministic
+  Part/Sketch model, constraints, serialization/migrations, geometry and
+  topology contracts, frame inference, homogeneous transform/Fastened mate
+  math, and the working OpenCascade.js/Replicad kernel worker with exact
+  topology, STEP import, tessellation projection, and Part evaluation. Aether
+  CAD consumes thin adapters and no longer directly owns the OCCT packages.
+  This intentionally creates only the two shared foundations Jonathan chose:
+  Aether Core and Aether UI. Render, assets, physics, connections, and workspace
+  state will be internal Core modules—not separate projects. Verification: 8
+  Core tests + 36 CAD tests, both type-checks, and production OCCT/WASM build.
+  Next sequence: define the renderer-neutral scene/material/picking contract;
+  move the proven Three.js/WebGPU adapter behind Core `render`; extract the
+  deterministic connector/mate registry; introduce the canonical `.aether`
+  graph; then perform the Python namespace rename atomically after Claude's
+  active bridge work releases.
+
+- **2026-08-01 — OUT: a separate suite-wide root pause checkpoint is ready.**
+  `AETHER_SUITE_PAUSE_CHECKPOINT.md` explains the exact Core/UI boundary, current CAD,
+  Animation, Dynamics, Core, and UI state, launch and verification commands,
+  native-format decisions, remaining gaps, and the ordered restart sequence.
+  Most importantly it identifies the current dirty/untracked Aether CAD and
+  Core work and tells the next session to review and integration-commit it
+  before any clean/reset operation. The existing Animation-specific
+  `WHERE_WE_ARE.md` remains unchanged. No runtime code changed.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 1 is released.**
+  `@aether/ui` now owns product-free Menu/MenuButton, Popover, and shared
+  collision-aware overlay placement with complete keyboard, focus, dismissal,
+  disabled-reason, submenu, check/radio, danger, shortcut, context-anchor, and
+  focus-return coverage. The gallery carries two menu datasets and a Popover;
+  the conformance matrix records Menu/Popover as shipped while Tooltip and the
+  larger CAD widgets remain planned. Aether CAD's Assembly panel consumes the
+  shared menu for Clear Mates through the existing command bridge. React owns
+  panel presentation state; overlapping tool rails, linked-package React
+  duplication, sibling Core dev serving, and nested development-reference
+  test discovery are fixed. No external source/assets/names/runtime dependency
+  entered the product. Verification: UI 44 tests/check/build, CAD 36 tests/
+  check/build, Core 8 tests/check, and live browser flow with OCCT ready.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 2 is released.**
+  `@aether/ui` now owns NumberField, SelectField, Checkbox, and FieldRow with
+  product-free contracts and 13 focused behavior pins. The gallery shows both
+  feature dimensions and document settings. Aether CAD's live Modeling panel
+  uses shared TextField/FieldRow/NumberField/Button components without changing
+  command IDs or Core ownership. Live arithmetic input normalized 60 × 40 × 20
+  mm and rebuilt through OCCT to one Body/six faces/54 exact snaps with
+  Sketch→Extrude history intact. UI 57 tests/check/build, CAD 36 tests/check/
+  build, Core 8 tests/check, and live gallery/CAD walkthroughs pass.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 3 is released.** Tooltip,
+  EmptyState, ErrorState, and ProgressOverlay now provide the common help,
+  recovery, diagnostics, and long-running-task surfaces. Progress includes
+  modal keyboard containment/return, Escape cancel, backgrounding, phases, and
+  reduced-motion behavior. Gallery and six focused pins pass; the UI suite is
+  63 tests with clean TypeScript and production build plus live visual review.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 4 is released.** The
+  product-free `ListBox` completes UI-1 with controlled single/multiple,
+  modifier/range selection, groups, keyboard/type-ahead, disabled/dimmed
+  items, activation/context/actions, empty/loading/error states, and fixed-row
+  virtualization. Material-library and sketch-constraint gallery examples plus
+  11 focused behavior pins pass. UI is now 74 tests with clean TypeScript,
+  production build, `git diff --check`, branding quarantine, and live semantic,
+  keyboard, and visual browser review.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 5 is released.** Tree v3
+  completes the flagship hierarchy surface with controlled rename, drag move
+  intent, expanded child loading/recovery, and large-assembly virtualization.
+  A 1,200-component gallery tree renders 11 visible rows; live rename and retry
+  work. UI 78 tests/check/build, downstream Animation build, and CAD 36 tests/
+  check/build pass with clean diff/source-name checks.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 6 is released.** Generic
+  `DataTable` now supplies the complete BOM/Problems/parameters table contract:
+  sort/filter, selection and keyboard rows, editing, resize/reorder intent,
+  pinned columns, commands, states, and virtualization. The live 140-row BOM
+  renders 11 rows and supports sort/edit. UI 89 tests/check/build, Animation
+  build, CAD 36 tests/check/build, Core 8 tests/check, and clean quarantine/
+  diff checks pass.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 7 is released.**
+  `PropertyGrid` is now the common schema-driven inspector surface, including
+  collapse, filter, modified-only, mixed/read-only, and FieldRow help/error/
+  reset behavior. Two gallery inspectors and five focused pins pass; UI is 94
+  tests with clean check/build, downstream Animation/CAD builds, and live
+  modified-only/semantic/visual review.
+
+- **2026-08-13 — OUT: shared CAD UI buildout slice 8 is released.** SplitPane
+  and BottomPanel complete UI-2 with accessible resizing, persistence signals,
+  collapse/restore, and Problems/History/Console/BOM/Tasks tabs. Eight pins
+  bring UI to 102 tests; UI/Animation/CAD/Core checks and builds plus live
+  resize/tab/collapse review pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 9 is released.** A typed command
+  registry now owns shell command handlers and enabled/active state. React no
+  longer uses hidden command buttons, MutationObserver availability mirroring,
+  or DOM query/click dispatch. The live registry New Part flow rebuilt an OCCT
+  Body with six faces/54 snaps and enabled Save/Fit. CAD 39 tests/check/build
+  plus clean diff/quarantine checks pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 10 is released.** Items/reference
+  and History are now typed controller projections rendered by shared Tree and
+  ListBox, not generated HTML. Typed actions retain all meaning in the viewer/
+  controller. Live plane selection, OCCT rebuild, Tree filtering, and History
+  navigation pass with one Body/six faces/54 snaps; CAD 43 tests/check/build and
+  clean diff/quarantine checks pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 11 is released.** Assembly
+  connectors and fastened mates are now typed controller projections rendered
+  by shared ListBox instances, with selection, pick, and delete returning
+  through typed workspace actions. Live review covered empty state, OCCT Part
+  creation, exact-face connector placement, selection, and deletion while the
+  model retained one Body/six faces/54 snaps. CAD 43 tests/check/build pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 12 is released.** A typed
+  presentation store makes React the owner of active panel, history collapse,
+  document/backend/status/metrics, sketch/tool/mate guidance, hover, and shared
+  progress surfaces. Controller DOM class/text/HTML mutation for those states
+  is gone. Live sketch→OCCT Part, collapse/restore, connector cancel, and
+  persistent viewport review retained one Body/six faces/54 snaps. CAD 46
+  tests/check/build and clean diff/quarantine checks pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 13 is released.** CAD's mode,
+  authoring, and navigation rails now consume shared Rail/RailButton with
+  standard disabled/data forwarding while preserving wide-label and compact
+  layouts plus registry state. The obsolete generated-HTML toolbar/fallback
+  path is removed. UI 102 and CAD 46 tests/check/build, Animation build, live
+  semantic/visual review, and clean diff/quarantine checks pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 14 is released; UI-3 is
+  complete.** Superseded string-rendered Items/assembly/reference views and
+  roughly 6 KB of dead toolbar/tree/list CSS are gone. Shared React shell
+  presentation remains visually intact; specialized sketch/ViewCube adapters
+  stay imperative with the persistent viewport. CAD 45 tests/check/build, live
+  visual/sketch entry, and clean diff/quarantine/dead-code audits pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 15 is released.** The persistent
+  viewport now sits beneath a React-owned Home/New/Import/Recovery entry
+  workbench composed from shared Dialog, fields, buttons, and EmptyState.
+  Typed requested naming reached the existing Core flow: live `Drive Bracket`
+  → Top Plane → finish produced one Body/six faces/54 snaps. Recovery and
+  Import state review, CAD 46 tests/check/build, and clean diff/quarantine pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 16 is released.** Inert Share is
+  replaced by an active-Part Export center for exact editable `.cadpart`
+  output, with target/history/dependency classification and honest disabled
+  STEP/mesh/drawing reasons. The first UI-4 Home/New/Import/Export/Recovery
+  packet is complete. CAD 47 tests/check/build, live OCCT Part/export review,
+  and clean diff/quarantine checks pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 17 is released.** Shared
+  PropertyGrid now supplies the right Part/Sketch/Topology inspector and shared
+  BottomPanel owns History/Problems below the persistent viewport. Typed Core/
+  viewport projections show dimensions, definition/DOF, six faces, 54 snaps,
+  and a real under-defined warning. CAD 47 tests/check/build, live empty/
+  authored/tab/collapse/restore review, and clean diff/quarantine pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 18 is released.** Settings and
+  Help now open shared Dialog utility screens with truthful current preferences,
+  disabled unsupported options, working workflow/shortcut guidance, Escape
+  close, and focus return. Dead Items footer controls are disabled with reasons.
+  CAD 48 tests/check/build, live keyboard/visual review, and clean diff/
+  quarantine checks pass.
+
+- **2026-08-13 — OUT: CAD UI buildout slice 19 is released.** Search now uses
+  typed presentation intent to return to Items and focus Filter Items;
+  Visualization stays disabled with its actual appearance-workbench reason
+  rather than aliasing Fit View. CAD 48 tests/check/build, live focus/disabled
+  semantics, and clean diff/quarantine pass.
+
+- **2026-08-14 — OUT: CAD UI buildout slice 20 is released; the
+  Part/Sketch/Inspect/Rebuild screen packet is complete.** Inspect is now a
+  first-class shared-rail browser. It consumes the same renderer-free
+  PropertyGrid projection as Properties, routes Fit through the typed command
+  registry, and disables Measure, mass properties, section analysis, and
+  curvature with exact missing-Core reasons. CAD 49 tests/check/build and live
+  empty/authored/keyboard review pass with two features, six faces, and 54
+  exact snaps.
+
+- **2026-08-14 — OUT: CAD UI buildout slice 21 is released.** The product
+  shell now names Home/workspace/3D viewport/backend/status/metrics, announces
+  backend and command status politely, and gives app-local controls a visible
+  focus ring. Reduced-motion, forced-colors, and a 620 px compact rule join the
+  existing dock breakpoints. CAD 50 tests/check/build, live desktop semantic/
+  keyboard/visual review, CSS breakpoint audit, and diff/quarantine pass. UI-5
+  superseded-local-UI removal is now checked; broader layout/scale stress work
+  remains.
+
+- **2026-08-14 — OUT: CAD UI buildout slice 22 is released.** Visualization
+  is no longer a disabled placeholder. One typed session store drives shared
+  background/grid/edge/finish/environment controls and the mounted renderer;
+  adaptive light display and persistent per-face assignments remain disabled
+  with reasons. Live testing caught and fixed a mode/Search rail collision,
+  then verified Midnight, grid/edges off, Gloss, 70% light, and Reset on an
+  exact 1-Body/6-face/54-snap Part. CAD 53 tests/check/build and clean diff/
+  quarantine pass.
+
+- **2026-08-14 — OUT: CAD UI buildout slice 23 is released; UI-5 large-data/
+  task validation is complete.** STEP batches now expose determinate N-of-M
+  progress, Run in background with a restorable footer action, and honest
+  cooperative Cancel that waits for/discards the current non-abortable kernel
+  result before stopping remaining files. A product projection pin covers
+  1,200 Parts/12 source documents. The extracted-Core STEP smoke harness is
+  repaired and reports 95 faces, 396,635 triangles, and 1,247 inferred
+  candidates. CAD 55 tests/check/build, smoke, and diff/quarantine pass.
+
+- **2026-08-14 — OUT: CAD UI buildout slice 24 is released; UI-5 layout
+  convergence is complete.** One typed shared-Menu choice switches Docked,
+  Expanded floating docks, and Canvas without remounting the viewport. Live
+  review found/fixed hidden rails and a covered ViewCube in Expanded, then
+  proved all commands recover across the three layouts with one persistent
+  1-Body/6-face/54-snap Part. Compact rules retain those paths. CAD 56 tests/
+  check/build and clean diff/quarantine pass.
+
+- **2026-08-14 — OUT: CAD UI buildout slice 25 is released; UI-5 is
+  complete.** Final live review confirms named landmarks/live regions, visible
+  keyboard focus, Preferences Escape/focus return, and no desktop overflow.
+  Explicit compact layout recovery, reduced-motion, and forced-colors rules
+  pass source audit. CAD 56 tests/check/build and clean diff/quarantine pass.
+  Remaining UI-4 Assembly/Mate/BOM and Drawing screens stay correctly gated on
+  the canonical persistent assembly graph and exact projection contracts.
+
+- **2026-08-14 — OUT: UI buildout slice 37 is released.** The shared field
+  family now includes product-free RadioGroup, SegmentedControl, Slider,
+  ColorField, and FileField implementations with full behavior specs, 13 new
+  pins, and two contrasting gallery datasets each. Live keyboard/validation
+  review found and fixed compact card clipping; a fresh session has zero
+  browser warnings/errors. UI 121 tests/type/build, CAD 95 tests/check/build,
+  Animation build, diff, and runtime/script quarantine pass.
+
+- **2026-08-14 — OUT: UI buildout slice 38 is released.** Shared
+  CommandPalette v1 now provides ranked fuzzy discovery, recents/categories,
+  shortcuts and disabled reasons, display-order keyboard navigation, focus
+  containment/return, no-results state, and validated argument follow-up while
+  emitting only product-owned IDs/text. Five pins and modeling/animation
+  gallery datasets ship. UI 126 tests/type/build, CAD 95 tests/check/build,
+  Animation build, live desktop/680 px zero-log, diff, and quarantine pass.
+
+- **2026-08-14 — OUT: UI buildout slice 39 is released.** Shared DocumentTabs
+  now covers controlled active/dirty/pinned/preview/disabled state and emits
+  close, pin, reorder, overflow-selection, and split intent only. Four pins and
+  CAD/animation gallery datasets prove full/compact behavior. UI 130 tests/
+  type/build, CAD 95 tests/check/build, Animation build, live zero-log review,
+  diff, and quarantine pass.
+
+- **2026-08-14 — OUT: UI buildout slice 40 is released.** Toast and
+  NotificationCenter complete the planned shared-widget expansion over one
+  product-free severity/progress/history model. Four pins and CAD/animation
+  gallery datasets cover announcements, actions, dismiss/persistence,
+  progress, read/unread, mark-read, clear, and empty state. UI 134 tests/type/
+  build, CAD 95 tests/check/build, Animation build, live desktop/680 px zero-
+  log, diff, and quarantine pass.
+
+- **2026-08-14 — OUT: UI/CAD buildout slice 41 is released.** CAD now projects
+  ten existing typed registry commands into shared CommandPalette with live
+  availability/reasons, categories, keywords, shortcuts, header and Cmd/Ctrl+K
+  entry. Selection stays registry-only. CAD 96 tests/check/build, UI/Animation
+  builds, live working/disabled/fuzzy/compact/focus zero-log review, diff, and
+  quarantine pass.
+
+- **2026-08-14 — OUT: UI/CAD buildout slice 42 is released.** Visualization
+  now uses shared SegmentedControl for finish and Slider for bounded
+  environment intensity over the unchanged appearance store/renderer seam.
+  CAD 96 tests/check/build, UI/Animation builds, live compact zero-log review,
+  diff, and quarantine pass.
+
+- **2026-08-14 — OUT: CAD buildout slice 43 is released; frontend-independent
+  work is exhausted.** UI-0/all shared widgets/frontend seams are complete.
+  The final audit added semantic nonselectable ListBox rows for read-only mates/
+  problems and removed Export's no-op selector callback. No canonical Assembly
+  or Drawing producer/RPC exists in current backend source, so the two assigned
+  UI-4 rows are the exact resume gate. UI 135 tests/type/build, CAD 96 tests/
+  check/build, Animation build, live zero-log semantics, diff, and quarantine
+  pass.
+- **2026-08-14 — OUT: the canonical persistent Assembly/Mate/BOM producer is
+  released per Jonathan's direct instruction.** One new renderer-free
+  AnimaCore workspace module owns stable IDs/revisions, Part definitions,
+  instances, reusable normalized connectors, fastened/revolute/prismatic
+  mates, native-unit DOF/relations, atomic mutations, preview, tree solve,
+  typed diagnostics, suppression-aware hierarchical/flattened BOM, and
+  deterministic checksummed `.aether` save/reopen. The existing stdio and HTTP
+  bridge expose the same direct verbs/envelopes and confine HTTP paths to its
+  workspace root. 1,195 AnimaCore tests pass (3 optional-media skips), focused
+  direct plus real HTTP subprocess gates pass, claimed Python ruff is clean,
+  and CAD 96 tests/check/build pass. The Assembly UI controller can now replace
+  its dependency state with real projections; exact Drawing remains next.
+
+- **2026-08-14 — OUT: Aether CAD's persistent Assembly controller is live.**
+  One controller owns the Core workspace handle, rejects mixed revisions, and
+  projects exact Assembly/solve/BOM data into the existing shared workbench.
+  New/open/save use opaque Core-owned `.aether` bytes; Vite proxies `/rpc`, and
+  the signed macOS wrapper now supervises the same HTTP bridge and serves the
+  bundled app same-origin. The transient Part/viewport proof remains separate.
+  Live review caught and fixed an unbound browser `fetch`; New Assembly,
+  revision-1 solved inspector, Structure/Mates/BOM, save status, zero logs, and
+  packaged `hello` RPC pass. CAD 101 tests/check/build, 19 focused Python tests,
+  claimed ruff, Swift type-check, and signed app build pass. The UI-4 Assembly
+  projection row is complete; exact Drawing remains producer-gated.
+
+- **2026-08-14 — OUT: Aether CAD's traditional baseline and selectable
+  presentation themes are live.** A product-owned seven-workspace ribbon now
+  exposes 150 grouped CAD operations while keeping future
+  Core-dependent tools disabled with exact reasons. Traditional is the v1
+  default; the floating-tool language remains selectable. Traditional/
+  Floating, Docked/Expanded/Canvas, and independent Browser/Properties/
+  History Dock/Float/Hide choices persist locally and never enter CAD truth.
+  Live tab, menu, float, reset, theme-reload, and viewport review passes. CAD
+  109 tests/check/build, signed root app, packaged Core hello, diff, and
+  runtime-name quarantine pass.
+
+- **2026-08-14 — OUT: Aether CAD viewport parity slice is released.** The
+  ViewCube now supplies face/Home plus deterministic 15-degree nudge and
+  90-degree roll; four standard views, five display modes, four lighting
+  presets, contact shadows, and four floor/grid modes route through one typed
+  registry and shared renderer-only appearance state. Traditional ribbon,
+  command palette, Visualization, and renderer active state stay coherent.
+  CAD 115 tests/check/build, live WebGPU interaction/visual review, signed root
+  app, diff, and integration-name quarantine pass. Selection filters and
+  directional window/crossing selection are sequenced next.
+
+- **2026-08-14 — OUT: Aether CAD selection parity slice is released.** One
+  typed snapshot now owns Auto/Component/Body/Face/Edge/Vertex filters,
+  preselection, stable selected entities, modifier extension, F6 cycling, and
+  directional Window-containment/Crossing-intersection box policy. Exact
+  topology candidates drive sub-object picks and selected Part IDs project
+  back into the shared Items tree. Traditional ribbon, palette, floating
+  tools, HUD, viewport, and status remain coherent. CAD 118 tests/check/build,
+  live Body/Face/Edge/F6/tree review, signed root app, diff, and integration-
+  name quarantine pass.
+
+- **2026-08-15 — OUT: the shared suite shell now preserves the live viewport
+  across layout themes.** `WorkspaceShell` keeps one stable center subtree
+  while Docked, Floating, and Canvas chrome changes around it, so a
+  `ViewportCanvas` renderer mounts once and tears down only when the workspace
+  closes. Existing rails, panel stacks, tear-offs, edge hot zones, bottom
+  editor, and status behavior remain intact. The new regression pin survives
+  all three preset transitions with the same canvas node. UI 136 tests/type/
+  build, CAD check/build, Animation build, and diff check pass. This shared
+  foundation removes Animation's layout-switch renderer reset and clears the
+  principal lifecycle blocker to future CAD shell convergence.
+
+- **2026-08-15 — OUT: shared viewport navigation and Aether CAD adoption are
+  released.** `@aether/ui` now owns the product-free controlled
+  `ViewportNavigationCube`: quaternion display plus accessible face, fit,
+  15-degree nudge, and quarter-turn roll intent. Aether CAD replaced its
+  imperative DOM implementation with that widget and a narrowly isolated
+  camera presentation store; camera basis math and behavior remain in the
+  viewer. Live Top and clockwise Roll changed the real camera and cube, status
+  reported the exact operation, and logs stayed empty. UI 138 tests/type/build,
+  CAD 120 tests/check/build, Animation build, signed root app, diff, and
+  integration-name quarantine pass. The macOS package script now strips
+  temporary icon metadata and, on macOS 26's current `iconutil` rejection,
+  safely preserves the already-installed product icon while rebuilding and
+  signing the new app bundle.
+
+- **2026-08-15 — OUT: the shared panel-presentation contract is released.**
+  `@aether/ui` now provides one product-free `PanelPlacementMenu` and
+  `WorkspaceShell` accepts controlled or uncontrolled stable-ID panel state,
+  including persisted floating coordinates. Applications retain all panel
+  identity and preference ownership. Aether CAD's Browser, Properties, and
+  History/Problems controls now consume the shared menu over its unchanged
+  `cad-presentation-store`. Live Browser Dock → Float → Dock → Hide and global
+  Reset produced the exact DOM placement state with zero warnings/errors. UI
+  140 tests/type/build, CAD 120 tests/check/build, Animation build, signed root
+  app, diff, and integration-name quarantine pass.
+
+- **2026-08-15 — OUT: the principal CAD standard-view set is complete.**
+  Bottom, Back, and Left now use the existing typed registry/viewer camera path,
+  completing Top/Bottom/Front/Back/Right/Left plus Isometric across the
+  traditional View ribbon, shared command palette, and shared ViewCube. Live
+  Back, palette Bottom, and ribbon Left changed the real camera/cube, returned
+  exact status, and logged zero browser warnings/errors. No new camera math or
+  document state was added. CAD 120 tests/check/build and signed root app pass.
+
+- **2026-08-15 — OUT: traditional appearance-command coverage is complete.**
+  Twelve typed commands now expose three backgrounds, three body finishes,
+  feature-edge visibility, four ground modes, and appearance reset through the
+  traditional View ribbon and shared command palette. They project the same
+  renderer-only state as Visualization. Live Midnight, Feature Edges, palette
+  Grid + Floor, Gloss, and Reset stayed synchronized with zero browser logs.
+  CAD 120 tests/check/build and the rebuilt signed root app pass.
+
+- **2026-08-15 — OUT: canonical Assembly instance controls are released.**
+  Ground/Float, Suppress/Restore, and Remove Component now route selected stable
+  instance IDs through the existing revisioned Core mutation surface. Ribbon
+  and shared-palette availability/active state follow selection and Core
+  capability; rejection preserves selection and successful removal clears it
+  through the refreshed projection. A real HTTP cycle advanced grounded r4,
+  suppressed r5 with BOM exclusion, and removed r6 with an empty solved graph;
+  the live empty Assembly kept all three actions disabled with zero browser
+  logs. CAD 122 tests/check/build and rebuilt signed root app pass.
+
+- **2026-08-15 — OUT: both canonical BOM projection modes are released.**
+  The Assembly BOM workbench now requests Hierarchical or Flattened directly
+  from Core and renders the returned rows without UI-side semantic grouping.
+  The controller preserves the selected mode after later instance mutations
+  when the follow-up projection succeeds and never publishes mixed revisions.
+  Live Hierarchical → Flattened → Hierarchical returned exact status with zero
+  browser logs. CAD 124 tests/check/build and rebuilt signed root app pass.
+
+- **2026-08-16 — OUT: persistent Assembly component insertion is released.**
+  Insert Component now routes from the traditional ribbon, Assembly actions
+  menu, and shared command palette into a shared-field authoring dialog with
+  explicit kilogram/meter values. The browser sends intent only: Core creates
+  the Part definition, returns its stable ID, then creates the instance at the
+  next revision. A rejected second mutation attempts compensating cleanup of
+  the unused definition. Live r1→r3 insertion projected grounded `Bracket:1`
+  in Structure and `BR-100 · Bracket · 1` in BOM, then saved through Core with
+  zero logs. CAD 129 tests, TypeScript/build, rebuilt signed app, diff, and
+  clean integration-name quarantine pass.
+
+- **2026-08-16 — OUT: persistent manual mate connectors are released.** One
+  selected editable Assembly instance enables Connector across the traditional
+  ribbon, actions menu, and shared command palette. The shared-field dialog
+  captures a Part-local meter origin plus nonparallel signed axes; Core owns
+  frame normalization, persistence, revision, and stable ID assignment. The
+  returned connector is selected into the existing shared inspector. Live r4
+  projected `Shaft axis · Bracket · Datum A`, the exact normalized frame, and a
+  successful Core save with zero logs. CAD 133 tests, TypeScript/build,
+  rebuilt signed app, diff, and clean integration-name quarantine pass.
+
+- **2026-08-17 — OUT: persistent Assembly mate preview and commit are
+  released.** The traditional Mate tool, actions menu, and shared command
+  palette now open one endpoint-driven Fastened/Revolute/Prismatic dialog.
+  Draft edits invalidate previous results; Core owns non-mutating preview,
+  solve diagnostics, stable mate IDs, revisioned `add_mate`, and refreshed BOM.
+  Apply is gated on a solved current preview, and the returned mate is selected
+  into the existing shared inspector. Live two-component/two-connector review
+  held revision 8 through all three previews, committed the fastened mate at
+  revision 9 as satisfied with zero DOF, and saved through Core. CAD 139 tests,
+  TypeScript/build, rebuilt signed app, diff, and clean integration-name
+  quarantine pass.
+
+- **2026-08-17 — OUT: persistent selected-mate lifecycle controls are
+  released.** Suppress/Restore and Remove Mate now share typed commands across
+  the traditional Assembly ribbon, actions menu, and command palette. The
+  controller returns the complete selected Core projection through revisioned
+  `update_mate`, changing only suppression state, and supplies stable identity
+  to `remove_mate`; failed dependency validation preserves selection, while a
+  successful removal clears it after refresh. Live verification retained the
+  selected fastened mate at suppressed r10 and restored r11, removed it at r12,
+  projected zero mates, and saved through Core. CAD 140 tests, TypeScript/
+  production build, rebuilt signed root app, diff/whitespace, and clean
+  integration-name quarantine pass.
+
+- **2026-08-17 — OUT: persistent mate DOF value and limit authoring is
+  released.** Active free revolute/prismatic DOFs now enable shared ribbon,
+  actions-menu, and palette commands. Focused shared-field dialogs author
+  degrees or meters; the boundary converts degrees to radians, routes values
+  through `set_dof_value`, and routes paired limits through a complete
+  revisioned `update_mate`. The inspector projects Core's value/state/limits,
+  and suppressed or dependent DOFs remain gated. Live revolute 45° and
+  −30°…60° limits passed, 90° produced Core's warning without UI clamping,
+  prismatic 0.025 m and −0.05…0.1 m limits passed, suppression gating passed,
+  and restored r18 saved through Core. CAD 142 tests, TypeScript/production
+  build, rebuilt signed root app, diff/whitespace, and clean integration-name
+  quarantine pass.
+
+- **2026-08-17 — OUT: persistent DOF relation authoring is released.** One
+  typed dialog now authors Gear, Rack and Pinion, Screw, and Linear relations
+  from compatible free canonical DOFs. Stable endpoint IDs, ratio/direction,
+  and driven-family offset route through `add_relation`; Core returns stable
+  relation identity, dependency state, and solved values. Rotation offsets
+  convert from degrees to radians, translation remains meters, and mixed ratios
+  are labeled m/rad. Relation inspection resolves human-readable endpoint
+  names, and mate inspection shows Core's solved dependent value. Live reversed
+  2:1 gear + 10° offset drove 30° to −50°, gated the dependent editor, and
+  saved r15. CAD 145 tests, TypeScript/production build, rebuilt signed root
+  app, diff/whitespace, and clean integration-name quarantine pass.
+
+- **2026-09-08 — OUT: identity and recovery completed.** Full name/email onboarding, email sign-in, profile/admin editing, private SMTP settings and test-delivery action, expiring single-use reset links, and refresh-persistent host setup authorization. Existing accounts migrate. Verified 22 host tests, Ruff, Studio build and isolated browser flow; SMTP mocked, no external sends. Original icons unchanged.
+
+- **2026-09-08 — OUT: setup email width fixed.** Full name and email now use separate full-width rows in `studio/src/SetupWizard.tsx`. Studio TypeScript/production build passed; refreshed assets are served by the running host.
+
+- **2026-09-08 — OUT: CAD server library and shared account controls released.** `/cad/` now opens a dark blue-grey home/file browser with folders, recents, search, grid/list and details. CAD Part/Assembly Save uses host library with revision protection; .cadpart/.aether/STEP imports, workspace read-only sharing and private copies work. Host account name/picture/theme shared through `core/session/` across Studio/CAD/Animation/gallery. 29 host tests; 145 existing CAD tests plus new async-save failure test; 146 UI tests; four builds/Ruff/JS syntax pass. Isolated browser verified import/open/save/share/separate-user deep-link/copy and independent-login avatar/theme/mobile views. Running service updated and CAD opened; existing production accounts preserved, no test users created there. Original icon archive hashes verified. Imports capped at 6 MB; no physical second-device network test or coediting claimed.
+
+- **2026-09-09 — OUT: supplied app branding applied.** Shared AppIcon uses the Fancy SVG renditions for Studio/CAD/Animation; Simple and former icons preserved. Product cards/setup/headers updated; launchers rebuilt, signatures verified, served assets checked, public app-card browser rendering verified, original hashes unchanged.
+
+- **2026-09-09 — OUT: wheel Part workflow implemented and verified.** Empty Part creation/naming fixed; Core history insertion/reorder/dependency suppression/deletion and rollback are persisted, multiple bodies retain identities and metadata. CAD tree actions and rollback drag, numeric/pointer sketch canvas, selective edge-plane fillets/chamfers and multi-body assembly rendering work. 14-feature `.acad`/`.acpart` examples plus `Aether CAD/examples/Wheel-Walkthrough.md` supplied. 18 Core / 146 CAD / 46 host-workspace tests passed, Core/CAD typechecks/build passed. Browser built a wheel from blank, inserted/replayed history, edited mirrored cuts, suppressed/restored, saved/reopened renamed/hidden bodies; additional pointer/rollback-drag/two-body flow passed. General constrained arcs, arbitrary edge picking, Shell and release/branch workflows remain deferred. Existing production documents/accounts preserved.
+
+- **2026-09-09 — OUT: full-suite CAD layout default.** Moved History/Problems to a left rail panel alongside Part and real saved Version control. Design dropdown beside expanded ribbon; Classic menu option persists old centered tabs/bottom history/floating tools. Changed shell/ribbon/styles, new CADVersionsPanel, shell tests and STATUS. 147 CAD tests and production build pass; isolated history/read-only API checks pass; production healthy. Browser runtime unavailable, visual review not claimed.
+
+- **2026-09-09 — OUT: document header updated.** Clickable app icon → document hamburger → name → Main/historical revision → copy link. Existing document commands/details wired, shared SVG assets retained in Core; safe routing-only copy with fallback dialog and no permission changes. 149 CAD + 146 UI tests, CAD build/UI typecheck/build pass. Browser unavailable; live clipboard verification not claimed.
+
+- **2026-09-09 — OUT: reference document settings connected.** Added portable Core CAD metadata/units and server ownership/revision-checked operations; full document menu dialogs for rename/move/details/recovery/copy/update/units/properties Apply/Save/viewport print. Update uses existing Core TS feature migration; references update only when selected. Units convert at feature/rectangle/placement/DOF boundaries, and quantities use SI. Deleted project tabs recover from retained definitions; live dependencies block deletion. 52 host/workspace, 20 Core, 155 CAD tests (six DOM tests), typechecks/build/Ruff and real HTTP roundtrips pass. Host restarted healthy, QA isolated. Limits documented in `dev/docs/reality/CAD_Document_Controls.md`; browser/native-print verification unavailable, no Git branching/release workflow implied.

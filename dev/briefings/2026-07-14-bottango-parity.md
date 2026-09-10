@@ -48,7 +48,512 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Live claims
 
-| Codex | Extract the first production TypeScript Aether Core package from Aether CAD without creating a second evaluator | `aether-core/{ARCHITECTURE.md,package.json,package-lock.json,tsconfig.json,src/**}` excluding Claude-owned `aether-core/README.md`; `Aether CAD/{AETHER_CORE_EXTRACTION.md,package.json,package-lock.json,src/{domain,sketch-constraints,part-document,part-file,cad-frame-math,topology-inference,math,aether-core,exact-topology,part-geometry,occt-part-evaluator,occt.worker,worker-client}.ts}` and focused tests; STATUS + append-only coordination only | `@aether/core` has no React or Three.js dependency and its semantic modules remain DOM-free; deterministic Part/sketch documents, serialization, topology inference, pure connector/mate transforms, OCCT/WASM startup, exact topology, STEP import, and Part evaluation move behind one package; Aether CAD consumes compatibility adapters with byte/transform parity; future render/physics adapters remain internal Core modules, not new top-level packages; Core tests plus CAD test/check/build pass | in progress 2026-08-01 |
+| Codex | Constraint-aware sketch moves | Core sketch/operations/{transform,copy-constraints,move-constraints,move-transform.test}; sketch/text/{transform,copy,README}; CAD sketch/transform-move.dom.test; STATUS/parity/coordination | Preserve retained text and compatible internal constraints during explicit moves; retain external/fixed guards | active |
+| Codex | Mirrored retained text placement | Core sketch/text/{copy,copy.test,placement,records,frame,edit,README}; CAD sketch/text-{panel,box-placement,reflection.dom.test}, README; STATUS/parity/coordination | Core698/check/build passed; CAD430 existing + corrected reflection test passed | released |
+| Codex | Browser sketch clipboard | CAD sketch/clipboard.ts, clipboard.dom.test.jsx, README.md; sketch-workspace.ts wiring; STATUS/parity/coordination | Native copy/paste and preview with atomic draft undo; CAD429 + focused4, build passed | released |
+| Codex | Sketch clipboard contract | Core document/sketch-clipboard.ts, clipboard-variables.ts, sketch-clipboard.test.ts, index.ts; sketch/operations/transform.ts; STATUS/parity/coordination | Core696/CAD426/check/build passed; browser commands next | released |
+| Codex | Editable text transform copies | Core sketch/text/copy.ts, copy.test.ts, README.md; operations/transform.ts, pattern-relations.ts; CAD sketch/copy-text.dom.test.jsx, README.md; STATUS/parity/coordination | Core691/CAD426/check/build passed | released |
+| Codex | Constraint-preserving copies | Core sketch/operations/copy-constraints.ts, copy-constraints.test.ts, transform.ts, pattern-relations.ts; sketch/index.ts; CAD sketch/modification-panel.ts, copy-transform.dom.test.jsx, README.md; STATUS/parity/coordination | Core687/CAD425/check/build; final UI workflow/build passed | released |
+| Codex | Initial dimension formulas | CAD sketch/constraint-formula.ts, constraint-formula.dom.test.jsx, constraint-panel.ts, README.md; Core sketch/index.ts export; STATUS/parity/coordination | CAD424/build/Core check passed; copy constraints next | released |
+| Codex | Dimension formula editor | CAD sketch/dimension-formula-editor.ts, dimension-formula-editor.dom.test.jsx, saved-constraints.ts, constraint-panel.ts, README.md; sketch-workspace.ts getter wiring; STATUS/parity/coordination | CAD420/build; final2 formula UI workflows passed | released |
+| Codex | Dimension formula bindings | Core sketch/solver/dimension-expressions.ts, dimension-links.ts, types.ts, solve.ts; operations/dimension-expression.ts, dimension-expression.test.ts, edit-dimension.ts, link-dimension.ts, dimension-reference.ts; sketch/index.ts; document/text-expressions.ts, update-variables.ts, text-expressions.test.ts; CAD sketch/variables.ts, variables.dom.test.jsx; README/STATUS/parity/coordination | Core682/CAD418/check/build; final3 variable UI tests passed | released |
+| Codex | Sketch draft variables | CAD sketch/variables.ts, variables.dom.test.jsx, text-expression.dom.test.jsx, history.ts, README.md; sketch-workspace.ts minimal wiring; Core document/update-variables.ts, text-expressions.test.ts; STATUS/parity/coordination | Core677/CAD417/check/build; final2 variable tests passed | released |
+| Codex | Sketch text expression editor | CAD sketch/text-expression.ts, text-expression.dom.test.jsx, text-panel.ts, README.md; sketch-workspace.ts minimal getter wiring; STATUS/parity/coordination | CAD416/build; final22 text tests/build passed; variable editor next | released |
+| Codex | Document text variable transactions | Core document/text-expressions.ts, update-variables.ts, text-expressions.test.ts, part-document.ts, index.ts; text README; STATUS/parity/coordination | Core675/CAD415/check/build passed; UI/draft integration next | released |
+| Codex | Retained text expression regeneration | Core sketch/text/expression.ts, regenerate-expressions.ts, expressions.test.ts, edit.ts, records.ts, README.md; sketch/index.ts; STATUS/parity/mailbox/briefing | Core668/CAD415/check/build; final6 expression tests/typecheck passed; document/UI wiring remains | released |
+| Codex | Requested dimension/arc-center verification | dev/briefings/codex.md; this briefing | Core30/CAD163 passed; live browser unavailable; coordination files only | released |
+| Codex | Shared typed expressions and document variables | Core expressions/{values,parser,evaluate,functions}.ts, expressions/expressions.test.ts, expressions/README.md; quantity-expression.ts/test; document/variables.ts/test, part-document.ts, index.ts; CAD sketch/dimension-input.ts, constraint-units.dom.test.jsx, README.md; STATUS/parity/coordination | Typed expressions/native variables/shared numeric functions; Core663/CAD415/check/build passed | released |
+| Codex | Ascender-based text sizing | Core sketch/text/font.ts, height.ts, height.test.ts, outline.ts, records.ts, placement.ts, frame.ts, edit.ts, README.md; sketch/index.ts; CAD sketch/text-height.ts, text-height.dom.test.jsx, text-panel.ts, text-box-placement.ts, text-resize.ts, text-placement.dom.test.jsx, README.md; STATUS/parity/coordination | Explicit ascender height drives frames/flips/resizing; Core626/CAD415/check/build passed | released |
+| Codex | Default text baseline constraint | Core sketch/text/baseline.ts, baseline.test.ts, frame.ts, edit.ts, frame.test.ts, drag.test.ts, resize.test.ts, README.md; CAD sketch/text-baseline.dom.test.jsx, text-drag.dom.test.jsx, README.md; STATUS/parity/coordination | New horizontal frames receive removable native constraint; Core622/CAD414/check/build passed | released |
+| Codex | Frame-center text flips | Core sketch/text/placement.ts, frame.ts, frame-width.ts, records.ts, edit.ts, resize.ts, frame-flips.test.ts, README.md; solver/text-coordinates.ts; sketch/index.ts; CAD sketch/text-panel.ts, text-box-placement.ts, text-resize.ts, text-frame-flips.dom.test.jsx, README.md; STATUS/parity/coordination | Frame-centered reflection matches preview, regeneration and width solving; Core619/CAD413/check/build passed | released |
+| Codex | Multiline sketch text | Core sketch/text/content.ts, shaping.ts, outline.ts, records.ts, edit.ts, multiline.test.ts, outline.test.ts, README.md; CAD sketch/text-panel.ts, text-multiline.dom.test.jsx, README.md; CAD sketch-workspace.css; STATUS/parity/coordination | First-line frame with retained multiline outlines; Core615/CAD412/check/final build passed | released |
+| Codex | Explicit text resize handles | Core sketch/text/resize.ts, resize.test.ts, README.md, sketch/index.ts; CAD sketch/text-resize.ts, text-resize.dom.test.jsx, text-panel.ts, text-items.ts, README.md; STATUS/parity/coordination | Width/height/corner handles with constrained atomic resize and native persistence; Core612/CAD411/check/build passed | released |
+| Codex | Retained text pointer editing | Core sketch/text/drag.ts, drag.test.ts, README.md; operations/drag-entity.ts; CAD sketch/text-drag.dom.test.jsx, README.md; STATUS/parity/coordination | Pointer edits preserve text grouping and solve saved constraints; Core608/CAD408/check/build passed | released |
+| Codex | Canvas text frame authoring | CAD sketch/text-box-placement.ts, text-box-placement.dom.test.jsx, text-panel.ts, text-placement.ts, README.md; Core sketch/text/edit.ts, frame.ts, frame.test.ts, README.md, sketch/index.ts; STATUS/parity/coordination | Live snapped box placement, native frame creation and cancellation; Core605/CAD407/check/build passed | released |
+| Codex | Constrainable retained text frame | Core sketch/text frame.ts, frame.test.ts, edit.ts, records.ts, README.md; solver/text-coordinates.ts; sketch/index.ts; CAD sketch/text-items.ts, text-frame.dom.test.jsx, README.md; STATUS/parity/coordination | Independent frame width, proportional height, stable frame references on regeneration; Core604/CAD403/check/build pass | released |
+| Codex | Retained text solver grouping | Core text/digest.ts, text/edit.ts, text/README.md; solver/text-coordinates.ts, text-coordinates.test.ts, solve.ts, diagnostics.ts; Core manifests; assets/licenses/harfbuzzjs.txt | Text dimensions preserve glyph proportions and report grouped degrees of freedom; Core 600 / CAD 402, check/build passed | released |
+| Codex | Sketch Text ribbon command | CAD sketch/text-command.ts, text-command.dom.test.jsx, text-fonts.ts, text-panel.ts; main.ts, cad-command-registry.ts/.test.ts, cad-tool-catalog.ts/.test.ts, sketch/README.md; Core assets/icons/tools/text.svg, ui/src/ToolIcon.tsx | Dedicated illustrated command opens text controls with a default local font in active sketches; UI 149 / CAD 402 and checks/builds passed | released |
+| Codex | Bundled sketch font styles | core/assets/fonts/noto-sans/*, core/assets/licenses/harfbuzzjs.txt; CAD sketch/text-fonts.ts, text-fonts.dom.test.jsx, text-panel.ts, README.md; Core sketch/text/bundled-fonts.test.ts, README.md, shaping.ts, outline.ts, woff.ts, woff.test.ts; Core package manifests; CAD vite.config.ts | Locally served licensed regular/bold/italic/bold-italic fonts create persistent outlines; Core 596 / CAD 401, check/build and dev asset HTTP checks passed | released |
+| Codex | Sketch text flips | Core sketch/text/{placement.ts,placement.test.ts,outline.ts,records.ts,edit.ts,edit.test.ts,README.md}, sketch/index.ts, kernel/text-evaluation.test.ts; CAD sketch/text-panel.ts, text-retained.dom.test.jsx, README.md | Shared local-axis flips persist and match preview/new/cut solids; Core 594 / CAD 400, check/build passed | released |
+| Codex | Retained text panel integration | Aether CAD/src/sketch/text-{panel.ts,items.ts,retained.dom.test.jsx}, README.md; Aether CAD/src/sketch-workspace.ts; Core sketch/text/README.md | Create, reopen, replace, detach and undo retained text with async conflict checks; CAD 400 and build passed | released |
+| Codex | Retained sketch text contract | core/engine/src/sketch/text/{records.ts,edit.ts,edit.test.ts,README.md}; core/engine/src/sketch/drawing.ts, index.ts | Persist font/text and replace generated curves atomically without losing unrelated geometry; Core 584 / CAD 398, check/build passed | released |
+| Codex | Text solid acceptance | core/engine/src/kernel/text-evaluation.test.ts, part-evaluator.ts; core/engine/src/sketch/regions/groups.ts, groups.test.ts | Native font outlines extrude/cut real OCCT solids with counters and curved glyphs; Core 580 / CAD 398, check/build passed | released |
+| Codex | Canvas text placement | Aether CAD/src/sketch/text-{panel.ts,placement.ts,placement.dom.test.jsx}, README.md | Snapped live placement, cancellation, cached outline transforms and native insertion; CAD 398 and build passed | released |
+| Codex | Sketch text outline insertion | Aether CAD/src/sketch/text-panel.ts, text-panel.dom.test.jsx, README.md; Aether CAD/src/sketch-workspace.ts | Font selection, live preview, placement, atomic insertion, undo and native reopening; CAD 396 and build passed | released |
+| Codex | Font outline sketch foundation | core/engine/package.json/package-lock.json; core/engine/src/sketch/text/outline.ts, outline.test.ts, README.md, sketch/index.ts | Font paths become exact closed line/Bezier contours with counters and placement; Core 568 / CAD 394, check/build passed | released |
+
+| Codex | Linked ring solid acceptance | core/engine/src/kernel/linked-ring-evaluation.test.ts; coordination docs | Native linked profiles rebuild correct hollow solid after driver/follower/unlink edits | released |
+
+| Codex | Linked fillet radius editing | Core operations/fillet-radius-edit.ts, fillet-handle.ts, linked-fillet.test.ts; CAD sketch/modification-panel.ts, linked-fillet.dom.test.jsx; docs | Handles resolve links and fillet edits preserve affine relationships | released |
+
+| Codex | Unlink dimension relationships | Core operations/link-dimension.ts, unlink-dimension.test.ts, sketch/index.ts; CAD sketch/dimension-link-editor.ts/test; docs | Preserve value/geometry on unlink, independent edits, chain continuity and undo/native persistence | released |
+
+| Codex | Affine dimension dependencies | Core sketch/solver/{types.ts,dimension-links.ts,solve.ts,measured-dimension.ts}, operations/{edit-dimension.ts,dimension-reference.ts,link-dimension.ts,affine-dimensions.test.ts}, sketch/index.ts; CAD sketch/dimension-link-editor.ts, saved-constraints.ts, dimension-link-editor.dom.test.jsx; docs | Persist multiplier/offset links, resolve chains, invert edits and preserve removed drivers | released |
+
+| Codex | Dimension annotation units | CAD sketch/dimension-label-units.ts, dimension-annotations.ts, dimension-manipulator.ts, constraint-panel.ts, sketch-workspace.ts, sketch/annotation-units.dom.test.jsx; docs | Live label units/precision and label-to-editor routing, canonical handle values | released |
+
+| Codex | Display units in constraint fields | CAD sketch/dimension-input.ts, constraint-panel.ts, saved-constraints.ts, constraint-units.dom.test.jsx; docs | Selected units for creation/edit and conversion of pending values with proper disposal | released |
+
+| Codex | Constraint arithmetic entry | CAD sketch/constraint-panel.ts, saved-constraints.ts, constraint-expression.dom.test.jsx; docs | Calculation creation/edit, invalid atomicity and native persistence | released |
+
+| Codex | Numeric dimension calculations | Core quantity-expression.ts/test, units.ts/test; CAD sketch/recent-radius.ts, recent-ellipse.ts, expression-entry.dom.test.jsx; docs | Safe arithmetic input, unit conversion, atomic invalid entry | released |
+
+| Codex | Semicircle inference | Core sketch/semicircle-snap.ts, operations/semicircle.ts and tests, sketch/index.ts; CAD sketch/drawing-tool.ts, sketch-workspace.ts, sketch/semicircle.dom.test.jsx, sketch-workspace.dom.test.jsx; READMEs and coordination docs | Pointer semicircle snapping and persistent relation through radius edits | released |
+
+| Codex | Stable arc center selection | core/engine/src/sketch/operations/arc-center.ts, arc-center.test.ts; Aether CAD/src/sketch/center-controls.ts and center-controls.dom.test.jsx; STATUS, parity ledger, mailbox | Stable edge identity, atomic stale-reference rejection, center reuse | released |
+
+| Codex | Assign associative tool source IDs | Core operations/mirror-entities.ts, mirror-edit.ts, offset-entities.ts, slot.ts, identify-source-edges.ts, curves/slot.ts and affected focused tests; CAD sketch-workspace.dom.test.jsx expectation; docs | Fresh Mirror/Offset/Slot source IDs assigned atomically | released |
+| Codex | DXF filled face boundaries | core/engine/src/sketch/import/dxf/{filled-face.ts,filled-face.test.ts,entities.ts,coordinates.ts,README.md}; Aether CAD/src/sketch/dxf-face-workflow.dom.test.jsx; docs | SOLID/TRACE editable planar closed profiles, validation and persistence | released |
+| Codex | DXF face solid evaluation | core/engine/src/kernel/dxf-face-evaluation.test.ts; docs | Native-reopened imported triangle/quad/concave profiles extrude to expected solid volumes | released |
+| Codex | Split finite line relations | core/engine/src/sketch/operations/{split.ts,split-line-span.ts,split-line-span.test.ts,README.md}; Aether CAD/src/sketch/split-span-workflow.dom.test.jsx; docs | Retain midpoint/equal constraints through line Split and dimension edits | released |
+| Codex | Split arc midpoint | core/engine/src/sketch/operations/{split.ts,split-arc-span.ts,split-span-links.ts,split-line-span.ts,split-arc-span.test.ts,split-relations.test.ts,README.md}; docs | Preserve original arc midpoint through subdivision and radius edits | released |
+| Codex | Arc Split editor acceptance | Aether CAD/src/sketch/split-arc-workflow.dom.test.jsx; docs | Arc midpoint Split, reopen, existing radius edit, undo/redo and persistence | released |
+| Codex | Center arc direction | Core sketch/primitives.ts and center-arc-direction.test.ts; CAD sketch/{arc-direction-control.ts,drawing-tool.ts,preview.ts,tool-instructions.ts,center-arc-direction.dom.test.jsx}, sketch-workspace.ts; docs | Explicit CW/CCW preview and committed arc direction | released |
+| Codex | Elliptical arc variant | Core sketch/{elliptical-arc.ts,elliptical-arc.test.ts,primitives.ts,index.ts}; CAD sketch/{drawing-tool.ts,preview.ts,arc-direction-control.ts,tool-instructions.ts,elliptical-arc.dom.test.jsx},cad-tool-catalog.ts,cad-command-registry.test.ts; core/ui/src/ToolIcon.tsx; core/assets/icons/tools/elliptical-arc.svg; docs | Four-click exact elliptical arc with temporary guide and preview | released |
+| Codex | Partial ellipse diameters | Core operations/{ellipse-support.ts,ellipse-axes.ts,ellipse-axis-references.ts,partial-ellipse-dimensions.test.ts,split-ellipse-dimensions.test.ts,README.md}; CAD sketch/partial-ellipse-dimensions.dom.test.jsx; docs | Dimension partial arcs through linked supporting conic | released |
+| Codex | Immediate ellipse sizing | Core operations/{set-ellipse-diameter.ts,set-ellipse-diameter.test.ts}, sketch/index.ts; CAD sketch/{recent-ellipse.ts,recent-curve-sizing.ts,recent-ellipse.dom.test.jsx}, sketch-workspace.ts; docs | Inline persistent ellipse diameters after placement | released |
+| Codex | Elliptical arc solid acceptance | core/engine/src/kernel/elliptical-arc-evaluation.test.ts; docs | Closed arc/chord extrusion after diameters/native reopen, construction excluded | released |
+| Codex | Elliptical arc axis starts | Core sketch/{elliptical-arc.ts,elliptical-arc.test.ts,primitives.ts}; CAD sketch/{elliptical-radius-control.ts,drawing-tool.ts,preview.ts,tool-instructions.ts,elliptical-axis-start.dom.test.jsx}, sketch-workspace.ts; docs | Optional numeric secondary radius permits axis starts with matching preview | released |
+| Codex | Elliptical arc remembered width | Core sketch/{elliptical-arc.ts,elliptical-arc.test.ts,primitives.ts}; CAD sketch/{elliptical-radius-control.ts,drawing-tool.ts,preview.ts,tool-instructions.ts,elliptical-pointer-start.dom.test.jsx}, sketch-workspace.ts; docs | Pointer-sized width retained for primary-axis starts and reset per gesture | released |
+| Codex | Elliptical guide quadrant snaps | Core sketch/{elliptical-guide-snap.ts,elliptical-guide-snap.test.ts,index.ts},operations/ellipse-endpoint-quadrants.ts; CAD sketch/drawing-tool.ts, sketch-workspace.ts, sketch/elliptical-guide-snap.dom.test.jsx; docs | Snap temporary ellipse axes and preserve quadrant inference | released |
+
+| Codex | Assign pattern source edge IDs | Core operations/identify-source-edges.ts, pattern-group.ts, pattern-edges.test.ts, pattern-source-identities.test.ts; CAD matching pattern regression if needed; docs | Fresh selected-edge patterns receive stable source IDs atomically | released 2026-09-09 |
+
+| Codex | Stable modification source picking | CAD sketch/source-control.ts and source-control.dom.test.jsx; docs | Mouse selection/highlight follows stable edge ID after insertion | released 2026-09-09 |
+
+| Codex | Derived dimension handle verification | Core operations/source-edge-handles.test.ts; docs | Handle location and edited dimension after earlier source insertion | released 2026-09-09 |
+
+| Codex | Stable offset and slot sources | Core operations/offset-entities.ts, offset-relations.ts, slot.ts, curves/slot.ts, operations/source-edge-identities.test.ts; docs | Capture/resolve source edge IDs through derived geometry | released 2026-09-09 |
+
+| Codex | Stable mirror menu acceptance | CAD sketch/mirror-relation-editor.dom.test.jsx; docs | Reordered axis preselection/exclusion, cancel/save, native persistence | released 2026-09-09 |
+
+| Codex | Stable mirror axis validation | Core pattern-source.ts, mirror-entities.ts, mirror-edit.ts, mirror-identities.test.ts; CAD source-control.ts, mirror-relation-editor.ts; docs | Source/axis exclusion resolves stable IDs | released 2026-09-09 |
+
+| Codex | Stable pattern source identity | Core solver/pattern-source.ts, pattern-source-key.ts, pattern-source-identities.test.ts; docs | Pattern extraction/selection/membership follows stable IDs | released 2026-09-09 |
+
+| Codex | Imported circle edit provenance | Core operations/split.ts, trim.ts, imported-layer-edits.test.ts; docs | Source layer survives circle-to-arc edits and native persistence | released 2026-09-09 |
+
+| Codex | Projected selection error UI | CAD sketch/selection-constraint-status.ts and focused DOM test; docs | Missing projected identity is visible instead of valid read-only status | released 2026-09-09 |
+
+| Codex | Projected curve diagnostics | Core solver/entity-observables.ts, diagnostics.ts, projected-diagnostics.test.ts; docs | Projected/stable arc and ellipse mobility selection | released 2026-09-09 |
+
+| Codex | Linked ellipse diagnostics | Core solver/ellipse-diagnostics.test.ts, diagnostic coordinates/state helpers if required; docs | Correct remaining mobility after dimensioning split ellipses | released 2026-09-09 |
+
+| Codex | Ellipse split dimension editor acceptance | CAD sketch/ellipse-split-workflow.dom.test.jsx; Core solver/ellipse-locus-coordinates.ts, solve.ts and focused test; docs | Authored Split and linked dimensions, Undo/Redo, native save/reopen | released 2026-09-09 |
+
+| Codex | Dimensioned ellipse split | Core operations/split-ellipse-dimensions.test.ts, ellipse-axes.ts, ellipse-axis-references.ts; docs | Dimension changes after split/native reopen preserve all arcs | released 2026-09-09 |
+
+| Codex | Split full ellipses | Core split/ellipse split helper/retained ellipse helper and trim import/tests; docs | Shared conic and quadrant remapping after split | released 2026-09-09 |
+
+| Codex | Ellipse trim editor acceptance | CAD sketch/ellipse-trim-workflow.dom.test.jsx; docs | Authored ellipse trim undo native persistence | released 2026-09-09 |
+
+| Codex | Trim full ellipses | Core ellipse-locus residual/link module, trim remap/types/tests; CAD constraint hint/catalog/registry tests; docs | Convert full-ellipse shape to shared retained arcs | released 2026-09-09 |
+
+| Codex | Elliptical quadrant spans | Core quadrant span helper/residuals/snaps/tests; CAD panel; docs | Finite ellipse spans without restricting full ellipses | released 2026-09-09 |
+
+| Codex | Circular quadrant snapping | Core circular snaps/arc span/ellipse inference/residuals; CAD quadrant panel; tests/docs | Circle/visible-arc quadrants with retained constraints | released 2026-09-09 |
+
+| Codex | Retained import layers | Core drawing/DXF importer/join/projection/tests; CAD selection status/block workflow test; docs | Save source layer and prevent cross-layer joins | released 2026-09-09 |
+
+| Codex | DXF block editor workflow | CAD sketch/dxf-block-workflow.dom.test.jsx; DXF README/ledger/status | Preview layer filter placement undo native reopen | released 2026-09-09 |
+
+| Codex | Affine conic scale robustness | Core projection drawing/conic/tests; DXF block tests; docs | Preserve small nonsingular block mappings | released 2026-09-09 |
+
+| Codex | DXF block insertion | Core DXF blocks/index/layers/tests and projection affine entry; docs | Nested planar block transforms and arrays | released 2026-09-09 |
+
+| Codex | Projected curve editor acceptance | CAD sketch/projected-curve-workflow.dom.test.jsx; docs | Pointer create/undo/save/reopen/source-update integration | released 2026-09-09 |
+
+| Codex | Continuous projected snapping | Core projected-curve-snap module/inference/index/tests; CAD snapping/tests; docs | Finite curve coincidence from pointer placement | released 2026-09-09 |
+
+| Codex | Projected quadrant snapping | Core projected-snaps, quadrant frame/residuals; CAD constraint panel; tests/docs | Persistent circle/ellipse quadrant snaps | released 2026-09-09 |
+
+| Codex | Selected projection identities | Core document identity helper/reference/tests; CAD projection-source-selection/tests; docs | Single-contour references capture subentity IDs | released 2026-09-09 |
+
+| Codex | Trim identity preservation | Core operations/trim, trim-references, trim-identities/tests; docs | Preserve surviving vertices and avoid moved-start aliasing | released 2026-09-09 |
+
+| Codex | Split reference preservation | Core operations/split and split-identities/tests; curves/subdivide; docs | Preserve surviving endpoint identities; remap local identified contacts | released 2026-09-09 |
+
+| Codex | Stable projected vertices | Core drawing/identity/projection/solver vertex-reference; tests; docs | Endpoint constraints retain vertex identity | released 2026-09-09 |
+
+| Codex | Stable projected segment references | Core drawing/types/entities/segment-reference, identity assignment/projection; CAD projected picker; tests/docs | Segment IDs on one-to-one projections | released 2026-09-09 |
+
+| Codex | Whole projection identities | Core profile-contour-identities/tests/index; CAD projection-source-selection and editor tests; docs | Core 428 / CAD 357 tests/check/build pass | released 2026-09-09 |
+
+| Codex | Projected point snaps | Core projected-snaps module/tests/index; CAD snapping/drawing-inference and mounted tests; docs | Core 426 / CAD 356 tests/check/build pass | released 2026-09-09 |
+
+| Codex | Projected canvas selection | CAD projected-picking/helper tests, workspace routing, selection renderer/status/drag; mounted tests; docs | CAD 355 tests/build pass | released 2026-09-09 |
+
+| Codex | Projection editor constraint context | Core drawing/entities/projected-context/index/solid-features and profile-projection.test; CAD constraint-panel/projection-authoring + mounted tests; docs | Core 424 / CAD 352 tests/check/build pass | released 2026-09-09 |
+
+| Codex | Projected constraint resolution | Core solver types/solve, external-projection solver/tests, mixed-projection, profile-projection.test, solid-features/part-document validation; docs | Core 423 / CAD 351 tests/check/build pass; UI pending | released 2026-09-09 |
+
+| Codex | Mixed projection authoring UI | CAD sketch projection-authoring helper, workspace routing, projection-editor, CSS and mounted tests; docs | CAD 351 tests/build pass; cross-projection constraints pending | released 2026-09-09 |
+
+| Codex | Mixed projection model | Core solid-features/profile-projection + tests and merge module; CAD projection-editor/test; docs | Core 419 / CAD 349 tests/check/build pass; editing pending | released 2026-09-09 |
+
+| Codex | Split cubic control references | Core solver types/entities/control-point; split + control helper/tests, split-contact.test; spline-handle; CAD mounted test; docs | Core 417 / CAD 348 tests/check/build pass | released 2026-09-09 |
+
+| Codex | Spline tangent handles | Core spline-handle operation/tests/index; CAD spline-handle-controls, constraint-panel, mounted tests; docs | Core 415 / CAD 347 tests/check/build pass | released 2026-09-09 |
+
+| Codex | Fit spline insertion | Core fit-spline, solver types/shape/residuals, insertion operation/helper/tests; CAD preview/mounted test; docs | Core 412 / CAD 346 tests/check/build pass | released 2026-09-09 |
+
+| Codex | Spline insertion UI | CAD sketch/tool-instructions,direct-modification,preview; sketch-workspace routing/test; cad-tool-catalog/test, command-registry.test; docs | CAD 345 tests/build pass; browser pending | released 2026-09-09 |
+
+| Codex | Cubic spline point insertion | Core operations/insert-spline-point.ts + tests, sketch/index.ts; docs | Core 410 tests/check, CAD build pass; UI pending | released 2026-09-09 |
+
+| Codex | Offset overlap validation | Core curves/line-overlap.ts + test, offset.ts; docs | Core 407 / CAD 342 tests; check/build pass | released 2026-09-09 |
+
+| Codex | Closed-chain slots | Core closed-slot geometry/operation/residual/slot handle/offset-mixed/tests; CAD slot-panel/tests; docs | Core 404 / CAD 342; typecheck/build/native/extrusion pass | released 2026-09-09 |
+
+| Codex | Circular closed-centerline slots | Core circular-slot.ts/slot operations+solver/slot-handle/types/tests; CAD slot-panel/mounted test; docs | slotBoundary field; Core 400 / CAD 341, check/build/native/extrusion pass | released 2026-09-09 |
+
+| Codex | Saved constraint panel extraction | CAD sketch/constraint-panel.ts/saved-constraints.ts/README; docs | CAD 340 tests, build/typecheck pass | released 2026-09-09 |
+
+| Codex | Polygon edit preview | CAD polygon-controls.ts/polygon-preview.ts/constraint-panel.ts/sketch-workspace.ts/mounted test; docs | Preview/apply/cancel/stale; CAD 340 tests, build/typecheck pass | released 2026-09-09 |
+
+| Codex | Polygon attachment remapping | Core polygon-attachments.ts/test/polygon-sides.ts; CAD mounted test; docs | Edge/contact correspondence; Core 396 / CAD 339, check/build pass | released 2026-09-09 |
+
+| Codex | Polygon side-count editing | Core polygon-definition.ts/polygon-sides.ts/tests/index; CAD polygon-controls.ts/constraint-panel/mounted test; docs | Sizing/attachments/native; Core 394 / CAD 338, check/build pass | released 2026-09-09 |
+
+| Codex | DXF planar object coordinates | Core import/dxf coordinates.ts/entities.ts/ellipse.ts/tests/README; CAD mounted test; docs | OCS/WCS distinction; Core 390 / CAD 337, check/build pass | released 2026-09-09 |
+
+| Codex | Edge-on conic projection | Core projection/collapsed-conic.ts/drawing.ts/tests; CAD projection DOM test; docs | Exact collapsed locus/native; Core 386 / CAD 336, check/build pass | released 2026-09-09 |
+
+| Codex | Unified line Trim | Core trim.ts/trim-extend.ts/operations.test.ts/README | Shared remapping/picking; Core 383 / CAD 335, check/build pass | released 2026-09-09 |
+
+| Codex | Extend contact remapping | Core extension-contacts.ts/test/trim-extend.ts/extend-curves.ts; CAD mounted test; docs | Preserve finite contacts; Core 382 / CAD 335, check/build pass | released 2026-09-09 |
+
+| Codex | Trim contact remapping | Core trim.ts/trim-references.ts/trim-contact.ts/test; CAD mounted test; STATUS/parity/mailbox | Retained interval contacts and undo/native; Core 380 / CAD 334, check/build pass | released 2026-09-09 |
+
+| Codex | Sketch origin dimension reference | Core operations/sketch-origin.ts/test/index; CAD origin-control.ts/constraint-panel/mounted test; STATUS/mailbox | Fixed origin reference, dimensions, undo/native; Core 377 / CAD 333, check/build pass | released 2026-09-09 |
+
+| Codex | Split contact remapping | Core split-contact.ts/split.ts/tests; CAD mounted test; docs | Contact remapping/native; Core 375 / CAD 332, check/build pass | released 2026-09-09 |
+
+| Codex | Saved contact modes | Core contact-mode.ts/test/export; CAD contact-mode-editor.ts/constraint-panel/tests; docs | Fixed/sliding/DOF/native; Core 373 / CAD 331, check/build pass | released 2026-09-09 |
+
+| Codex | Sliding curve contacts | Core parameter coordinates/types/solve/diagnostics/drag/tests; CAD controls/tests; docs | Bounded contacts/DOF/native; Core 371 / CAD 330, check/build pass | released 2026-09-09 |
+
+| Codex | Extend curve attachments | Core extension-boundary.ts/point-link/residuals/tests; CAD hints/mounted test; docs | Curve attachments/edit/save; Core 367 / CAD 329, check/build pass | released 2026-09-09 |
+
+| Codex | Extend point attachment | Core extension-point-link.ts/test and extend operations/tests; CAD mounted test; docs | Persistent links/drag/save; Core 364 / CAD 328, check/build pass | released 2026-09-09 |
+
+| Codex | Extend to sketch points | Core extend point-boundaries/operations/tests; CAD mounted test; docs | Point boundaries/constraints/save; Core 362 / CAD 328, check/build pass | released 2026-09-09 |
+
+| Codex | DXF layer selection | Core DXF records/layers/index/tests; CAD layer picker/import panel/tests; docs | Layer filtering/preview/save; Core 359 / CAD 327, check/build pass | released 2026-09-09 |
+
+| Codex | DXF anchor placement | CAD dxf-placement.ts/dxf-anchor.ts/dxf-import-panel.ts/mounted tests; docs | Numeric/source anchors, snap/undo/save; CAD 326 and build pass | released 2026-09-09 |
+
+| Codex | Whole spline symmetry | Core symmetric-spline.ts/test/types/residuals/symmetric; CAD constraint-panel/tests; docs | Exact controls/reversal/save; Core 356 / CAD 325, check/build pass | released 2026-09-09 |
+
+| Codex | Circle locus continuity | Core circle-continuity.ts/test/residuals; CAD constraint hints/mounted tests; docs | Tangent/curvature solve/save; Core 354 / CAD 324, check/build pass | released 2026-09-09 |
+
+| Codex | Editable quadrant constraints | Core quadrant-edit.ts/test/index; CAD quadrant-editor.ts/constraint-panel/test; docs | Stable IDs, conflict atomicity, undo/save; Core 351 / CAD 323, check/build pass | released 2026-09-09 |
+
+| Codex | Ellipse axis handles | Core ellipse-axes.ts/test/index; CAD ellipse-axis-controls.ts/constraint-panel/test; docs | Axis dimensions and persistence; Core 349 / CAD 322, check/build pass | released 2026-09-09 |
+
+| Codex | Ellipse center constraints | Core center-snaps/ellipse-center/residuals/tests/index; CAD center controls/tests; docs | Persistent ellipse center selection/inference; Core 347 / CAD 321, check/build pass | released 2026-09-09 |
+
+| Codex | Selected-edge grouped patterns | Core source keys/group creation/edit/resize/repair/suppression/tests; CAD shared source picker/pattern wiring/tests; docs | Distinct edge memberships across group operations; Core 345 / CAD 320; check/build pass | released 2026-09-09 |
+| Codex | Mirror canvas source picking | CAD mirror source control/selection renderer/modification wiring/tests; Core source projection export; docs | Click toggle sources with live highlight and preview | released 2026-09-09 |
+| Codex | Associative selected-edge mirrors | Core source geometry/mirror operation/edit/residual/tests; CAD edge selection/editor/tests; docs | Mirror selected segments with live references including same-contour axis | released 2026-09-09 |
+| Codex | Whole-placement pattern suppression | Core placement summary/batch operation/tests/exports; CAD placement controls/editor/tests; docs | Atomic suppression of all contours at a repeated position | released 2026-09-09 |
+| Codex | Pattern instance suppression | Core suppression contract/validation/operations/resize/tests; CAD relation controls/tests; docs | Suppress geometry, retain slots, restore current source | released 2026-09-09 |
+| Codex | Repair partial pattern membership | Core pattern repair/resize/tests/exports; CAD group editor/tests; docs | Restore absent links without changing detached geometry | released 2026-09-09 |
+| Codex | Pattern count editing | Core pattern resize/edit/tests; CAD count fields/workspace tests; docs | Stable grid slots, guarded removal, undo/native persistence | released 2026-09-09 |
+| Codex | Canonical pattern groups/parameter editing | Core pattern group contract/creation/edit/residual/tests; CAD group editor/panel/tests; docs | Shared spacing/rotation settings with stable instances | released 2026-09-09 |
+| Codex | Edit existing mirror axis | Core mirror-edit operation/tests/exports; CAD mirror relation editor/panel/tests; docs | Reassign/fix axis with stable ID and undo/native save | released 2026-09-09 |
+| Codex | Associative mirror/live axis | Core mirror math/operations/pattern residual/tests; CAD mirror-axis module/modification panel/tests; docs | Source and axis edits propagate through native relations | released 2026-09-09 |
+| Codex | Associative pattern geometry | Core pattern/transform math/solver types residuals tests; CAD generated-relation filtering/modification-panel/tests; docs | Pattern geometry follows source edits and persists | released 2026-09-09 |
+| Codex | Entity constraint coloring | Core batched diagnostics/tests/exports; CAD canvas geometry-state module/CSS/tests; docs | Mixed constrained/free geometry colors with shared analysis | released 2026-09-09 |
+| Codex | Selected-entity constraint state | Core diagnostics/rank/entity observables/tests; CAD workspace selection status/tests; docs | Entity DOF independent of unrelated geometry | released 2026-09-09 |
+| Codex | Parallel-line distance | Core solver line measurement/residual/reference/tests/index; CAD annotation/panel/tests; docs | Driving and reference spacing with parallelism | released 2026-09-09 |
+| Codex | Point-to-line distance dimensions | Core measurement geometry/residuals/reference measurement/split rules/tests/index; CAD constraint-panel/annotations/tests; docs | perpendicular distance supports driving/reference and display | released 2026-09-09 |
+
+| Codex | Dimension mode conversion | Core operations/dimension-reference.ts/tests/index; CAD constraint-panel/workspace tests; docs | conversion retains IDs and dependent values atomically | released 2026-09-09 |
+
+| Codex | Reference dimensions | Core measured-dimension/types/residuals/links/edit/set-radius/solve and tests; CAD constraint-panel/annotations/workspace tests; docs | read-only measured dimensions persist without reducing DOF | released 2026-09-09 |
+
+| Codex | Automatic dimension label spacing | CAD sketch/dimension-label-spacing.ts and annotation integration/canvas tests; docs | automatic labels avoid other labels while manual placements stay fixed | released 2026-09-09 |
+
+| Codex | Curved dimension placement | CAD sketch/curved-dimension-layout.ts, angular layout/annotation/leader integration and canvas tests; docs | angle arc scale and radial direction follow label placement | released 2026-09-09 |
+
+| Codex | Aligned dimension-line relocation | CAD axis-dimension-layout renamed linear-dimension-layout, annotations/leader and canvas tests; docs | diagonal length/distance guides remain parallel under label movement | released 2026-09-09 |
+
+| Codex | Axis dimension-line relocation | CAD sketch/axis-dimension-layout.ts, annotation/leader integration and canvas/workspace tests; docs | X/Y lines and guides follow labels and undo/cancel | released 2026-09-09 |
+
+| Codex | Dimension label leader tracking | CAD sketch/dimension-label-leader.ts, annotations/drag integration and workspace/canvas tests; docs | connectors follow drag/undo/cancel/reopen | released 2026-09-09 |
+
+| Codex | Manual dimension label positions | Core document presentation schema/validation/tests; CAD sketch dimension-label-drag/history/renderer, workspace integration/tests; docs | label positions drag/undo/reopen independently of solver geometry | released 2026-09-09 |
+
+| Codex | Offset and slot annotations | CAD sketch/dimension-annotations.ts and canvas DOM tests; docs | saved offset and full slot width appear using canonical handles | released 2026-09-09 |
+
+| Codex | Angular annotations and axis guides | CAD sketch/angular-dimension-layout.ts/tests, dimension-annotations.ts and canvas DOM tests, CSS; docs | angle arc/label and X/Y extension guides reflect saved dimensions | released 2026-09-09 |
+
+| Codex | Canvas dimension annotations | CAD sketch/dimension-annotations.ts, canvas-renderer.ts/tests, constraint-panel.ts, workspace CSS and DOM tests; docs | visible saved dimensions activate their existing value editor | released 2026-09-09 |
+
+| Codex | Axis distance dimensions | Core solver types/residuals/dimension-links and tests; CAD constraint-panel/catalog/registry tests and workspace DOM test; docs | independent signed X/Y dimensions solve and persist | released 2026-09-09 |
+
+| Codex | Driving diameter dimensions | Core solver types/residuals/dimension-links, operations split-relations/set-radius and tests; CAD constraint panel/catalog/registry tests; docs | native diameter driver supports circles/arcs and survives edits | released 2026-09-09 |
+
+| Codex | Selected contour projection UI | CAD sketch/projection-source-selection.ts, projection-editor.ts/DOM tests; docs | selected contour identity persists and broken links can be explicitly replaced | released 2026-09-09 |
+
+| Codex | Midpoint snap inference | Core operations/midpoint-snaps.ts/tests/index; CAD sketch-snapping.ts/tests, drawing-inference.ts and workspace DOM tests; docs | midpoint snaps remain constrained on lines and circular arcs | released 2026-09-09 |
+
+| Codex | Line alignment inference | Core operations/alignment-snaps.ts/tests/index; CAD sketch/drawing-inference.ts, workspace integration/DOM tests; docs | new snapped lines retain horizontal or vertical alignment | released 2026-09-09 |
+
+| Codex | Endpoint and origin inference | Core operations/point-snaps.ts/tests/index; CAD workspace inference/tests; docs | persistent endpoint and origin constraints on new drawing vertices | released 2026-09-09 |
+
+| Codex | Persistent center snap inference | Core sketch/operations/center-snaps.ts and tests/index; CAD sketch-snapping.ts, sketch-workspace.ts and DOM tests; docs | newly drawn points snapped to centers follow edits with native constraints | released 2026-09-09 |
+
+| Codex | Arc center snapping and dimension access | CAD sketch-snapping/tests, sketch/constraint-panel/tests; Core operations/arc-center/tests; docs | arc centers snap and remain dimensionable through a constrained construction point | released 2026-09-09 |
+
+| Codex | Stable projected contour references | Core sketch contour identity/validation/projection and copy/offset/trim/join identity rules; document reference helper/schema/resolver/tests; CAD projection-editor preservation/tests; docs | source contour IDs survive edits/reordering and fail explicitly on deletion | released 2026-09-09 |
+
+| Codex | Whole-sketch projection editor | CAD projection editor/commands/tests, canvas grid density/test, feature authoring routing, registry/catalog/count; Core feature dependencies/test; docs | create/relink whole-source projections with preview and safe document apply | released 2026-09-09 — 286 Core / 273 CAD tests, check/build pass |
+
+| Codex | Associative whole-sketch projection | Core document profile schema/resolver/tests/index, kernel evaluator/tests; CAD projection edit guard; docs | persisted earlier-feature links and rebuild propagation | released 2026-09-09 — 285 Core / 269 CAD tests, check/build pass |
+
+| Codex | Sketch projection geometry | Core sketch/projection modules/tests/index and kernel projection test; docs | exact plane-to-plane native curve projection foundation | released 2026-09-09 — 281 Core tests/check, CAD build pass |
+
+| Codex | Persistent fit spline shape | Core solver/types/residual/entities/solve, spline relation/tests/index; CAD creation/constraint/catalog/count tests; docs | solver-backed natural/periodic refitting during edits | released 2026-09-09 — 276 Core / 269 CAD tests, check/build pass |
+
+| Codex | Closed fit splines | Core curves periodic solver/fit spline/tests and kernel extrusion test; CAD fit tool/drawing/preview/instructions/tests; docs | periodic C2 closure, preview and commit | released 2026-09-09 — 270 Core / 269 CAD tests, check/build pass |
+
+| Codex | Fit-point spline authoring | Core curves/fit-spline/index/tests; CAD sketch fit-spline tool/drawing/preview/instructions/contextual registry, workspace integration/catalog/tests; docs | arbitrary fit points with preview and explicit finish | released 2026-09-09 — 268 Core / 268 CAD tests, check/build pass |
+
+| Codex | DXF spline import | Core curves/bspline + tests; import/dxf spline/entities/tests/README; CAD import DOM tests; docs | exact polynomial spline spans as editable native Beziers | released 2026-09-09 — 266 Core / 267 CAD tests, check/build pass |
+
+| Codex | Nested sketch region display | Core regions/order + test/index/kernel ordering; CAD canvas-renderer + DOM tests; docs | outside-in rendering with unchanged entity references | released 2026-09-09 — 261 Core / 266 CAD tests; check/build pass |
+
+| Codex | Sketch dropdown icon clarity | core/assets/icons/tools/{rectangle,center-rectangle,aligned-rectangle,arc,center-arc,midpoint-line,circle-three-point}.svg; docs | distinct construction cues for dropdown variants; CAD/UI build | released 2026-09-09 — 149 UI / 265 CAD tests; typecheck/build pass; no browser connection |
+
+| Codex | Nested imported regions | Core nesting/classification/tests/DXF; kernel profile ordering/tests; CAD import option/DOM; docs | classify contained holes/islands and extrude in nesting order | released 2026-09-09 — 259 Core / 265 CAD tests and check/build pass; island fill compositing remains open |
+| Codex | DXF contour joining | Core import/join module/tests/DXF orchestration; CAD import option/DOM; kernel tests/docs | connect unambiguous endpoints preserving curves for extrusion | released 2026-09-09 |
+| Codex | DXF placement | CAD dxf placement module/import panel/DOM tests; docs | numeric and canvas placement previews preserve native curves and undo | released 2026-09-09 |
+| Codex | DXF ellipses and legacy polylines | Core DXF entity/sequence modules/tests; CAD import tests; docs | exact elliptical arcs/full ellipses and classic bulged polyline sequences | released 2026-09-09 |
+| Codex | DXF sketch import | Core sketch/import/dxf modules/tests/index; CAD import panel/workspace/tests; docs | exact 2D primitive parsing with explicit units and undoable import | released 2026-09-09 |
+| Codex | Quadrant inference | Core ellipse snap candidates/inference/tests/index; CAD snapping/workspace hookup/tests; docs | visible quadrant snaps with saved point relationships | released 2026-09-09 |
+| Codex | Ellipse point constraints | Core ellipse-contact residual/selection/types/tests; CAD constraint panel/catalog/DOM; shared quadrant icon; docs | point-on-ellipse and retained quadrant endpoint | released 2026-09-09 |
+| Codex | Full ellipse shape | Core ellipse-shape equation/operation/types/tests/index; CAD placement/panel/catalog/tests; docs | paired halves retain one ellipse under constraints | released 2026-09-09 |
+| Codex | Elliptical symmetry | Core entities/types/symmetric/solve/tests; CAD hint/DOM; docs | ellipse locus symmetry with editable radii/orientation | released 2026-09-09 |
+| Codex | Symmetric sketch constraint | Core solver/types and reference lifecycle operations/tests; CAD constraint panel/catalog/DOM tests; shared symmetry SVG; docs | persistent axis reference, reflected points and curve loci | released 2026-09-09 |
+| Codex | Dropdown icon clarity | core/assets/icons/tools rectangle variants; core/ui/src/widgets.css; docs | distinct corner/center/aligned artwork and readable menu sizing | released 2026-09-09 |
+| Codex | Open-chain slots | Core slot-chain geometry/dispatch/relations/handle/tests; CAD slot selection/DOM tests; docs | rounded chained envelopes with persisted width/source edits | released 2026-09-09 |
+| Codex | Slot width manipulator | Core slot-handle/tests/index; CAD slot-manipulator/panel/shared dimension capture/CSS/DOM tests; docs | on-canvas diameter drag with shared dimension lifecycle | released 2026-09-09 |
+| Codex | Line and arc slots | Core slot geometry/operation/residual/tests/index/kernel test; CAD slot panel/routing/catalog/count/DOM tests; shared slot icon; docs | exact linked slot width, preview, persistence and edits | released 2026-09-09 |
+| Codex | Mixed offset relationships | Core mixed-offset residuals/offset dispatch/relation builder/tests; CAD hint/DOM tests; docs | source/distance updates with exact line/arc carrier relationships | released 2026-09-09 |
+| Codex | Mixed line/arc offset geometry | Core curves offset carriers/mixed path/tests; CAD hint/DOM tests; docs | exact finite line/arc joins and native preview/reopen | released 2026-09-09 |
+| Codex | Individual-edge offsets | Core offset-entities/relation helper/tests/index; CAD offset-panel extraction/modification routing/DOM tests; docs | click-select individual line/arc edges with saved source references | released 2026-09-09 |
+| Codex | Offset distance manipulator | Core offset-handle + test/index; CAD dimension/fillet/offset manipulators, modification panel/CSS/DOM tests; docs | signed drag, flip, numeric/keyboard preview and cancel | released 2026-09-09 |
+| Codex | Associative line-chain offsets | Core offset geometry extraction/solver/ref types/entities/relations/tests, trim/split guards; CAD hints/DOM tests; docs | whole-chain offset correspondence through geometry edits | released 2026-09-09 |
+| Codex | Persistent arc offsets | Core solver offset + relation builder/tests; CAD hints/DOM tests; docs | exact arc span/radius association, edits and reopen | released 2026-09-09 |
+| Codex | Persistent simple offsets | Core solver offset/types/residuals/dimension links; offset operation/tests; CAD panel/catalog/count/DOM tests; docs | circle/single-line offset relations, shared editable distance | released 2026-09-09 |
+| Codex | Sketch offset geometry and workflow | Core operations/offset + tests/index; CAD modification panel/workspace/tool catalog/instructions/count/DOM tests; docs | signed exact circle/arc/polyline offsets with preview and persistence | released 2026-09-09 |
+| Codex | Normal sketch constraint | Core solver normal/types/residuals/tests; CAD catalog/panel/count/DOM tests; shared normal SVG/ToolIcon; docs | persisted line/curve normal solve and editor roundtrip | released 2026-09-09 |
+| Codex | Rectangle variant icon clarity | core/assets/icons/tools/{rectangle,center-rectangle,aligned-rectangle}.svg; STATUS/mailbox/briefing | distinct placement markers at dropdown size; UI checks and product builds | released 2026-09-09 |
+| Codex | Curvature continuity constraint | Core solver continuity/types/residuals/entities/tests; CAD hints/catalog/count/DOM tests; shared curvature icon/ToolIcon; docs | persisted finite-contact G2 constraint with real solver behavior | released 2026-09-09 |
+
+| Codex | Radius document units | CAD recent-radius/workspace/DOM tests; docs | display-unit conversion with preserved canonical dimensions | released 2026-09-09 |
+
+| Codex | Immediate curve radius | Core set-radius operation/tests/index; CAD recent-radius module/workspace/DOM tests; docs | inline saved radius dimensions after circle/arc creation | released 2026-09-09 |
+
+| Codex | Three-point arc chord drag | CAD shared endpoint gesture rename, arc-chord-tool, workspace/instructions/DOM tests; docs | drag chord then curvature using shared capture/cancel logic | released 2026-09-09 |
+
+| Codex | Endpoint-first three-point arc | CAD drawing-tool/preview/workspace/instructions/catalog/DOM/ribbon tests; docs | start/end/through-point placement with stable preview chord | released 2026-09-09 |
+
+| Codex | Tangent arc drag gesture | CAD sketch/tangent-arc-gesture.ts, workspace wiring/DOM tests/instructions; docs | drag-release preview and atomic undo/cancellation | released 2026-09-09 |
+
+| Codex | Tangent arc tool | Core tangent-arc geometry/operation/tests/index/kernel; CAD tangent-arc gesture, placement/preview/instructions/catalog/registry/main wiring/tests, workspace history extraction; shared ToolIcon + tangent-arc SVG; docs | real endpoint tangent arcs, preview, persistent tangency, native extrusion | released 2026-09-09 |
+
+| Codex | Persistent arc center | Core arc-center operation/tests/index, kernel variant test; CAD drawing-tool/DOM tests; docs | selectable center-point arc center with canonical constraints | released 2026-09-09 |
+
+| Codex | Three-point circle relations | Core circle-points operation/tests/index, kernel variant test; CAD drawing-tool/DOM tests, sketch/picking.ts + test; docs | preserve three placement points through constraints and edits | released 2026-09-09 |
+
+| Codex | Persistent midpoint line | Core line-midpoint operation/tests/index; CAD drawing-tool/DOM tests; docs | selectable persisted midpoint and symmetric endpoint editing | released 2026-09-09 |
+
+| Codex | Persistent polygon relations | Core polygon-relations operation/tests/index, solver/solve.ts, kernel variant test; CAD drawing-tool/DOM tests; docs | regular polygon editing with sizing circles and 100-side support | released 2026-09-09 |
+
+| Codex | Persistent rectangle relations | Core rectangle-relations operation/tests/index, kernel/part-evaluator.test.ts; CAD drawing-tool/tests; docs | preserve rectangle shape and center during edits | released 2026-09-09 |
+
+| Codex | Dropdown icon legibility | core/assets/icons/tools/{rectangle,center-rectangle,aligned-rectangle}.svg; core/ui/src/widgets.css; STATUS/mailbox/briefing | fit illustrated icons and emphasize variant geometry | released 2026-09-09 |
+
+| Codex | Sketch interaction and variant icons | CAD workspace/selection/tests/ribbon/catalog; Core diagnostics; shared ToolIcon/assets/tests; docs | user-requested selection, constraint state and distinct variant artwork | released 2026-09-09 |
+| Codex | Chamfer direct editing | Core chamfer inspection/edit/handle tests; CAD shared manipulator/chamfer panel/tests/styles; docs | reopen bevel dimensions and setback dragging | released partial 2026-09-09; UI integration pending |
+| Codex | Linked chamfer batches | Core signed dimension links/chamfer batch/tests; CAD chamfer panel/tests; docs | shared distances and orientation-aware angles across corners | released 2026-09-09 |
+| Codex | Two-edge chamfer | Core shared line-corner/join wrapper/chamfer/tests; CAD chamfer panel/tests; docs | retained-side two-line chamfers and selection-order dimensions | released 2026-09-09 |
+| Codex | Linked sketch dimensions | Core dimension-link contract/resolver/tests, chamfer/delete/trim; CAD constraint panel/tests; docs | saved equal dimensions and safe driver removal | released 2026-09-09 |
+| Codex | Sketch chamfer Core | Core corner geometry/break helper, fillet refactor, chamfer/tests/exports; CAD chamfer panel/routing/catalog/tests; docs | persistent chamfer variants without duplicated topology logic | released 2026-09-09 |
+| Codex | Curved fillet batches and editing | Core fillet batch/connected/handle tests; CAD panel/DOM tests; docs | shared radius across mixed corners and reopening | released 2026-09-09 |
+| Codex | Connected curved fillets | Core connected-fillet/shared constraints/tests; exports; CAD modification panel/DOM tests; docs | adjacent curved corners including closed seam | released 2026-09-09 |
+| Codex | Curved fillet authoring | Core fillet-curves operation/tests/exports; CAD modification panel/tests; docs | persistent curved joins with reference safety | released 2026-09-09 |
+| Codex | Finite curve tangency | Core constraint reference/resolution/residual/tests, Trim remap; CAD DOM test; docs | persistent parameter-specific tangent joins | released 2026-09-09 |
+| Codex | Curved fillet tangent geometry | Core curve jets/tangent circle solver/fillet pieces/tests; docs | exact curve evaluation and tangent center candidates | released 2026-09-09 |
+| Codex | Existing fillet radius edit | Core radius lookup/edit/tests/export; CAD panel/DOM tests; docs | reopen and resize existing shared fillets | released 2026-09-09 |
+| Codex | Fillet radius handle | Core handle projection/tests/export; CAD manipulator/panel/DOM/CSS; docs | drag preview radius without document mutation | released 2026-09-09 |
+| Codex | Intersecting-line fillets | Core line intersection helper/fillet/tests; CAD panel/DOM test; docs | retain picked sides at virtual intersection | released 2026-09-09 |
+| Codex | Two-line fillets | Core selected-line operation/tests/export; CAD panel/DOM tests; docs | shared endpoint selection and reference remapping | released 2026-09-09 |
+| Codex | Shared fillet batches | Core batch helper/tests/export; CAD panel/DOM tests; docs | multiple corners one persisted radius | released 2026-09-09 |
+| Codex | Sketch corner fillet | Core fillet operation/tests/export and kernel test; CAD modification panel/workspace/catalog/tests; docs | exact line corner fillet with editable radius | released 2026-09-09 |
+| Codex | Cubic overlap intervals | Core cubic overlap helper/pairs/tests; docs | exact affine subcurve matching | released 2026-09-09 |
+| Codex | Coincident trim boundaries | Core curve pairs/picking/Trim/tests; docs | finite line and conic overlap endpoints | released 2026-09-09 |
+| Codex | Point sweep Trim | Core sweep/tests; CAD gesture/workspace/tests; docs | point tolerance and constraint deletion/undo | released 2026-09-09 |
+| Codex | Drag Trim | Core sweep operation/tests/export; CAD gesture module/workspace/tests; docs | pointer sweep and one undo transaction | released 2026-09-09 |
+| Codex | Trim fragment relations | Core trim reference helper/tests; docs | preserved supporting geometry across remnants | released 2026-09-09 |
+| Codex | Path Trim remapping | Core Trim topology helper, operation/tests; CAD direct editing/workspace/DOM test; docs | surviving entity references across contour replacement | released 2026-09-09 |
+| Codex | Circle Trim relations | Core circle-reference helper, Trim/Split/tests; CAD DOM test; docs | retained radius and center on arc conversion | released 2026-09-09 |
+| Codex | Line Split relations | Core split relation helper and tests; CAD DOM tests; docs | direction and overall length preservation | released 2026-09-09 |
+| Codex | Arc Split relations | Core split constraint helper, split and tests; docs | shared circular locus after split and radius edits | released 2026-09-09 |
+| Codex | Constraint-preserving Extend | Core operations constraint guard, extend implementations/tests; docs | retained IDs/relations and atomic conflicts | released 2026-09-09 |
+| Codex | Curved Extend | Core operations/extend-curves and tests, sketch exports; CAD direct editing and tests; docs | exact conic endpoint extension and persistence | released 2026-09-09 |
+| Codex | General curve trim | Core curve-pair intersections/picking/trim/tests; CAD direct trim/tests; docs | exact curved interval removal, shared picking, root coverage | released 2026-09-09 |
+
+| Codex | Circle split and free extension gestures | Core sketch split/extend/tests; CAD direct-modification interaction/preview/tests; docs | two-click circle split preserving circle constraints, two-click free extension | released 2026-09-09 |
+
+| Codex | Exact curve subdivision and split | Core sketch curve geometry/operations/tests/index; CAD sketch split command/preview/tests; docs | exact line/arc/ellipse/Bezier subdivision, interactive split, roundtrip | released 2026-09-09 |
+
+| Codex | Sketch parity and contributor structure | CAD sketch modules/workspace/catalog/commands/tests; Core sketch operations/tests/evaluator; docs | focused modules, real modification tools, tested persistence, contributor guide | released 2026-09-09 |
+
+| Codex | Plane creation and fixed surface labels | CAD viewer/authoring/commands/projection/tree/tests; Core plane schema/evaluator; UI cube/tests; docs | persisted offset planes, face-fixed labels, consistent icons | released 2026-09-09 |
+
+| Codex | Sketch tool variants and parity audit | Core sketch primitives/drawing/evaluator/tests/index; CAD sketch workspace/ribbon/catalog/commands/main/tests/styles; reality/roadmap/mailbox | exact variant geometry, preview/commit parity, dropdowns, explicit gap audit | released 2026-09-09 |
+
+| Codex | Sketch constraints and plane selection | Core sketch constraints/drawing/evaluator/tests; CAD sketch workspace, main/viewer/catalog/tests/styles; docs | persistent solved constraints, snap feedback, visible pickable planes | released 2026-09-09 |
+
+| Codex | Live sketch preview | CAD sketch-workspace.ts/css/DOM tests; STATUS/mailbox | pointer previews, dimensions, matching commit, no draft persistence | released 2026-09-09 |
+
+| Codex | Restore viewport sizing | CAD sketch-workspace.css, STATUS/mailbox | remove lazy stylesheet positioning override, build | released 2026-09-09 |
+
+| Codex | Workspace sketch authoring | CAD feature authoring/new sketch workspace/main/viewer/ribbon/commands/tests/CSS; Core profile schema/evaluator/tests; docs | in-workspace plane/face sketch drawing, exact curves, open/closed status, remove duplicate panel | released 2026-09-09 |
+
+| Codex | Fix CAD left/right panel routing | CAD shell/main/panel-routing/tests/styles, STATUS/mailbox | interactive left switching, ribbon isolation, right properties, build | released 2026-09-09 |
+
+| Codex | Illustrated ribbon icons | core/assets/icons/tools/**, core/ui/src/ToolIcon*, index.ts/widgets.css/gallery/main.tsx, CAD ribbon/catalog/icon mapping/tests/styles, STATUS/mailbox | shared SVG collection, light/dark contrast, no command regressions, tests/build | released 2026-09-09 |
+
+| Codex | Complete document settings operations | Core CAD metadata/units/project graph, host library/history/tests, CAD settings/menu/unit fields/printing/tests, docs | persisted metadata, permission/conflict-safe operations, units conversion, restore/copy/update/print | released 2026-09-09 |
+
+| Codex | Document header controls | CAD React header/shell/styles/tests, shared menu/link SVG assets and AetherIcon, STATUS/coordination | document menu, revision label, safe copy link, build/tests | released 2026-09-09 |
+
+| Codex | Default expanded CAD ribbon and left history | CAD React shell/ribbon/version panel/styles/tests, STATUS/coordination | left Part/Version control/History rails, saved classic alternative, build/API verification; browser unavailable | released 2026-09-09 |
+
+| Codex | Wheel Part authoring workflow, rollback and bodies | Core Part history/evaluator/contracts/tests, CAD feature authoring/sketch canvas/tree/viewer/main/tests, fixtures/docs | blank-Part authoring, dependency-safe edits, rollback insertion/replay, saved bodies and actual OCCT/browser roundtrips | released 2026-09-09 |
+
+| Codex | Single CAD Create dropdown | `studio/src/LibraryHome.tsx`, `studio/src/CreateMenu.tsx`, `studio/src/library.css`, STATUS/coordination | production build and browser dropdown navigation/actions | released 2026-09-09 |
+
+| Codex | Wheel authoring, project documents and real saved history | Core CAD document/kernel, CAD feature authoring UI/controllers, canonical workspace project container, host library/history APIs, Studio project browser and docs/tests | exact wheel rebuild, feature editing/mirror/extrude/revolve, project Part/Assembly containment, revision read/restore, ownership/conflict tests and browser roundtrips | released 2026-09-09 |
+
+| Codex | Apply supplied Fancy/Simple app branding | `core/assets/branding/**`, Core AppIcon widget/export, icon build script, Studio/CAD/Animation branding consumers, host icon metadata, docs/coordination | SVG/PNG visual review, product builds, launcher signatures and archive hashes | released 2026-09-09 |
+
+| Codex | CAD file home, shared library and suite account preferences | `core/host/**`, `core/session/**`, core UI gallery account slot, `studio/src/**`, CAD browser/controller entry and shell, Animation account header, docs/coordination | host permission/persistence tests, product builds, browser personal/shared file roundtrip and profile consistency | released 2026-09-08 |
+
+| Codex | Full-width setup identity fields | `studio/src/SetupWizard.tsx`, status/coordination | Studio production build | released 2026-09-08 |
+| Codex | Account identity, email recovery and automatic setup authorization | `core/host/**`, `studio/src/**`, host docs/status/coordination | migrate existing users; one-use expiring recovery tokens, SMTP config, setup authorization across refresh; integration and browser checks | released 2026-09-08 |
+
+| Codex | Preserve original app branding | `core/assets/branding/originals/**`, assets README, icon-generator comment, AGENTS.md and coordination | byte-for-byte hashes against existing original CAD/Animation sources | released 2026-09-08 — original sources and copied files have matching SHA-256 hashes |
+
+| Codex | Independent Studio host and administration | `core/host/**`, `studio/**`, root Studio launcher, three launcher build scripts, CAD bridge clients and Animation engine/base config, shared suite home integration; documentation/coordination | authenticated host integration tests, admin UI build and browser flows, installed background service and app routes | released 2026-09-08 — host/admin/guided setup shipped; 16 host tests, CAD/UI tests, four builds, browser flows and installed service verified |
+
+Scope extension: user supplied home and split-panel onboarding references; add guided first-installation wizard, atomic initial workspace/app choices, a double-click installation command and clear prerequisite/progress output. Community plugins stay explicitly planned.
+
+Host contract: authenticated same-origin `/api/*`, `/cad/`, `/animation/`, `/ui/`; per-user/app engine sessions and per-user workspace roots. Host calls canonical bridge without changing engine semantics. Local account admin owns app enablement and network configuration; no external identity provider is assumed. User explicitly authorized implementation across hosting and UI lanes.
+
+| Codex | Unify native window chrome and gallery workspace | `core/ui/native/**`, all three launcher sources/build scripts, shared DocumentBar/widgets.css, gallery, CAD header spacer, status/coordination | three builds; shared UI checks; browser and native chrome verification | released 2026-09-08 — shared chrome, gallery workspace, 146 UI tests and all builds/native configuration/browser checks pass |
+
+| Codex | Refresh all launchable packages | generated `Aether CAD.app`, `Aether Animation.app`, `Aether UI.app` and their dist outputs; additive briefing/mailbox | rebuild/sign each app; verify served HTML/JS/CSS matches latest build | released 2026-09-08 — all builds/signatures, 12 served-file hashes and three UI loads pass |
+
+| Codex | Shared vector asset sources | `core/assets/**`, `core/ui/src/AetherIcon*`, `Aether CAD/src/react/CadIcon.tsx`, `Aether CAD/{Scripts/build-macos-app.sh,vite.config.ts,Resources/AetherCADIcon.svg}`, `aether-animation/web/src/App.tsx`, current docs/status/coordination | canonical SVG geometry in shared assets, UI renderer only, downstream tests/builds | released 2026-09-08 — 291 tests/checks/builds, launchers and visual icon gallery pass |
+
+| Codex | Resume suite-chrome convergence: actual shared Studio shell | `core/ui/src/{WorkspaceShell,WorkspaceShell.test,widgets}.tsx/css`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test,shapr-shell}.tsx/css`, `Aether CAD/src/style.css`; launcher builds and old native bundle archival; docs/status/coordination | shared shell preserves viewport and editor input state across layouts; existing CAD commands; tests/builds and local visual checks; correctly named launcher | released 2026-09-08 — 290 tests, checks/builds, live browser and signed launchers pass |
+
+Scope extension per Jonathan's follow-ups: port the native Studio design profile
+into `core/ui/tokens/*`, shared `StatusBar`, add shared camera cube wiring in
+`aether-animation/web/src/{App,viewport,app.css}`, and record native/web parity
+and mockup retirement gates. Native engine/format meaning stays in Python.
+
+The earlier CAD suite-chrome claim is resumed by this packet at the relocated
+Core UI paths; all existing edits are preserved. User selected Animation/old
+Anima Studio as visual authority. The shared shell is already its web port.
+
+| Codex | User-approved shared core directory organization | relocation only `aether-core/**` → `core/engine/**`, `aether-ui/**` → `core/ui/**`; package manifests/locks, CAD Vite + smoke script, UI launcher, CI, .gitignore, current docs and additive coordination | preserve all source edits; Core/UI tests and checks, CAD tests/build, Animation build | released 2026-09-08 — 296 tests, checks/builds, signed gallery launcher pass |
+
+Relocation notice: the existing CAD suite-chrome claim continues to own its
+widget/source edits at their new `core/ui/` paths. This task moves those files
+intact; it does not edit their implementation. Package names remain `@aether/core`
+and `@aether/ui`; Python `animacore/` is unchanged.
+
+| Codex | Aether Studio naming and web suite review | `README.md`, `AGENTS.md`, `CONVENTIONS.md`, `dev/docs/roadmap/Aether_Studio_Suite.md`; additive coordination/status; repository directory rename only | source-backed inventory, explicit planned hosting boundary, preserved checkout and old-path compatibility | released 2026-09-08 — directory/link, Python import, doc links and diff checks pass |
+
+| Codex | Phase 2 standalone adaptive CAD docking | `onshape mockup/**`; additive STATUS/mailbox/briefing entries | same mounted viewport and panels across presets; layout/persistence/drag tests, lint and build | released 2026-09-08 phase 2 — 13 tests, lint/type/build pass; visual QA pending |
+
+
+| Codex | Standalone Onshape mockup requested 2026-09-08 | `onshape mockup/**`; additive session entries in STATUS and Codex mailbox/briefing | TypeScript/build and browser walkthrough | released 2026-09-08 — 6 tests, lint/type/build pass; browser QA pending |
+
+
+| Codex | Aether CAD suite-chrome convergence | `aether-ui/src/{AetherIcon,AetherIcon.test,DocumentBar,DocumentBar.test,Tabs,Tabs.test,ViewportNavigationCube,ViewportNavigationCube.test,index,widgets}.tsx?`; `Aether CAD/Launcher/AetherCADApplication.swift`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test,CADTraditionalRibbon,CADTraditionalRibbon.test,CadIcon,shapr-shell}.tsx/css`; narrow `Aether CAD/src/style.css`; status + append-only coordination | CAD consumes the same shared Studio document bar, icon vocabulary, stage-tab treatment, and native-shaped ViewCube as the family baseline; fake traffic lights and duplicated suite navigation are removed; empty header space performs native window drag/double-click behavior without stealing controls; current CAD semantics remain unchanged; shared UI/CAD tests, checks/builds, signed app, live drag/header/cube review, diff check | released 2026-09-08 — completed by native-baseline shared-shell handoff below |
+| Codex | CAD persistent relation authoring | new `Aether CAD/src/{cad-relation-authoring,cad-relation-authoring.test}.ts`; `Aether CAD/src/{cad-assembly-controller,cad-assembly-controller.test,cad-assembly-presentation,cad-assembly-presentation.test,cad-assembly-workspace-store.test,cad-presentation-store,cad-presentation-store.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; architecture/status + append-only coordination | Gear, Rack and Pinion, Screw, and Linear drafts consume compatible free canonical DOFs with stable IDs, explicit ratio/direction, and driven-unit offset; add_relation selects Core-returned identity and republishes solved/dependent values; ribbon/menu/palette parity; live reversed 2:1 + 10° gear drove 30°→−50°, dependent edit gated, r15 save; 145 tests/build, signed app, diff/quarantine | released 2026-08-17 |
+| Codex | CAD persistent mate DOF value + limits | `Aether CAD/src/{cad-mate-authoring,cad-mate-authoring.test,cad-assembly-controller,cad-assembly-controller.test,cad-assembly-presentation,cad-assembly-presentation.test,cad-assembly-workspace-store.test,cad-presentation-store,cad-presentation-store.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; architecture/status + append-only coordination | active free revolute/prismatic DOFs expose degree/meter value and paired-limit dialogs plus inspector projection; unit-correct `set_dof_value` and revisioned `update_mate` retain Core solve/violation authority; suppressed/dependent/fixed mates gate honestly; ribbon/menu/palette parity; live revolute value/limits/warning, prismatic value/limits, suppress/restore/save; 142 tests/build, signed app, diff/quarantine | released 2026-08-17 |
+| Codex | CAD persistent mate lifecycle controls | `Aether CAD/src/{cad-mate-authoring,cad-mate-authoring.test,cad-assembly-controller,cad-assembly-controller.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; architecture/status + append-only coordination | selection/capability-aware Suppress/Restore and Remove now route canonical mate identity through revisioned Core mutations; the full update projection preserves every field except requested suppression, dependency failure keeps selection, successful removal clears it, and ribbon/menu/palette share the typed commands while the Part-session proof stays isolated; 140 tests/check/build, live r9→r10→r11→r12 lifecycle/save, signed app, diff/quarantine | released 2026-08-17 |
+| Codex | CAD persistent mate preview + commit | new `Aether CAD/src/{cad-mate-authoring,cad-mate-authoring.test}.ts`; `Aether CAD/src/{cad-assembly-bridge,cad-assembly-bridge.test,cad-assembly-presentation,cad-assembly-presentation.test,cad-assembly-controller,cad-assembly-controller.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,cad-presentation-store,cad-presentation-store.test,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, architecture/status + append-only coordination | expose Fastened/Revolute/Prismatic authoring from two distinct instance+connector endpoint projections; bridge decodes non-mutating preview_mate revision/solution/diagnostics; dialog invalidates stale preview on every edit and enables Apply only after a successful current preview; add_mate commit selects only Core-returned stable ID and republishes solve/BOM; persistent Assembly Fixed replaces legacy session route without removing Part proof; CAD tests/check/build, live two-instance/two-connector preview/commit/solve/save, signed app, diff/quarantine | released 2026-08-17 — 139 CAD tests and production build pass; signed root app rebuilt; live r8 previews for all three v1 types remained non-mutating, fastened commit advanced r9 and selected a satisfied zero-DOF mate, Core save passed; diff/quarantine clean |
+| Codex | CAD persistent manual mate connectors | new `Aether CAD/src/{cad-connector-authoring,cad-connector-authoring.test}.ts`; `Aether CAD/src/{cad-assembly-controller,cad-assembly-controller.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,cad-presentation-store,cad-presentation-store.test,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, architecture/status + append-only coordination | add a manual Part-local connector dialog for exactly one selected editable Assembly instance; explicit meter origin and axis presets normalize into a nonparallel frame; controller sends definition ID + revisioned add_connector intent and selects only the Core-returned stable connector; replace the persistent Assembly ribbon's legacy session connector route without removing the Part proof; no viewport snap/feature provenance claim; CAD tests/check/build, live insert/select/add/connector/inspector/save, signed app, diff/quarantine | released 2026-08-16 — manual Part-local frame dialog, selection/capability gating, Core add_connector mutation and returned-ID selection ship; live r4 list/inspector/save is zero-log; 133 CAD tests, TypeScript/build, signed app, diff/quarantine pass |
+| Codex | CAD persistent component insertion | new `Aether CAD/src/{cad-assembly-authoring,cad-assembly-authoring.test}.ts`; `Aether CAD/src/{cad-assembly-controller,cad-assembly-controller.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,cad-presentation-store,cad-presentation-store.test,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS if required, architecture/status + append-only coordination | enable Insert Component for editable canonical Assemblies; shared-field dialog captures explicit SI mass/position and metadata; controller adds a Core-owned Part definition then instance with stable-ID/revision checks and compensating definition removal on second-step failure; tree/BOM refresh only from Core results; no browser Assembly graph or viewport geometry claims; CAD tests/check/build, live insert/tree/BOM/save, signed app, diff/quarantine | released 2026-08-16 — typed ribbon/menu/palette insertion, shared SI dialog, Core-assigned-ID transaction and compensating rollback ship; live r1→r3 Structure/BOM/save is zero-log; 129 CAD tests, TypeScript/build, signed app, diff/quarantine pass |
+| Codex | CAD canonical BOM projection modes | `Aether CAD/src/{cad-assembly-controller,cad-assembly-controller.test,cad-assembly-workspace-store,cad-assembly-workspace-store.test}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS if required, architecture/status + append-only coordination | add Hierarchical/Flattened BOM selection backed only by Core `project_bom`; controller publishes one revision-coherent projection and preserves chosen mode after instance mutations when projection succeeds; React never groups or filters canonical BOM meaning; CAD tests/check/build, live empty Assembly toggle, real HTTP modes, signed app, diff/quarantine | released 2026-08-15 — Core-backed Hierarchical/Flattened switch and post-mutation mode preservation ship; live round trip returned exact statuses with zero logs; 124 CAD tests/check/build and signed root app pass |
+| Codex | CAD canonical instance controls | `Aether CAD/src/{cad-assembly-controller,cad-assembly-controller.test,cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, architecture/status + append-only coordination | connect Ground/Float, Suppress/Restore, and Remove Component for one selected canonical Assembly instance through existing revisioned Core mutations; typed ribbon/palette availability and active state follow Core capabilities/selection; preserve selection on failure and clear after removal; no Assembly meaning in UI; CAD tests/check/build, live Core flow, signed app, diff/quarantine | released 2026-08-15 — three capability/selection-aware instance commands ship; controller revision/failure pins and real HTTP grounded r4 → suppressed r5/BOM exclusion → removed r6/empty graph cycle pass; live empty-state gating zero-log; 122 CAD tests/check/build and signed root app pass |
+| Codex | CAD traditional appearance-command completion | `Aether CAD/src/{cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, architecture/status + append-only coordination | expose the already-shipped renderer appearance controls as typed traditional-ribbon and shared-palette commands: background, body finish, exact edges, ground mode, and reset; share active state with Visualization; no new renderer behavior or saved CAD meaning; CAD tests/check/build, live ribbon/palette synchronization, signed app, diff/quarantine | released 2026-08-15 — 12 typed commands and ribbon tools complete background/finish/edges/ground/reset coverage; live ribbon/palette/Visualization synchronization and reset passed with zero warnings/errors; 120 CAD tests/check/build and signed root app pass |
+| Codex | CAD standard-view command completion | `Aether CAD/src/{cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, architecture/status + append-only coordination | connect Back, Left, and Bottom through the existing typed camera registry/viewer path; traditional View ribbon, shared command palette, and ViewCube expose one complete six-face plus isometric set; no new camera math or document state; CAD tests/check/build, live commands, signed app, diff/quarantine | released 2026-08-15 — complete six-face plus Isometric set is live across ribbon/palette/ViewCube; Back/Bottom/Left changed real camera/cube with exact status and zero browser warnings/errors; 120 CAD tests/check/build and signed root app pass |
+| Codex | Shared panel presentation contract + Aether CAD menu adoption | new `aether-ui/src/{PanelPlacementMenu,PanelPlacementMenu.test}.tsx`, `aether-ui/src/{WorkspaceShell,WorkspaceShell.test,index}.tsx?`, `aether-ui/{gallery/main.tsx,WIDGETS.md}`; narrow `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, architecture/status + append-only coordination | product-free Dock/Float/Hide menu emits placement only; WorkspaceShell supports controlled or uncontrolled stable-ID panel state including persisted floating coordinates while retaining existing defaults; CAD browser/inspector/bottom placement menus adopt shared widget over unchanged presentation store; no app preference or CAD meaning enters shared UI; UI/CAD tests/check/build, Animation build, live placement menu, signed app, diff/quarantine | released 2026-08-15 — shared menu/pin/gallery and controlled shell state/pin ship; CAD's three menus adopt it over unchanged preference authority; UI 140 tests/type/build, CAD 120 tests/check/build, Animation build, live Dock/Float/Hide/Reset zero-log review, signed root app, diff/quarantine pass |
+| Codex | Shared suite viewport navigation cube + Aether CAD adoption | new `aether-ui/src/{ViewportNavigationCube,ViewportNavigationCube.test}.tsx`, narrow `aether-ui/src/{index,widgets.css}`, `aether-ui/{gallery/main.tsx,WIDGETS.md}`; new `Aether CAD/src/{cad-camera-presentation-store,cad-camera-presentation-store.test}.ts`, `Aether CAD/src/{main,style}.ts*`, `Aether CAD/src/react/{AetherCADShell,shapr-shell.css}.ts*`, replace superseded `Aether CAD/src/view-cube.ts`, narrow `Aether CAD/Scripts/build-macos-app.sh`, `Aether CAD/ARCHITECTURE.md`, status + append-only coordination | product-free controlled cube owns accessible face/Home/nudge/roll chrome and quaternion display transform only; isolated CAD store bridges UI intent to the existing viewer camera without moving camera math into React or rerendering the full shell; keep all existing CAD camera behavior and traditional/floating layouts; strip generated-icon metadata only in the temporary package staging folder when required by `iconutil`; UI/CAD tests/check/build, Animation build, live navigation, signed app, diff and reference-name quarantine | released 2026-08-15 — shared controlled cube/gallery/two pins plus isolated CAD store/two pins replace imperative DOM implementation; UI 138 tests/type/build, CAD 120 tests/check/build, Animation build, live Top/Roll zero-log review, signed root app, diff and quarantine pass; package fallback preserves the installed icon when macOS 26 iconutil rejects its own complete generated iconset |
+| Codex | Shared suite baseline: persistent viewport across workspace layouts | `aether-ui/src/{WorkspaceShell,WorkspaceShell.test}.tsx`, `aether-ui/WIDGETS.md`, `dev/docs/reality/STATUS.md`, append-only `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | keep one stable center/viewport React subtree while Docked, Floating, and Canvas chrome changes around it; preserve existing panel, rail, tear-off, hot-zone, bottom, and status behavior; add a mount/teardown regression pin; UI tests/type/build plus downstream CAD/Animation builds and diff check | released 2026-08-15 — one stable center/canvas subtree now survives all preset changes; mount/teardown pin passes; UI 136 tests/type/build, CAD check/build, Animation build, and diff check pass |
+| Codex | CAD parity slice: typed selection filters and directional box selection | new `Aether CAD/src/{cad-selection-store,cad-selection-store.test}.ts`; `Aether CAD/src/{cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,viewer,main}.ts`; `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; narrow `Aether CAD/src/{style.css,react/shapr-shell.css}`; `Aether CAD/ARCHITECTURE.md`, `dev/docs/{roadmap/Aether_CAD_UI_System.md,reality/STATUS.md}`, append-only coordination | one renderer/UI selection snapshot owns Auto/Component/Body/Face/Edge/Vertex filtering, modifier extension, hover preselection, and left-to-right Window versus right-to-left Crossing box policy; viewport publishes selected stable Part IDs to the existing tree projection instead of creating panel-local selection; traditional and floating selection tools share typed actions and honest active state; no exact-geometry or Assembly semantics move into renderer; deterministic policy/store tests, CAD tests/check/build, live pointer/filter/box review, signed package, diff/quarantine pass | released 2026-08-14 — one cross-surface selection snapshot, six filters, exact sub-object click/preselection, modifier extension, F6 cycle, directional box policy/overlay, tree projection, 31 live commands and 158 ribbon tools; CAD 118 tests/check/build, live authored-Part review and signed root app pass |
+| Codex | CAD parity slice: ViewCube, standard views, display modes, and environment | `Aether CAD/src/{cad-command-registry,cad-command-registry.test,cad-tool-catalog,cad-tool-catalog.test,cad-appearance-store,cad-appearance-store.test,viewport-appearance,viewport-appearance.test,camera-view,camera-view.test,view-cube,viewer,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow `Aether CAD/src/{style.css,react/shapr-shell.css}`, `Aether CAD/ARCHITECTURE.md`, `dev/docs/{roadmap/Aether_CAD_UI_System.md,reality/STATUS.md}`, append-only coordination | clean-room parity slice over existing Aether camera/renderer foundations and read-only suite behavior: connect Top/Front/Right/Isometric and Shaded/Shaded+Edges/Wireframe/Hidden Line/Ghost through one typed command registry; restore ViewCube nudge/roll plus face/home actions; add shared lighting presets and floor/grid environment controls; Visualization and traditional ribbon share appearance state/active commands; renderer policy remains presentation-only and preserves exact geometry; CAD tests/check/build, live cube/view/mode/environment review, signed package, diff/quarantine pass | released 2026-08-14 — 24 live view/display/scene commands, 151-tool ribbon catalog, ViewCube face/Home/15-degree nudge/90-degree roll, five display policies, four lighting rigs, contact shadows and four ground modes shipped; CAD 115 tests/check/build, live WebGPU review and signed root app pass |
+| Codex | User-directed traditional CAD baseline and panel presentation controls | `Aether CAD/src/{cad-tool-catalog,cad-tool-catalog.test,cad-presentation-store,cad-presentation-store.test,main}.ts`, `Aether CAD/src/react/{CADTraditionalRibbon,CADTraditionalRibbon.test,AetherCADShell,AetherCADShell.test}.tsx`, `Aether CAD/src/react/shapr-shell.css`, `Aether CAD/ARCHITECTURE.md`, `dev/docs/{roadmap/Aether_CAD_UI_System.md,reality/STATUS.md}`, append-only coordination | clean-room functional inventory from the downloaded read-only CAD reference; default product-owned traditional seven-workspace ribbon with complete discoverable CAD command coverage, exact disabled reasons for producer-gated tools, Anima suite-stage navigation, and retained floating palette mode; add explicit browser/inspector/bottom panel dock, float, hide, and reset presentation controls without changing CAD semantics or copying reference code/assets/names; CAD tests/check/build, live desktop/compact/layout/log verification, package/sign gate, diff/quarantine pass | released 2026-08-14 — seven-workspace traditional default, 150-entry product-owned tool catalog, persistent Traditional/Floating and layout/panel choices, independent Dock/Float/Hide controls, live tab/menu/reload review, 109 CAD tests/check/build, signed native package, packaged Core hello, and clean quarantine/diff checks pass |
+| Codex | User-directed Aether CAD persistent Assembly controller integration | `animacore/{aether_workspace,bridge}.py`, focused `animacore/tests/test_bridge_aether_workspace.py`; `Aether CAD/src/{cad-assembly-bridge,cad-assembly-controller,cad-assembly-workspace-store,cad-presentation-store,main}.{ts,test.ts}` plus narrow `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, `Aether CAD/{vite.config.ts,Launcher/{AetherCADApplication,LocalWebServer}.swift,Scripts/build-macos-app.sh,ARCHITECTURE.md}`, `dev/docs/{roadmap/Aether_CAD_UI_System.md,reality/STATUS.md}`, append-only coordination | connect the shipped canonical producer to one modular browser controller; new/open/save `.aether` use Core-owned bytes and never browser-authored ZIP/assembly truth; revision-coherent describe/solve/BOM refresh and selection-aware presentation; keep the transient Part/viewport session separate; proxy `/rpc` in Vite; supervise the same Core HTTP process in the clickable macOS wrapper and remove the superseded static-only server; focused/full Python + CAD tests/check/build and live flow when environment permits | released 2026-08-14 — one Core-handle controller, opaque byte open/save, revision-coherent solve/BOM projection, selection-aware workbench, Vite proxy, supervised same-origin macOS helper, and static-server removal shipped; CAD 101 tests/check/build, 19 focused Python, claimed ruff, Swift type-check, signed app build, packaged hello, live New/solve/tabs/save/zero-log pass |
+| Codex | User-directed canonical persistent Assembly/Mate/BOM producer | `animacore/aether_workspace.py` (new), narrow registration/session integration in `animacore/bridge.py`, focused `animacore/tests/{test_aether_workspace,test_bridge_aether_workspace,test_httpbridge}.py`, `dev/docs/{reality/STATUS.md,roadmap/Aether_Workspace_Format.md}`, append-only coordination in `dev/briefings/{2026-07-14-bottango-parity,codex}.md` | implement the frozen `Aether_CAD_Assembly_Projection.md` contract as one Core-owned stable-ID/revisioned graph; deterministic `.aether` save/reopen; normalized Part-owned connectors; atomic instance/connector/mate/relation/DOF mutations; non-mutating fastened/revolute/prismatic preview; tree solve; hierarchical/flattened derived BOM; direct and HTTP RPC gates; preserve all unrelated shared-tree changes. Jonathan's 2026-08-14 explicit instruction to complete this producer supersedes the earlier backend lane assignment for this bounded packet; the stale broad HTTP-bridge claim is touched only at its generic Session/verb registration seam. | released 2026-08-14 — stable graph/revision/mutation/solve/BOM/ZIP producer and direct + HTTP RPC surface shipped; 1,195 AnimaCore tests (3 skipped), claimed ruff, CAD 96 tests/check/build pass; Assembly product-controller wiring is now unblocked |
+| Codex | CAD buildout slice 43: frontend completion + blocker audit | `dev/docs/roadmap/Aether_CAD_UI_System.md`, `aether-ui/{src/ListBox,src/ListBox.test,WIDGETS.md}`, `Aether CAD/src/react/AetherCADShell.tsx`, narrow status/append-only coordination | normalize completed UI-0/widget inventory and explicitly leave only Assembly/Mate/BOM plus Drawing producer-gated UI-4 rows open; verify no canonical producer/RPC exists; audit/fix enabled inert controls by giving shared ListBox a semantic nonselectable mode for read-only mate/problem collections and removing a no-op export selector callback; record exact handoff/resume condition; final UI/CAD/Animation gates, diff/quarantine pass | released 2026-08-14 — UI-0/widget/frontend-independent work closed; semantic nonselectable ListBox fixes mate/problem rows and export warning removed; only two assigned producer-gated UI-4 rows remain; UI 135 tests/type/build, CAD 96 tests/check/build, Animation build, live semantic zero-log, diff/quarantine pass |
+| Codex | UI/CAD buildout slice 42: Visualization field-family adoption | `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow status/append-only coordination | replace the bounded environment NumberField with shared Slider and the three-way finish select with shared SegmentedControl; retain the exact cadAppearance store/renderer callbacks and session-only truth, keyboard/disabled/accessibility behavior, no semantic or persistence change; CAD tests/check/build, downstream UI/Animation builds, live value/visual/compact/log/diff/quarantine pass | released 2026-08-14 — Visualization now uses shared segmented finish and bounded environment slider over unchanged store/renderer callbacks; CAD 96 tests/check/build, UI/Animation builds, live Gloss/Reset/compact/zero-log, diff/quarantine pass |
+| Codex | UI/CAD buildout slice 41: typed CAD command-palette adoption | `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS only if needed, roadmap/status/append-only coordination | shared CommandPalette projects the existing cadCommands registry with stable IDs, categories/keywords/shortcuts and exact unavailable reasons; header button plus Cmd/Ctrl+K open it, selection executes only through the registry, focus/Escape return work, no duplicate command semantics; projection pin, CAD test/check/build, downstream UI/Animation build, live working/disabled/compact/log/diff/quarantine pass | released 2026-08-14 — ten registry commands project through shared palette; button/Cmd-K, working New Part, disabled mate reasons, fuzzy compact view and focus/Escape pass; CAD 96 tests/check/build, UI/Animation builds, zero-log, diff/quarantine pass |
+| Codex | UI buildout slice 40: shared Toast + NotificationCenter | `aether-ui/src/{Toast,Toast.test,NotificationCenter,NotificationCenter.test,index,widgets.css}.tsx?`, `aether-ui/{WIDGETS.md,gallery/main.tsx}`, narrow UI roadmap/status/append-only coordination | product-free notification model covers success/warning/error/progress, polite/assertive announcements, optional action/dismiss, progress state and persistent read/unread history; toast stack and controlled center keyboard/focus/empty/clear behavior; two gallery datasets/full pins/UI+downstream builds/live desktop/compact/log/diff/quarantine pass | released 2026-08-14 — final planned shared-widget row ships with four pins/two histories/switchable toast stacks; UI 134 tests/type/build, CAD 95 tests/check/build, Animation build, live desktop/680 px action/read/clear/progress/zero-log, diff/quarantine pass |
+| Codex | UI buildout slice 39: shared DocumentTabs | `aether-ui/src/{DocumentTabs,DocumentTabs.test,index,widgets.css}.tsx?`, `aether-ui/{WIDGETS.md,gallery/main.tsx}`, narrow UI roadmap/status/append-only coordination | controlled product-free document tab strip exposes active/dirty/pinned/preview/disabled state, close/pin/reorder/overflow and horizontal/vertical split intent; arrow/Home/End keyboard navigation and focus follow selection, pinned close policy is truthful, drag emits IDs only, two gallery datasets/full pins/UI+downstream builds/live compact/diff/quarantine pass | released 2026-08-14 — full controlled state/intent contract ships with four pins/two datasets; active-preserving overflow and compact strips verified live; UI 130 tests/type/build, CAD 95 tests/check/build, Animation build, zero-log, diff/quarantine pass |
+| Codex | UI buildout slice 38: shared CommandPalette | `aether-ui/src/{CommandPalette,CommandPalette.test,index,widgets.css}.tsx?`, `aether-ui/{WIDGETS.md,gallery/main.tsx}`, narrow UI roadmap/status/append-only coordination | product-free controlled modal accepts command data and emits IDs/arguments only; ranked fuzzy search, category grouping, recent ordering, shortcut and disabled-reason display, arrow/Home/End/Enter/Escape keyboard behavior, focus return, no-results state, and typed argument follow-up; two contrasting gallery datasets, full pins, UI test/type/build, downstream CAD/Animation builds, live desktop/compact/keyboard/log, diff/quarantine pass | released 2026-08-14 — ranked discovery, recents/categories, shortcuts/reasons, display-order keyboard navigation, focus return and validated argument follow-up ship with five pins/two datasets; UI 126 tests/type/build, CAD 95 tests/check/build, Animation build, live desktop/680 px zero-log, diff/quarantine pass |
+| Codex | UI buildout slice 37: complete shared field family | `aether-ui/src/{RadioGroup,RadioGroup.test,SegmentedControl,SegmentedControl.test,Slider,Slider.test,ColorField,ColorField.test,FileField,FileField.test,index,widgets.css}.tsx?`, `aether-ui/{WIDGETS.md,gallery/main.tsx}`, narrow UI roadmap/status/append-only coordination | five product-free v1 fields share controlled/uncontrolled state, native form semantics, labels/help/disabled/error/focus treatment; RadioGroup and SegmentedControl cover arrow/Home/End selection; Slider covers explicit range/step/unit/output; ColorField synchronizes native picker and validated hex text with commit/cancel; FileField covers browse/drop/multiple/accept/list/clear without product I/O; two contrasting gallery datasets each, full pins, UI test/type/build, downstream CAD/Animation builds, live keyboard/visual/diff/quarantine pass | released 2026-08-14 — five product-free v1 fields, 13 focused pins and two contrasting gallery datasets ship; compact card-wrap defect found/fixed live; UI 121 tests/type/build, CAD 95 tests/check/build, Animation build, fresh-session zero-log review, diff/quarantine pass |
+| Codex | UI/CAD buildout slice 36: shared SearchField + Breadcrumbs | `aether-ui/src/{SearchField,SearchField.test,Breadcrumbs,Breadcrumbs.test,index,widgets.css}.tsx?`, `aether-ui/{WIDGETS.md,gallery/main.tsx}`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test,DrawingWorkspace,DrawingWorkspace.test}.tsx`, narrow CAD CSS/roadmap/status/append-only coordination | product-free SearchField owns controlled/uncontrolled query, delayed search signal, Enter flush, Escape/clear, optional scope and accessible result count/focus ref; Breadcrumbs owns stable current-page semantics, native navigation, disabled items and shared-Menu overflow; gallery proves two datasets each; CAD replaces local browser filters and adds Modeling/Drawing paths without changing Core state; UI/CAD tests/check/build/live keyboard/diff/quarantine pass | released 2026-08-14 — shared SearchField/Breadcrumbs ship full specs, two gallery datasets and CAD Items/Assembly/Drawing/header adoption; live delay/clear/scope/count/overflow/focus/path and 1280/680 no-overflow pass; UI 108, CAD 95 tests/check/build, Animation build, diff/quarantine pass |
+| Codex | CAD buildout slice 35: truthful Drawing workspace routing | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test,DrawingWorkspace,DrawingWorkspace.test}.tsx`, `Aether CAD/src/react/shapr-shell.css`, `dev/docs/reality/STATUS.md`, append-only coordination | typed modeling/Drawing workspace mode routes from the shared mode rail; Drawing route spans the workbench and exposes return navigation in Docked/Expanded/Canvas without remounting the 3D viewport or inventing projection data; unavailable/loading/error/ready store states render automatically; commands remain transport-disabled until a real controller is connected; SSR/controller pins plus CAD test/check/build/live desktop/compact/keyboard/diff/quarantine pass | released 2026-08-14 — shared rail routes Modeling↔Drawing across all layouts; exact dependency state is truthful, ready store route is wired, commands transport-gated, and 3D viewport stays mounted/inert; live 1280/680 px no-overflow, keyboard return, zero-console pass; CAD 95 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 34: canonical-ready Drawing workbench | `Aether CAD/src/{cad-drawing-presentation,cad-drawing-workspace-store,cad-drawing-workspace-store.test}.ts`, `Aether CAD/src/react/{DrawingWorkspace,DrawingWorkspace.test}.tsx`, `Aether CAD/src/react/shapr-shell.css`, `Aether CAD/ARCHITECTURE.md`, append-only coordination | one modular presentational workbench renders unavailable/loading/error/ready states; ready state composes shared Tabs/Tree/ListBox/DataTable/PropertyGrid/buttons with the exact DrawingSheetCanvas, revision-coherent active sheet, cross-surface stable selection, Core command availability/reasons, diagnostics and scale-safe collections; it emits typed UI intent only and adds no Drawing semantics; deterministic SSR/store pins plus CAD test/check/build/diff/quarantine pass | released 2026-08-14 — modular dependency/ready workbench composes shared collections, property inspector, typed capability-gated command surface and exact canvas; one selection drives tree/list/table/canvas/inspector; 1,200-row and mismatch gates pass; CAD 93 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 33: exact sheet-space Drawing SVG renderer | `Aether CAD/src/react/{DrawingSheetCanvas,DrawingSheetCanvas.test}.tsx`, `Aether CAD/ARCHITECTURE.md`, append-only coordination | isolated renderer consumes only decoded Core sheet-space primitives/styles/hatch loops/snaps/annotations/title block/BOM; covers line/arc/circle/ellipse/NURBS display, view/primitive selection and accessible sheet labels; rendering math is limited to SVG path/display sampling and never HLR/section/measurement semantics; deterministic SSR pins plus CAD test/check/build/diff/quarantine pass | released 2026-08-14 — isolated accessible SVG renderer ships all five exact primitive families, styled hatches, snaps, annotations, BOM/title block, keyboard view/primitive selection, and renderer-only NURBS sampling; CAD 89 tests/check/build and boundary/quarantine pass |
+| Codex | CAD buildout slice 32: exact Drawing presentation adapter + workspace store | `Aether CAD/src/{cad-drawing-presentation,cad-drawing-presentation.test,cad-drawing-workspace-store,cad-drawing-workspace-store.test}.ts`, `Aether CAD/ARCHITECTURE.md`, append-only coordination | pure renderer/React-free mapper converts exact Drawing DTOs into shared Tree/ListBox/PropertyGrid/DataTable datasets without HLR/section/measurement math; stable IDs, active sheet, stale/dangling diagnostics, capability reasons, and raw exact primitive rows survive; store owns unavailable/loading/ready/error plus tab/filter/selection/expansion; empty/stale/read-only/1,200-view pins and CAD test/check/build/diff/quarantine pass | released 2026-08-14 — pure Drawing adapter/store ship stable sheet/view/annotation/BOM/layer datasets, raw primitive rows, Core reasons/diagnostics, and load/tab/filter/selection state; empty/stale/read-only/1,200-view pins pass; CAD 86 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 31: shared bridge decoder primitives + exact Drawing client | `Aether CAD/src/{cad-bridge-decode,cad-bridge-decode.test,cad-assembly-bridge,cad-assembly-bridge.test,cad-drawing-bridge,cad-drawing-bridge.test}.ts`, `Aether CAD/ARCHITECTURE.md`, append-only coordination | extract one precise structural-decode/error-path vocabulary reused by Assembly and Drawing; readonly Drawing DTOs cover every frozen sheet/view/primitive/hatch/snap/style/annotation/BOM/rebuild field; injected abortable `/rpc` client preserves typed errors/revisions and rejects unknown schema/geometry versions or malformed explicit-unit vectors; focused/full CAD test/check/build/diff/quarantine pass | released 2026-08-14 — shared decoder vocabulary now backs Assembly and exact Drawing; Drawing DTO/client covers frozen fields, abort/error/revision handling, and strict schema/geometry/unit-vector paths; CAD 79 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 30: exact Drawing bridge projection + sequenced backend packet | `dev/docs/roadmap/Aether_CAD_Drawing_Projection.md` (new), narrow references in `dev/docs/roadmap/{Aether_CAD_UI_System,Aether_Workspace_Format,Aether_CAD_Assembly_Projection}.md`, `dev/briefings/{claude,2026-07-14-bottango-parity}.md`, append-only coordination | freeze renderer-free exact sheet/view/vector/annotation/BOM/stale/export projection and atomic command envelopes with explicit sheet units/stable IDs/revisions; forbid display-mesh tracing and UI-owned measurement/HLR/section semantics; backend request is sequenced after Assembly producer with deterministic exact-geometry, save/reopen, and PDF/DXF/SVG gates; docs/diff/link/quarantine pass | released 2026-08-14 — exact sheet/view/primitive/hatch/snap/style/annotation/BOM/rebuild/export contract and twelve-gate sequenced backend packet published; cross-links, diff, and runtime/script quarantine pass |
+| Codex | CAD buildout slice 29: canonical-ready Assembly/Mate/BOM workbench shell | `Aether CAD/src/{cad-assembly-workspace-store,cad-assembly-workspace-store.test}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test,shapr-shell}.tsx/css`, `dev/docs/reality/STATUS.md`, append-only coordination | one presentation store owns unavailable/loading/ready/error and Structure/Mates/BOM tab/selection/filter state; ready state renders canonical adapter through shared Tabs/Tree/ListBox/DataTable/PropertyGrid; unavailable state preserves current working session-only connector/mate proof with explicit persistence limitation and no enabled inert commands; tests/check/build/live keyboard/visual/diff/quarantine pass; do not mark persistent graph UI complete | released 2026-08-14 — canonical-ready Structure/Mates/BOM tabs and Assembly inspector ship across unavailable/loading/ready/error states; session-only proof preserved/labeled; live keyboard/layout/1-Body/6-face/54-snap Connector flow passes; CAD 71 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 28: canonical Assembly presentation adapter | `Aether CAD/src/{cad-assembly-presentation,cad-assembly-presentation.test}.ts`, `Aether CAD/ARCHITECTURE.md`, append-only coordination | one pure renderer/React-free mapper turns the Core read projection into shared Tree/ListBox/PropertyGrid/DataTable datasets; stable semantic IDs survive sorting/filtering; nested instances, connectors, mates, relations, diagnostics, capability reasons, and hierarchical/flattened BOM remain projections only; empty/populated/missing/read-only/unconverged/1,200-instance pins plus CAD test/check/build/diff/quarantine pass | released 2026-08-14 — pure shared-widget adapter ships stable nested Tree/ListBox/inspector/BOM row datasets and Core capability reasons; empty/read-only/missing/unconverged and 1,200-instance pins pass; CAD 66 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 27: Assembly bridge client + structural projection decoder | `Aether CAD/src/{cad-assembly-bridge,cad-assembly-bridge.test}.ts`, `Aether CAD/ARCHITECTURE.md`, narrow completeness corrections in `dev/docs/roadmap/Aether_CAD_Assembly_Projection.md`, append-only coordination | typed renderer-free DTOs mirror the frozen contract; injected HTTP client preserves current `/rpc` envelope, typed bridge errors, revision fields, and abort signals; strict structural decoder rejects unknown schema/malformed explicit-unit transforms without adding solve/BOM meaning; focused tests plus CAD test/check/build/diff/quarantine pass | released 2026-08-14 — typed projection/solution/BOM DTOs, strict schema/path decoder, injected abortable `/rpc` client, typed Core errors, and revision-coherence guard shipped; CAD 62 tests/check/build and diff/quarantine pass |
+| Codex | CAD buildout slice 26: canonical Assembly/Mate/BOM bridge projection + backend packet | `dev/docs/roadmap/Aether_CAD_Assembly_Projection.md` (new), narrow references in `dev/docs/roadmap/{Aether_CAD_UI_System,Aether_Workspace_Format}.md`, `dev/briefings/{claude,2026-07-14-bottango-parity}.md`, `dev/docs/reality/STATUS.md` only if shipped truth changes | freeze a renderer-free, read-only frontend projection and engine mutation/solve/BOM envelopes with explicit units, stable IDs, revisions, capability/diagnostic states, and no UI-authored mate/BOM/solver meaning; backend request names exact persistence and deterministic round-trip tests; docs/diff/link/quarantine audit passes | released 2026-08-14 — frozen projection/command/persistence contract and nine-gate backend packet published; cross-links, diff, and runtime/script quarantine audit pass; no shipped-runtime claim changed |
+| Codex | UI buildout slice 25: final UI-5 accessibility + scaling audit | `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS only if defects appear; roadmap/status/append-only coordination | compact breakpoint contracts prevent horizontal overflow or missing layout/menu/modeling/navigation recovery; semantic snapshot retains named landmarks/live regions; keyboard focus and dialog return remain visible; forced-colors/reduced-motion CSS rules remain scoped; tests/check/build/live desktop keyboard/semantics plus media/layout source audit/diff/quarantine pass; close UI-5 only if all gates hold | released 2026-08-14 — semantic landmarks/live regions, visible keyboard focus, Preferences Escape/focus return, no desktop overflow, compact/layout recovery source audit, reduced-motion/forced-colors rules pass; CAD 56 tests/check/build and diff/quarantine pass; UI-5 complete |
+| Codex | UI buildout slice 24: Docked/Expanded/Canvas layout convergence | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; roadmap/status/append-only coordination | one typed session layout state and shared Menu select Docked, Expanded, or Canvas; Docked retains traditional three-pane workbench; Expanded floats browser/inspector/bottom docks over a full persistent viewport; Canvas hides docks without removing commands or remounting renderer; compact rules keep recovery paths; tests/check/build/live three-mode/keyboard/persistence/diff/quarantine pass | released 2026-08-14 — one typed shared-Menu layout contract shipped; live Docked/Expanded/Canvas retained one viewport and all commands; overlap/ViewCube recovery issues found/fixed; exact Part stayed 1 Body/6 faces/54 snaps; CAD 56 tests/check/build and diff/quarantine pass; UI-5 layout item complete |
+| Codex | UI buildout slice 23: cancellable/background STEP tasks + scale pin | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,cad-workspace-projection.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, `Aether CAD/scripts/smoke-step.mjs`; roadmap/status/append-only coordination | shared ProgressOverlay exposes Run in background and cooperative Cancel for STEP batches; cancel waits for the non-abortable current kernel operation, discards that result, and stops remaining files; background keeps exact import running with live footer status; rebuild remains non-cancellable; product projection deterministically covers 1,200 imported Parts without duplicating shared Tree virtualization; extracted-Core STEP smoke resolves through Core ownership; tests/check/build/smoke/live semantics/diff/quarantine pass | released 2026-08-14 — determinate backgroundable/cooperatively cancellable STEP batch UI, 1,200-Part projection pin, and Core-resolved smoke harness shipped; CAD 55 tests/check/build; exact STEP smoke 95 faces/396,635 triangles/1,247 candidates; diff/quarantine pass; UI-5 scale/task item complete |
+| Codex | UI buildout slice 22: working Visualization appearance screen | `Aether CAD/src/{cad-appearance-store,cad-appearance-store.test,main,viewer,viewport-appearance}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; status/append-only coordination | typed session appearance store owns background preset, grid, edge visibility, material finish, and environment intensity; React shared fields/checkboxes select the Visualization browser; viewer consumes renderer-only settings without CAD semantic changes or viewport rebuild; adaptive light theme and per-face assignments remain disabled with reasons; tests/check/build/live state/visual/keyboard/diff/quarantine pass | released 2026-08-14 — typed session appearance store + working Visualization browser shipped; live Midnight/grid/edges/Gloss/70% and reset updated the persistent WebGPU Part; rail collision found/fixed; CAD 53 tests/check/build and diff/quarantine pass |
+| Codex | UI buildout slice 21: shell accessibility + responsive hardening | `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; roadmap/status/append-only coordination | name Home/workspace/viewport/status/backend regions; expose polite atomic live status without duplicate alerts; add visible keyboard focus for app-local controls plus reduced-motion and forced-colors treatments; retain all shared-widget behavior; validate desktop/compact breakpoints, keyboard navigation, screen-reader snapshot, CAD tests/check/build/live and diff/quarantine | released 2026-08-14 — named landmarks/live regions, app-control focus treatment, 620 px compact rule, reduced-motion/forced-colors styles shipped; CAD 50 tests/check/build, desktop semantic/keyboard/visual live review, CSS breakpoint audit and diff/quarantine pass |
+| Codex | UI buildout slice 20: exact Inspect workbench | `Aether CAD/src/cad-presentation-store.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; roadmap/status/append-only coordination | add a dedicated Inspect browser reached from the shared modeling rail; reuse the renderer-free PropertyGrid projection for document/feature/sketch/exact-topology facts; working Fit View routes through the typed command registry; Measure, mass properties, section analysis, and curvature remain visibly disabled with Core-dependency reasons; tests/check/build/live empty/authored/keyboard/disabled-semantics/diff/quarantine pass | released 2026-08-14 — exact Inspect browser shipped from the shared projection; UI-4 Part/Sketch/Inspect/Rebuild packet complete; CAD 49 tests/check/build, live empty/authored/keyboard review with 2 features/6 faces/54 snaps, diff/quarantine pass |
+| Codex | UI buildout slice 19: truthful Search/Visualization command hardening | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; status/append-only coordination | Search sends typed focus intent, selects Items, and focuses shared filter without controller DOM queries; Visualization remains disabled with an explicit appearance-workbench reason instead of aliasing Fit View; tests/check/build/live focus/disabled semantics/diff/quarantine pass | released 2026-08-13 — typed Search focus and truthful Visualization disable reason shipped; CAD 48 tests/check/build; live Assembly→Search focus + semantic disable review and diff/quarantine pass |
+| Codex | UI buildout slice 18: Preferences + Help utility dialogs | `Aether CAD/src/cad-presentation-store.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; status/append-only coordination | replace inert Settings/Help icon buttons with shared Dialog-based utility screens; Preferences exposes current theme/navigation/units/precision/accessibility truth and disables unsupported persistence choices with reasons; Help documents working sketch/part/assembly navigation and keyboard shortcuts; all actions close/return focus, no enabled inert controls; tests/check/build/live keyboard/visual/diff/quarantine pass | released 2026-08-13 — Preferences/Help dialogs shipped, dead footer controls disabled with reasons; CAD 48 tests/check/build; live Escape focus return + Help visual/semantic, diff/quarantine pass |
+| Codex | UI buildout slice 17: Part inspector + Rebuild/Problems bottom workbench | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,cad-workspace-store,cad-workspace-store.test,cad-workspace-projection,cad-workspace-projection.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; status/append-only coordination | projection adds renderer-free Part/Sketch/Topology inspector values and under-defined diagnostic items; right dock consumes shared PropertyGrid; shared BottomPanel moves History and Problems beneath persistent viewport with typed tab/collapse actions; history activation, dimensions, OCCT metrics, and sketch warning remain controller/Core projections; tests/check/build/live authored/empty/tab/collapse/visual/diff/quarantine pass | released 2026-08-13 — PropertyGrid Part inspector + History/Problems BottomPanel shipped; CAD 47 tests/check/build; live empty/authored/Problems/collapse/Show History review showed 2 DOF, 6 faces, 54 snaps; diff/quarantine pass |
+| Codex | UI buildout slice 16: functional Export center | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; roadmap/status/append-only coordination | replace inert Share with Export availability tied to active Part; shared Dialog/fields/checkboxes expose current target, exact editable native format, dependency closure and result expectations; Save native Part executes existing registry command; STEP/mesh/drawing outputs stay disabled with reasons until Core supports them; tests/check/build/live populated/disabled review/diff/quarantine pass; close UI-4 first entry-screen bullet | released 2026-08-13 — functional exact native Export center shipped and inert Share removed; UI-4 entry-screen packet complete; CAD 47 tests/check/build, live OCCT Part/export visual/semantic, diff/quarantine pass |
+| Codex | UI buildout slice 15: Home/New/Import/Recovery entry workbench | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; roadmap/status/append-only coordination | persistent viewport stays mounted beneath React-owned Home/Recovery start center; shared Dialog/fields/buttons/EmptyState provide New Part naming/template/units, Open, STEP Import, and honest empty Recovery; Part creation routes typed requested name into existing sketch/Core path, file commands use registry, unavailable Assembly/Drawing are visibly disabled with reason; tests/check/build/live full flow/diff/quarantine pass | released 2026-08-13 — Home/New/Import/Recovery entry workbench shipped; CAD 46 tests/check/build; live named `Drive Bracket`→Top Plane→OCCT Body, Recovery, Import review produced 6 faces/54 snaps; diff/quarantine pass |
+| Codex | UI buildout slice 14: remove superseded local DOM UI | `Aether CAD/src/{items-tree-view,assembly-tree-view,reference-geometry,reference-geometry.test,style}.ts/css`, `Aether CAD/src/react/shapr-shell.css`, `Aether CAD/ARCHITECTURE.md`; UI roadmap/status/append-only coordination | remove unreferenced string-rendered Items/assembly/reference view modules and dead toolbar/browser/tree/history CSS; preserve shared Tree/ListBox/Rail shell visuals and all viewport/sketch/connector styles; no runtime imports remain; CAD tests/check/build/live visual and diff/quarantine pass; mark UI-3 complete only if audit finds no replaced app-local equivalent | released 2026-08-13 — superseded DOM renderers and ~6 KB dead CSS removed; UI-3 complete; CAD 45 tests/check/build, live visual/sketch-entry, diff/quarantine/audit pass |
+| Codex | UI buildout slice 13: shared Rail command surfaces + dead toolbar removal | `aether-ui/src/{Rail,Rail.test,index,widgets.css}.ts*`, `aether-ui/WIDGETS.md`; `Aether CAD/src/{cad-toolbar,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS, architecture/status/append-only coordination | shared Rail forwards standard container/button semantics including disabled command state; CAD workspace-mode/modeling/bottom rails adopt Rail/RailButton while preserving icon+label layout, command registry state, keyboard labels and breakpoints; unused HTML toolbar renderer and fallback path are removed; UI/CAD/downstream tests/build/live keyboard/visual and diff/quarantine pass | released 2026-08-13 — Rail standard-attribute contract and CAD adoption shipped; obsolete HTML toolbar removed; UI 102/CAD 46 tests and builds, Animation build, live semantic/visual, diff/quarantine pass |
+| Codex | UI buildout slice 12: React-owned CAD presentation/workflow overlays | `Aether CAD/src/{cad-presentation-store,cad-presentation-store.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; `dev/docs/reality/STATUS.md`; append-only coordination | typed presentation snapshot owns active browser panel, history collapse, backend/status/metrics, tool/sketch/loading/hover cards and mate guidance; React replaces DOM class/text/innerHTML mutation and routes cancel/toggle/panel actions to controller; persistent viewport/ViewCube/Core semantics remain imperative; CAD tests/check/build/live sketch, connector, collapse, loading-independent review and diff/quarantine pass | released 2026-08-13 — typed presentation store + three shell pins shipped; CAD 46 tests/check/build; live sketch→OCCT Part, history collapse/restore, connector cancel, persistent 6-face/54-snap viewport pass |
+| Codex | UI buildout slice 11: React-owned Assembly connector/mate lists | `Aether CAD/src/{cad-workspace-store,cad-workspace-store.test,cad-workspace-projection,cad-workspace-projection.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; `dev/docs/reality/STATUS.md`; append-only coordination | workspace projection publishes connector and mate ListBox data/counts; React Assembly browser replaces connector/mate innerHTML; pick/delete/selection actions return through typed controller dispatch; menu availability stays registry-driven; CAD tests/check/build/live empty and authored-state review and `git diff --check` pass | released 2026-08-13 — typed connector/mate ListBox projection and controller actions shipped; CAD 43 tests/check/build; live empty, OCCT-authored connector placement/selection/deletion, 6-face/54-snap review pass |
+| Codex | UI buildout slice 10: React-owned Items + History projections | `Aether CAD/src/{cad-workspace-store,cad-workspace-store.test,cad-workspace-projection,cad-workspace-projection.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, narrow shell CSS; `dev/docs/reality/STATUS.md`; append-only coordination | controller publishes typed Tree/ListBox snapshots and receives typed item/history actions; React shared Tree replaces Items/reference generated HTML and local filtering; shared ListBox replaces History HTML; selection/expansion/visibility/reference-plane/history navigation preserved without duplicating Core truth; tests/check/build/live Part/import-independent flow and `git diff --check` pass | released 2026-08-13 — shared Tree/ListBox projection and four direct pins shipped; CAD 43 tests/check/build; live plane→OCCT Part, filtering, history navigation, 6-face/54-snap review pass |
+| Codex | UI buildout slice 9: unified Aether CAD command registry | `Aether CAD/src/{cad-command-registry,cad-command-registry.test,main}.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`; `dev/docs/reality/STATUS.md`; append-only coordination | one typed registry owns visible command IDs, enabled/active state, subscriptions, handler registration and execution; React toolbar/header/menu invoke it without DOM query/click or MutationObserver; controller registers existing operations and publishes availability while persistent viewer/Core semantics remain unchanged; tests/check/build/live command flow and `git diff --check` pass | released 2026-08-13 — registry and three direct pins shipped; CAD 39 tests/check/build; live New Part→Sketch→OCCT Body flow produced 6 faces/54 snaps and enabled Save/Fit without hidden command bridge |
+| Codex | UI buildout slice 8: shared SplitPane + BottomPanel | `aether-ui/src/{SplitPane,SplitPane.test,BottomPanel,BottomPanel.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/roadmap/Aether_CAD_UI_System.md`; `dev/docs/reality/STATUS.md`; append-only coordination | accessible horizontal/vertical split resizing, keyboard separator, min/max/collapse/restore and controlled persistence signal; BottomPanel tabs with badges, collapse/restore, active content and actions; gallery/pins/downstream builds/live review and `git diff --check` pass | released 2026-08-13 — UI-2 complete; SplitPane/BottomPanel shipped with eight pins; UI 102 tests/check/build, Animation build, CAD 36 tests/check/build, Core 8 tests/check, and live resize/tab/collapse review pass |
+| Codex | UI buildout slice 7: shared PropertyGrid inspector | `aether-ui/src/{PropertyGrid,PropertyGrid.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/reality/STATUS.md`; append-only coordination | schema-driven sections support controlled/uncontrolled collapse, filtering, modified-only review, mixed/read-only states, shared FieldRow help/error/reset composition, empty result; two gallery datasets, pins/build/live review and `git diff --check` pass | released 2026-08-13 — PropertyGrid shipped with five focused pins; UI 94 tests/check/build, Animation/CAD builds, and live modified-only/semantic/visual review pass |
+| Codex | UI buildout slice 6: definitive shared DataTable | `aether-ui/src/{DataTable,DataTable.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/reality/STATUS.md`; append-only coordination | typed columns support controlled sorting/filtering, single/multiple/range selection, keyboard rows, inline edit, resize/reorder signals, pinned columns, row commands, empty/loading/error states, and virtualization; two gallery datasets, focused pins, downstream build/live review and `git diff --check` pass | released 2026-08-13 — DataTable shipped with 11 focused pins; UI 89 tests/check/build, Animation build, CAD 36 tests/check/build, Core 8 tests/check, and live sort/edit/visual review pass |
+| Codex | UI buildout slice 5: complete definitive Tree behaviors | `aether-ui/src/{Tree,Tree.test,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/reality/STATUS.md`; append-only coordination | Tree v3 adds controlled inline rename, native drag move signals with before/inside/after intent, child loading/error/retry rows, and fixed-row virtualization without regressing selection/filter/expansion/keyboard/actions; gallery/pins/build/live review and `git diff --check` pass | released 2026-08-13 — Tree v3 shipped with four new pins; UI 78 tests/check/build, Animation build, CAD 36 tests/check/build, and live rename/retry/1,200-row review pass |
+| Codex | UI buildout slice 4: definitive shared ListBox | `aether-ui/src/{ListBox,ListBox.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/roadmap/Aether_CAD_UI_System.md`; `dev/docs/reality/STATUS.md`; append-only coordination | product-free flat collection supports controlled single/multiple selection, range/toggle semantics, groups, disabled/dimmed rows, type-ahead, activation/context/row actions, empty/loading/error states, and fixed-row virtualization; gallery datasets and focused behavior pins; UI tests/type-check/build, live gallery walkthrough, `git diff --check` | released 2026-08-13 — ListBox shipped with 11 focused pins and two gallery datasets; UI-1 is complete; 74 UI tests/type-check/build and live semantic/keyboard/visual walkthrough pass |
+| Codex | UI buildout slice 3: Tooltip + reusable empty/error/progress states | `aether-ui/src/{Tooltip,Tooltip.test,EmptyState,EmptyState.test,ErrorState,ErrorState.test,ProgressOverlay,ProgressOverlay.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/reality/STATUS.md`; append-only coordination | Tooltip supplies delayed pointer help, immediate focus help, shortcut/disabled explanation, Escape dismissal, shared collision placement, and accessible description; compact/full empty and error states expose recovery actions; determinate/indeterminate progress exposes phase/cancel/background actions; gallery/pins/build and `git diff --check` pass | released 2026-08-13 — Tooltip plus empty/error/progress surfaces shipped with six focused pins; modal progress focus/Escape/reduced-motion behavior included; UI 63 tests/type-check/build and live gallery walkthrough pass |
+| Codex | UI buildout slice 2: shared field family + Aether CAD Part-parameter adoption | `aether-ui/src/{NumberField,NumberField.test,number-expression,number-expression.test,SelectField,SelectField.test,Checkbox,Checkbox.test,FieldRow,FieldRow.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `Aether CAD/src/main.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, `Aether CAD/src/react/shapr-shell.css`; `dev/docs/reality/STATUS.md`; append-only coordination | product-free NumberField supports arithmetic expressions, explicit units, min/max, mixed state, commit/cancel, keyboard stepping, and pointer scrub; SelectField/Checkbox/FieldRow provide one accessible visual contract; gallery and behavior pins; CAD Modeling panel adopts shared fields without changing controller IDs or Core rebuild semantics; UI/CAD/Core tests, checks, builds, live browser walkthrough, `git diff --check` | released 2026-08-13 — shared NumberField/SelectField/Checkbox/FieldRow shipped with 13 focused pins and two gallery datasets; CAD Modeling adopted them and live arithmetic input rebuilt a 60 × 40 × 20 mm OCCT Body; UI 57, CAD 36, Core 8 tests plus checks/builds/browser pass |
+| Codex | UI buildout slice 1: reference isolation + shared Menu/Popover + first Aether CAD menu adoption | `Aether CAD/vite.config.ts`, `Aether CAD/src/react/{AetherCADShell,AetherCADShell.test}.tsx`, `Aether CAD/src/react/shapr-shell.css`; `aether-ui/src/{Menu,Menu.test,Popover,Popover.test,overlay-position,overlay-position.test,index,widgets.css}.ts*`, `aether-ui/gallery/main.tsx`, `aether-ui/WIDGETS.md`; `dev/docs/reality/STATUS.md`; append-only coordination | CAD tests ignore development references; product-free controlled Menu and Popover support keyboard/focus/outside-dismiss/disabled-reason/submenu/checkbox/danger and anchored collision-aware placement; gallery pins; CAD Mates overflow uses shared menu without breaking command bridge; Core/UI/CAD tests, type-checks, builds, `git diff --check` | released 2026-08-13 — Menu/Popover/positioner shipped in shared UI with gallery and 12 focused pins; CAD Assembly adopted the menu, panel selection moved into React presentation state, overlapping rails and sibling-package dev serving fixed; UI 44, CAD 36, Core 8 tests plus checks/builds and live browser walkthrough pass |
+| Codex | Define the shared Aether CAD UI-system expansion and missing-screen plan | `dev/docs/roadmap/Aether_CAD_UI_System.md` (new), `aether-ui/WIDGETS.md`, append-only `dev/briefings/{2026-07-14-bottango-parity,codex}.md`; no runtime component implementation | reuse-first shared-widget practice with documented exceptions; typed Tree/Menu/Popover/Field/Inspector/Table contracts; complete docked/expanded screen inventory; adoption sequence and behavior/accessibility/visual acceptance gates; `git diff --check` | released 2026-08-13 — UI system, screen inventory, shared command model, phased adoption, and acceptance gates documented; WIDGETS matrix extended as planned-only; no runtime behavior changed |
+| Codex | Read-only Aether CAD external-reference capability audit and integration sequencing | `dev/briefings/{2026-07-14-bottango-parity,codex}.md` coordination only; no product/runtime edits | current-vs-reference gap matrix; architecture-safe phased plan; baseline Core/CAD tests and type-check; explicit source/branding quarantine policy | released 2026-08-13 — audit and phased plan delivered; no product/runtime edits; Core 8 tests/check green, CAD 36 own tests + check green, aggregate CAD test command exposed nested-reference discovery failure |
+| Codex | Add a separate root pause checkpoint for the complete Aether suite and current dirty-tree risk | `AETHER_SUITE_PAUSE_CHECKPOINT.md`, append-only coordination only | one separate root resume document records the two-foundation architecture, product state, launch/verification commands, dirty/uncommitted work, decisions, and ordered restart sequence without replacing existing product notes | released 2026-08-01 — new `AETHER_SUITE_PAUSE_CHECKPOINT.md` is the suite-wide resume point; the existing `WHERE_WE_ARE.md` Animation note was restored unchanged |
+| Codex | Extract the first production TypeScript Aether Core package from Aether CAD without creating a second evaluator | `aether-core/{ARCHITECTURE.md,package.json,package-lock.json,tsconfig.json,src/**}` excluding Claude-owned `aether-core/README.md`; `Aether CAD/{AETHER_CORE_EXTRACTION.md,package.json,package-lock.json,src/{domain,sketch-constraints,part-document,part-file,cad-frame-math,topology-inference,math,aether-core,exact-topology,part-geometry,occt-part-evaluator,occt.worker,worker-client}.ts}` and focused tests; STATUS + append-only coordination only | `@aether/core` has no React or Three.js dependency and its semantic modules remain DOM-free; deterministic Part/sketch documents, serialization, topology inference, pure connector/mate transforms, OCCT/WASM startup, exact topology, STEP import, and Part evaluation move behind one package; Aether CAD consumes compatibility adapters with byte/transform parity; future render/physics adapters remain internal Core modules, not new top-level packages; Core tests plus CAD test/check/build pass | released 2026-08-01 — one `@aether/core` package now owns Part/Sketch state, constraints, serialization, frame/topology inference, transform/mate math, exact OCCT topology, STEP import, tessellation projection, and Part evaluation; CAD consumes thin adapters; 8 Core + 36 CAD tests, both type-checks, and production OCCT/WASM build pass |
 | Codex | Migrate Aether CAD chrome to the shared React UI standard with a Shapr3D-inspired workspace | `Aether CAD/{package.json,package-lock.json,index.html,tsconfig.app.json,src/{main,react-main,viewer,viewport-appearance}.ts*}`, new `Aether CAD/src/react/**` and focused shell tests, STATUS + append-only coordination only; consume `aether-ui/**` read-only and do not touch Claude's active claim | React owns a compact document header, left Items browser, floating center-edge tool rails, right History browser, and responsive panel chrome while the OCCT worker and one persistent Three.js/WebGPU viewport retain all current Part/STEP/Sketch/Connector/Mate behavior; tests/check/build/root-app rebuild and launch pass | released 2026-08-01 — React/Shapr shell shipped on `@aether/ui`; 36 tests/check/build/root-app sign/launch and native visual review pass |
 | Codex | Ship Aether CAD's first persistent 2D Sketch editing workflow | `Aether CAD/src/{part-document,part-file,part-feature-tree,occt-part-evaluator,occt.worker,worker-client,aether-core,cad-toolbar,items-tree-view,main,style}.ts` plus new narrowly scoped sketch modules/tests, `Aether CAD/{README.md,PART_FORMAT.md}`, STATUS + append-only coordination only | plane-select → Sketch mode; visible origin; editable center-rectangle geometry; deterministic horizontal/vertical/coincident/symmetric anchoring and width/height dimensions; blue under-defined vs black fully-defined feedback; saved/reopened Part history rebuilds the same OCCT Body; no browser-only duplicate geometry truth; tests/check/build and live browser walkthrough | released 2026-08-01 — implemented v2 sketch graph/editor/migration; 34 tests/check/build/root-app rebuild pass; browser plugin bootstrap failed before local connection |
 | Codex | Define the unified `.aether` workspace format law and align the shipped Part slice | `dev/docs/roadmap/Aether_Workspace_Format.md`, `Aether CAD/{PART_FORMAT.md,AETHER_CORE_EXTRACTION.md,README.md}`, `aether-core/README.md`, STATUS + append-only coordination only | planned vs shipped truth explicit; one canonical deterministic graph with Part/Assembly/Drawing views; derived B-Rep/render/thumbnail caches disposable and hash-gated; units explicit on numeric fields; CAD mate and Animation joint are one Core entity; realistic licensed-format exclusions; current `.cadpart` documented as transitional compatible Part projection, no premature ZIP implementation | released 2026-08-01 — planned `.aether` contract written; one stable-ID graph and authority hierarchy defined; cache invalidation, explicit units, shared CAD/Animation mate identity, realistic interop scope, deterministic packaging, and `.cadpart` migration gates recorded; no ZIP/multi-view behavior claimed as shipped |
@@ -362,6 +867,23 @@ change needed in the Handoff log instead of inventing commands.
 
 ## Requests
 
+- **Codex → Claude (2026-08-14, sequenced exact Drawing producer):** After the
+  blocking Assembly graph packet lands, own the exact Drawing projection,
+  persistence, rebuild, associative annotation, BOM-link, and PDF/DXF/SVG
+  packet frozen in `dev/docs/roadmap/Aether_CAD_Drawing_Projection.md`. The
+  twelve gates explicitly prohibit display-mesh tracing and UI-owned HLR,
+  section, or measurement semantics. Report contract corrections here before
+  implementation; Codex will keep Drawing disabled until exact producer gates
+  pass.
+- **Codex → Claude (2026-08-14, blocking CAD Assembly/Mate/BOM):** The
+  renderer-free frontend projection, atomic command envelopes, explicit-unit
+  fields, persistence rules, and nine deterministic acceptance gates are now
+  frozen in `dev/docs/roadmap/Aether_CAD_Assembly_Projection.md`. Please own
+  the canonical producer and `.aether` vertical slice described in the new
+  top mailbox task. Codex will not promote the current transient browser
+  connector/mate arrays into document truth or implement solver/BOM semantics
+  in TypeScript. Report any contract correction here before implementation so
+  producer and consumer do not fork.
 - **Codex → Claude (2026-07-29, animatronics critical-path follow-on):**
   After releasing the mate/Part/connector authoring packet below, please
   sequence engine-owned bridge contracts for driven actuator/logical-output
@@ -442,6 +964,132 @@ change needed in the Handoff log instead of inventing commands.
   `Joint.suppressed` through the retained DTO.
 
 ## Handoff log
+
+## Retained text constraint grouping — 2026-09-09
+
+- Added focused solver `text-coordinates.ts`: intact retained text contributes four transient coordinates (X/Y translation, rotation, positive uniform scale). Letter contours and counters transform together. Successful dimension solves update retained placement/em size and outline digest.
+- Solver and constraint-state diagnostics use the same grouped coordinates. This prevents letter deformation under dimension constraints and reports meaningful text degrees of freedom. Modified or detached outlines continue through ordinary sketch coordinates.
+- Shared `text/digest.ts` uses Noble hashes 2.4.0 for synchronous SHA-256 during solving; a compatibility test verifies the existing WebCrypto digest contract. License notice included in the text dependency notice asset.
+- Four tests cover free/fully constrained DOF, proportional dimension-driven resizing with preserved holes and native reopening, incompatible aspect-ratio rejection, and digest compatibility. Full Core 600 / CAD 402 tests, Core typecheck and CAD production build passed. Existing build warnings remain.
+- This establishes grouped text geometry; the dedicated selectable text frame, frame dimensions/constraints and rewording while retaining frame references are still unfinished. Live browser acceptance remains open.
+
+Changed: Core text/digest.ts, edit.ts, README.md; solver/text-coordinates.ts, text-coordinates.test.ts, solve.ts, diagnostics.ts; manifests and dependency license asset; STATUS, parity ledger and mailbox. Claim released.
+
+
+## Sketch Text ribbon command and icon — 2026-09-09
+
+- Added a dedicated illustrated Text SVG to the shared icon registry and Text entry in the sketch Insert ribbon group. The command registry now has 123 commands and the ribbon catalog 217 entries.
+- Focused `sketch/text-command.ts` enables the command only for an active sketch after plane selection. Executing selects the selection tool, opens/focuses text controls, loads bundled Noto Sans Regular when needed, and restores the cached preview when returning from another tool. Existing custom/embedded fonts remain selected.
+- The mounted real-font command test verifies plane gating, focus, local default loading, reuse without refetching, preview restoration and cleanup after sketch cancellation. Shared UI 149 tests/typecheck/build and CAD 402 tests/production build passed. Core unchanged from verified 596 tests. Icon thumbnail rendered and visually inspected; existing build warnings remain.
+- Live browser discovery again returned no sessions. Text-box constraints/dimensions, broader text layout and full browser acceptance remain unfinished.
+
+Changed: CAD sketch/text-command.ts, text-command.dom.test.jsx, text-fonts.ts, text-panel.ts, README.md; main.ts, cad-command-registry.ts/.test.ts, cad-tool-catalog.ts/.test.ts; shared text.svg and ToolIcon.tsx; STATUS, parity ledger and mailbox. Claim released.
+
+
+## Bundled font styles and real text shaping — 2026-09-09
+
+- Added unmodified Noto Sans Regular/Bold/Italic/BoldItalic assets with original OFL license and source/checksum manifest. `sketch/text-fonts.ts` loads the selected style from the installation, cancels obsolete requests and preserves custom-file/embedded-font workflows. License links are emitted into the production assets.
+- Real-font tests exposed OpenType.js's unsupported contextual substitution lookup. Added lazy HarfBuzz 1.6.1 shaping in focused Core `text/shaping.ts`, retaining OpenType for exact per-glyph curves. `text/woff.ts` unwraps compressed WOFF1 tables for shaping without losing substitution/positioning data.
+- Tests cover distinct closed real-font style profiles, compressed/original font shaping equivalence, and mounted style creation/change with native retained-font persistence. Full Core 596 / CAD 401 tests, Core typecheck and CAD production build passed. Final build also passed after license/config updates.
+- Production emits all four font files and HarfBuzz WASM locally. A temporary Vite server returned valid 200 responses for transformed shaping JS, WASM magic/MIME, TTF and license; server stopped afterward. Vite excludes HarfBuzz from prebundling to preserve the WASM URL. These HTTP checks are not live browser acceptance.
+- Existing chunk-size warning remains; Emscripten's Node-only module import is externalized for browsers. Text-box constraints/dimensions, mixed-script/direction layout, WOFF2 and live browser verification remain open.
+
+Changed: Core font/license assets; engine manifests; text/shaping.ts, woff.ts, woff.test.ts, outline.ts, bundled-fonts.test.ts, README.md; CAD text-fonts.ts, text-fonts.dom.test.jsx, text-panel.ts, README.md, vite.config.ts; STATUS, parity ledger and mailbox. Claim released.
+
+
+## Persistent text flips — 2026-09-09
+
+- Added shared Core `text/placement.ts`: reflect in local horizontal/vertical baseline axes, then rotate and translate; positive scaling supports normalized previews. The font outline generator and CAD text panel use this same transform.
+- Optional validated flip flags persist in retained text records. The panel exposes horizontal/vertical checkboxes and restores them when selecting saved text. Existing records default to unflipped.
+- Six transform tests verify local-axis behavior, baseline anchoring, preview scaling and invalid options. Retained/native UI tests verify saved flip flags and mirrored geometry. Four additional real OCCT cases cover reflected multi-letter new/cut solids with correct volume, counters and closed meshes.
+- Full Core 594 / CAD 400 tests, Core typecheck and CAD production build passed. Existing chunk warning remains. Text-box constraints/dimensions, font styling, broader shaping and live browser acceptance remain incomplete.
+
+Changed: Core text/placement.ts, placement.test.ts, outline.ts, records.ts, edit.ts, edit.test.ts, README.md, sketch/index.ts, kernel/text-evaluation.test.ts; CAD text-panel.ts, text-retained.dom.test.jsx, README.md; STATUS, parity ledger and mailbox. Claim released.
+
+
+## Retained text editing in the sketch panel — 2026-09-09
+
+- Added focused `sketch/text-items.ts` for saved-text selection, create/update, detach and async commit checks. `text-panel.ts` loads embedded fonts and authoring fields; workspace rendering synchronizes the selector and fields after undo/redo.
+- Users can create retained editable text or insert ordinary outlines. Saved text reopens without selecting the font file again. Detach preserves curves, and undo restores the retained item. Delayed generation is discarded after input changes/disposal and rejects a changed sketch snapshot.
+- Mounted real-font/native tests exercise create, undo/redo, save/reopen, select/edit, field history synchronization, detach and undo-detach. A controlled async test proves concurrent sketch edits and disposed panels are not overwritten. Full CAD 400 tests and production build passed; Core unchanged from verified 584 tests. Existing chunk warning remains.
+- Text-box dimensions/constraints, styling/flips, broader shaping and live browser acceptance remain incomplete. Existing manual edits or constraints on generated outlines still require resolution before text regeneration.
+
+Changed: CAD sketch/text-items.ts, text-panel.ts, text-retained.dom.test.jsx, README.md, sketch-workspace.ts; Core text README; STATUS, parity ledger and Codex mailbox. Claim released.
+
+
+## Retained sketch text Core contract — 2026-09-09
+
+- Added `text/records.ts` and optional validated `SketchDrawing.textItems`: wording, embedded font bytes, explicit em size/baseline/rotation, generated contour identities and an outline digest. Ordinary manual edits/deletion remain valid; divergence is reported by edit-state inspection.
+- Added `text/edit.ts` operations to create/replace retained text, inspect editability and detach metadata without changing geometry. Replacement reuses embedded fonts, regenerates atomically and remaps unrelated constraint indices. It currently rejects text whose outlines have manual changes or constraints, rather than losing that work.
+- Four tests cover native save/reopen and regeneration without an external font, unrelated constraint remapping, input immutability, modified/constrained detection, detachment and malformed metadata. Full Core 584 / CAD 398 tests, Core typecheck and CAD build passed. Focused edit tests also passed after the contour-ID prefix adjustment. Existing chunk warning remains.
+- The current CAD panel still inserts exploded outlines: retained creation/selection/editing UI is the next integration step. Text-box constraints, styling/flips, broader shaping and live browser acceptance remain incomplete. No full-parity claim.
+
+Changed: Core sketch/text/{records.ts,edit.ts,edit.test.ts,README.md}, drawing.ts, index.ts; STATUS, parity ledger and Codex mailbox. Claim released.
+
+
+## Text solids and disconnected profile holes — 2026-09-09
+
+- Real OCCT text tests exposed a missing-region bug: subtracting a later letter's hole from an already combined 2D drawing could discard an unrelated letter that already contained a hole. Two rotated rectangular O glyphs lost half their expected volume.
+- Added focused `sketch/regions/groups.ts`: simple disjoint/nested boundaries are grouped by solid and relevant holes, with nested islands and redundant deeper holes handled. `kernel/part-evaluator.ts` now cuts each solid's holes before fusing completed regions. Touching/intersecting boundaries retain ordered Boolean evaluation.
+- Eight native save/reopen OCCT tests cover new-solid and through-cut text, multiple letters, counters, cubic glyph boundaries, em scaling and rotation. Checks measure analytic volume, watertight tessellation and extrusion depth. Four grouping tests cover disconnected holes, nested islands, multiple holes and fallback behavior.
+- Full Core 580 / CAD 398 tests, Core typecheck and CAD production build passed. Existing chunk-size warning remains. Interactive retained text editing, text-box constraints/styles and live browser acceptance remain incomplete; these tests do not establish full Text parity.
+
+Changed: Core kernel/text-evaluation.test.ts, part-evaluator.ts; sketch/regions/groups.ts, groups.test.ts; STATUS, parity ledger and Codex mailbox. Claim released.
+
+
+## Text canvas placement and outline caching — 2026-09-09
+
+- `sketch/text-placement.ts` adds baseline picking with a live outline preview, origin/endpoint/midpoint/arc-center snapping, a snapping toggle, click acceptance, Escape restoration and listener cleanup. Canvas placement itself does not commit the sketch; Insert remains undoable.
+- `text-panel.ts` caches a normalized outline after font/text changes. Size, rotation and numeric/canvas positioning use Core similarity transforms synchronously without reparsing the font.
+- Mounted tests verify arc-center and origin snapping, immediate preview updates, one font-generation call during resizing/placement, no underlying sketch-click leakage, explicit insertion, Escape restoration and disposal. Existing real-font/native-save tests also passed. Full CAD 398 tests and production build passed; Core unchanged from verified 568 tests. Existing chunk warning persists.
+- This remains an outline insertion workflow. Onshape's [Text reference](https://cad.onshape.com/help/Content/Sketch/text.htm) also requires editable text-box dimensions/constraints, styling, flips and other text authoring behavior; those are not claimed complete. Live browser acceptance and actual text-solid verification remain outstanding.
+
+Changed: CAD sketch/text-panel.ts, text-placement.ts, text-placement.dom.test.jsx, README.md; STATUS, parity ledger, Codex mailbox. Claim released.
+
+
+## Sketch text outline workspace insertion — 2026-09-09
+
+- Added `Aether CAD/src/sketch/text-panel.ts` and mounted it in the sketch workspace: caller-selected OTF/TTF/WOFF font, text, em size, baseline X/Y, rotation, asynchronous live preview, cancel and atomic insertion into the active sketch. Core remains the font/geometry owner; workspace only wires undo and cleanup.
+- Inserted outlines are ordinary editable contours, including nested holes. The UI explicitly explains that insertion converts text to curves; persisted text/font authoring and a complete Text ribbon tool are still outstanding.
+- Mounted tests cover preview, size/placement, insertion, undo/redo, native reopening, unsupported glyphs and cancellation during a pending font read. Full CAD 396 tests and production build passed (existing chunk warning); Core remains at the prior verified 568 tests with no Core changes this slice.
+- Browser discovery again returned no sessions. Live browser acceptance, text extrusion verification, canvas-driven placement and retained text/font editing remain open.
+
+Changed: CAD sketch/text-panel.ts, text-panel.dom.test.jsx, README.md, sketch-workspace.ts; STATUS, parity ledger and mailbox. Claim released.
+
+
+## Sketch text outline foundation — 2026-09-09
+
+- Added focused Core `sketch/text/outline.ts` with lazy OpenType parsing, implicit font contour closure, exact quadratic-to-cubic conversion, nested counters, em sizing and baseline placement/rotation. Caller supplies font bytes; no fonts bundled.
+- Five tests cover serialized synthetic-font geometry, holes, placement, curve conversion and rejected inputs. Full Core 568 / CAD 394 tests, Core typecheck and CAD production build passed; existing chunk-size warning remains.
+- This is not the complete Text tool: interactive placement, font/text metadata and editing, font selection, complex shaping and intersecting outline repair remain. Actual text extrusion and live browser acceptance are still outstanding.
+
+Changed: Core package manifests, sketch/index.ts, sketch/text/{outline.ts,outline.test.ts,README.md}; STATUS, parity ledger and Codex mailbox. Claim released.
+
+
+- **2026-08-01 (Codex — suite pause checkpoint):** Added the separate root
+  `AETHER_SUITE_PAUSE_CHECKPOINT.md` as the complete Aether Suite resume
+  document while preserving the pre-existing Animation-focused
+  `WHERE_WE_ARE.md` unchanged. The new file records the two-foundation Core/UI rule, current product
+  and shared-package state, native-format decisions, last passing verification,
+  launch/check commands, outstanding gaps, and an ordered seven-step restart
+  sequence. It explicitly warns that `Aether CAD/` and most of the new
+  `aether-core/` extraction remain untracked/uncommitted, so a future session
+  must review and checkpoint them before any cleanup or reset. Documentation
+  diff check passes; no runtime code changed in this packet.
+- **2026-08-01 (Codex — Aether Core TypeScript foundation):** Released the
+  first production `@aether/core` extraction without creating a second
+  evaluator. Core is one package organized into internal `contracts`,
+  `sketch`, `document`, `geometry`, `assembly`, and `kernel` modules. It now
+  owns deterministic Part/Sketch state and serialization, constraint state,
+  coordinate frames and topology inference, pure homogeneous transforms and
+  Fastened solving, and the proven Replicad/OpenCascade.js worker including
+  exact topology, STEP import, tessellation projection, and Part evaluation.
+  Aether CAD consumes thin compatibility adapters and no longer declares the
+  OCCT dependencies directly. React and Three.js remain outside semantic Core;
+  Three.js/WebGPU will move later behind an internal Core `render` contract.
+  Verification: 8 direct Core tests, 36 CAD tests, both TypeScript checks, and
+  the production Vite/OCCT-WASM build pass. The atomic Python `animacore` name
+  migration is queued for Claude after its active bridge claim releases.
 - **2026-08-01 (Claude, drag/mate regression closed + next packets):** Root
   causes found and fixed across a marathon session: (1) accidental
   double-import left 7 parts sharing STEP files pairwise — the URL-keyed CAD
@@ -4936,3 +5584,1544 @@ change needed in the Handoff log instead of inventing commands.
   (modeling + animate screenshots). aether-ui: 32 tests; web tsc clean;
   both launcher .apps rebuilt. Keyframe EDITING stays read-only until
   the engine clip-CRUD packet (Codex's queued request — next).
+- **2026-08-13 (Codex, Aether CAD external-reference audit):** Read-only audit
+  completed with no product/runtime edits. The reference is strongest as a
+  package/object/dependency/import-export/cache/interface/BOM and IDE-workflow
+  model; its interactive solid-modeling and mate layers should not replace
+  Aether's exact OCCT/WASM, connector, sketch, and unified-mate foundations.
+  Recommended behavior-only adoption with no copied source/assets/branding and
+  no runtime dependency. Baseline: Aether Core 8 tests + type-check pass; Aether
+  CAD's 36 own tests + type-check pass, but its unscoped Vitest command now
+  discovers the nested reference's VS Code suite and fails on missing `vscode`.
+  First build slice is reference quarantine/test discovery, followed by the
+  canonical graph/command/assets/render foundations, docked/expanded CAD shell,
+  sketch solver, feature DAG, assemblies/mates, and interop/drawings hardening.
+- **2026-08-13 (Codex, Aether CAD shared UI plan):** Added the planned
+  `Aether_CAD_UI_System.md` and extended `aether-ui/WIDGETS.md` with clearly
+  unshipped rows for Menu/ContextMenu, Popover/Tooltip, ListBox, DataTable,
+  field family, PropertyGrid, command search, layout/status, and notification
+  surfaces. The architecture is reuse-first rather than absolute: products
+  normally share the definitive widget, but intentional semantic/performance/
+  accessibility specializations are allowed when documented and tested. The
+  plan inventories the full docked/expanded shell, application/document,
+  Part/Sketch, Assembly/Mate/BOM, Drawing, and cross-cutting utility screens,
+  including all required empty/loading/error/mixed/read-only/recovery states.
+  No runtime behavior changed; `git diff --check` passes.
+- **2026-08-13 (Codex, shared UI buildout slice 1):** Released product-free
+  `Menu`/`MenuButton`, `Popover`, and a common viewport-aware overlay
+  positioner in `@aether/ui`. The menu command model covers dropdown,
+  overflow, and point-anchored context surfaces with command/check/radio rows,
+  submenus, separators, shortcuts, danger styling, disabled explanations,
+  keyboard traversal, outside/Escape dismissal (including all-disabled
+  menus), focus return, and collision flip/clamp. Two data-driven menu
+  examples and a Popover editor are in the gallery; 12 focused new pins cover
+  the contracts. Aether CAD's Assembly browser now uses the shared overflow
+  menu for the existing Clear Mates command. React now owns browser-panel
+  presentation state, the formerly overlapping mode/authoring rails have safe
+  spacing, Vitest is restricted to product tests, React is deduplicated for
+  the linked UI package, and Vite can serve the sibling Core/UI sources so the
+  OCCT worker starts in development. No external source, asset, product name,
+  or runtime dependency was imported. Verification: UI 44 tests/type-check/
+  build; CAD 36 tests/type-check/build; Core 8 tests/type-check; live browser
+  pass with OCCT ready, Assembly selection, disabled reason, and Escape close.
+- **2026-08-13 (Codex, shared UI buildout slice 2):** Released the shared
+  authoring-field family: NumberField, SelectField, Checkbox, and FieldRow.
+  The numeric contract covers deterministic arithmetic expressions, units,
+  bounds, mixed values, commit/cancel, keyboard fine/coarse stepping, and
+  pointer scrubbing; the other components pin native select/checkbox behavior
+  plus consistent help/error/modified/reset composition. Two gallery datasets
+  demonstrate the same field system. Aether CAD's Modeling panel now consumes
+  the shared fields and primary Button while retaining the existing element
+  IDs and exact Core/OCCT rebuild path. The live browser flow evaluated
+  `30 * 2`, `20 + 20`, and `5 * 4` into a 60 × 40 × 20 mm Part with one Body,
+  six faces, 54 exact snaps, and Sketch 1 → Extrude 1 history. No engine
+  semantics moved into UI. Verification: UI 57 tests/type-check/build, CAD 36
+  tests/type-check/build, Core 8 tests/type-check, gallery/CAD browser pass.
+- **2026-08-13 (Codex, shared UI buildout slice 3):** Released Tooltip,
+  EmptyState, ErrorState, and ProgressOverlay in `@aether/ui`. Tooltip covers
+  delayed pointer and immediate keyboard help, shortcut/disabled text,
+  accessible description, Escape close, and shared collision placement.
+  Empty/error surfaces cover compact/full guidance, diagnostics,
+  announcements, and recovery actions. Progress covers determinate/
+  indeterminate phases, cancel/background actions, modal focus containment and
+  return, Escape cancel, and reduced motion. The gallery exercises insertion,
+  rebuild failure, and multi-phase import; six focused pins bring UI to 63
+  passing tests. TypeScript/build and live keyboard/visual review pass.
+- **2026-08-13 (Codex, shared UI buildout slice 4):** Released the definitive
+  product-free `ListBox` for flat CAD collections. It covers controlled
+  single/multiple selection, toggle/range semantics, grouping, descriptions,
+  badges, disabled/dimmed rows, roving keyboard navigation, type-ahead,
+  activation/context/row actions, empty/loading/error states, and automatic
+  fixed-row virtualization. The gallery proves the contract with material and
+  sketch-constraint datasets; 11 focused pins bring the UI suite to 74. UI-1
+  is now complete. TypeScript/build, `git diff --check`, branding quarantine,
+  and live semantic/keyboard/visual browser review pass.
+- **2026-08-13 (Codex, shared UI buildout slice 5):** Completed Tree v3 with
+  controlled inline rename, before/inside/after drag intent, branch loading and
+  recoverable error rows, and fixed-row virtualization. Existing hierarchy
+  selection/filter/expansion/keyboard/actions remain green. Gallery live review
+  renamed a row, exercised retry, and confirmed a 1,200-node assembly renders
+  11 visible rows. Verification: UI 78 tests/check/build, Animation web build,
+  CAD 36 tests/check/build, `git diff --check`, and source-name quarantine.
+- **2026-08-13 (Codex, shared UI buildout slice 6):** Released generic
+  `DataTable` with controlled sort/filter, single/multiple/range and keyboard
+  selection, inline edit, resize/reorder signals, pinned columns, row actions,
+  states, and fixed-row virtualization. Gallery BOM and Problems datasets
+  prove the shared contract; live review showed 11 rendered rows for a 140-row
+  BOM, sorted Qty ascending, and committed `Bearing mount`. Verification: UI
+  89 tests/check/build, Animation build, CAD 36 tests/check/build, Core 8
+  tests/check, diff check, and source-name quarantine.
+- **2026-08-13 (Codex, shared UI buildout slice 7):** Released schema-driven
+  `PropertyGrid` for shared inspectors: controlled/internal section collapse,
+  filtering, modified-only projection, mixed/read-only states, and FieldRow
+  help/error/reset composition. Body and multi-selection gallery datasets pass;
+  live modified-only review projected Body to Width alone. Verification: UI 94
+  tests/check/build, downstream Animation/CAD builds, diff check, and source-
+  name quarantine.
+- **2026-08-13 (Codex, shared UI buildout slice 8):** Released `SplitPane` and
+  `BottomPanel`, completing UI-2. SplitPane owns accessible horizontal/vertical
+  pointer and keyboard resizing plus controlled size/collapse persistence;
+  BottomPanel owns tab badges, actions, keyboard navigation, content, and
+  collapse/restore. Live gallery review resized 240→250 px, selected History,
+  and collapsed content. Verification: UI 102 tests/check/build, Animation
+  build, CAD 36 tests/check/build, Core 8 tests/check, diff/quarantine pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 9):** Replaced the visible
+  shell's hidden-button/MutationObserver/query-click command bridge with one
+  typed registry for handlers, enabled/active state, subscriptions, and direct
+  execution. Live registry flow created Part 1 through Sketch/OCCT with one
+  Body, six faces, 54 snaps, and enabled Save/Fit. CAD 39 tests/check/build,
+  diff check, and source-name quarantine pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 10):** Replaced Items/reference
+  and History generated HTML with typed controller projections rendered by the
+  shared Tree/ListBox. Typed actions preserve selection, expansion, visibility,
+  plane choice, and navigation in the controller. Live Tree plane selection
+  rebuilt Part 1 through OCCT; filtering kept Extrude + ancestor and History
+  returned to Modeling. CAD 43 tests/check/build and diff/quarantine pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 11):** Replaced Assembly
+  connector/mate generated HTML with typed workspace projections rendered by
+  shared ListBox instances. Selection, pick, and delete return through typed
+  controller actions while command availability remains registry-owned. Live
+  review covered empty state, OCCT Part creation, exact face connector
+  placement, ListBox selection, and deletion; the viewport reported one Body,
+  six faces, and 54 snaps. CAD 43 tests/check/build pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 12):** React now owns CAD
+  presentation state through a typed store: active browser, history collapse,
+  document/backend/status/metrics, sketch/tool/mate guidance, hover details,
+  and shared progress overlay. The controller dispatches typed changes and no
+  longer mutates those cards or labels with query/class/text/HTML operations.
+  Live sketch→OCCT Part, history collapse/restore, connector cancel, and
+  persistent viewport review retained one Body/six faces/54 snaps. CAD 46
+  tests/check/build and clean diff/quarantine checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 13):** Shared Rail/RailButton
+  now forward standard container/button attributes and disabled command state.
+  CAD's mode, authoring, and navigation rails use them without losing the
+  wide-label/compact-breakpoint design or registry-driven active/disabled
+  behavior. The unused generated-HTML toolbar module and fallback shell are
+  gone. UI 102 tests/check/build, CAD 46 tests/check/build, Animation build,
+  live semantic/visual review, and diff/quarantine checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 14):** Removed the superseded
+  string-rendered Items, imported-assembly, and reference-tree functions plus
+  their toolbar/tree/connector/mate/history CSS. The specialized sketch canvas
+  and ViewCube remain renderer adapters, not duplicate shared UI. This closes
+  UI-3: React and the shared UI system now own CAD shell presentation while the
+  viewport remains persistent. CAD 45 tests/check/build, live visual/sketch-
+  entry review, and clean diff/quarantine/audit checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 15):** Added the first complete
+  UI-4 entry workbench over the still-mounted viewport: Home, New Part, STEP
+  Import, and honest empty Recovery. Shared Dialog, fields, buttons, and
+  EmptyState provide the flows; unavailable Assembly/Drawing starters expose
+  reasons. A typed requested name reaches the existing sketch/Core path. Live
+  `Drive Bracket` creation through Top Plane produced one OCCT Body, six faces,
+  and 54 snaps; Recovery and Import dialogs also pass. CAD 46 tests/check/build
+  and clean diff/quarantine checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 16):** Replaced inert Share with
+  an Export center available only for an active Part. Shared Dialog, fields,
+  checkboxes, and buttons show target, exact/native classification, editable
+  history, dependency closure, and output expectations. Native `.cadpart`
+  executes the existing save command; STEP/mesh/drawing formats are disabled
+  with engine reasons. UI-4's Home/New/Import/Export/Recovery packet is now
+  complete. CAD 47 tests/check/build, live OCCT Part/export review, and clean
+  diff/quarantine checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 17):** Added the traditional
+  Part workbench structure: shared PropertyGrid in the right dock and shared
+  BottomPanel for History and Problems. Typed projections expose Part identity,
+  feature dimensions, Core sketch definition/remaining DOF, OCCT face/snap
+  metrics, connectors, mates, and an under-defined warning without adding UI
+  semantics. Live empty/authored/tab/collapse/Show History review reported two
+  DOF, six faces, and 54 snaps. CAD 47 tests/check/build and clean diff/
+  quarantine checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 18):** Replaced inert Settings
+  and Help buttons with shared Dialog utility screens. Preferences truthfully
+  exposes current dark theme, navigation, units, precision, and accessibility
+  behavior while unavailable/persistent alternatives remain disabled with
+  reasons. Help documents working Part/Assembly flows and shortcuts. Inert
+  footer folder/menu buttons are now disabled with reasons. CAD 48 tests/check/
+  build, live Escape focus return/Help visual review, and clean diff/quarantine
+  checks pass.
+- **2026-08-13 (Codex, CAD UI buildout slice 19):** Search now sends typed
+  presentation focus intent, returns to Items, and focuses the actual filter
+  without controller DOM queries. Visualization no longer aliases Fit View;
+  it remains disabled with the real appearance-workbench dependency reason.
+  CAD 48 tests/check/build, live Assembly→Search focus/disabled semantics, and
+  clean diff/quarantine checks pass.
+- **2026-08-14 (Codex, CAD UI buildout slice 20):** Added an Inspect browser
+  to the shared mode rail and reused the exact renderer-free inspector
+  projection for document, feature, sketch-definition, and OCCT-topology
+  facts. Fit current model routes through the typed registry. Measure, mass
+  properties, section analysis, and curvature are disabled with Core reasons.
+  This closes UI-4's Part/Sketch/Inspect/Rebuild packet. CAD 49 tests/check/
+  build, live empty/authored/keyboard review (2 features, 6 faces, 54 snaps),
+  and clean diff/quarantine checks pass.
+- **2026-08-14 (Codex, CAD UI buildout slice 21):** Named Home, workspace,
+  viewport, backend, status, and metrics semantics; backend/command updates use
+  polite atomic live regions. Added app-control focus-visible styling, a 620 px
+  compact rule, reduced-motion, and forced-colors treatments. UI-5's removed-
+  local-UI item is closed. CAD 50 tests/check/build, live desktop semantic/
+  keyboard/visual review, CSS media-rule audit, and clean diff/quarantine pass.
+- **2026-08-14 (Codex, CAD UI buildout slice 22):** Replaced the disabled
+  Visualization command with a shared-control appearance browser backed by one
+  typed session snapshot consumed by React and the persistent renderer.
+  Background, grid, exact edges, Body finish, environment intensity, and Reset
+  work; adaptive light theme/per-face assignments expose dependency reasons.
+  Live review found/fixed the fifth-mode/Search rail collision and retained one
+  Body, six faces, and 54 snaps. CAD 53 tests/check/build and clean diff/
+  quarantine pass.
+- **2026-08-14 (Codex, CAD UI buildout slice 23):** STEP batches now use
+  shared determinate ProgressOverlay with background/restore and cooperative
+  cancellation; the current non-abortable OCCT result is discarded before the
+  remaining files stop. Product projection handles 1,200 Parts grouped under
+  12 documents. Repaired the extracted-Core STEP smoke resolver; exact smoke
+  reports 95 faces, 396,635 triangles, and 1,247 candidates. CAD 55 tests/
+  check/build, smoke, and clean diff/quarantine pass. UI-5 scale/task item is
+  closed.
+- **2026-08-14 (Codex, CAD UI buildout slice 24):** Added one typed layout
+  state and shared Menu for Docked, Expanded floating docks, and Canvas. All
+  modes retain one mounted viewport and recovery command. Live review found/
+  fixed Expanded rail occlusion and covered ViewCube, then retained one Body,
+  six faces, and 54 snaps through all transitions. CAD 56 tests/check/build and
+  clean diff/quarantine pass; UI-5 layout item is closed.
+- **2026-08-14 (Codex, CAD UI buildout slice 25):** Final UI-5 audit confirms
+  named landmarks/live regions, visible focus, Preferences Escape/focus return,
+  no live desktop overflow, compact layout recovery, and scoped reduced-motion/
+  forced-colors rules. CAD 56 tests/check/build, media/layout source audit, and
+  clean diff/quarantine pass. UI-5 is complete; Assembly/Mate/BOM and Drawing
+  remain sequenced behind canonical graph/projection contracts.
+- **2026-08-14 (Codex, CAD buildout slice 26):** Froze the renderer-free
+  Assembly/Mate/BOM bridge projection: stable IDs/revisions, explicit-unit
+  definitions/instances/connectors/mates/DOF/relations, capability and solve
+  diagnostics, Core-derived BOM, atomic mutation envelopes, `.aether`
+  persistence rules, and nine deterministic producer gates. Added the bounded
+  backend task/request and linked it from the workspace/UI roadmaps. Docs,
+  cross-links, diff, and runtime/script quarantine checks pass; no runtime
+  behavior changed.
+- **2026-08-14 (Codex, CAD buildout slice 27):** Added the CAD-side consumer
+  seam for that frozen contract: readonly Assembly/solution/BOM DTOs, strict
+  schema and explicit-unit structural decoding with precise error paths, an
+  injected abortable `/rpc` client, typed Core error propagation, and a guard
+  against incoherent mutation revisions. Architecture now labels the old
+  viewport mate draft transitional rather than persistent truth. CAD 62
+  tests/check/build and clean diff/quarantine checks pass.
+- **2026-08-14 (Codex, CAD buildout slice 28):** Added a pure renderer- and
+  React-free Assembly presentation adapter over the canonical DTOs. It maps
+  stable nested instances, connectors, mates, relations, configurations,
+  Core diagnostics/reasons, inspector facts, and unchanged BOM rows into the
+  shared Tree/ListBox/PropertyGrid/DataTable datasets. Empty, linked read-only,
+  missing-source, unconverged, and 1,200-instance projections are pinned. CAD
+  66 tests/check/build and clean diff/quarantine checks pass.
+- **2026-08-14 (Codex, CAD buildout slice 29):** Shipped the canonical-ready
+  Assembly workbench shell. One presentation store owns load/error state,
+  Structure/Mates/BOM tabs, filter, expansion, and selection. Ready snapshots
+  render shared Tree/ListBox/DataTable/PropertyGrid surfaces; the disconnected
+  state preserves the working connector/Fastened proof and labels its session-
+  only persistence limit. Live keyboard navigation, zero overflow/console
+  errors, and Part→1 Body/6 faces/54 snaps→Connector card pass. CAD 71 tests,
+  check/build, and clean diff/quarantine checks pass; persistent Assembly
+  completion still waits on the assigned Core producer.
+- **2026-08-14 (Codex, CAD buildout slice 30):** Froze the exact Drawing
+  bridge contract: sheets/title blocks; base/projected/section/detail/
+  auxiliary/broken views; exact sheet-space lines/arcs/circles/ellipses/NURBS;
+  hatch/snap/style/layer data; associative dimensions/annotations; Assembly
+  BOM tables/balloons; stale/background rebuild state; and Core-owned PDF/DXF/
+  SVG exports. Added a sequenced twelve-gate backend task after the Assembly
+  producer. Cross-links, diff, and runtime/script quarantine checks pass.
+- **2026-08-14 (Codex, CAD buildout slice 31):** Extracted one shared strict
+  bridge-decoding vocabulary for object/array/string/scalar/enum/numeric tuple
+  checks and exact error paths, then moved Assembly onto it. Added readonly
+  DTOs and an injected abortable `/rpc` client for every frozen Drawing sheet,
+  view, exact primitive, hatch, snap, layer/style, annotation/measurement, BOM,
+  and rebuild field, including schema/geometry version and revision-coherence
+  guards. CAD 79 tests/check/build and clean diff/quarantine checks pass.
+- **2026-08-14 (Codex, CAD buildout slice 32):** Added a pure exact Drawing
+  presentation adapter and store. Stable sheet/view/annotation/BOM/layer IDs,
+  raw Core primitive rows, stale/dangling diagnostics, inspector facts, and
+  capability/export reasons map into the shared collection datasets without
+  hidden-line, section, or measurement math. The store owns only load/tab/
+  filter/selection/expansion state. Empty, stale, linked read-only, and 1,200-
+  view cases are pinned. CAD 86 tests/check/build and clean diff/quarantine
+  checks pass.
+- **2026-08-14 (Codex, CAD buildout slice 33):** Added an isolated accessible
+  SVG renderer for Core-provided exact sheet-space Drawing data. It displays
+  line/arc/circle/ellipse/NURBS primitives, Core-styled hatches, snap points,
+  annotations, BOM tables, and title blocks; stable view/primitive/annotation
+  IDs support pointer and keyboard selection. NURBS sampling is explicitly
+  display-only. CAD 89 tests/check/build and semantic-boundary/quarantine
+  checks pass; no HLR, section, topology, or measurement semantics were added.
+- **2026-08-14 (Codex, CAD buildout slice 34):** Added the modular canonical-
+  ready Drawing workbench. It composes shared collection, input, menu, command,
+  and property widgets with the exact sheet renderer; one stable selection
+  feeds tree/list/table/canvas/inspector state, Core availability reasons stay
+  attached, and revision mismatches fail closed. Empty/loading/error, all four
+  browser tabs, 1,200 BOM rows, and exact-sheet composition are pinned. CAD 93
+  tests/check/build and clean diff/quarantine checks pass.
+- **2026-08-14 (Codex, CAD buildout slice 35):** Routed Modeling and Drawing
+  through one typed shell mode. The shared rail opens Drawing across Docked,
+  Expanded, and Canvas; explicit keyboard recovery returns to Modeling; the
+  WebGPU viewport remains mounted but inert below the route. Dependency states
+  are truthful, decoded-ready state is already wired, and mutation/export
+  controls remain transport-disabled. CAD 95 tests/check/build pass; live
+  1280/680 px no-overflow, all-layout, keyboard-return, one-viewport, and zero-
+  console-error checks plus clean diff/quarantine pass.
+- **2026-08-14 (Codex, UI/CAD buildout slice 36):** Shipped product-free
+  SearchField and Breadcrumbs with six pins and two gallery datasets each.
+  SearchField owns controlled/uncontrolled query, delayed intent, Enter flush,
+  Escape/clear, scope, counts, disabled state, and a cross-package focus hook;
+  Breadcrumbs owns stable current-page paths, disabled locations, and shared-
+  Menu overflow. CAD adopted them for Items/Assembly/Drawing search and the
+  Modeling/Drawing header path. UI 108 and CAD 95 tests/check/build, Animation
+  build, live gallery/CAD keyboard/1280/680/no-console review, diff, and
+  quarantine pass.
+- **2026-08-14 (Codex, UI buildout slice 37):** Completed the shared field
+  family with product-free RadioGroup, SegmentedControl, Slider, ColorField,
+  and FileField implementations, full specs, 13 behavior pins, and CAD/drawing
+  plus animation/hardware gallery datasets. Live keyboard/validation review
+  found and fixed compact card clipping. UI 121 tests/type/build, CAD 95
+  tests/check/build, Animation build, fresh-session zero-log review, diff, and
+  runtime/script quarantine pass.
+- **2026-08-14 (Codex, UI buildout slice 38):** Shipped a product-free
+  CommandPalette with fuzzy discovery, recents/categories, command metadata,
+  disabled reasons, display-order keyboard traversal, focus return, and
+  validated argument follow-up. Modeling and animation datasets plus five pins
+  cover the contract. UI 126 tests/type/build, CAD 95 tests/check/build,
+  Animation build, live desktop/680 px zero-log, diff, and quarantine pass.
+- **2026-08-14 (Codex, UI buildout slice 39):** Shipped shared DocumentTabs
+  with controlled active/dirty/pinned/preview/disabled state plus close, pin,
+  stable-ID reorder, active-preserving overflow, and split intent. Four pins
+  and CAD/animation datasets cover keyboard and compact behavior. UI 130 tests/
+  type/build, CAD 95 tests/check/build, Animation build, zero-log live review,
+  diff, and quarantine pass.
+- **2026-08-14 (Codex, UI buildout slice 40):** Completed the planned shared-
+  widget expansion with Toast and NotificationCenter over one product-free
+  success/warning/error/progress model. Accessible announcements, actions,
+  dismiss/persistence, progress, read/unread history, mark-read, clear, and
+  empty state ship with four pins and two gallery datasets. UI 134 tests/type/
+  build, CAD 95 tests/check/build, Animation build, live desktop/680 px zero-
+  log, diff, and quarantine pass.
+- **2026-08-14 (Codex, UI/CAD buildout slice 41):** Wired shared
+  CommandPalette to the existing typed CAD command registry. Ten stable IDs
+  retain registry availability, categories, keywords, shortcuts, and exact
+  disabled reasons; header and Cmd/Ctrl+K entry points execute no parallel
+  semantics. CAD 96 tests/check/build, UI/Animation builds, live working New
+  Part/disabled mate/fuzzy/compact/focus zero-log review, diff, and quarantine
+  pass.
+- **2026-08-14 (Codex, UI/CAD buildout slice 42):** Replaced Visualization's
+  three-way finish select and bounded light number entry with shared
+  SegmentedControl and Slider over unchanged cadAppearance/renderer callbacks.
+  CAD 96 tests/check/build, UI/Animation builds, live Gloss/Reset/compact zero-
+  log review, diff, and quarantine pass.
+- **2026-08-14 (Codex, CAD buildout slice 43):** Closed the frontend-
+  independent audit. UI-0 and all planned shared widgets are complete;
+  ListBox gained a semantic nonselectable mode so read-only mate/problem rows
+  no longer expose inert selection, and Export no longer uses a no-op change
+  callback. Backend search confirms no Assembly or Drawing producer/RPC exists.
+  Only those two assigned UI-4 gates remain. UI 135 tests/type/build, CAD 96
+  tests/check/build, Animation build, live semantic zero-log review, diff, and
+  quarantine pass.
+- **2026-08-14 (Codex, user-directed canonical Assembly producer):** Shipped
+  `animacore.aether_workspace` as the one persistent Assembly/Mate/BOM truth:
+  stable Core IDs and monotonic revisions; Part definitions/instances;
+  normalized reusable Part-local connectors; atomic mutation envelopes;
+  non-mutating fastened/revolute/prismatic preview; native-unit DOF and
+  relations; grounding/configuration suppression; deterministic tree solve and
+  typed limit diagnostics; hierarchical/flattened BOM; checksummed byte-stable
+  `.aether` ZIP save/release/reopen with disposable-cache isolation. Registered
+  the same verbs in the existing stdio and HTTP `/rpc` bridge without changing
+  legacy rig behavior. Verification: 1,195 AnimaCore tests pass (3 skipped),
+  including direct and real HTTP subprocess gates; claimed Python files are
+  ruff-clean; CAD 96 tests/check/build pass. Repo-wide ruff remains red only in
+  the separately imported read-only CAD reference corpus and pre-existing
+  example files. Assembly controller wiring is unblocked; Drawing remains
+  sequenced next.
+- **2026-08-14 (Codex, user-directed traditional CAD baseline):** Audited the
+  downloaded CAD reference read-only and implemented an original Aether-owned
+  catalog and shell. Home, Sketch, 3D Tools, Assembly, View, Manage, and Output
+  now expose 150 grouped operations; connected commands execute
+  through the existing registry/controller paths and unconnected Core features
+  carry exact disabled reasons. The Anima suite-stage language and document
+  strip frame the persistent viewport. Traditional is the default, Floating
+  remains a selectable design theme, and Traditional/Floating, Docked/
+  Expanded/Canvas, and Browser/Properties/History Dock/Float/Hide preferences
+  persist locally without entering CAD documents. Live ribbon/tab/panel/menu
+  and reload review passes. CAD 109 tests, type-check, production build, signed
+  root app, packaged Core hello, diff, and runtime-name quarantine pass.
+- **2026-08-14 (Codex, CAD viewport parity):** Brought Aether CAD's camera and
+  environment controls up to the shared Studio baseline without introducing a
+  second viewport or CAD truth. ViewCube face/Home, 15-degree nudge, and
+  90-degree roll share the orbit camera; standard views, five display modes,
+  four lighting presets, contact shadows, and ground modes share one typed
+  registry/appearance path across ribbon, palette, Visualization, and WebGPU.
+  CAD 115 tests/check/build, live interaction and visual review, signed root
+  app, diff, and clean integration-name audit pass. Selection filter and
+  directional window/crossing selection are next.
+- **2026-08-14 (Codex, CAD selection parity):** Shipped one typed selection
+  projection shared by viewport, Items, traditional/floating tools, palette,
+  and HUD. Auto/Component/Body/Face/Edge/Vertex filters, exact sub-object picks,
+  hover preselection, modifiers, F6 cycling, and directional Window/
+  Crossing policy are live without adding CAD meaning to Three.js. CAD 118
+  tests/check/build, live Body/Face/Edge/F6/tree review, signed root app, diff,
+  and clean integration-name audit pass.
+- **2026-08-15 (Codex, shared persistent workspace viewport):** Refactored the
+  product-free `WorkspaceShell` so Docked, Floating, and Canvas presentation
+  changes around one stable center subtree. `ViewportCanvas` no longer
+  remounts its Three.js/WebGPU renderer when the layout preference changes;
+  the exact canvas node survives all three transitions and teardown runs only
+  when the workspace closes. Existing rails, stacked/torn panels, canvas edge
+  reveal, bottom editor, and status chrome remain unchanged. Verification:
+  136 UI tests, UI type-check/build, CAD check/build, Animation build, and
+  claimed-file diff check pass.
+- **2026-08-15 (Codex, shared ViewCube + CAD adoption):** Promoted the camera
+  navigation chrome into product-free `@aether/ui` as a controlled quaternion
+  display and typed face/fit/nudge/roll intent surface. Aether CAD now consumes
+  it through an isolated camera presentation store; renderer camera math and
+  updates remain in the viewer, and the superseded imperative DOM builder is
+  removed. Live Top and clockwise Roll changed the actual camera/cube and
+  reported accurate status with zero browser warnings/errors. Verification:
+  UI 138 tests/type/build, CAD 120 tests/check/build, Animation build, signed
+  root app rebuild, diff check, and integration-name quarantine pass. The
+  package script also handles macOS 26 `iconutil` rejection by preserving the
+  installed signed app icon rather than failing the web-bundle update.
+- **2026-08-15 (Codex, shared panel presentation):** Added the product-free
+  `PanelPlacementMenu` and a controlled/uncontrolled stable-ID panel-state
+  contract to `WorkspaceShell`, including persisted floating coordinates.
+  Aether CAD replaced three local menu item definitions with the shared
+  control while its own presentation store remains preference authority. Live
+  Browser Dock/Float/Dock/Hide and global Reset projected exact placement
+  state with zero browser warnings/errors. Verification: UI 140 tests/type/
+  build, CAD 120 tests/check/build, Animation build, rebuilt signed root app,
+  diff check, and integration-name quarantine pass.
+- **2026-08-15 (Codex, complete CAD standard views):** Connected Bottom, Back,
+  and Left to the existing typed registry/viewer path, completing Top/Bottom/
+  Front/Back/Right/Left plus Isometric across the traditional View ribbon,
+  shared command palette, and shared ViewCube. Live Back, palette Bottom, and
+  ribbon Left each changed the real camera/cube and reported exact status with
+  zero browser warnings/errors. No new camera math or saved CAD state was
+  introduced. Verification: 120 CAD tests/check/build and signed root app pass.
+- **2026-08-15 (Codex, traditional appearance commands):** Added twelve typed
+  commands and ribbon tools for Graphite/Midnight/Slate, Matte/Satin/Gloss,
+  exact feature edges, None/Grid/Floor/Both ground modes, and appearance reset.
+  The traditional View ribbon, shared command palette, Visualization panel, and
+  renderer stay on one session-only appearance store. Live cross-surface state
+  and reset checks produced zero browser warnings/errors. Verification: 120 CAD
+  tests/check/build and rebuilt signed root app pass.
+- **2026-08-15 (Codex, canonical Assembly instance controls):** Connected
+  Ground/Float, Suppress/Restore, and Remove Component to the persistent Core
+  workspace controller with selection/capability-aware command state. The UI
+  supplies only stable IDs and intent; Core returns the next coherent Assembly,
+  solve, and BOM revision. Controller pins cover revision progression, active
+  state, removal selection cleanup, and rejected-mutation selection retention.
+  A real HTTP cycle passed grounded r4, suppressed r5/BOM exclusion, and removed
+  r6/empty solved graph; live empty-state gating logged no browser errors.
+  Verification: 122 CAD tests/check/build and rebuilt signed root app pass.
+- **2026-08-15 (Codex, canonical BOM projection modes):** Added a shared
+  Hierarchical/Flattened control that requests `project_bom` from Core and
+  publishes only revision-coherent results. React renders returned rows as-is;
+  controller pins prove the selected mode is re-requested after instance
+  mutation. Live round-trip status was exact with zero browser warnings/errors.
+  Verification: 124 CAD tests/check/build and rebuilt signed root app pass.
+- **2026-08-16 (Codex, persistent Assembly component insertion):** Connected
+  Insert Component through the traditional ribbon, Assembly actions menu, and
+  shared command palette. One shared-field draft captures explicit kilogram
+  and meter inputs plus Part/instance metadata. The controller asks Core to
+  create the Part definition, discovers the returned stable ID, and adds the
+  instance against the next revision; a second-step rejection triggers a
+  compensating Core definition removal. Live r1→r3 insertion showed grounded
+  `Bracket:1` in Structure, `BR-100 · Bracket · 1` in BOM, and saved through
+  Core with zero browser logs. Verification: 129 CAD tests, TypeScript/build,
+  rebuilt signed app, diff/whitespace, and integration-name quarantine pass.
+- **2026-08-16 (Codex, persistent manual mate connectors):** Replaced the
+  canonical Assembly ribbon's session connector route with a selected-instance,
+  capability-gated Core authoring path while preserving the older Part proof.
+  Shared fields capture Part-local meter origin and nonparallel signed axes;
+  Core normalizes/persists the frame and the controller selects only its
+  returned stable ID. Live revision 4 showed `Shaft axis · Bracket · Datum A`
+  and exact frame values in the shared inspector, then saved with zero logs.
+  Verification: 133 CAD tests, TypeScript/build, rebuilt signed app, diff/
+  whitespace, and integration-name quarantine pass.
+- **2026-08-17 (Codex, persistent Assembly mate authoring):** Added one pure
+  Fastened/Revolute/Prismatic draft module, canonical instance+connector
+  endpoint projection, typed `preview_mate` decode/transport, and controller
+  preview/commit paths. The shared dialog clears stale previews on every edit
+  and gates Apply on a solved current result; `add_mate` selects only Core's
+  returned stable ID and refreshes the coherent solve/BOM projection. The
+  persistent Assembly Mate command replaces the ribbon's old session route,
+  while the Part proof remains available in its own context. Live r8 previews
+  solved revolute/prismatic with one free DOF and fastened with zero without
+  mutation; fastened commit produced selected satisfied mate r9 and Core save
+  passed. Verification: 139 CAD tests, TypeScript/build, rebuilt signed root
+  app, diff/whitespace, and clean integration-name quarantine pass.
+- **2026-08-17 (Codex, persistent selected-mate lifecycle):** Added typed,
+  selection-aware Suppress/Restore and Remove Mate commands across the
+  traditional Assembly ribbon, actions menu, and command palette. The
+  controller reconstructs the complete Core update payload from the selected
+  mate, changes only suppression state, and delegates dependency validation,
+  solving, and revision ownership to Core; failed removal retains selection
+  and successful removal clears it after refresh. Live r9→r10 suppression,
+  r10→r11 restoration, r11→r12 removal, zero-mate projection, and Core save
+  passed. Verification: 140 CAD tests, TypeScript/production build, rebuilt
+  signed root app, diff/whitespace, and clean integration-name quarantine pass.
+- **2026-08-17 (Codex, persistent mate DOF value and limits):** Added
+  selection-gated revolute/prismatic value and paired-limit editors across the
+  traditional ribbon, actions menu, and shared palette. Degrees convert to
+  radians only in the typed boundary helper; translation remains meters.
+  Values use `set_dof_value`, limits use complete revisioned `update_mate`, and
+  Core alone returns pose, state, and limit warnings. The existing inspector
+  now shows the canonical DOF value and range. Live r9→r12 revolute value,
+  limits, and intentional warning passed; r14→r16 prismatic value and limits
+  passed; r17 suppression gated both commands, r18 restore/save passed.
+  Verification: 142 CAD tests, TypeScript/production build, rebuilt signed root
+  app, diff/whitespace, and clean integration-name quarantine pass.
+- **2026-08-17 (Codex, persistent DOF relation authoring):** Added a typed
+  Gear/Rack and Pinion/Screw/Linear relation draft with compatible free-DOF
+  filtering, explicit ratio/direction, driven-family offset conversion, and
+  stable-ID `add_relation`. Core remains the owner of pairing validation,
+  dependency order, identity, and solved values. The inspector resolves DOF
+  names and displays solved dependent motion. Live reversed 2:1 gear with 10°
+  offset drove 30° to −50°, direct dependent editing gated, and r15 saved.
+  Verification: 145 CAD tests, TypeScript/production build, rebuilt signed root
+  app, diff/whitespace, and clean integration-name quarantine pass.
+
+- **2026-09-08 (Codex, standalone Onshape mockup):** Added
+  `onshape mockup/**` and additive STATUS/mailbox entries. React/Vite/Three.js
+  workspace implements fixture navigation, sketch lifecycle, feature editing,
+  history and visibility, context menus and tab/auxiliary controls. No engine
+  or shared-widget changes. Six interaction tests, lint and production build
+  pass; browser unavailable, visual/pointer checks pending. Source publication
+  uses external Git metadata to preserve the shared parent checkout.
+
+  Publication follow-up: private version 1 saved; both deployment attempts failed
+  with hosting callback HTTP 409. Local source/build remain ready; exact IDs are
+  recorded in `onshape mockup/HOSTING_STATUS.md`.
+
+- **2026-09-08 (Codex, Phase 2 adaptive CAD docking):** Added
+  `onshape mockup/components/layout/{layout-store,layout-geometry,AdaptiveLayout,
+  LayoutControls}` and two layout/lifecycle test files; adapted CADWorkspace,
+  FeatureTree, CADViewport, CSS, original tests and README. The five requested
+  panels use one global layout authority with independent dock/float/hide,
+  per-preset persistence and keyboard/pointer positioning. Stable panel slots
+  and cube portal retain scene/camera/renderers. 13 tests, lint, TypeScript and
+  build pass; no browser available for visual/GPU review. No engine/shared UI
+  source changes; claim released. Existing publication state preserved.
+
+
+### 2026-09-08 — Codex: Aether Studio naming and architecture review
+
+Changed `README.md`, `AGENTS.md`, `CONVENTIONS.md`, added
+`dev/docs/roadmap/Aether_Studio_Suite.md`, appended status/mailbox/this handoff.
+Renamed local repository directory to `Aether Studio`; old path is a compatibility
+symlink. Reviewed current CAD, Animation, Core/UI and mockup source; web pivot is
+already in place, unified hosting/package installation remains planned. Existing
+active CAD chrome claim is untouched. Verification: rename/link and engine import
+pass; local documentation links resolve; `git diff --check` passes. Documentation
+and directory change only; no product build or GUI walkthrough required.
+
+
+### 2026-09-08 — Codex: shared core relocation handoff
+
+Moved shared packages intact from `aether-core/` and `aether-ui/` to
+`core/engine/` and `core/ui/`. Import identities remain `@aether/core` and
+`@aether/ui`; engine modules stay UI-independent. Updated CAD/Animation local
+package dependencies and locks, CAD Vite allowlist and STEP smoke script, CI,
+gallery launcher paths/root calculation, ignore comment, and current contributor,
+package and suite docs. Added `core/README.md`. Existing widget edits were carried
+intact; the active CAD chrome claim continues at the new paths. Product directories,
+Python semantics, historical handoffs and archive sources were not reorganized.
+
+Verification: Core 8 tests/check, UI 143 tests/typecheck/build, CAD 145 tests/check/
+build and Animation build pass. UI launcher Swift typecheck, shell syntax and
+signed app rebuild pass; installed package links, doc links and diff checks pass.
+UI tests emit React act warnings; CAD/Animation builds emit bundle-size warnings.
+No visible UI behavior changed; no GUI walkthrough performed.
+
+### 2026-09-08 — Codex shared Studio UI handoff
+
+The native StudioDesignProfile structural palette, system font and 54px header
+now feed the shared theme. CAD consumes the same WorkspaceShell as Animation;
+its private ribbon, ViewCube and field skins were removed. Animation uses the
+shared ViewportNavigationCube with live camera face/Home/nudge/roll adapters.
+Both products retain their tool sets and engine authority. Shared shell additions:
+retained panel DOM/input state, validated per-preset preferences (Animation),
+keyboard float movement, resize clamping and compact rail-revealed side panels.
+
+Rebuilt and opened `Aether Animation.app` and `Aether CAD.app`; both serve HTTP
+200 and accept protocol-v1 hello. Moved the old root `Anima Studio.app` into
+`aether-animation/archive/` as a reference. It is preserved, not deleted.
+The mockup is also retained pending all-edge docking and independent toolbar/
+ViewCube/tab placement integration. Full native-to-web workflow parity is not
+complete: Assets/library, editable keyframes/curves, Show/Hardware and 2D/VR
+remain tracked in `dev/docs/roadmap/Aether_Studio_UI_Convergence.md`.
+
+Validation: 145 shared UI tests/typecheck/build and 145 CAD tests/check/build;
+Animation production build and signed native launcher builds pass. Isolated
+local Chromium checks show zero page errors, identical computed header height/
+background and ViewCube background/border in both apps, responsive 1440/780px
+layouts, camera cube response, retained canvas across all presets and retained
+CAD input draft followed by a real OCCT Part rebuild. The in-app browser was
+unavailable; screenshots were inspected from the isolated local browser instead.
+React act warnings and production bundle-size warnings remain nonfatal.
+
+Changed: shared WorkspaceShell/tests, StatusBar, widget CSS/tokens and WIDGETS;
+CAD shell/tests and CSS; Animation App/viewport/CSS and README; AGENTS, ignore
+rule and UI roadmap/coordination/status. No engine, saved-format or protocol
+implementation changed. Original widget edits were preserved.
+
+
+### 2026-09-08 — Codex shared artwork handoff
+
+Added `core/assets/icons/` with 42 canonical SVG files exposed as 43 semantic
+icon names (model aliases design), plus `core/assets/branding/aether-cad.svg`.
+`AetherIcon` is now a thin renderer over those static sources; CAD's `CadIcon`
+is a vocabulary adapter with no private geometry. Animation's main toolbar,
+mate tools and panel/tree icons now use the shared vectors. The CAD native icon
+build reads its moved shared branding source. Vite allowlists include shared
+assets for UI gallery, CAD and Animation development. The shared gallery renders
+all 43 names. Root contributor guidance and `core/assets/README.md` define SVG,
+color, sizing, attribution and project-media boundaries.
+
+Validation: 146 UI tests and 145 CAD tests pass, UI/CAD type checks and all three
+web builds pass; focused icon tests/typecheck also pass after alias deduplication.
+All three native launcher builds pass. Isolated local Chromium verifies the dev
+gallery loads all 43 SVGs with zero page errors; its contact sheet was visually
+inspected and a grid-width issue fixed. Diff whitespace check passes. Existing
+React act and bundle-size warnings remain. Remaining legacy text glyphs in older
+product tool catalogs/shared controls are explicitly recorded; this does not
+claim every icon in the suite has already been migrated.
+
+Changed files: core/assets SVGs + README; core/ui AetherIcon/tests/index,
+gallery and Vite config; CAD CadIcon, Vite config, launcher build script and
+branding relocation; Animation App + Vite config; core README, AGENTS and
+additive status/coordination. No model, engine or protocol behavior changed.
+
+
+### Launcher refresh verification
+
+2026-09-08 — Refreshed every current root launcher: Aether CAD, Aether
+Animation and Aether UI. All production builds and Swift/signing steps passed;
+opened all three. Strict codesign verification and bundle names pass. Every served
+build file matches its current dist byte-for-byte (CAD 6, Animation 3, UI 3),
+including CAD's worker/WASM. Both engine launchers pass protocol-v1 hello. Local
+Chromium loaded each launcher URL and verified mounted UI/SVGs with zero page
+errors. No source implementation changed; prior feature-parity limitations remain.
+
+### 2026-09-08 — Codex window chrome handoff
+
+Extracted CAD window adapter to Core UI native source; all three launcher builds consume it. DocumentBar owns native inset; CAD private spacer removed; embedded gallery headers disable drag/inset. Gallery gets outer shared workspace with working navigation. Changed claimed launcher/build, DocumentBar/CSS/gallery and status/roadmap files. 146 UI tests, typecheck, all three builds/signatures, browser header geometry and gallery navigation, native AppKit configuration checks pass. Current app windows were not terminated. User prefers browser-installed apps; independent suite host is next architectural work, not shipped here. Claim released.
+
+### 2026-09-08 — Codex independent host/admin/setup handoff
+
+Implemented `core/host/**`, `studio/**`, shared Core home theme/brand derivatives,
+root Install command, browser-shortcut builds, scoped CAD/Animation API URLs,
+Animation revision-aware text saves and suite links. Updated CI, ignores, root
+and product-host docs. User steering incorporated: screenshot-based charcoal
+sidebar; Teams/Roles/Service accounts/Backups; community plugins future only;
+five-step split-panel onboarding; normal signed-out Studio home and direct-app
+sign-in return. No semantic engine changes. Existing work stays preserved.
+
+Verification: 16 host tests + targeted lint; prior full Python 1212 pass/3 skip;
+CAD 145 and Core UI 146 tests; all four builds and signatures; installer syntax /
+prerequisite check; actual launchd host running; browser setup/admin/member/app
+routing/restart flows and desktop/tablet screenshots. Global lint has 233 existing
+reference/example issues. Actual setup awaits the user's credentials; test users
+were confined to temporary QA data roots. Claim released; community distribution,
+SSO/email/org tenancy/collaboration remain documented future work.
+
+### 2026-09-08 — Original icon preservation
+
+Codex visually confirmed the original CAD icon matches the user screenshot; original Animation icon also intact. Copied 15 original source/catalog/compiled files to Core branding originals with SHA-256 provenance; all match byte-for-byte. Existing originals untouched. Added durable AGENTS/assets archive policy and generator boundary comment. Claim released.
+
+- **2026-09-08 Codex handoff — identity and recovery:** Changed `core/host/{mail,state,server,backup}.py`, host tests/README, `studio/src/{main,SetupWizard,Recovery,EmailSettings}.tsx`, STATUS and coordination. Existing users migrate; full name/email, SMTP settings, one-use 30-minute recovery and one-hour setup cookies implemented. 22 host tests and targeted Ruff pass; Studio build passes; isolated browser setup refresh, email login, SMTP form and reset pass. SMTP mocked only. Claim released.
+
+- **2026-09-08 Codex handoff:** Setup identity fields stacked at full width in `studio/src/SetupWizard.tsx`; STATUS and mailbox updated. Studio TypeScript and production build passed. Claim released.
+
+Library contract: host-owned document metadata/content with personal or workspace visibility. Workspace files are readable to signed-in users with product access; only owner writes originals. Save uses expected revision. Existing CAD format/engine semantics unchanged. Profile preferences and avatar live with host account and are consumed by all front ends.
+
+- **2026-09-08 Codex handoff — CAD library/account:** Changed host state/server/new `library.py` and library tests; new `core/session/{account.js,account.css,README.md}`; Studio LibraryHome/CSS, main/API and product launch targets; CAD `host-library.ts`, controller/main/shell and async save regression; Animation/gallery account slots; host README/STATUS/mailbox. Validation: 29 host tests, 145 existing CAD tests plus the added async failure test, 146 UI tests; four production builds, targeted Ruff, JS syntax and diff check. Browser: imported Part opened/saved server-side; owner shared, other user deep-linked after sign-in and could copy but not overwrite; account avatar/theme across apps and independent sessions; tablet/phone library inspected. Production host restarted and ready, CAD launch invoked, account assets/manifest match current files; original icon hashes unchanged. Claim released.
+
+- **2026-09-09 Codex branding handoff:** Fancy/Simple SVG sources, shared AppIcon, product branding consumers, icon build script and docs changed. Three launchers rebuilt/signed; Studio/CAD/Animation and Core UI builds pass; served icons/browser cards verified; original archive hashes unchanged. Released.
+
+Project/history contract extension: immutable server snapshots retain file bytes plus author/time; restore appends a new revision. CAD project .aether uses canonical graph Part definitions and Assemblies rather than a second geometry schema. Core CAD v3 adds executable profile/revolve/extrude/mirror features with explicit millimeter fields; existing v1/v2 imports remain supported.
+
+### 2026-09-09 — Codex wheel authoring, packaging and saved-history handoff
+
+Changed `core/engine/src/document/{part-document,part-serialization,solid-features,file-types,wheel-example,index}.ts`, Core exact evaluator/tests/package dev types; `animacore/aether_workspace.py` and `aether_project.py`; `core/host/library.py`, `history.py`, project/history tests; CAD main/host transport/feature editor+styles, command registry/catalog, Assembly bridge/controller/viewer projection and affected tests; Studio LibraryHome/history UI/styles; wheel `.acad`/`.acpart` fixtures; STATUS/packaging roadmap/mailbox. No second geometry/assembly semantic engine was introduced. Part feature data belongs to Core and is embedded once in canonical Part definitions; Python retains the document envelope and assembly meaning. External links pin immutable saved snapshots and embed those dependencies for export.
+
+Validation: 46 Python host/workspace tests; 146 CAD tests; 11 Core tests including actual OCCT wheel topology, mirrored holes, parameter change, axial bounds and fillet/chamfer; Core/CAD checks, Studio/CAD production builds, targeted Ruff. Browser proof: `/tmp/aether-wheel-project.png`, `aether-wheel-history.png`, `aether-wheel-assembly.png`, `aether-linked-part.png`; project creation/edit/save/reopen, named version/restore retaining future history, authored Assembly rendering, standalone Assembly pinned-link workflow/read-only/export. Local production service reloaded and health/auth checked. Existing original icons preserved. No production test accounts/documents created. Claim released. General sketch drawing/constraints, nested assemblies, release approvals, item-level engineering revisions, branching/merge and live collaboration remain unimplemented and documented explicitly.
+
+### 2026-09-09 — Codex single Create menu follow-up
+
+Changed Studio `LibraryHome.tsx`, new `CreateMenu.tsx`, `library.css`, STATUS/mailbox. One Create dropdown replaces individual creation buttons, including redundant hero actions. All five choices wired to existing real handlers; folder creation from Home reveals its location. Build passed; browser mouse/keyboard/Escape and all five actions passed; visual proof `/tmp/aether-create-menu.png`. Production uses rebuilt static bundle. Claim released.
+
+- **2026-09-09 — Codex handoff/release: wheel authoring workflow.** Changed Core `document/{part-document,solid-features,feature-history,wheel-example,index}.ts` and history tests, `kernel/part-evaluator.ts`/tests; CAD `main.ts`, `viewer.ts`, `feature-authoring.ts/.css`, new `profile-canvas.ts`, `part-feature-tree.ts`, `cad-workspace-projection.ts`/tests, `cad-workspace-store.ts`, React shell; wheel fixtures/README/walkthrough and STATUS. Core optional v3 contract fields: `rollbackIndex`, `bodyProperties`, new-solid `bodyId`, operation `targetBodyId`, finish `edgePlane`. Canonical history helper stabilizes body IDs before structural changes; evaluator executes prefix and returns all bodies. Fixed Create Part dialog hidden in workspace. Review/verification: 18 Core, 146 CAD, 46 host/workspace tests, both typechecks and CAD build pass. Browser blank-to-wheel workflow, rollback insertion/replay, tree edit/suppression, body metadata roundtrip, actual drag and pointer sketch editing and two-body reopen pass. QA data isolated under /tmp; production static bundle updated without resetting installation. Limits documented in wheel walkthrough; no full Onshape parity claimed.
+
+- **2026-09-09 — Codex handoff/release: default ribbon and left-side history.** Changed CAD React `AetherCADShell.tsx`/tests, `CADTraditionalRibbon.tsx`, `shapr-shell.css`, new `CADVersionsPanel.tsx`, STATUS/mailbox. New Full suite default places workspace dropdown alongside full ribbon and uses Part/Version control/History rail panels. Classic remains selectable/persisted with centered tabs and bottom tray. Server histories are read from canonical API; links preserve project Part selection and open read-only, management stays in CAD Home. 147 CAD tests/build pass, authenticated revision API checks pass, prod /api/status 200. Browser bootstrap reports no available browser, so visual verification is outstanding. No engine/data mutations or production test documents.
+
+- **2026-09-09 — Codex handoff/release: document header.** Changed CAD shell/header component/styles/shell tests, new document-link helper/tests, Core menu/link SVGs and AetherIcon, STATUS/mailbox. Removed redundant Home button; logo remains Home. Main/historical revision label, document menu existing command wiring, safe clipboard URL and selectable fallback. 149 CAD / 146 UI tests plus CAD build/UI typecheck/build pass. Browser unavailable, visual/clipboard checks outstanding. No backend schema or permissions changes.
+
+- **2026-09-09 — Codex handoff/release: document settings.** Changed canonical workspace optional `document_settings` graph field; new `animacore/cad_document.py`; `core/host/cad_settings.py`, library/history dispatch and six backend tests; shared `core/assets/cad/units.json`, Core unit helpers/tests/JSON compilation export; CAD document settings/session/preferences/print/quantity components, host transport accessor, feature and legacy/assembly unit boundaries, viewer print capture, menu/styles, DOM tests/test inclusion and docs. Metadata/units are portable; edits retain immutable host snapshots. Graph mass remains canonical. Feature upgrades accept Core-migrated payloads instead of flipping version markers. Verification: 52 host/workspace, 20 Core, 155 CAD tests, Core/CAD typechecks, CAD build, Ruff and isolated authenticated HTTP roundtrips pass. Running host restarted healthy, production data untouched by QA. Browser/native-print visualization not verified; recovery is project Part/Assembly tabs, no branching/merging/release approvals introduced.
+
+- **2026-09-09 Codex handoff — illustrated tools:** Changed Core assets/icons/tools (85 SVGs, generator, README), ToolIcon renderer/tests/export/widgets CSS/gallery; CAD tool catalog, traditional ribbon and CSS; STATUS/mailbox. Replaced font glyphs with semantic vector artwork and full-suite ribbon treatments while preserving actions/gates and app branding. 148 UI, 155 CAD, six host document-settings tests pass; UI/CAD checks/builds and Animation build pass. Both icon palettes inspected through librsvg rendering; connected browser unavailable. No production data mutations; host 200. Claim released.
+
+- **2026-09-09 Codex handoff — panel routing:** Fixed CAD AetherCADShell controlled panel-state omission and explicit ribbon/browser coupling. Exclusive left Model/History/Version control, independent right Properties/Parameters/Assembly/Inspect/Appearance. Main showBrowserPanel no longer forces left model open for properties. Updated shell tests and added mounted DOM rail/ribbon regression coverage. 157 tests, CAD check/build pass; current static build ready on refresh. STATUS/mailbox updated, claim released.
+
+- **2026-09-09 Codex handoff — workspace sketch:** Changed Core sketch drawing schema/export, profile validation, exact evaluator/tests; CAD new sketch workspace/CSS/DOM tests, feature authoring/CSS, main/viewer, registry/catalog/shell and registry count test. Removed duplicate floating feature panel and profile modal path. Planes/selected planar face frames, four real sketch tools, explicit open/closed contours/holes and exact extrusion verified. 21 Core, 160 CAD tests, Core check/CAD build pass; final removal rechecked with three DOM tests. STATUS/mailbox record solver/intersection/face-associativity limits and unavailable connected browser. Claim released.
+
+- **2026-09-09 Codex handoff — viewport regression:** Changed sketch-workspace.css only in runtime code, removing global relative-position override. Shell absolute/inset sizing preserved in actual CSS cascade and compiled build. CAD build passed; connected browser unavailable. STATUS/mailbox updated, claim released.
+
+- **2026-09-09 Codex handoff — live previews:** CAD sketch workspace now renders pointer/numeric previews without model mutations. Added dimensional guides and shared commit snapping, clear-on-leave/tool-change/Escape. Changed sketch-workspace.ts/css/tests, STATUS/mailbox. 162 CAD tests/build pass, new pointer DOM tests use a known SVG mapping; native-browser rendering not verified. Claim released.
+
+- **2026-09-09 Codex handoff — sketch constraints/planes:** Changed Core drawing schema/constraint solver/index/evaluator and deterministic solver/kernel tests; CAD sketch workspace/snapping/CSS/tests, registry/catalog/count tests, main/viewer plane selection. Persisted constraints solve on edit and evaluation; plane start temporarily shows reference geometry; clicks select planes/planar faces. 26 Core + 164 CAD tests, Core check/CAD build pass. Native browser visuals unavailable; documented missing DOF, arc-specific relations and advanced sketching. STATUS/mailbox updated; claim released.
+
+
+### 2026-09-09 — Sketch variants and parity inventory
+
+Implemented nine real tools: midpoint line, center/aligned rectangles, three-point circle, center arc, both polygon methods, ellipse, cubic Bézier. Split ribbon menus retain the chosen variant. Core builders are shared by preview and commit; exact ellipse/Bézier segment payloads evaluate through OCCT. Cubic controls can be selected, edited and used by point constraints. Old profile payloads remain readable; newer curve payloads require current clients.
+
+Changed files: `core/engine/src/sketch/{primitives.ts,primitives.test.ts,index.ts,drawing.ts,drawing-constraints.ts}`, `core/engine/src/kernel/{part-evaluator.ts,part-evaluator.test.ts}`; CAD `src/{sketch-workspace.ts,sketch-workspace.dom.test.jsx,cad-command-registry.ts,cad-command-registry.test.ts,cad-tool-catalog.ts,main.ts}`, `src/react/{CADTraditionalRibbon.tsx,CADSketchVariants.dom.test.jsx,shapr-shell.css}`; STATUS and `dev/docs/roadmap/CAD_Sketch_Parity.md`.
+
+Verification: 32 Core / 167 CAD tests pass, Core typecheck and CAD production build pass, host8780 HTTP200. Tests exercise degeneracy, preview/commit, persistence/reopen, real extrusion, ellipse extents, curve-control editing and dropdown dispatch/reuse. Browser list is empty; Safari/WebGPU visual verification unavailable. Full requested parity remains incomplete; acceptance ledger explicitly records missing operations and constraint/interaction variants. No commit or production account/data mutation. Claim released.
+
+
+### 2026-09-09 — Construction plane command / surface labels / tree icons
+
+Plane was disabled/unconnected; now a validated Core plane feature (principal-plane offset) persists and participates in history without requiring a body. CAD authoring command creates/edits it, viewer displays active planes, sketch selection works via viewport/tree/chooser. Plane text changed from Sprite to plane-local textured Mesh at upper-left. Shared cube text now transforms in the face basis, tested through a half-turn. Tree icons reuse illustrated SVGs.
+
+Files: Core document solid-features/part-document/feature-history, kernel part-evaluator and tests; CAD feature-authoring, viewer, new plane-visual/test, main, sketch-workspace/DOM tests, commands/test, catalog, part-feature-tree, workspace-projection, shapr-shell.css; UI ViewportNavigationCube/test; STATUS and coordination.
+
+Verified 170 CAD + 33 Core + 149 UI tests, Core/UI typechecks, CAD/UI/Animation builds. Browser list empty: native visual QA outstanding. Plane-to-sketch uses persisted frame snapshot; associative updates and other plane construction modes remain future work. No commits or production user-data mutations. Claim released.
+
+
+### 2026-09-09 — Sketch parity operations and human co-development structure
+
+Implemented mirror, 2D linear/circular independent copies, numeric transform, points/construction, limited line trim/extend, and expanded point/circle/circular-arc equations. Extracted CAD sketch modules (drawing-tool, preview, canvas-renderer, svg-geometry, picking, constraint-panel, modification-panel, contour-list, tool-instructions) and Core operations plus solver families. Contributor guides live with both code areas. A persistent active goal now tracks the user's explicit full-parity objective; do not switch product sections or mark complete while ledger gaps remain.
+
+Changed scope: CAD sketch-workspace.ts/css/DOM tests, src/sketch/**, main.ts, catalog/command registry/count tests; Core sketch drawing/primitives/index/public constraint facade, arc-geometry, operations/**, solver/**, evaluator construction filtering and solid tests; reality/roadmap/contributor docs.
+
+Verified 45 Core and 174 CAD tests, Core check, CAD build. No live browser connection available in prior checks; no native visual claim. Key remaining limits: curved trim/extend and constrained target remapping; independent copies rather than associative patterns; no offset/slot/projection/import/text completion; finite-arc contact parameters and advanced constraints/DOF remain open. Tests and acceptance ledger record actual supported subsets. No commit or production account mutations. This bounded implementation claim is released; full-parity goal remains active.
+
+
+### 2026-09-09 — Exact curve subdivision / Split / curved boundaries
+
+Previous goal turn classified as progress; this turn adds actual exact geometry and UI behavior. Core `sketch/curves/{parameterization,subdivide,intersections,curves.test}.ts` and README, new operations/split.ts, expanded trim-extend.ts plus updated operation regression; sketch/index.ts exports split. CAD direct-tool metadata/commands/catalog count test, workspace, preview, DOM tests wire Split. STATUS/parity/contributor docs updated.
+
+Verified 52 Core + 175 CAD tests, Core check, CAD build, HTTP200. Exact subdivision preserves cubic degree and arc/ellipse curves. Line trim/extend accepts curved boundaries. Split preserves endpoint constraints; segment-specific constrained cases and circles still have documented gaps. General curve/curve intersections and curved trim/extend targets are next foundation work. No commit or production data mutation. Claim released; full parity goal remains active.
+
+
+### 2026-09-09 — Circle split and free extension gestures
+
+Prior goal turn: progress. Current turn closes the two-click circle split and no-boundary straight-line Extend workflows. Core operations/split.ts remaps circle radius/center references and adds exact arc relations; trim-extend.ts exposes typed endpoint-needed state and projected endpoint extension. CAD new sketch/direct-modification.ts is shared between workspace and preview. Added circle-split Core tests and mounted gesture DOM tests; updated tool instructions, guides, ledger and STATUS.
+
+Verified 55 Core / 177 CAD tests, Core check, CAD build, HTTP200. Goal remains active. Next: general curved trim targets and curve/curve intersections, then remaining constraints/operations/import/projection gaps. No commit or production account mutation. Claim released.
+
+
+### 2026-09-09 — Codex curved Trim handoff
+
+Changed Core `sketch/curves/{intersections,pairs,picking}.ts`, pair tests,
+`operations/trim.ts` and tests, sketch index; CAD direct-modification and tool
+instructions plus workspace DOM test; curve/operation contributor guides,
+STATUS and sketch parity ledger. 62 Core / 178 CAD tests, Core check and CAD
+build pass. Exact curve remnants verified through native save/reopen. Constraint
+remapping, overlaps, drag-trim and curved Extend remain open. No live browser
+verification claimed. Claim released; full sketch parity goal remains active.
+
+
+### 2026-09-09 — Codex conic Extend handoff
+
+Changed Core sketch `operations/extend-curves.ts` and tests, index export and
+operation guide; CAD direct-modification, tool instructions and workspace DOM
+tests; STATUS and parity ledger. 66 Core / 179 CAD tests, Core check and CAD
+build pass. Browser verification remains outstanding. Cubic extension and
+constraint remapping remain open. Claim released; full parity goal active.
+
+
+### 2026-09-09 — Codex Extend constraints handoff
+
+Changed Core operations preserve-constraints, extend-curves, trim-extend and
+extend tests; CAD workspace DOM test; operations guide, parity ledger and STATUS.
+67 Core / 180 CAD tests, Core check and CAD build pass. Existing constraint
+references persist for topology-preserving extension; named conflicts reject
+without mutation. Trim/Split remapping and live browser QA remain open. Claim
+released; full parity goal remains active.
+
+
+### 2026-09-09 — Codex Arc Split relations handoff
+
+Changed Core split.ts, split-relations.ts/tests and operations guide; CAD
+workspace DOM test; STATUS and parity ledger. 69 Core / 181 CAD tests, Core
+check and CAD build pass. Radius edit updates both arcs with common center;
+workspace native round-trip retains links. Finite midpoint, line length and
+cubic control remapping remain open. Browser QA outstanding. Claim released;
+full parity goal active.
+
+
+### 2026-09-09 — Codex Line Split relations handoff
+
+Changed Core split.ts, split-relations.ts/tests, operations guide; CAD workspace
+DOM test; STATUS/parity ledger. 70 Core / 182 CAD tests, Core check and CAD build
+pass. Overall length edit and native reopen verified. Finite equal-length,
+midpoint, control and interval semantics remain open. Browser QA outstanding.
+Claim released; full parity goal active.
+
+
+### 2026-09-09 — Codex Circle Trim handoff
+
+Changed Core circle-references.ts, trim.ts, split.ts, trim tests and operations
+guide; CAD workspace DOM test; STATUS/parity ledger. 71 Core / 183 CAD tests,
+Core check and CAD build pass. Fixed-center/radius edits and native reopen
+verified. Path Trim constraint remapping remains open. Browser QA outstanding.
+Claim released; full parity goal active.
+
+
+### 2026-09-09 — Codex Path Trim remapping handoff
+
+Changed Core trim-references.ts, trim.ts/tests, operations guide; CAD direct
+modification/workspace/DOM test; STATUS/parity ledger. 72 Core / 184 CAD tests,
+Core check and CAD build pass. Surviving entity constraints remap; removed
+relations are reported and undo restores them. Partial-segment locus relations
+remain open. Browser QA outstanding. Claim released; full parity goal active.
+
+
+### 2026-09-09 — Codex Trim fragment relations handoff
+
+Changed Core trim-references/tests, operations guide; CAD workspace DOM test;
+STATUS/parity ledger. 74 Core / 185 CAD tests, Core check and CAD build pass.
+Partial line/arc supporting-locus relations persist with links across remnants.
+Finite extent/control and browser QA remain open. Claim released; full parity
+active.
+
+
+### 2026-09-09 — Codex Drag Trim handoff
+
+Changed Core trim-sweep.ts/tests/export, CAD trim-gesture.ts/workspace/tool
+instructions/DOM tests, contributor guides and STATUS/parity ledger. 76 Core /
+187 CAD tests, Core check and CAD build pass. Sparse crossings, single gesture
+undo/redo and cancellation verified. Point sweeps, overlaps and browser QA
+remain open. Claim released; full parity active.
+
+
+### 2026-09-09 — Codex Point sweep Trim handoff
+
+Changed Core trim-sweep/tests, CAD trim-gesture/workspace/DOM test, operations
+guide and STATUS/parity ledger. 77 Core / 188 CAD tests, Core check and CAD build
+pass. Standalone point hits, constraint remapping and undo verified. Coincident
+curve overlaps and browser QA remain open. Claim released; full parity active.
+
+
+### 2026-09-09 — Codex finite overlap boundaries handoff
+
+Changed Core curve pairs/picking/tests and Trim/tests; contributor guides,
+STATUS/parity ledger. 81 Core / 188 CAD tests, Core check and CAD build pass.
+Finite line/conic overlap endpoints and duplicate-circle seam exclusion
+verified. General cubic overlap, selection cycling and browser QA remain open.
+Claim released; full parity active.
+
+
+### 2026-09-09 — Codex cubic overlap handoff
+
+Changed Core cubic-overlap.ts/tests, pairs.ts/tests, curve guide and STATUS/parity
+ledger. 84 Core / 188 CAD tests, Core check and CAD build pass. Duplicate,
+reversed, contained interval and actual Trim remnants verified. Degenerate
+retracing/non-affine cases and browser QA remain open. Claim released; full
+parity active.
+
+
+### 2026-09-09 — Codex connected-line fillet handoff
+
+Changed Core fillet.ts/tests/export and kernel test; CAD modification panel,
+workspace, tool list/catalog, command/catalog count tests and workspace DOM test;
+operations guide and STATUS/parity ledger. 88 Core / 189 CAD tests, Core check
+and CAD build pass. Native persistence, radius edit, virtual sharp and exact
+OCCT cylinder verified. Arc/spline/two-curve fillets, shared-radius batches and
+manipulators remain open. Browser QA outstanding. Claim released; full parity
+active.
+
+
+### 2026-09-09 — Codex shared fillet batches handoff
+
+Changed Core fillet-batch.ts/tests/export, CAD modification panel/DOM tests,
+operations guide and STATUS/parity ledger. 90 Core / 190 CAD tests, Core check
+and CAD build pass. Batch radius editing and native persistence verified.
+Arc/spline/two-curve fillets, manipulators and browser QA remain open. Claim
+released; full parity active.
+
+
+### 2026-09-09 — Codex two-line fillets handoff
+
+Changed Core fillet-lines.ts/tests/export, CAD modification panel/DOM test,
+operations guide and STATUS/parity ledger. 92 Core / 191 CAD tests, Core check
+and CAD build pass. Shared-endpoint separate lines and adjacent segments work
+with reference remapping/native persistence. Disconnected/multi-segment/arc/
+spline pairs and direction-sensitive reversal remapping remain open. Browser
+QA outstanding. Claim released; full parity active.
+
+
+### 2026-09-09 — Codex virtual-intersection fillet handoff
+
+Changed Core fillet-line-intersection.ts, fillet-lines.ts/tests; CAD panel/DOM
+test; operations guide and STATUS/parity ledger. 94 Core / 192 CAD tests, Core
+check and CAD build pass. Disconnected/crossing sides and atomic constraint
+conflicts verified; native persistence tested. Multi-segment/arc/spline pairs
+and browser QA remain open. Claim released; full parity active.
+
+
+### 2026-09-09 — Codex fillet radius handle handoff
+
+Changed Core fillet-handle.ts/tests/export, CAD fillet-manipulator.ts/panel/DOM
+and CSS, contributor guides and STATUS/parity ledger. 95 Core / 193 CAD tests,
+Core check and CAD build pass. Drag/cancel and no pre-Apply document mutation
+verified. Existing-fillets direct handles, arc/spline pairs and browser QA remain
+open. Claim released; full parity active.
+
+
+### 2026-09-09 — Codex existing fillet radius edit handoff
+
+Changed Core fillet-radius-edit.ts/tests/export, CAD panel/DOM test, operations
+guide and STATUS/parity ledger. 96 Core / 194 CAD tests, Core check and CAD build
+pass. Shared-driver lookup and reopen/edit/save verified. Arc/spline fillets,
+finite-contact diagnostics and browser QA remain open. Claim released; full
+parity active.
+
+
+### 2026-09-09 — Codex curved fillet geometry handoff
+
+Added Core curves derivatives.ts, tangent-circle.ts/tests, fillet-pieces.ts/tests;
+curve guide and STATUS/parity ledger. 99 Core tests and Core check pass.
+Line/arc, line/Bezier, arc/arc tangent centers and line/Bezier bridge verified.
+These internal modules are not app-integrated; generic tangent persistence,
+reference remapping and UI/browser workflows remain next. No app build claimed.
+Claim released; full parity active.
+
+
+### 2026-09-09 — Codex finite curve tangency handoff
+
+Changed Core solver types/entities/residuals/tests and Trim reference remapping;
+CAD DOM test, solver guide and STATUS/parity ledger. New persisted curve refs
+carry parameter in [0,1]; endpoints exposed in panel. 102 Core / 195 CAD tests,
+Core check and CAD build pass. Native reopen and Trim metadata preservation
+verified. Curved fillet integration, sliding contacts and browser QA remain open.
+Claim released; full parity active.
+
+- **2026-09-09 Codex handoff — Curved fillet authoring:** changed Core `operations/fillet-curves.ts`, tests, sketch exports, CAD modification panel and DOM tests; updated operation/UI READMEs, parity ledger, STATUS and mailbox. 107 Core/196 CAD tests pass; Core tsc and CAD build pass. Original source remains unchanged on unsupported references/unstable joins. No live browser verification; remaining connected-path/radius-intent work documented. Claim released.
+
+- **2026-09-09 Codex handoff — Connected curved fillets:** added Core `fillet-connected-curves.ts`, `fillet-constraints.ts`, tests; updated `fillet-curves.ts`, kernel tests, CAD modification panel/DOM tests and module docs/STATUS/parity/mailbox. 112 Core and 197 CAD tests pass; Core check/CAD build pass. Saved connected curved fillet extrudes successfully with OCCT; closed seam and two-edge ambiguity tests pass. Live browser remains unverified. Claim released.
+
+- **2026-09-09 Codex handoff — Curved fillet batches/editing:** modified Core fillet-batch, fillet-connected-curves, fillet-handle and connected tests; CAD modification panel/DOM tests; module READMEs, parity, STATUS and mailbox. 113 Core/198 CAD tests pass, Core check/CAD build pass. Mixed batch and shared radius persistence verified; browser discovery returns no available browser. Claim released.
+
+- **2026-09-09 Codex handoff — Sketch chamfer:** Core chamfer/test, break-line-corner, fillet refactor, exports/kernel tests; CAD chamfer panel, modification routing, tool instructions/catalog/count tests and DOM tests; README/STATUS/parity/mailbox. 117 Core/200 CAD tests, Core check/CAD build pass; reopened asymmetric bevel extrudes with OCCT. Remaining linked/two-edge/handle/browser acceptance documented. Claim released.
+
+- **2026-09-09 Codex handoff — Linked sketch dimensions:** Core dimension-links/types/residuals/solve, edit-dimension, chamfer/Delete/Trim/tests/exports; CAD constraint panel and DOM tests; module docs/STATUS/parity/mailbox. 121 Core/201 CAD tests pass; check/build pass. Native follower editing and driver-removal cases verified. New saved `valueFrom` contract documented; no live browser. Claim released.
+
+- **2026-09-09 Codex handoff — Two-edge chamfer:** Core line-corner-selection, fillet-lines refactor/intersection type, chamfer-lines, chamfer reverse orientation/tests/exports; CAD chamfer panel/DOM tests; module docs/parity/STATUS/mailbox. 124 Core/202 CAD tests and check/build pass; first-picked dimensions and virtual joins verified. Claim released; multi-segment/batch/handle/browser work remains.
+
+- **2026-09-09 Codex handoff — Linked chamfer batches:** Core chamfer-batch/tests, dimension-links/types/solve/edit-dimension/exports; CAD chamfer panel/DOM tests; module docs/parity/STATUS/mailbox. 127 Core/203 CAD tests, Core check/CAD build pass. Opposite-turn signed edit/removal and mounted vertex batches verified. Updated-client requirement documented; edge-pair batches/handle/browser work remains. Claim released.
+
+- **2026-09-09 Codex handoff — User priority interaction/icons:** changed CAD workspace, canvas/picking/selection drag/renderers/tests, ribbon/catalog/menu tests; Core drag-entity and diagnostic coordinates/state/tests/exports; shared SVG assets/ToolIcon; docs/STATUS/mailbox. 133 Core/207 CAD/149 UI tests, Core/UI checks and CAD/UI/Animation builds pass. Local DOF limits documented; browser remains unavailable. Prior chamfer-edit Core/test and shared dimension/fillet manipulator refactor preserved, dedicated chamfer UI still pending. Claims released with explicit remaining work.
+
+- 2026-09-09 Codex handoff: dropdown icon legibility released. Changed shared widgets.css illustrated-menu sizing and rectangle/center-rectangle/aligned-rectangle SVG assets, STATUS and mailbox. 207 CAD / 149 UI tests, UI typecheck, CAD/UI builds pass. Browser visual verification outstanding.
+
+- 2026-09-09 Codex handoff: rectangle relations released. Changed Core sketch/operations/rectangle-relations.ts + test, sketch/index.ts, kernel/part-evaluator.test.ts; CAD sketch/drawing-tool.ts and sketch-workspace.dom.test.jsx; STATUS/parity ledger/mailbox/briefing. 137 Core / 208 CAD tests, Core check and CAD build pass. New center construction geometry persists and is excluded from solids. Browser unavailable; broader parity remains active.
+
+- 2026-09-09 Codex handoff: polygon intent released. Changed Core operations/polygon-relations.ts + tests, sketch/index.ts, solver/solve.ts + README, kernel/part-evaluator.test.ts; CAD sketch/drawing-tool.ts, sketch-workspace.dom.test.jsx; STATUS/parity/mailbox/briefing. 143 Core / 209 CAD tests, Core check and CAD build pass. Construction circles persist and do not create extra solids. 100-sided sizing edits tested. Full parity and live browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: midpoint-line intent released. Changed Core operations/line-midpoint.ts + tests and sketch/index.ts; CAD sketch/drawing-tool.ts and sketch-workspace.dom.test.jsx; STATUS/parity/mailbox/briefing. 147 Core / 210 CAD tests, Core check and CAD build pass. Canonical construction point/midpoint relation survives pointer edits, undo and native persistence. Live browser and full parity still open.
+
+- 2026-09-09 Codex handoff: three-point circle intent released. Changed Core operations/circle-points.ts + tests, sketch/index.ts, kernel/part-evaluator.test.ts; CAD sketch/drawing-tool.ts, picking.ts + test, sketch-workspace.dom.test.jsx; STATUS/parity/mailbox/briefing. 151 Core / 212 CAD tests, Core check and CAD build pass. Three placement points persist and constrain circle edits; coincident point picking fixed. Full parity and live browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: center-point arc intent released. Changed Core operations/arc-center.ts + tests, sketch/index.ts, kernel/part-evaluator.test.ts; CAD sketch/drawing-tool.ts and sketch-workspace.dom.test.jsx; STATUS/parity/mailbox/briefing. 155 Core / 213 CAD tests, Core check/CAD build pass. Center relationships remain through radius edits, native persistence and extrusion. Broader arc parity and live browser remain open.
+
+- 2026-09-09 Codex handoff: tangent arc tool released. Changed Core operations/tangent-arc.ts + test, sketch/index.ts, kernel test; CAD tangent-arc-tool.ts, history.ts, drawing-tool.ts, preview.ts, tool-instructions.ts, sketch-workspace.ts, catalog/registry/main configuration, registry/DOM/ribbon tests; shared ToolIcon/tangent-arc SVG; STATUS/parity/mailbox/briefing. 160 Core / 216 CAD / 149 UI tests, Core/UI checks and CAD/UI/Animation builds pass. Workflow test caught and fixed active-path undo/redo loss via focused history extraction. Full parity/live browser remain open.
+
+- 2026-09-09 Codex handoff: tangent arc drag gesture released. Changed CAD sketch/tangent-arc-gesture.ts, sketch-workspace.ts, sketch-workspace.dom.test.jsx, sketch/tool-instructions.ts; STATUS/parity/mailbox/briefing. 220 CAD tests and CAD typecheck/build pass. Geometry remains unchanged during preview; release commits once, invalid/cancelled gestures add no undo step. Two-click workflow preserved. Live browser/full parity remain open.
+
+- 2026-09-09 Codex handoff: endpoint-first three-point arc released. Changed CAD sketch/drawing-tool.ts, preview.ts, tool-instructions.ts, sketch-workspace.ts, cad-tool-catalog.ts, workspace/ribbon DOM tests; STATUS/parity/mailbox/briefing. 223 CAD tests and CAD typecheck/build pass. Native representation unchanged. Browser discovery empty; drag-chord/immediate sizing and broader parity remain open.
+
+- 2026-09-09 Codex handoff: three-point arc chord drag released. Renamed CAD sketch/tangent-arc-gesture.ts to endpoint-drag-gesture.ts; added arc-chord-tool.ts; updated workspace/instructions/DOM tests and STATUS/parity/mailbox/briefing. 226 CAD tests and CAD typecheck/build pass. Gesture remains transient until curvature click; one pointer state machine serves both arc tools. Full parity/live browser remain open.
+
+- 2026-09-09 Codex handoff: immediate radius entry released. Changed Core sketch/operations/set-radius.ts + tests and sketch/index.ts; CAD sketch/recent-radius.ts, sketch-workspace.ts, sketch-workspace.dom.test.jsx; STATUS/parity/mailbox/briefing. 165 Core / 232 CAD tests, Core check and CAD build pass. Radius dimensions persist and existing drivers are reused; invalid/conflicting input is atomic. Live browser, expressions and document-unit entry remain open.
+
+- 2026-09-09 Codex handoff: radius document units released. Changed CAD sketch/recent-radius.ts, sketch-workspace.ts cleanup, sketch-workspace.dom.test.jsx; STATUS/parity/mailbox/briefing. 237 CAD tests and CAD typecheck/build pass. Shared unit catalog governs conversion; stored geometry/constraints remain millimeters. Full parity/live browser remain open.
+
+- 2026-09-09 Codex handoff: Rectangle icon clarity released. Changed core/assets/icons/tools/{rectangle,center-rectangle,aligned-rectangle}.svg; STATUS/mailbox/briefing. 149 UI tests, UI typecheck/build and CAD/Animation builds pass. Browser discovery empty. Curvature claim remains separate and in flight; no solver verification is implied by the artwork checks.
+
+- 2026-09-09 Codex handoff: Curvature released. Changed Core solver curve-continuity.ts + tests, types/residuals/entities/README; CAD constraint-panel/catalog/registry count tests and sketch-workspace DOM test; shared curvature.svg/ToolIcon; STATUS/parity/mailbox. 171 Core / 238 CAD tests, Core check/CAD build pass. UI 149/check/build and Animation build passed with icon in prior artwork checks. Persisted curvature kind requires updated readers. Finite-contact scope only; full parity and browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: Normal released. Changed Core solver normal.ts/test, types/residuals/README; CAD catalog/panel/count tests and sketch-workspace DOM test; shared normal.svg/ToolIcon; STATUS/parity/mailbox. 176 Core / 239 CAD / 149 UI tests, Core/UI checks, CAD/UI/Animation builds pass. New persisted normal kind; curve-to-plane and free contacts remain incomplete. No browser connection; full goal remains active.
+
+- 2026-09-09 Codex handoff: Offset initial geometry/workflow released. Changed Core operations/offset.ts + test/index; CAD modification-panel, sketch-workspace, tool-instructions, catalog, registry count/DOM tests; STATUS/parity/mailbox. 182 Core / 240 CAD tests, Core check/CAD build pass. Independent offsets are not full parity: association, general curves, full topology cleanup and browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: Persistent simple offsets released. Changed Core solver offset/types/residuals/dimension-links/README, operations offset/offset-relations + tests; CAD panel/catalog/count/DOM tests and modification-panel hint; STATUS/parity/mailbox. 185 Core / 241 CAD tests, Core check/CAD build pass. Shared driver/removal and signed dimension edits tested. Arc/chain offsets remain independent; full parity and browser acceptance open.
+
+- 2026-09-09 Codex handoff: Persistent arc offsets released. Changed Core solver offset/README, operations offset-relations and offset-arc-relations.test; CAD constraint/modification hints and default selection, sketch-workspace DOM tests; STATUS/parity/mailbox. 189 Core / 243 CAD tests, Core check/CAD build pass. Arc geometry has five independent association equations. Multi-edge/general-curve association and browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: Associative line-chain offset claim released. Changed Core curves/offset extraction, operation/relations/test, solver offset/types/entities/README, split/trim-references guards; CAD modification hint/DOM test; STATUS/parity/mailbox. 193 Core / 244 CAD tests, Core check and CAD/Animation builds pass. New contour reference requires updated readers. Topology remapping/general curves/browser acceptance remain incomplete.
+
+- 2026-09-09 Codex handoff: Offset manipulator released. Changed Core operations/offset-handle + test/index; CAD dimension/fillet/offset manipulators, modification-panel, sketch-workspace CSS/DOM test; STATUS/parity/mailbox. 198 Core / 245 CAD tests, Core check/CAD build pass. Signed drag/cancel/flip/Enter and existing fillet regressions verified. Browser unavailable; full parity remains active.
+
+- 2026-09-09 Codex handoff: Individual-edge offsets released. Changed Core offset-entities + tests/index and relation helper; CAD offset-panel extraction/modification routing/DOM tests; STATUS/parity/mailbox. 201 Core / 246 CAD tests, Core check/CAD build pass. Core source segment associations and UI edge toggle/native persistence verified. Full parity remains open.
+
+- 2026-09-09 Codex handoff: Mixed line/arc geometry released. Changed Core curves offset-carriers/offset-mixed + tests/offset dispatch; CAD offset-panel hint/DOM test; STATUS/parity/mailbox. 206 Core / 247 CAD tests, Core check/CAD build pass. Mixed copies remain independent; association/topology repair/general curves/browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: Mixed offset relationships released. Changed Core solver offset-mixed/offset/README, relation builder and offset-mixed-relations tests; CAD offset-panel hint/DOM test; STATUS/parity/mailbox. 210 Core / 248 CAD tests, Core check/CAD build pass. Singular tangent configurations, geometric error bounds, topology/branch repair and browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: Line/arc Slot released. Changed Core curves/operations/solver slot + tests/index/types/dimension links/residual dispatch/README and kernel test; CAD slot-panel/routing/tool catalog/instructions/count/DOM tests/constraint fields; shared slot.svg/ToolIcon; STATUS/parity/mailbox. 215 Core / 249 CAD / 149 UI tests, Core/UI checks, CAD/UI/Animation builds pass. Native new slot constraint kind; standalone centerline construction behavior documented. Remaining Slot variants and wider parity stay open.
+
+- 2026-09-09 Codex handoff: Slot handle released. Changed Core slot-handle/test/index; CAD slot-manipulator/panel, dimension-manipulator capture cleanup, sketch CSS/DOM tests; STATUS/parity/mailbox. 217 Core / 251 CAD tests, Core check/CAD build pass. Browser discovery empty; live capture and remaining variants/parity open.
+
+- 2026-09-09 Codex handoff: Dropdown icon clarity released. Changed core/assets/icons/tools/{rectangle,center-rectangle,aligned-rectangle}.svg, core/ui/src/widgets.css and coordination/STATUS docs. UI/CAD tests and builds, UI typecheck pass. Browser unavailable. Existing open-chain Slot claim remains unfinished.
+
+- 2026-09-09 Codex handoff: Open-chain Slot released. Changed Core curves/slot-chain.ts and slot.ts, operations/slot.ts/slot-handle.ts/slot-chain.test.ts, solver/slot.ts/slot-chain.ts, kernel test; CAD slot-panel.ts, DOM test/README; STATUS/parity/mailbox. 223 Core / 252 CAD tests, Core check/CAD build pass. Smooth joins retain tangency; corner topology changes, closed/spline slots and live browser remain incomplete. Full parity goal stays active.
+
+- Contract notice: symmetric constraint adds optional `axis: SketchEntityRef` to DrawingConstraint, required for symmetry. All geometry-reference remapping must carry that third reference; updated readers required.
+
+- 2026-09-09 Codex handoff: Symmetry released. Changed Core solver symmetric/types/residuals/solve/tests/README and operations reference remapping (delete, split, split-relations, trim-references, trim-extend, circle-references, break-line-corner, fillet-curves, fillet-connected-curves, line-corner-selection); CAD constraint-panel/catalog/count/DOM tests; shared ToolIcon/symmetric.svg; STATUS/parity/mailbox. Core228 + focused6/CAD253/UI149 tests and checks/builds pass. New axis reference contract, updated readers required. Broader symmetry and full sketch parity/live browser remain open.
+
+- Contract notice: add ellipse segment entity reference kind for supporting-locus constraints. Solver now includes positive ellipse radii and rotation among editable coordinates; existing ellipse contacts gain those degrees of freedom.
+
+- 2026-09-09 Codex handoff: Elliptical symmetry released. Changed Core solver entities/types/symmetric/solve/symmetric-ellipse.test/README, CAD constraint hint and DOM test, STATUS/parity/mailbox. 232 Core / 254 CAD tests, Core check/CAD+Animation builds pass. Per-segment ellipse loci verified; shared full-ellipse halves, singular endpoint robustness, ellipse relation topology remapping and live browser remain open.
+
+- Contract: persisted `ellipse-shape` constraint references the full two-half contour and retains matching positive radii, orientation and diameter endpoints. Updated readers required.
+
+- 2026-09-09 Codex handoff: Full ellipse shape released. Core ellipse-shape residual/ellipse-relations operation and tests, entities/types/residuals/index/README/kernel test; CAD drawing-tool/constraint-panel/catalog/count/DOM tests; STATUS/parity/mailbox. Core235/CAD255 tests, Core check/CAD build pass. New ellipse-shape vocabulary requires updated reader. Browser unavailable, full parity remains active.
+
+- Contract: quadrant constraint adds quadrant index 0–3 relative to ellipse local axes; captures nearest endpoint on creation and retains it during edits.
+
+- 2026-09-09 Codex handoff: Ellipse point constraints released. Core ellipse-contact residual/test/types/residuals/index/README; CAD constraint-panel/catalog/count/DOM tests; shared quadrant.svg/ToolIcon; STATUS/parity/mailbox. Core238/CAD256/UI149 tests and checks/builds pass. New quadrant choice persisted; automatic inference and browser verification remain open.
+
+- 2026-09-09 Codex handoff: Quadrant inference released. Changed Core operations/ellipse-snaps.ts + tests/index; CAD sketch-snapping.ts/test, sketch-workspace placement hook/DOM test/README; STATUS/parity/mailbox. Core240/CAD258 +95 focused editor tests pass, Core check/CAD build. Geometry snapping off prevents inference. Alternate gestures and full browser acceptance remain open.
+
+- 2026-09-09 Codex handoff: DXF import subset released. Core sketch/import/dxf modules/tests/README/index export/kernel test; CAD dxf-import-panel/import-command/workspace/catalog/registry/count/DOM tests and thin main registration; STATUS/parity/mailbox. Core244/CAD260 tests, Core check/CAD build pass. Exact bulged extrusion and unit/native/undo flow verified. Unsupported entities reject; full format and browser parity remain open.
+
+- 2026-09-09 Codex handoff: DXF curves released. Core import/dxf ellipse/polyline/entities/index/curves.test/README, kernel test; CAD DOM test; STATUS/parity/mailbox. Core249/CAD261 tests +5 focused import tests pass; Core check/CAD build. Imported full ellipses remain unconstrained geometry until user applies shape relation. Broader format/browser parity remains active.
+
+- 2026-09-09 Codex handoff: DXF placement released. CAD sketch/dxf-placement.ts, dxf-import-panel.ts, DOM tests; import README/STATUS/parity/mailbox. CAD263 +99 focused editor tests, CAD build pass. No Core geometry changes; reuses similarity transforms. Browser absent; custom anchors and placement snapping remain open.
+
+- 2026-09-09 Codex handoff: DXF contour joining released. Core import/join-contours.ts/test, DXF index/README/kernel test; CAD import-panel/DOM tests; STATUS/parity/mailbox. Core255/CAD264 tests, Core check/CAD build pass. Joined raw-line rectangle extrudes to expected dimensions. Branches/interior intersections/hole classification and browser verification remain open.
+
+### 2026-09-09 — Codex dropdown icons and nested DXF region handoff
+
+Changed seven dedicated tools SVGs (rectangle, center-rectangle, aligned-rectangle, arc, center-arc, midpoint-line, circle-three-point), STATUS/parity ledger/mailbox. Each dropdown variant retains its own asset; construction cues now consistent. 149 UI / 265 CAD tests and UI typecheck/build/CAD build pass. Browser discovery empty. Earlier region packet changes: Core regions/nesting and tests, import/classify-regions, DXF index/README, kernel evaluator/test; CAD dxf-import-panel and workspace DOM tests. 259 Core tests/check pass. Nested extrusion verified; sketch island fill compositing remains unverified/incomplete. Claims released; full parity remains open.
+
+### 2026-09-09 — Nested sketch region display handoff
+
+Changed Core sketch/regions/order.ts and tests, sketch/index.ts, kernel/part-evaluator.ts; CAD sketch/canvas-renderer.ts and focused DOM test; STATUS/parity/mailbox. Kernel and renderer share containment order. All six input permutations covered; source indices/geometry preserved. 261 Core / 266 CAD tests, Core check/CAD build pass. Browser connection discovery empty; live rendering verification remains open. Claim released.
+
+### 2026-09-09 — DXF spline import handoff
+
+Changed Core curves/bspline.ts and test, import/dxf/{spline.ts,spline.test.ts,entities.ts,dxf.test.ts,README.md}; CAD sketch/dxf-spline.dom.test.jsx; STATUS/parity/mailbox. Dedicated spline conversion emits exact polynomial spans; independent basis tests verify geometry. 266 Core / 267 CAD tests, Core check/CAD build pass. Rational/higher-degree/fit-only and associative source spline editing remain open. Browser discovery empty. Claim released.
+
+### 2026-09-09 — Fit-point spline authoring handoff
+
+Changed Core curves/fit-spline.ts/test and sketch/index; CAD sketch/fit-spline-tool.ts/DOM test, drawing-tool, preview, tool-instructions, contextual tool inventory in tangent-arc-tool, workspace completion wiring, command-count test and tool catalog; STATUS/parity/mailbox. Chord-parameterized natural cubic interpolation emits native spans. 268 Core / 268 CAD tests and Core check/CAD build pass. Live browser unavailable; persistent fit-point refitting/periodic closure remain incomplete. Claim released.
+
+### 2026-09-09 — Closed fit spline handoff
+
+Changed Core curves/periodic-spline.ts, fit-spline.ts/test, kernel/part-evaluator.test.ts; CAD sketch fit-spline-tool, drawing-tool, preview, tool-instructions and fit-spline DOM test; STATUS/parity/mailbox. Periodic linear-time solve preserves C2 across seam. 270 Core / 269 CAD tests, check/build pass; actual native reopened loop extrusion verified. Browser discovery empty, persistent refit editing remains open. Claim released.
+
+### 2026-09-09 — Persistent fit spline refitting handoff
+
+Changed Core solver spline-shape/types/residuals/entities/solve/README, operations spline-relations/test, sketch/index; CAD sketch fit-spline-tool/drawing-tool/constraint-panel/DOM tests, catalog and command/catalog count tests; STATUS/parity/mailbox. Saved whole-contour relationship derives handles from vertices. 276 Core / 269 CAD tests, check/build pass. Tests cover fixed-neighbor and seam drags, DOF/full definition, native persistence, topology guard and large satisfied-system validation. Browser unavailable; scalable iteration/diagnostics and topology insertion remain open. Claim released.
+
+### 2026-09-09 — Sketch projection geometry handoff
+
+Changed Core sketch/projection/{frame-map,conic,drawing,drawing.test}.ts and README, sketch/index, kernel/part-evaluator.test; STATUS/parity/mailbox. Exact solved curve projection into target frames, conic degeneracy errors, native extrusion acceptance. 281 Core tests/check and CAD build pass. Geometry-only foundation; next requires persisted stable references, source-edit propagation, broken-link reporting and UI integration. Claim released.
+
+### 2026-09-09 — Associative whole-profile projection handoff
+
+Changed Core document solid-features schema/validation, profile-projection.ts/test/index, kernel evaluator/test; CAD sketch-workspace direct-edit guard; projection README/STATUS/parity/mailbox. Profile projection stores sourceFeatureId only. Earlier-source validation, current geometry/frame resolution and chained rebuild work. 285 Core / 269 CAD tests/check/build pass, including real changed-radius projected extrusion. Project UI, stable subentities and recovery remain pending. Claim released.
+
+### 2026-09-09 — Whole-sketch projection editor handoff
+
+Changed CAD sketch/projection-editor.ts/DOM test, canvas-renderer/grid test, feature-authoring routing/registration, registry/count test/catalog, sketch README; Core feature-history dependencies/profile-projection test; STATUS/parity/mailbox. Reference-only create/relink previews and safe apply; dependency cascade handles projection links. 286 Core / 273 CAD tests, check/build pass. Browser discovery empty. Stable subentities/mixed sketch editing and invalid-file recovery remain open. Claim released.
+
+### Codex handoff — 2026-09-09: arc centers and contour reference identity
+
+Changed Core document reference helper/schema/resolver/export/tests, sketch drawing ID validation, projection ID preservation and copy/offset/trim/join identity rules; CAD projection-editor preservation/test; CAD sketch-snapping/tests and constraint-panel plus workspace DOM test; Core arc-center reuse/test. Updated STATUS, parity roadmap and mailbox OUT. Verification: 290 Core / 277 CAD tests pass; Core check and CAD build. Browser list empty. Arc snapping is positional; automatic concentric inference is still open. Individual-contour projection creation GUI, advanced constraints and remaining full parity are not complete. Both bounded claims released; unrelated working-tree edits preserved, no commit.
+
+### Codex handoff — 2026-09-09: persistent center snaps
+
+Added Core center-snaps module/tests/export; CAD snap candidate reuse and workspace inference integration with DOM test; sketch README, STATUS, parity roadmap and mailbox updated. 293 Core / 278 CAD tests pass, Core check and CAD build pass. Native persistence, constrained movement and undo/redo tested. Alternate gestures and live browser remain open. Claim released; no commit, unrelated changes preserved.
+
+### Codex handoff — 2026-09-09: endpoint and origin inference
+
+Changed Core operations/point-snaps.ts/tests and sketch/index.ts; CAD sketch-workspace.ts/DOM tests; STATUS, parity ledger and mailbox. 297 Core / 279 CAD tests pass; check/build pass. Canvas gestures use explicitly placed points, avoiding automatic fixation of generated centers. Numeric placement and alternate gesture limitations documented. Claim released, no commit, unrelated work preserved.
+
+### Codex handoff — 2026-09-09: line alignment inference
+
+Changed Core operations/alignment-snaps.ts/tests and sketch/index.ts; CAD sketch/drawing-inference.ts, workspace integration/DOM tests and README; STATUS, parity roadmap, mailbox. 299 Core / 280 CAD tests, Core check/CAD build pass. Browser discovery empty. New axis-aligned line segments retain constraints; broader guides and alternate gestures remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: midpoint inference
+
+Changed Core operations/midpoint-snaps.ts/tests and sketch/index.ts; CAD sketch-snapping.ts, drawing-inference.ts and workspace DOM tests; STATUS, parity ledger, mailbox. 301 Core / 281 CAD tests pass; Core check/CAD build pass. Shared midpoint geometry supports lines/arcs; native relationship survives endpoint edits and save. Live browser still outstanding. Claim released; unrelated work preserved, no commit.
+
+### Codex handoff — 2026-09-09: selected contour projection UI
+
+Changed CAD sketch/projection-source-selection.ts, projection-editor.ts/DOM tests and README; STATUS, parity ledger and mailbox. 283 CAD tests and production typecheck/build pass. Core unchanged (last verified 301 tests). Stable source IDs are committed with references; cancellation and broken-contour repair tested. Segment/vertex and mixed authored/projected geometry plus live browser acceptance remain open. Claim released, no commit.
+
+### Codex handoff — 2026-09-09: driving diameter dimensions
+
+Changed Core solver types/residuals/dimension-links and diameter tests, operations split-relations/set-radius; CAD constraint panel, catalog and registry/catalog tests, workspace DOM test; STATUS, parity ledger, mailbox. 304 Core / 284 CAD tests pass; Core check/CAD build pass. Native diameter drives circles/arcs and survives split/edit/link workflows. Full graphical dimensions and browser acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: axis distance dimensions
+
+Changed Core solver types/residuals/dimension-links and axis-distance tests; CAD constraint-panel/catalog, registry/catalog tests and workspace DOM test; STATUS/parity/mailbox. 306 Core / 285 CAD tests pass, Core check/CAD build pass. Signed X/Y driver contract documented in UI. Full graphical dimension placement and browser parity remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: canvas dimension annotations
+
+Changed CAD sketch/dimension-annotations.ts, canvas-renderer.ts/DOM test, constraint-panel.ts, sketch-workspace.css and workspace DOM test; STATUS/parity/mailbox. 287 CAD tests and build pass; Core unchanged, last verified 306 tests. Annotations select canonical editors; no duplicate dimension truth. Positioning polish, other dimension kinds and live browser acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: angular annotations and axis guides
+
+Changed CAD sketch/angular-dimension-layout.ts/tests, dimension-annotations.ts, canvas-renderer DOM tests and sketch-workspace.css; STATUS/parity/mailbox. 290 CAD tests and build pass. Core unchanged, last verified 306 tests. Automatic layout only; manual placement, overlap handling, offset/slot and browser acceptance remain open. Claim released, no commit.
+
+### Codex handoff — 2026-09-09: offset and slot annotations
+
+Changed CAD sketch/dimension-annotations.ts and canvas-renderer DOM tests; STATUS/parity/mailbox. 292 CAD tests and build pass; Core unchanged. Offset signs, full slot span and keyboard event isolation verified. Browser list empty; manual placement/overlap and full parity remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: manual dimension-label placement
+
+Changed Core document sketch-presentation.ts/tests and PartDocument schema/validation; CAD dimension-label-drag.ts, history.ts, canvas renderer/dimension annotations, workspace integration/DOM test and README; STATUS/parity/mailbox. 308 Core / 293 CAD tests, Core check/CAD build pass; 110 workspace tests rerun after focus adjustment. Solver geometry unchanged; positions persist independently. Automatic leaders still need tracking and browser visuals remain unverified. Claim released, no commit.
+
+### Codex handoff — 2026-09-09: manual label connectors
+
+Changed CAD dimension-label-leader.ts, dimension annotations/drag, workspace/canvas DOM tests; STATUS/parity/mailbox. 294 CAD tests and build pass. Core unchanged. Connector behavior tested through geometry edits, drag/cancel/undo. Full dimension-line relocation, overlap handling and live browser acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: X/Y dimension-line relocation
+
+Changed CAD axis-dimension-layout.ts, dimension annotations/leader integration, canvas/workspace DOM tests; STATUS/parity/mailbox. 296 CAD tests and build pass. Core unchanged. Saved and dragged label positions move X/Y lines/guides while preserving source endpoints; cancellation verified. Other layouts and browser visuals remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: aligned dimension lines
+
+Renamed CAD axis-dimension-layout.ts to linear-dimension-layout.ts; updated dimension annotations/leader and canvas tests; STATUS/parity/mailbox. 297 CAD tests and build pass; Core unchanged. Diagonal length/distance guides preserve span/parallelism under manual positioning. Remaining layouts, overlap handling and live browser acceptance open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: curved dimension placement
+
+Changed CAD curved-dimension-layout.ts, angular layout/annotations/leader integration and canvas tests; STATUS/parity/mailbox. 299 CAD tests/build passed; additional cancellation test followed by 12 passing canvas tests. Core unchanged. Arc scale, radial direction, visible-arc attachment and restore verified. Overlap handling, broader parity and live browser visuals remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: automatic label spacing
+
+Changed CAD dimension-label-spacing.ts, annotation integration and canvas tests; STATUS/parity/mailbox. 301 CAD tests and build pass. Manual positions pinned; automatic label separation/determinism/nonmutation verified. Core unchanged. Geometry collisions, dense layout viewport fitting and browser visual acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: reference dimensions
+
+Changed Core measured-dimension module/tests, solver types/residuals/links/solve, set-radius and sketch exports; CAD constraint panel/annotations/workspace DOM test; STATUS/parity/mailbox. 311 Core / 302 CAD tests, Core check/CAD build pass. Reference dimensions measure live geometry with no equations; invalid driving links rejected. Conversion UI, offset/slot reference and live browser acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: dimension mode conversion
+
+Changed Core operations/dimension-reference.ts/tests and sketch exports; CAD constraint-panel/workspace DOM test; STATUS/parity/mailbox. 313 Core / 303 CAD tests pass, Core check/CAD build pass. Conversion keeps IDs and values, respects reference non-driving semantics, and supports undo/native persistence. Offset/slot references and full browser/parity remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: point-to-line dimensions
+
+Changed Core solver/point-line-measurement.ts/tests, residuals, measured-dimension, split-relations and sketch exports; CAD constraint-panel, dimension-annotations and canvas DOM tests; STATUS/parity/mailbox. 315 Core / 304 CAD tests, Core check/CAD build pass. Perpendicular supporting-line measurement works in either reference order, driving edits and reference conversion tested. Browser verification remains outstanding. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: parallel-line dimensions
+
+Changed Core solver/line-line-measurement.ts/tests, residuals, measured-dimension and sketch exports; CAD constraint-panel, dimension-annotations, canvas DOM tests and sketch-workspace DOM tests; STATUS/parity/mailbox. 318 Core / 306 CAD tests, Core check/CAD build pass. Native persistence and mounted creation/edit/undo covered; browser verification remains outstanding. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: selected-entity constraint state
+
+Changed Core diagnostics.ts, diagnostic-rank.ts, entity-observables.ts, entity-diagnostics.test.ts and solver README; CAD selection-constraint-status.ts, sketch-workspace.ts and workspace DOM tests; STATUS/parity/mailbox. 320 Core / 307 CAD tests, Core check/CAD build pass. Browser discovery `[]`; local numerical/singular and canvas coloring limitations documented. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: entity constraint colors
+
+Changed Core diagnostics.ts, entity-diagnostics.test.ts, sketch/index.ts and solver README; CAD geometry-constraint-colors.ts, canvas-renderer.ts/tests and sketch-workspace.css; STATUS/parity/mailbox. 321 Core / 309 CAD tests, Core check/CAD build pass. Single/batch agreement, mixed state, dimension update, construction metadata and cubic controls verified. Live theme visuals remain outstanding. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: associative pattern geometry
+
+Changed Core curves/similarity.ts, operations transform/pattern/pattern-relations/tests, solver types/residuals/pattern and README; CAD catalog/command registry/constraint panel generated-relation filtering, modification-panel hint and workspace DOM test; STATUS/parity/mailbox. 324 Core / 310 CAD tests, Core check/CAD build pass before final explanatory copy edit. Fixed transforms only; editable grouping/topology/live mirror and browser acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: associative mirror/live axis
+
+Changed Core curves/reflection.ts, operations/mirror.ts and mirror-relations/operations tests, solver residuals and README; CAD mirror-axis-control.ts, modification-panel.ts and workspace DOM tests; STATUS/parity/mailbox. 326 Core / 311 CAD tests, Core check/CAD build pass. Whole-axis-contour selection is excluded; post-creation reassignment/edge selection/topology/browser remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: saved mirror-axis editing
+
+Changed Core operations/mirror-edit.ts/tests, sketch exports and solver README; CAD mirror-relation-editor.ts, constraint-panel.ts and workspace DOM test; STATUS/parity/mailbox. 328 Core / 312 CAD tests, Core check/CAD build pass. Per-relation edits preserve identities and support undo/native save. Grouped controls/topology/browser remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: canonical pattern groups
+
+Changed Core pattern-groups.ts, drawing.ts, solver types/residuals, operations pattern.ts/pattern-group.ts/tests/pattern-relations.test.ts, sketch exports and solver README; CAD pattern-group-editor.ts, constraint-panel.ts and workspace DOM test; STATUS/parity/mailbox. 330 Core / 313 CAD tests, Core check/CAD build pass. Canonical shared placement edits shipped; count changes and legacy grouping intentionally remain incomplete. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: pattern count editing
+
+Changed Core operations/pattern-resize.ts/tests, pattern-group.ts/group test; CAD pattern-group-editor.ts and workspace DOM test; STATUS/parity/mailbox/solver README. 333 Core / 314 CAD tests, Core check/CAD build pass. Surviving identities, count edits, dependent-removal rejection and native history verified. Partial-detachment repair, suppression and browser acceptance remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: pattern membership repair
+
+Changed Core pattern-repair.ts/tests, pattern-resize.ts and sketch exports; CAD pattern-group-editor.ts and workspace DOM test; STATUS/parity/mailbox/solver README. 335 Core / 315 CAD tests, Core check/CAD build pass. Detached geometry preservation, restored membership/count editing and undo/native persistence verified. Suppression, edge/topology/browser remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: pattern-instance suppression
+
+Changed Core solver types/residuals/pattern-suppression.ts, operations pattern-suppression.ts/tests, pattern-group.ts, pattern-resize.ts and exports; CAD constraint-panel.ts and workspace DOM test; STATUS/parity/mailbox/solver README. 338 Core / 316 CAD tests, Core check/CAD build pass. Identity regression caught/retested after CAD suite. Suppression/resize/native behavior verified; batch edge/topology/browser remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: whole-placement suppression
+
+Changed Core operations/pattern-placement.ts/tests and exports; CAD pattern-placement-controls.ts, pattern-group-editor.ts and workspace DOM test; STATUS/parity/mailbox/solver README. 340 Core / 317 CAD tests, Core check/CAD build pass. Atomic multi-source placement control and undo/native behavior verified. Edge-level/topology/manipulator/browser work remains open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: selected-edge mirrors
+
+Changed Core solver/pattern-source.ts/residuals, operations/mirror-entities.ts/tests/mirror-edit.ts, exports and README; CAD mirror-source-control.ts, modification-panel.ts, mirror-relation-editor.ts and workspace DOM test; STATUS/parity/mailbox. 342 Core / 318 CAD tests, Core check/CAD build pass. Same-contour axes and source propagation verified; browser `[]`. Direct picking/joining/edge groups/topology remain open. Claim released; no commit.
+
+### Codex handoff — 2026-09-09: mirror canvas picking
+
+Changed CAD mirror-source-control.ts, mirror-source-selection.ts, modification-panel.ts, sketch-workspace.css and workspace DOM test; Core sketch source projection export; STATUS/parity/mailbox. 319 CAD tests, Core check/CAD build pass. Toggle/axis/cancel/reopen/native workflow verified. Live browser visuals and broader parity remain open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Selected-edge grouped patterns verified. Changed Core `solver/pattern-source{,-key}.ts`, suppression validation, pattern creation/edit/resize/repair/placement/suppression operations and tests/export; CAD `sketch/source-control.ts`, `source-selection.ts` (renamed mirror source helpers), modification wiring, styles and mounted tests. Updated STATUS/parity/mailbox. Core 345 and CAD 320 tests pass, Core check and CAD build pass. Browser unavailable. No commits or unrelated changes touched; claim released.
+
+- 2026-09-09 Codex handoff: Ellipse centers now selectable and snappable with persistent concentric relations. Changed Core operations/ellipse-center.ts + test, center-snaps.ts, solver/residuals.ts, sketch/index.ts; CAD sketch/center-controls.ts, constraint-panel.ts, mounted tests and README. STATUS/parity/mailbox updated. Core 347 / CAD 321 tests, Core check and CAD build pass. Full parity and live browser acceptance open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Ellipse axes use persistent quadrant-constrained construction lines. Changed Core ellipse-axes.ts/test/index, CAD ellipse-axis-controls.ts/constraint-panel/mounted tests/README, STATUS/parity/mailbox. Core 349 / CAD 322 tests, Core check and CAD build pass. No live browser acceptance claimed. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Quadrant reassignment implemented. Changed Core quadrant-edit.ts/test/index, CAD quadrant-editor.ts/constraint-panel/mounted tests/README, STATUS/parity/mailbox. Core 351 / CAD 323 tests, Core typecheck and CAD build pass. No browser acceptance claim. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Circle-locus continuity. Changed Core solver/circle-continuity.ts/test, residuals.ts, curve-continuity.test.ts; CAD constraint hints and mounted tests; STATUS/parity/mailbox. Core 354 / CAD 324 tests, Core typecheck/CAD build pass. No browser verification claimed. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Whole-spline symmetry. Changed Core solver/symmetric-spline.ts/test, symmetric.ts, residuals.ts/types.ts; CAD constraint-panel and mounted tests; STATUS/parity/mailbox. Optional splineReversed persists correspondence. Core 356 / CAD 325 tests, Core typecheck/CAD build pass. No browser acceptance claim. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: DXF anchor placement. Changed CAD sketch/dxf-anchor.ts, dxf-placement.ts, dxf-import-panel.ts, mounted tests/README; STATUS/parity/mailbox. CAD 326 tests and build (typecheck included) pass. Core unchanged, baseline 356. Snapping is placement-only, no persistent attachment. Browser acceptance open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: DXF layer selection. Changed Core DXF records/layers/index/test/README and sketch export; CAD dxf-layer-control/import-panel/mounted tests; STATUS/parity/mailbox. Core 359 / CAD 327 tests, Core typecheck and CAD build pass. Layers filter import only; metadata/style persistence remains open. No browser acceptance claimed. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Extend point boundaries. Changed Core curves/point-boundaries.ts, operations/trim-extend.ts, extend-curves.ts, extend-points.test.ts; CAD mounted test; STATUS/parity/mailbox. Core 362 / CAD 328 tests, Core check and CAD build pass. Exact geometric termination only; automatic boundary attachments not added. Browser verification open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Extend point attachments. Changed Core extension-point-link.ts/test, trim-extend.ts, extend-curves.ts, extend-points.test.ts; CAD mounted test; STATUS/parity/mailbox. Core 364 / CAD 328 tests, Core typecheck and CAD build pass. General curve boundaries not yet linked; browser verification open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Extend curve attachments. Changed Core operations/extension-boundary.ts/test, extension-point-link.ts, solver/residuals.ts/entities.ts; CAD constraint hints/mounted test; STATUS/parity/mailbox. Core 367 / CAD 329 tests, Core typecheck and CAD build pass. Cubic fixed-parameter vs conic/line locus behavior documented; full parity/browser verification open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Sliding contacts. Changed Core contact-parameters.ts/test, types.ts, solve.ts, diagnostics.ts, drag-entity.ts, extension-boundary.ts; CAD constraint-panel and mounted test; STATUS/parity/mailbox. Optional curve ref sliding flag persists relation-owned bounded parameter. Core 371 / CAD 330 tests, Core check/CAD build pass. New Extend cubic contacts slide; old contacts remain fixed. Browser acceptance open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Saved contact modes. Changed Core operations/contact-mode.ts/test/export; CAD contact-mode-editor.ts/constraint-panel/mounted tests/README; STATUS/parity/mailbox. Core 373 / CAD 331 tests, Core typecheck and CAD build pass. Geometry and relation ID stable during mode changes. Browser verification/full parity open. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Split contact remapping. Changed Core split-contact.ts/test and split.ts; CAD mounted test; STATUS/parity/mailbox. Core 375 / CAD 332 tests, Core typecheck/CAD build pass. Geometry/contact IDs preserved; unsupported control/whole-fit topology still rejects. No browser acceptance claim. Claim released; no commit.
+
+- 2026-09-09 Codex handoff: Sketch origin dimension reference released. Changed Core operations/sketch-origin.ts/test/index, CAD sketch/origin-control.ts/constraint-panel.ts/mounted test and STATUS/mailbox/ledger. Core 377 / CAD 333 tests, Core check/CAD build pass. Live browser unavailable; no full parity claim. No commit.
+
+- 2026-09-09 Codex handoff: Trim contact remapping released. Changed Core trim.ts/trim-references.ts/trim-contact.ts/test, CAD mounted test, STATUS/parity/mailbox/ledger. Core 380 / CAD 334 tests, typecheck/build pass. No commit; no live-browser or full-parity claim.
+
+- 2026-09-09 Codex handoff: Extend contact remapping released. Changed Core extension-contacts.ts/test/trim-extend.ts/extend-curves.ts, CAD mounted test and STATUS/parity/mailbox/ledger. Core 382 / CAD 335 tests, typecheck/build pass. No commit; live browser and full parity remain open.
+
+- 2026-09-09 Codex handoff: Unified line Trim released. Changed Core trim.ts/trim-extend.ts/operations.test.ts/README, STATUS/parity/mailbox/ledger. Core 383 / CAD 335 tests, check/build pass. No commit; full parity/browser remains open.
+
+- 2026-09-09 Codex handoff: Edge-on conic projection released. Changed Core projection/collapsed-conic.ts/test/drawing.ts/test/README, CAD projection DOM test, STATUS/parity/mailbox/ledger. Core 386 / CAD 336 tests, check/build pass. No commit. Nearly singular conics and broader projection/browser parity remain open.
+
+- 2026-09-09 Codex handoff: DXF planar OCS released. Changed Core import/dxf coordinates.ts/test/entities.ts/ellipse.ts/README, CAD mounted test and STATUS/parity/mailbox/ledger. Core 390 / CAD 337 tests, check/build pass. No commit; full parity/browser still open.
+
+- 2026-09-09 Codex handoff: Polygon side-count editing released. Changed Core polygon-definition.ts/polygon-sides.ts/test/index/README; CAD polygon-controls.ts/constraint-panel/mounted test; STATUS/parity/mailbox/ledger. Core 394 / CAD 338 tests, check/build pass. No commit; full parity/browser remains open.
+
+- 2026-09-09 Codex handoff: Polygon attachment remapping released. Changed Core polygon-attachments.ts/test/polygon-sides.ts/README, CAD mounted test and STATUS/parity/mailbox/ledger. Core 396 / CAD 339 tests, check/build pass. No commit. Browser unavailable; full goal remains open.
+
+- 2026-09-09 Codex handoff: Polygon edit preview released. Changed CAD polygon-controls.ts/polygon-preview.ts/constraint-panel.ts/sketch-workspace.ts/mounted test/README and STATUS/parity/mailbox/ledger. CAD 340 tests and build/typecheck pass; Core unchanged. No commit; full goal/browser remains open.
+
+- 2026-09-09 Codex handoff: Saved-constraint UI extraction released. Changed CAD sketch/constraint-panel.ts/saved-constraints.ts/README and STATUS/mailbox/ledger. CAD 340 tests and build/typecheck pass; behavior preserved, Core unchanged. No commit. Full goal remains open.
+
+- 2026-09-09 Codex handoff: Circular slots released. Changed Core circular-slot operation/solver/tests, slot operation/solver/handle/types, kernel test; CAD slot-panel/mounted test; README/STATUS/parity/mailbox/ledger. Core 400 / CAD 341 tests, check/build pass. No commit. Noncircular closed chains and full/browser parity remain open.
+
+- 2026-09-09 Codex handoff: Closed-chain slots released. Changed Core closed-slot geometry/operation/residual, slot operation/solver/handle/types, offset-mixed, operation/kernel tests; CAD slot-panel and mounted tests; README/STATUS/parity/mailbox. Core 404 / CAD 342 tests, typecheck/build pass. Circular creation consolidated into closed-slot operation. No commit. Browser verification and full parity remain open.
+
+- 2026-09-09 Codex handoff: Offset collinear-contact guard released. Changed Core curves/line-overlap.ts, line-overlap.test.ts, offset.ts and README/STATUS/parity/mailbox. Core 407 / CAD 342 tests and typecheck/build pass. Browser query returned []; no live acceptance claim. No commit.
+
+- 2026-09-09 Codex handoff: Core cubic spline-point insertion released. Changed operations/insert-spline-point.ts + tests, sketch/index.ts, README/STATUS/parity/mailbox. Core 410 tests and check, CAD build pass. Exact insertion, saved smoothness, drag and repeated/contact remapping tested. Next: ribbon/pointer/preview/undo UI integration; fit-spline/control remapping remains unsupported. No commit.
+
+- 2026-09-09 Codex handoff: Cubic insertion UI released. Changed CAD sketch/tool-instructions, direct-modification, preview; sketch-workspace routing and mounted tests; tool catalog/test and command-registry test; README/STATUS/parity/mailbox. CAD 345 tests/build pass; Core unchanged from 410-test baseline. No commit. Live browser and fit-spline/control remapping remain open.
+
+- 2026-09-09 Codex handoff: Fit-spline insertion released. Changed Core fit-spline, solver types/shape/residuals, insertion operation/helper/tests; CAD preview/mounted test; README/STATUS/parity/mailbox. Core 412 / CAD 346 tests/check/build pass. Optional splineSpanIntervals preserves natural/periodic parameterization on insertion; old missing-field behavior unchanged. Browser and broader spline-reference parity remain open. No commit.
+
+- 2026-09-09 Codex handoff: Spline tangent handles released. Changed Core spline-handle operation/tests/index; CAD spline-handle-controls, constraint-panel, mounted tests; README/STATUS/parity/mailbox. Core 415 / CAD 347 tests, check/build pass. Handles reuse native controls and existing coincidence semantics; UI selection matches reference fields. Control remapping/browser acceptance still open. No commit.
+
+- 2026-09-09 Codex handoff: Cubic control remapping released. Changed Core types/entities/control-point, split/control helper+tests, split-contact test and spline-handle equality; CAD mounted test; README/STATUS/parity/mailbox. Core 417 / CAD 348 tests/check/build pass. Optional controlScale preserves dimension/fixed control semantics across repeated raw/fitted insertion. No commit; full/browser parity still open.
+
+- 2026-09-09 Codex handoff: Mixed projection model released. Changed Core solid-features/profile-projection/tests and mixed-projection module; CAD projection-editor/test; docs/README/STATUS/parity/mailbox. Core 419 / CAD 349 tests/check/build pass. Optional authored drawing stays independent of derived topology; relinking preserves it. Next: authoring editor integration, cross-projection references. Browser remains unavailable. No commit.
+
+- 2026-09-09 Codex handoff: Mixed projection authoring UI released. Changed projection-authoring helper, workspace routing, projection-editor, CSS and mounted tests; README/STATUS/parity/mailbox. CAD 351 tests/build pass. Core unchanged from 419 tests. Source updates on reopen; authored history/save separate. Next cross-projection references/snapping/constraints; live browser still unverified. No commit.
+
+- 2026-09-09 Codex handoff: Projected constraint resolution released. Changed solver types/solve, projected-constraints module/tests, mixed-projection, profile-projection tests, solid-features/part-document validation; docs. Core 423 / CAD 351 tests/check/build pass. External contour IDs resolve to immutable runtime geometry and preserve sliding parameters. UI context, stable segment identity and browser acceptance remain next. No commit.
+
+- 2026-09-09 Codex handoff: Projected editor context released. Changed Core drawing/entities/projected-context/index/solid-features and native rejection test; CAD constraint-panel/projection-authoring/mounted tests; docs. Core 424 / CAD 352 tests/check/build pass. Selector-based external constraints, undo/native/source-update verified; context stripped/rejected for storage. Pointer picking/snapping/identity assignment remain next. No commit.
+
+- 2026-09-09 Codex handoff: Projected canvas selection released. Changed projected-picking/helper tests, workspace routing, selection renderer/status/drag, mounted test; README/STATUS/parity/mailbox. CAD 355 tests/build pass. Core unchanged from 424 tests. Canvas constraints preserve source immutability; snapping/identity assignment still pending. No commit.
+
+- 2026-09-09 Codex handoff: Projected point snaps released. Changed Core projected-snaps module/tests/index; CAD snapping/drawing-inference/mounted test; README/STATUS/parity/mailbox. Core 426 / CAD 356 tests/check/build pass. Persistent endpoint/center/midpoint external snaps verified against source edits. Quadrant/locus snapping and broader identity handling remain open. No commit.
+
+- 2026-09-09 Codex handoff: Whole projection identities released. Changed Core profile-contour-identities/tests/index; CAD projection-source-selection/editor tests; README/STATUS/parity/mailbox. Core 428 / CAD 357 tests/check/build pass. Preview/cancel atomicity, upstream chains, persistence/reordering, source repair and authoring availability verified. Stable subentity topology remains open. No commit.
+
+- 2026-09-09 Codex handoff: stable projected segment references implemented in Core drawing/solver types, new solver/segment-reference module, projection/identity assignment, projected snapping and CAD projected picking. Regression tests cover inserted edges, broken identities, validation, projection preservation and picker capture. Core 430 / CAD 357; Core check and CAD build pass. Updated STATUS, parity ledger and projection README. Browser discovery [] — no live acceptance. Vertex/topology remapping and full parity remain open. Claim released; unrelated changes preserved.
+
+- 2026-09-09 Codex handoff: stable projected endpoint references. Added focused vertex-reference resolver/capture, optional path vertex identities/validation, atomic identity assignment and projection preservation; extended segment reference dispatch so projected selector/picker/snap consumers capture endpoint IDs. Tests cover inserted-edge/moved-endpoint constraints, deletion, closed seams, ambiguous IDs, native save/reopen and picker capture. Core432 suite + updated 3-test identity suite; CAD357 + picker suite, Core check, CAD build pass. Docs updated. Split/trim remapping and live browser acceptance remain open; claim released.
+
+- 2026-09-09 Codex handoff: Split identity preservation in operations/split.ts, new split-identities module/tests, and curves/subdivide.ts ellipse identity handling. Original terminal vertices survive; local identified contacts/controls remap to child IDs. External replaced whole-edge links fail explicitly. Core435/CAD357, Core check/CAD build pass. STATUS, ledger, operation README updated; live browser remains outstanding. Claim released.
+
+- 2026-09-09 Codex handoff: Trim identities in operations/trim.ts, trim-references.ts, new trim-identities.ts/test. Retained intervals govern output IDs; stable local references normalize then remap. Fixed moved-start identity alias bug. Core437/CAD357/check/build pass after correcting a missing fixed-point test coordinate. STATUS/ledger/operations README updated. Multi-contour lineage and live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: selected-contour identity assignment. Added document/identify-sketch-contour.ts shared helper; updated profile-contour-identities/reference, selected-source UI and Core/UI tests. Existing contour IDs no longer bypass edge/vertex assignment; derived-source selections identify upstream geometry atomically. Core439/CAD358/check/build pass. STATUS/ledger/projection README updated. Full parity/live acceptance remain open; claim released.
+
+- 2026-09-09 Codex handoff: projected quadrant snaps in operations/projected-snaps, new projected-quadrants tests; circle-compatible quadrant frame/residuals/index; CAD constraint panel and snap test. Core441/CAD359/check/build pass. Circle source center/radius edits drive the relation; ellipse candidates retain edge IDs. Docs updated. Continuous snapping/finite-span updates/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: continuous projected snapping in new Core projected-curve-snap module/test, projected inference/index, CAD snapping/test. Finite paths persist sliding curve coincidence with stable IDs; circles persist radial coincidence. Core443/CAD360/check/build pass. Source edit + fixed-point regression verifies parameter movement; UI priority tested. Docs updated. Live pointer acceptance/performance/topology lineage remain open. Claim released.
+
+- 2026-09-09 Codex handoff: new CAD sketch/projected-curve-workflow.dom.test.jsx verifies pointer curve snapping, Undo/Redo, native save/reopen, source edits, read-only source preservation and quadrant source updates. CAD362/build pass; Core unchanged (prior443 baseline). Sketch README, STATUS and ledger updated. Browser discovery []: mounted integration only, live acceptance not claimed. Claim released.
+
+- 2026-09-09 Codex handoff: DXF block import via new blocks.ts/tests, index/layers integration and shared mapSketchDrawing affine entry. Nested base-point transforms/nonuniform conics/arrays/reflections/layer inheritance supported. Core447/CAD362/check/build pass; fixed eager polyline decoding caught by layer tests. STATUS/ledger/DXF README updated with Autodesk references and limitations. Attributes/xrefs/tilted geometry/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: conic scale robustness in projection/drawing.ts/conic.ts, new conic.test.ts and DXF block scale regression. Separate import/frame collapse tolerance; normalized matrix and determinant minor radius avoid scale-dependent collapse/cancellation. Core450/CAD362/check/build pass. STATUS/ledger/projection README updated. Extreme precision/frame policy/live acceptance remain open; claim released.
+
+- 2026-09-09 Codex handoff: new sketch/dxf-block-workflow.dom.test.jsx passes layer/filter/ellipse preview/placement/undo/native reopen integration. Production unchanged (prior Core450/CAD362 full baseline); new targeted test passed. Corrected DXF README/parity row, added sketch README/STATUS acceptance notes. Live browser acceptance remains open. Claim released.
+
+- 2026-09-09 Codex handoff: retained sourceLayer metadata in drawing validation/DXF index/join/projection, new layer-persistence tests and default-layer fixture update. CAD selection status displays provenance; mounted block workflow checks native retention and selected label. Core452/CAD363/check/build pass, updated mounted test separately passes. Docs updated; full layer management/style/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: circular-quadrants module/tests, angular-span helper, ellipse-snap inference integration/projected reuse, quadrant frame/residuals and CAD panel arc selection. Core455/CAD363/check/build pass. Fixed degenerate draft arc snap regression caught by CAD suite. STATUS/ledger/operations README updated; ellipse finite spans/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: elliptical finite quadrant spans in ellipse-contact/residuals/index/ellipse-snaps and CAD panel; new elliptical-quadrants solver tests. Core458/CAD363/check/build pass. Full constrained ellipses remain unrestricted; local/external finite arcs enforce spans. STATUS/ledger/operations README updated. Interactive singular/topology/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: full ellipse trim conversion via ellipse-locus solver/types and trim-ellipse-relations, trim/remap integration, new native-persistence tests. CAD panel/catalog icon and registry counts integrated after failing app checks exposed omissions. Core460/CAD363/check/build pass. STATUS/ledger/operations README updated. Interactive/mounted/live acceptance remains open. Claim released.
+
+- 2026-09-09 Codex handoff: new ellipse-trim-workflow.dom.test.jsx passes authored ellipse/cutters → pointer Trim → Undo/Redo → native reopen with retained conic relations. Production unchanged from460/363 baseline; targeted test passed. STATUS/ledger/sketch README updated. Live browser acceptance remains open; claim released.
+
+- 2026-09-09 Codex handoff: Split full ellipses completed in Core split.ts, new split-ellipse-relations.ts/test, renamed shared retained-ellipse-relations.ts and trim.ts import. Shared conic and quadrant reference conversion verified through repeated splits. Core461/CAD364/check/build pass. STATUS, parity ledger and operations README updated. Live browser/full parity acceptance remain open; claim released.
+
+- 2026-09-09 Codex handoff: dimensioned ellipse Split verification plus axis creation/reuse correction. Changed operations/ellipse-axes.ts, new ellipse-axis-references.ts and split-ellipse-dimensions.test.ts; STATUS/ledger/README updated. Core463/CAD364/check/build pass. Tests cover JSON persistence, changing both dimensions, linked-arc creation/reuse and missing-endpoint rejection. Browser list remains empty; live/full parity acceptance outstanding. Claim released.
+
+- 2026-09-09 Codex handoff: mounted ellipse-split-workflow.dom.test.jsx exposed sequential X-diameter solve failure. Fixed via Core solver/ellipse-locus-coordinates.ts + focused test and solve.ts integration. Core465/CAD365/check/build pass. STATUS, parity ledger and solver README updated. No format changes. Live browser/full parity acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: linked ellipse diagnostics fixed in solver/diagnostics.ts and diagnostic-coordinates.ts, with new diagnostic-residuals.ts/ellipse-diagnostics.test.ts. Previous split reported false over-constraint/6DOF; now8, then7/6 after diameters, selected diameter3. Duplicate conic relations still flagged. Core466/CAD365/check/build pass. STATUS/ledger/solver README updated. Full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: fixed projected/identified curve diagnostics in solver/entity-observables.ts and diagnostics.ts with new projected-diagnostics.test.ts. Core469/CAD365/check/build pass. STATUS/ledger/solver README updated. Existing projected read-only UI label unchanged; full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: CAD sketch/selection-constraint-status.ts now validates projected references through Core resolve; new selection-constraint-status.dom.test.jsx covers missing/replaced identity, restoration and deselection. CAD366/build pass; Core unchanged from469 baseline. STATUS/ledger updated. Browser list empty; full parity remains active. Claim released.
+
+- 2026-09-09 Codex handoff: imported circle layer preservation fixed in Core operations/split.ts and trim.ts, with imported-layer-edits.test.ts covering real DXF input, subsequent arc splitting, native roundtrip and trim/cutter isolation. Core471/CAD366/check/build pass. STATUS/ledger/DXF README updated. Full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: selected-edge pattern stability fixed in Core solver/pattern-source.ts and pattern-source-key.ts with pattern-source-identities.test.ts. Available IDs captured, stale indexes normalized, membership scoped by stable ID, extracted edge layers retained. Core473/CAD366/check/build pass. STATUS/ledger/solver README updated, including stale selected-edge support statement. Full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: stable mirror-axis validation/capture in Core pattern-source.ts, operations/mirror-entities.ts, mirror-edit.ts and new mirror-identities.test.ts. CAD source-control.ts and mirror-relation-editor.ts use normalized comparison/filtering/preselection. Final Core475/CAD366/check/build pass after axis capture addition. STATUS/ledger/solver README updated. Full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: added CAD sketch/mirror-relation-editor.dom.test.jsx. Actual menu handles reordered stable axis, source/instance exclusions, cancellation, save and native roundtrip. Targeted test passes; production unchanged from475/366/check/build baseline. STATUS/ledger updated. Live browser/full parity remain open. Claim released.
+
+- 2026-09-09 Codex handoff: stable offset/slot references in Core operations/offset-entities.ts, offset-relations.ts, slot.ts, curves/slot.ts and new source-edge-identities.test.ts. Source IDs retained/captured; slot residual lookup normalizes IDs. Core477/CAD367/check/build pass. STATUS/ledger/operations README updated. General topology/full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: new Core operations/source-edge-handles.test.ts verifies offset and slot handle geometry/dimension editing after source insertion and drawing serialization. Both targeted tests pass; production unchanged477/367 full baseline. STATUS/ledger updated. Live/full parity acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: CAD sketch/source-control.ts now matches stable IDs during source picking; new source-control.dom.test.jsx covers insertion, highlight, toggle and replacement rejection. CAD368/build pass; Core production unchanged477 baseline plus prior two targeted handle tests. STATUS/ledger updated. Full parity/live acceptance remain open. Claim released.
+
+- 2026-09-09 Codex handoff: fresh pattern source edge IDs assigned atomically via new operations/identify-source-edges.ts and pattern-group.ts integration. Updated pattern-edges.test.ts for identified memberships; pattern-source-identities.test.ts now covers fresh/preidentified insertion/native persistence and input immutability. Core480/CAD368/check/build pass; final focused identity tests pass after added immutability assertions. STATUS/ledger/operations README updated. Other creation paths/full parity/live acceptance remain open. Claim released.
+
+### Codex — fresh associative source identity handoff (2026-09-09)
+
+Changed Core operations mirror-entities.ts, mirror-edit.ts, offset-entities.ts, slot.ts, identify-source-edges.ts; curves/slot.ts; focused mirror/source-edge identity tests; CAD sketch-workspace.dom.test.jsx mirror metadata expectations; operations README, STATUS, parity ledger and Codex OUT. Selected authored sources acquire stable IDs atomically; slot boundaries no longer duplicate centerline IDs. Full Core 482 / CAD 368 tests passed; Core check and CAD build passed, existing size warning only. Live browser acceptance and overall sketch parity remain outstanding. Claim released.
+
+### Codex — DXF face import handoff (2026-09-09)
+
+Changed Core import/dxf/filled-face.ts, filled-face.test.ts, entities.ts, coordinates.ts, README.md; CAD sketch/dxf-face-workflow.dom.test.jsx; STATUS, parity ledger and mailbox OUT. SOLID/TRACE import as validated editable closed boundaries. Full Core 486 / CAD 368 tests and Core check/CAD build passed; subsequent mounted editor test passed separately. Four full-run process handles confirmed exit 0. Live browser and complete parity still outstanding. Claim released.
+
+### Codex — DXF face extrusion verification (2026-09-09)
+
+Added core/engine/src/kernel/dxf-face-evaluation.test.ts and updated STATUS, parity ledger and mailbox OUT. Four targeted real-kernel tests passed, including native reopen, scaling, expected volume/depth and watertight triangulated boundaries for quad/triangle/concave/negative-normal inputs. Core typecheck passed. No production files changed. Prior full-suite baseline retained; live browser and broader parity remain open. Claim released.
+
+### Codex — retained Split line spans (2026-09-09)
+
+Changed operations/split.ts, split-line-span.ts, split-line-span.test.ts and README; CAD sketch/split-span-workflow.dom.test.jsx; STATUS, parity ledger and Codex OUT. Original midpoint/equal-length semantics preserved through a visible construction span linked to outer endpoints. Full Core 491 / CAD 369 suites, check/build passed (all four process handles exit 0); added mounted Split-span workflow passed separately afterward. Broader topology/parity and live browser acceptance outstanding. Claim released.
+
+### Codex — Split arc midpoint preservation (2026-09-09)
+
+Changed operations/split.ts, split-arc-span.ts, split-span-links.ts, split-line-span.ts, split-arc-span.test.ts, split-relations.test.ts and README; STATUS, parity ledger and OUT. Retains original angular midpoint via endpoint/circle-linked construction geometry and shared endpoint linking. Core final full 493 passed after correcting outdated invalid rejection fixture; CAD 370/check/build passed with no later production edits. Browser list empty. Arc mounted workflow/full browser and broader parity acceptance outstanding. Claim released.
+
+### Codex — Arc Split editor acceptance (2026-09-09)
+
+Added Aether CAD/src/sketch/split-arc-workflow.dom.test.jsx; updated STATUS, parity ledger and OUT. Targeted mounted workflow passes Split/native reopen/saved radius edit/undo/redo/second save and reopen. No production changes, prior full-suite/check/build baseline retained. Live browser acceptance still outstanding. Claim released.
+
+### Codex — Center arc direction handoff (2026-09-09)
+
+Changed Core primitives.ts and center-arc-direction.test.ts; CAD sketch arc-direction-control.ts, drawing-tool.ts, preview.ts, tool-instructions.ts, center-arc-direction.dom.test.jsx, README and minimal workspace wiring; STATUS, parity ledger and OUT. Clockwise/counterclockwise selection updates live preview and exact saved geometry. Full Core495/CAD372 tests, Core check/CAD build passed; all process handles exit 0. Broader parity/live browser remain open. Claim released.
+
+### Codex — Elliptical arc authoring handoff (2026-09-09)
+
+Changed claimed Core elliptical-arc.ts/tests, primitives/index; CAD drawing-tool, preview, arc-direction-control, instructions, elliptical-arc DOM test, catalog/registry test/README; shared ToolIcon and new SVG; STATUS/parity/OUT. Four-point conic authoring uses shared geometry, temporary guide, selectable linked center and direction. Full Core498/CAD373/UI149 pass; checks/builds pass. CAD suite/build reran after correcting count/type issues. Remaining variant gaps explicitly listed in ledger; overall/full browser parity open. Claim released.
+
+### Codex — partial ellipse diameter controls (2026-09-09)
+
+Changed Core ellipse-support.ts, ellipse-axes.ts, ellipse-axis-references.ts, partial-ellipse-dimensions.test.ts, split-ellipse-dimensions.test.ts and operations README; CAD partial-ellipse-dimensions.dom.test.jsx; STATUS/parity/OUT. Missing finite axes are supplied by linked visible construction conic, reused on repeat selection. Sequential dimensions and persisted constraints verified. Core499/CAD374/check/build pass (all handles exit0). Immediate entry, axis-start/inference and live/full parity outstanding. Claim released.
+
+### Codex — immediate ellipse diameter entry (2026-09-09)
+
+Changed Core set-ellipse-diameter.ts/test and sketch exports; CAD recent-ellipse.ts, recent-curve-sizing.ts, recent-ellipse.dom.test.jsx, minimal workspace lifecycle wiring and README; STATUS/parity/OUT. Inline sequential diameters persist as ordinary drivers, with atomic combined apply. Core501/CAD376/check/build pass, all handles exit0. Live/browser and full parity remain open. Claim released.
+
+### Codex — elliptical arc solid acceptance (2026-09-09)
+
+Added kernel/elliptical-arc-evaluation.test.ts; updated STATUS/parity/OUT. Two real OCCT tests pass after native reopen, with fixed endpoint quadrant semantics, diameter edits, one body/depth and display-mesh volume within 3% of analytic expectation. Construction ellipse/axes excluded. Core check passed. No production change; previous full baseline retained. Full parity/live browser still open. Claim released.
+
+### Codex — elliptical arc axis-start option (2026-09-09)
+
+Changed Core elliptical-arc/primitives/tests; CAD elliptical-radius-control, drawing-tool, preview, instructions, axis-start DOM test and workspace wiring/README; STATUS/parity/OUT. Numeric secondary radius enables primary-axis start and persists a normal driving dimension. Core504/CAD377/check/build passed, all handles exit0. Remaining pointer-only remembered-radius/inference and browser/full parity documented. Claim released.
+
+### Codex — pointer-sized elliptical axis starts (2026-09-09)
+
+Changed Core elliptical-arc/primitives/tests; CAD radius control, drawing-tool, preview, instructions, pointer-start DOM test, workspace/README; STATUS/parity/OUT. Gesture-local remembered width used only for ambiguous axis starts. Explicit numeric radius wins; later gestures reset. Core505/CAD378/check/build pass; all handles exit0. Browser list empty. Guide quadrant inference and remaining full parity outstanding. Claim released.
+
+### Codex — elliptical guide quadrant inference (2026-09-09)
+
+Changed Core elliptical-guide-snap.ts/test, ellipse-endpoint-quadrants.ts, exports; CAD drawing-tool/workspace, guide-snap DOM test, README; STATUS/parity/OUT. Canonical construction guide snaps and optional retained endpoint quadrant constraints. Initial DOM selector corrected; full suite exposed tiny center drift fixed in production. Final Core507/CAD380/check/build all pass, handles exit0. Full/live-browser parity remains open. Claim released.
+
+### 2026-09-09 — Codex: stable arc-center selection
+
+Released arc-center.ts/test and CAD center-controls.ts/dom.test.jsx plus STATUS/parity/mailbox documentation. Stable IDs survive preceding edge insertion and radius edits; UI reuses the center. Full Core509/CAD381 and Core check passed; final UI test and CAD build passed. Existing chunk warning only. No browser session available; live acceptance remains open. No commit or unrelated file edits.
+
+### 2026-09-09 — Codex: semicircle inference
+
+Released Core semicircle-snap.ts/test, operations/semicircle.ts/test, sketch/index.ts, CAD sketch/drawing-tool.ts, sketch-workspace.ts, sketch/semicircle.dom.test.jsx and existing workspace regression expectations; README/STATUS/parity/mailbox docs updated. Replaced redundant midpoint equations with center-on-chord equation after diagnostics caught over-constraint. Full Core517/CAD383 tests, Core check and CAD build green; existing size warning. Browser list empty, live/full parity outstanding. No commit or unrelated edits.
+
+### 2026-09-09 — Codex: calculated curve dimension entry
+
+Released Core quantity-expression.ts/test and units.ts/test, CAD sketch/recent-radius.ts, recent-ellipse.ts and expression-entry.dom.test.jsx; sketch README, STATUS, parity and mailbox updated. Safe numeric arithmetic before display-unit conversion; no saved expression graph claimed. Full Core546/CAD385 tests, Core check and CAD build passed, existing chunk warning. Live browser unavailable. Full goal remains active; no commits or unrelated changes.
+
+### 2026-09-09 — Codex: constraint arithmetic entry
+
+Released CAD sketch/constraint-panel.ts, saved-constraints.ts, constraint-expression.dom.test.jsx; README, STATUS, parity and mailbox updated. Creation/editing share Core arithmetic parser; numerical input only, atomic rejection. CAD388 tests/build passed; Core unchanged (546 baseline). Existing size warning. Browser discovery empty; live/full parity still open. No commits or unrelated edits.
+
+### 2026-09-09 — Codex: document units in constraint panels
+
+Released CAD sketch/dimension-input.ts, constraint-panel.ts, saved-constraints.ts, constraint-units.dom.test.jsx; README/STATUS/parity/mailbox updated. Length/angle fields and pending calculations follow selected units with canonical numeric persistence and subscription disposal. CAD390 tests/build passed, final instructions corrected; Core unchanged. Existing size warning; no browser sessions. Full parity goal remains open; no commits/unrelated edits.
+
+### 2026-09-09 — Codex: unit-aware annotations and pending edits
+
+Released CAD sketch/dimension-label-units.ts, dimension-annotations.ts, dimension-manipulator.ts, constraint-panel.ts, sketch-workspace.ts and annotation-units.dom.test.jsx; README/STATUS/parity/mailbox updated. Labels use document units without rebuilding inputs; label activation preserves pending edits. CAD392 tests/build passed, Core unchanged. Existing size warning and no browser sessions. Full parity remains open. No commits or unrelated edits.
+
+Contract note: optional valueScale (dimensionless nonzero finite) and valueOffset (canonical mm/degrees) extend existing valueFrom links. Follower = valueScale * valueSign * driver + valueOffset. No duplicate literal value. Existing sign-only links remain valid.
+
+### 2026-09-09 — Codex: affine dimension dependencies
+
+Released claimed Core solver types/link resolution/validation, reference/removal/edit operations, new link-dimension operation and affine tests; CAD dimension-link-editor.ts/test and saved-constraints integration; README/STATUS/parity/mailbox docs. Contract announcement precedes implementation above. Core555/CAD393 tests, Core check and CAD build green, existing size warning. Live browser unavailable; named variables/multi-input formulas/full parity remain open. No commits/unrelated edits.
+
+### 2026-09-09 — Codex: unlink dimension relationships
+
+Released Core link-dimension.ts/unlink-dimension.test.ts/index export and CAD dimension-link-editor.ts/test; operation/sketch READMEs, STATUS/parity/mailbox updated. Unlink preserves value/geometry/downstream IDs; UI supports undo/native persistence. Core557/CAD393 tests, Core check and CAD build pass. Existing size warning; no browser sessions. Full goal remains open; no commits/unrelated edits.
+
+### 2026-09-09 — Codex: linked fillet edit integration
+
+Released Core fillet-radius-edit.ts, fillet-handle.ts, linked-fillet.test.ts; CAD modification-panel.ts and linked-fillet.dom.test.jsx; operation README/STATUS/parity/mailbox docs. Fillet reads/edits resolved dimensions, reference measurements are not editable handles. Core559/CAD394/check/build green. Existing size warning; no browser sessions. Full parity remains open. No commits or unrelated edits.
+
+### 2026-09-09 — Codex: linked ring kernel acceptance
+
+Released new core/engine/src/kernel/linked-ring-evaluation.test.ts and STATUS/parity/mailbox documentation. Four native-roundtripped affine-radius ring scenarios evaluate through real OCCT to expected hollow-body radii/depth/volume. Targeted four tests + Core check pass. No implementation changes/full-suite rerun; previous full Core559/CAD394 baseline retained. Full parity and browser/wheel acceptance remain open. No commits or unrelated edits.
+
+
+### 2026-09-09 — Codex: constrainable retained text frame
+
+Changed Core sketch/text/frame.ts, frame.test.ts, edit.ts, records.ts, README.md; solver/text-coordinates.ts; sketch/index.ts; CAD sketch/text-items.ts, text-frame.dom.test.jsx, README.md; STATUS/parity/OUT. Frame remains construction geometry; width is independent, height scales letters, and rewording preserves frame identities/constraints with solved output. Full Core604/CAD403/check/build passed (all handles exit0). Browser discovery empty; direct canvas box gestures and overall parity remain unfinished. Claim released.
+
+
+### 2026-09-09 — Codex: canvas text frame placement
+
+Changed CAD sketch/text-box-placement.ts, text-box-placement.dom.test.jsx, text-panel.ts, text-placement.ts, README.md; Core sketch/text/edit.ts, frame.ts, frame.test.ts, README.md, sketch/index.ts; STATUS/parity/OUT. Drag/two-corner placement previews cached text with shared frame geometry and snapping; Core creates/updates frames atomically. Four mounted real-font cases and one Core case added. Full Core605/CAD407/check/build passed, all handles exit0. Direct existing-frame resize handles and full/live-browser parity remain unfinished. Claim released.
+
+
+### 2026-09-09 — Codex: retained text pointer editing
+
+Changed Core sketch/text/drag.ts, drag.test.ts, README.md; operations/drag-entity.ts; CAD sketch/text-drag.dom.test.jsx, README.md; STATUS/parity/OUT. Seeded whole-group pointer translation preserves metadata/digest before constraint solving, allowing free text motion and anchored frame-corner resizing. Three Core cases plus one real-font mounted selection/native case. Full Core608/CAD408/check/build pass, all handles exit0. Browser discovery empty. Dedicated unconstrained resize handles and full parity still open. Claim released.
+
+
+### 2026-09-09 — Codex: explicit retained text resize handles
+
+Changed Core sketch/text/resize.ts, resize.test.ts, README.md, sketch/index.ts; CAD sketch/text-resize.ts, text-resize.dom.test.jsx, text-panel.ts, text-items.ts, README.md; STATUS/parity/OUT. Dedicated handles use one Core operation with temporary corner targets, preserve baseline/rotation/flips and glyph proportions, reject locked-dimension conflicts and guard stale commits. Four Core and three real-font DOM cases added. Full Core612/CAD411/check/build pass; all handles exit0. Browser discovery empty; overall sketch/text/live acceptance remains open. Claim released.
+
+
+### 2026-09-09 — Codex: multiline retained text
+
+Changed Core sketch/text/content.ts, shaping.ts, outline.ts, records.ts, edit.ts, multiline.test.ts, outline.test.ts, README.md; CAD sketch/text-panel.ts, text-multiline.dom.test.jsx, README.md, sketch-workspace.css; STATUS/parity/OUT. Newline normalization/per-line shaping, blank-line spacing, textarea preview/update and first-line frame semantics persist through native reopening and resizing. Core615/CAD412/check passed; final styled production build passed (all handles exit0). Full Text parity not claimed: frame-center flips, ascender sizing, variable expressions, mixed-script layout and live browser remain. Claim released.
+
+
+### 2026-09-09 — Codex: frame-center text flips
+
+Changed Core sketch/text/placement.ts, frame.ts, frame-width.ts, records.ts, edit.ts, resize.ts, frame-flips.test.ts, README.md; solver/text-coordinates.ts; sketch/index.ts; CAD sketch/text-panel.ts, text-box-placement.ts, text-resize.ts, text-frame-flips.dom.test.jsx, README.md; STATUS/parity/OUT. Optional persisted convention preserves legacy geometry; new framed text centers reflection inside stationary frame. Independent width moves reflected letters consistently in solver/resize. Four Core plus real-font mounted/native tests. Final Core619/CAD413/check/build passed, all final handles exit0; initial preview assertion fixed for float-rounding tolerance. Ascender sizing/text expressions/mixed-script/live acceptance remain. Claim released.
+
+
+### 2026-09-09 — Codex: default text baseline constraint
+
+Changed Core sketch/text/baseline.ts, baseline.test.ts, frame.ts, edit.ts, frame.test.ts, drag.test.ts, resize.test.ts, README.md; CAD sketch/text-baseline.dom.test.jsx, text-drag.dom.test.jsx, README.md; STATUS/parity/OUT. Creation-only horizontal inference appears in normal controls, preserves/remaps on rewording, and respects removal. Rotated/already-constrained text skips redundant relations. Final Core622/CAD414/check/build pass, all final handles exit0; updated drag/resize expectations for the intended default. Ascender sizing/text expressions/mixed-script/live parity remain. Claim released.
+
+
+### 2026-09-09 — Codex: ascender-based text sizing
+
+Changed Core sketch/text/font.ts, height.ts, height.test.ts, outline.ts, records.ts, placement.ts, frame.ts, edit.ts, README.md; sketch/index.ts; CAD sketch/text-height.ts, text-height.dom.test.jsx, text-panel.ts, text-box-placement.ts, text-resize.ts, text-placement.dom.test.jsx, README.md; STATUS/parity/OUT. Explicit physical height converts via font ascender, native ratio supports synchronous frame/flip/solver meaning, gestures/handles agree. Four Core plus real-font mounted entry/native/resize/undo tests; mocked placement fixture now supplies font metrics. Full Core626/CAD415/check/build pass, all handles exit0. Browser discovery empty; text expressions/mixed-script/full parity remain. Claim released.
+
+
+### 2026-09-09 — Codex: shared typed expressions and native variables
+
+Changed Core expressions/values.ts, parser.ts, evaluate.ts, functions.ts, expressions.test.ts, README.md; quantity-expression.ts/test; document/variables.ts/test, part-document.ts, index.ts; CAD sketch/dimension-input.ts, constraint-units.dom.test.jsx, README.md; STATUS/parity/OUT. Native definitions resolve SI dimensions/strings with dependency/cycle validation; numeric fields reuse bounded parsing with new functions. Added 37 Core cases and enhanced mounted numeric-unit cases. Final Core663/CAD415/check/build passed; all final handles exit0, earlier error-message/test-table failures corrected. Variable editor/text bindings and automatic regeneration are not claimed; full/live parity stays open. Claim released.
+
+
+### Dimension and arc-center verification handoff
+
+2026-09-09 — Rechecked requested sketch dimensions, constraints and arc-center snaps. Existing implementation supports saved driving/reference dimensions, editable values, constraint/DOF feedback and persistent arc-center inference. Focused Core 30/30 and mounted CAD 163/163 tests passed (including 156 workspace workflows); both processes exited 0. Browser discovery returned no sessions, so live viewport acceptance remains outstanding. No implementation changes needed for this verification; full parity remains unfinished.
+
+
+### Retained text expression handoff — 2026-09-09
+
+Changed claimed text expression/regeneration/edit/records modules, sketch exports, six tests, README and STATUS/parity/coordination. Full Core668/CAD415/check/build passed; sixth multi-item atomic rollback test and final typecheck passed. Next: document-wide variable transactions and cached-wording validation, then draft-aware variable/text UI and browser acceptance. No document cache validation is claimed yet. All process handles exited 0.
+
+
+### Document variable transaction handoff — 2026-09-09
+
+Prior goal turn classified as progress: retained text formulas/regeneration implemented. This turn changed claimed document text validation/variable transaction modules, six tests, minimal validator/exports wiring, text README and STATUS/parity/coordination. Core675/CAD415/typecheck/build all passed, final handles exited 0. Initial test fixture missing required document name corrected. Variable/text-expression editor, draft/undo integration and browser acceptance remain; full ledger stays open.
+
+
+### Text expression UI handoff — 2026-09-09
+
+Previous goal turn classified as progress (document transactions/native validation). Changed claimed focused text-expression UI/test, text-panel integration, one workspace getter and README/STATUS/parity/coordination. CAD416/build passed; final22 text tests/build passed after stale-preview guard. All handles exited 0. Live browser unavailable. Next: variable-definition editing within a sketch draft, undo snapshots and finish/cancel document transactions; full goal remains active.
+
+
+### Sketch draft variable handoff — 2026-09-09
+
+Previous turn classified as progress (text expression UI). Changed claimed variables UI/two workflow tests, history snapshots, minimal workspace wiring, Core combined variable/profile transaction/two tests, compatibility expression workflow test and README/STATUS/parity/coordination. Core677/CAD417/check/build passed; final2 variable UI tests passed. All handles exited 0. Variables now drive retained text through UI; dimensional expression bindings and live browser/full parity remain.
+
+
+### Dimension formula handoff — 2026-09-09
+
+Previous goal turn classified as progress (draft-variable editor). Changed claimed dimension solver/types/operations and five tests, native validation/transaction and sketch exports, draft variable regeneration/one mounted radius test, README/STATUS/parity/coordination. Core682/CAD418/check/build passed; final3 variable UI tests pass. All handles exited 0. Formula-authoring controls and tool-propagation audit remain, alongside broader live/full parity.
+
+
+### Saved dimension formula UI handoff — 2026-09-09
+
+Previous turn classified as progress (native dimension formulas). Changed claimed focused formula UI/test, saved constraint presentation, panel getter/focus handling, minimal workspace variable getter, README/STATUS/parity/coordination. CAD420/build and final2 workflow tests passed; initial selector matched SVG instead of row and was corrected. All handles exited 0. Initial-creation formula input, geometry-tool propagation audit and live/full parity remain next.
+
+
+### Initial dimension formula handoff — 2026-09-09
+
+Previous turn classified as progress (saved formula editor). Changed claimed constraint-formula UI/three workflows, minimal creation-panel wiring, Core public resolver export and README/STATUS/parity/coordination. CAD424/build/Core check passed; all handles exited 0. Read-only inspection of operations/transform.ts shows copySketchContours intentionally keeps only original constraints, so copied geometry loses relations. Next: verify reference copy behavior and implement remapping/preservation, including formulas. Full/live parity remains open.
+
+
+### Constraint-preserving copy handoff — 2026-09-09
+
+Previous turn classified as progress (initial formula creation). Read official Transform reference; changed claimed Core copy-constraint module/five tests, transform/pattern wiring and public export; added UI copy toggle/preview/workflow and README/STATUS/parity/coordination. Core687/CAD425/check/build passed; final copy workflow/build passed after hint. All handles exited 0. Clipboard transport, retained text metadata, arbitrary-rotation DOF replacement and move constraint adaptation remain. Full/live parity remains open.
+
+
+### Editable text copy handoff — 2026-09-09
+
+Previous turn classified as progress (constraint-preserving Transform copies). Changed claimed focused text-copy module/four tests, copy/pattern wiring, one real-font mounted Transform workflow, READMEs/STATUS/parity/coordination. Core691/CAD426/check/build passed; all handles exited 0. Frame-centered reflected text needs frame reference remapping and rejects explicitly; clipboard, arbitrary-rotation DOF replacement, move adaptation and live/full parity remain.
+
+
+### Sketch clipboard contract handoff — 2026-09-09
+
+Previous turn classified as progress (editable text copies). Changed claimed clipboard format/variable modules/five tests, document exports and shared copy append primitive; STATUS/parity/coordination updated. Core696/CAD426/check/build passed; all handles exited 0. Next: focused browser clipboard UI with selected contours, native copy/paste events or clipboard API, placement preview and one geometry/variables checkpoint; native form text copy must remain unaffected. Full/live parity stays open.
+
+### Codex handoff — browser sketch clipboard, 2026-09-09
+
+Released browser clipboard claim. Changed CAD `sketch/clipboard.ts`, `clipboard.dom.test.jsx`, `README.md`, workspace wiring, STATUS/parity ledger and coordination docs. Native copy/paste and explicit preview apply use the Core payload with atomic drawing/variable undo; pending previews block Finish. Full CAD suite429 passed before the final integration test was added; focused4 then passed. CAD build/typecheck passed. Existing Core696 verification remains valid (no Core changes). Browser list empty; actual clipboard permissions/visual acceptance remain open. No commit or unrelated changes staged.
+
+### Codex handoff — mirrored retained text placement, 2026-09-09
+
+Released mirrored placement claim. Core text copy/placement/records/frame/edit + tests/README now preserve frame-centered reflected copies with optional `placementReflected`; CAD text-panel/box-placement and new reflection DOM test carry the same orientation. Updated STATUS/parity/contributor/coordination docs. Core698 tests, Core check and CAD build passed. Broad CAD run430 existing tests passed; new test initially exposed overly exact SVG float assertion, corrected numerical-tolerance test then passed independently. No browser visual acceptance; no commit. Files remain scoped to claimed text modules and documentation.

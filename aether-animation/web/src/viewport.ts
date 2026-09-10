@@ -4,6 +4,7 @@
 // right-handed Y-up, so transforms pass through unchanged.
 
 import * as THREE from "three";
+import type { StandardViewportView, ViewportOrientation } from "@aether/ui";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { assetURL } from "./engine";
 import type { PartSummary, PartTransform } from "./engine";
@@ -20,6 +21,39 @@ export class AnimationViewport {
   private running = true;
   private orbit = { yaw: 0.6, pitch: 0.4, distance: 0.8 };
   private target = new THREE.Vector3();
+  private cameraRoll = 0;
+  private lastOrientation = new THREE.Quaternion();
+  private onOrientation?: (orientation: ViewportOrientation) => void;
+
+  setOrientationHandler(handler: (orientation: ViewportOrientation) => void): void {
+    this.onOrientation = handler;
+    handler(this.camera.quaternion.toArray() as [number, number, number, number]);
+  }
+
+  setStandardView(view: StandardViewportView): void {
+    const views = { front: [0, 0], back: [Math.PI, 0], right: [Math.PI / 2, 0], left: [-Math.PI / 2, 0], top: [0, Math.PI / 2 - 0.00001], bottom: [0, -Math.PI / 2 + 0.00001] };
+    [this.orbit.yaw, this.orbit.pitch] = views[view];
+    this.cameraRoll = 0;
+  }
+
+  nudgeView(horizontal: number, vertical: number): void {
+    this.orbit.yaw += horizontal * Math.PI / 12;
+    this.orbit.pitch = Math.max(-Math.PI / 2 + 0.00001, Math.min(Math.PI / 2 - 0.00001, this.orbit.pitch + vertical * Math.PI / 12));
+  }
+
+  rollView(quarterTurns: number): void { this.cameraRoll -= quarterTurns * Math.PI / 2; }
+
+  fitView(): void {
+    this.orbit.yaw = 0.6;
+    this.orbit.pitch = 0.4;
+    this.cameraRoll = 0;
+    const bounds = new THREE.Box3();
+    for (const object of this.partObjects.values()) if (object.visible) bounds.expandByObject(object);
+    if (!bounds.isEmpty()) {
+      bounds.getCenter(this.target);
+      this.orbit.distance = Math.max(0.15, bounds.getSize(new THREE.Vector3()).length() * 1.4);
+    }
+  }
   private onPick?: (part: string | null, extend: boolean) => void;
   private connectorMode = false;
   private onConnectorPick?: (pick: ConnectorPickInfo) => void;
@@ -168,7 +202,12 @@ export class AnimationViewport {
       this.target.z + distance * Math.cos(yaw) * Math.cos(pitch)
     );
     this.camera.lookAt(this.target);
+    this.camera.rotateZ(this.cameraRoll);
     this.camera.updateProjectionMatrix();
+    if (!this.lastOrientation.equals(this.camera.quaternion)) {
+      this.lastOrientation.copy(this.camera.quaternion);
+      this.onOrientation?.(this.camera.quaternion.toArray() as [number, number, number, number]);
+    }
   }
 
   private scaleTriad(triad: THREE.Object3D): void {
@@ -252,6 +291,7 @@ export class AnimationViewport {
       }
     });
     window.addEventListener("mouseup", (event) => {
+      if (dragging === null) return;
       if (event.button === 0 && !moved) {
         if (this.connectorMode) this.pickConnector(event);
         else this.pick(event);

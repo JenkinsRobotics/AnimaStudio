@@ -6,16 +6,16 @@ accepted by the engine lane).
 ## Decision
 
 The Aether product family standardizes on **React + TypeScript + Vite** for
-application UI, with shared widgets in the root **`aether-ui/`** package.
+application UI, with shared widgets in the root **`core/ui/`** package.
 Server rendering (Next.js) is rejected — local WebGPU editors gain nothing
 from it.
 
 ## The three UI tiers
 
-1. **`aether-core/` — no UI, ever.** In-world tools (gizmos, triads, snap
+1. **`core/engine/` — no UI, ever.** In-world tools (gizmos, triads, snap
    nodes) are engine-drawn 3D geometry, not UI; their line lists live at the
    engine layer and renderers only upload them.
-2. **`aether-ui/` — the shared design system.** Framework-neutral **design
+2. **`core/ui/` — the shared design system.** Framework-neutral **design
    tokens as CSS custom properties** (JSON source of truth, so a future
    Swift or other native shell can consume the same theme), plus **one React
    widget per file**, importable like a class. A widget lives here only when
@@ -44,5 +44,14 @@ from it.
 ## Baseline
 
 The visual baseline is Aether CAD's current `src/style.css` — its palette,
-radii, and type scale were extracted into `aether-ui/tokens/` so the design
+radii, and type scale were extracted into `core/ui/tokens/` so the design
 system's default theme IS the CAD app's existing look.
+
+
+## Visual authority update — 2026-09-08
+
+Jonathan selected the old native Anima Studio interface as the suite baseline.
+Its StudioDesignProfile is ported through `core/ui/tokens/`; CAD and Animation
+consume shared widgets and WorkspaceShell. Product tool sets and arrangements
+may differ, but product styles must not fork shared control or ViewCube skins.
+See `Aether_Studio_UI_Convergence.md` for implementation and parity/retirement gates.

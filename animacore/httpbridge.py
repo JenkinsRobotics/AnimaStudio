@@ -138,9 +138,10 @@ def _content_type(path: Path) -> str:
 def serve(port: int = 8787, root: Path | None = None,
           app_dir: Path | None = None) -> ThreadingHTTPServer:
     """Build the server (caller decides threading/serve_forever)."""
-    session = Session()
+    workspace_root = (root or _REPO_ROOT).resolve()
+    session = Session(workspace_root=workspace_root)
     lock = threading.Lock()
-    handler = make_handler(session, lock, root or _REPO_ROOT, app_dir)
+    handler = make_handler(session, lock, workspace_root, app_dir)
     return ThreadingHTTPServer(("127.0.0.1", port), handler)
 
 

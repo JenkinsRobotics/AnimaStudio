@@ -25,6 +25,11 @@ dist/
 .eggs/
 pip-wheel-metadata/
 
+# Node / web builds
+node_modules/
+.vite/
+*.tsbuildinfo
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -52,6 +57,8 @@ xcuserdata/
 
 # Local development app assembled by app/Scripts/build-root-app.sh
 /Anima Studio.app/
+# Local web-app bundle assembled by Aether CAD/Scripts/build-macos-app.sh
+/Aether CAD.app/
 
 # Notebooks
 .ipynb_checkpoints/
@@ -81,3 +88,23 @@ reference_ui/
 
 # Test coverage artifacts
 default.profraw
+
+# Local web-app bundle assembled by aether-animation/Launcher/build-launcher.sh
+/Aether Animation.app/
+
+# Local gallery bundle assembled by core/ui/Launcher/build-launcher.sh
+/Aether UI.app/
+
+# Frozen native application retained during web parity work
+/aether-animation/archive/*.app/
+
+# Independent host browser shortcut
+/Aether Studio.app/
+
+# Vendored third-party CAD reference material (54MB) — never commit
+/Aether CAD/ REFERENCE CAD/
+
+# Reference clones with their own .git (would land as broken gitlinks)
+/examples/Open-LLM-VTuber/
+/examples/Open-LLM-VTuber-Unity/
+/examples/Open-LLM-VTuber-Web/

@@ -16,15 +16,19 @@ propagates.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import math
 import sys
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import IO, Callable
 
 import yaml
 
 from animacore import __version__ as ENGINE_VERSION
+from animacore.aether_workspace import AetherWorkspace, AetherWorkspaceError
 from animacore.canvas2d import Canvas2D, SourceKind, evaluate_surfaces
 from animacore.canvas2d_io import (
     canvas2d_from_mapping,
@@ -97,6 +101,27 @@ CAPABILITIES = [
     "remove_relation",
     "serialize_character",
     "serialize_scene",
+    "new_workspace",
+    "load_workspace",
+    "save_workspace",
+    "describe_workspace",
+    "describe_assembly",
+    "project_bom",
+    "solve_assembly",
+    "list_connectors",
+    "add_part_definition",
+    "update_part_definition",
+    "remove_part_definition",
+    "add_instance",
+    "update_instance",
+    "remove_instance",
+    "move_instance",
+    "set_instance_grounded",
+    "set_instance_suppressed",
+    "add_connector",
+    "update_connector",
+    "remove_connector",
+    "set_dof_value",
     "canvas2d.describe",
     "canvas2d.new",
     "canvas2d.load",
@@ -129,6 +154,9 @@ class Session:
     _counter: int = 0
     _canvases: dict[str, Canvas2D] = field(default_factory=dict)
     _canvas_counter: int = 0
+    _workspaces: dict[str, AetherWorkspace] = field(default_factory=dict)
+    _workspace_counter: int = 0
+    workspace_root: Path | None = None
     exit: bool = False
 
     def add(self, rig: Rig) -> str:
@@ -162,6 +190,22 @@ class Session:
 
     def drop_canvas(self, handle: str) -> bool:
         return self._canvases.pop(handle, None) is not None
+
+    def add_workspace(self, workspace: AetherWorkspace) -> str:
+        self._workspace_counter += 1
+        handle = f"workspace{self._workspace_counter}"
+        self._workspaces[handle] = workspace
+        return handle
+
+    def new_workspace(self, name: str) -> tuple[str, AetherWorkspace]:
+        workspace = AetherWorkspace.new(self._workspace_counter + 1, name)
+        return self.add_workspace(workspace), workspace
+
+    def get_workspace(self, handle: str) -> AetherWorkspace | None:
+        return self._workspaces.get(handle)
+
+    def drop_workspace(self, handle: str) -> bool:
+        return self._workspaces.pop(handle, None) is not None
 
 
 # Envelope helpers ------------------------------------------------------------
@@ -1301,10 +1345,209 @@ def _remove_relation(session: Session, params: dict, request_id: object) -> dict
     )
 
 
+# Aether Assembly workspaces --------------------------------------------------
+
+
+def _workspace_or_error(
+    session: Session, params: dict, request_id: object
+) -> tuple[AetherWorkspace | None, str, dict | None]:
+    handle = _require_str(params, "handle")
+    workspace = session.get_workspace(handle)
+    if workspace is None:
+        return None, handle, _error(
+            request_id, "unknown_handle", f"no workspace loaded as {handle!r}"
+        )
+    return workspace, handle, None
+
+
+def _workspace_path(session: Session, params: dict) -> Path:
+    raw = _require_str(params, "path")
+    path = Path(raw)
+    if session.workspace_root is None:
+        return path.resolve()
+    if path.is_absolute():
+        raise AetherWorkspaceError(
+            "bad_request", "workspace path must be relative to the server root", "path"
+        )
+    root = session.workspace_root.resolve()
+    target = (root / path).resolve()
+    if not target.is_relative_to(root):
+        raise AetherWorkspaceError(
+            "bad_request", "workspace path escapes the server root", "path"
+        )
+    return target
+
+
+def _new_workspace(session: Session, params: dict, request_id: object) -> dict:
+    name = params.get("name", "Untitled Workspace")
+    if not isinstance(name, str) or not name:
+        raise _BadRequest("'name' must be a non-empty string")
+    handle, workspace = session.new_workspace(name)
+    return _ok(request_id, workspace.describe_workspace(handle))
+
+
+def _load_workspace(session: Session, params: dict, request_id: object) -> dict:
+    encoded = params.get("data_base64")
+    if encoded is None:
+        workspace = AetherWorkspace.load(_workspace_path(session, params))
+    else:
+        if not isinstance(encoded, str) or not encoded:
+            raise _BadRequest("'data_base64' must be a non-empty base64 string")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error) as error:
+            raise AetherWorkspaceError(
+                "bad_request", "'data_base64' is not valid base64", "data_base64"
+            ) from error
+        workspace = AetherWorkspace.from_bytes(data)
+    handle = session.add_workspace(workspace)
+    return _ok(request_id, workspace.describe_workspace(handle))
+
+
+def _save_workspace(session: Session, params: dict, request_id: object) -> dict:
+    workspace, handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    expected_revision = params.get("expected_revision")
+    if expected_revision is not None and expected_revision != workspace.revision:
+        raise AetherWorkspaceError(
+            "revision_conflict",
+            f"expected revision {expected_revision!r}, current revision is "
+            f"{workspace.revision!r}",
+            "expected_revision",
+        )
+    if params.get("return_data") is True:
+        archive_bytes, digest = workspace.to_bytes()
+        result = {
+            "revision": workspace.revision,
+            "graph_sha256": digest,
+            "data_base64": base64.b64encode(archive_bytes).decode("ascii"),
+        }
+    else:
+        result = workspace.save(_workspace_path(session, params))
+    return _ok(request_id, {"handle": handle, **result})
+
+
+def _describe_workspace(session: Session, params: dict, request_id: object) -> dict:
+    workspace, handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    return _ok(request_id, workspace.describe_workspace(handle))
+
+
+def _describe_assembly(session: Session, params: dict, request_id: object) -> dict:
+    workspace, _handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    assembly_id = _require_str(params, "assembly_id")
+    return _ok(request_id, workspace.projection(assembly_id))
+
+
+def _project_bom(session: Session, params: dict, request_id: object) -> dict:
+    workspace, _handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    return _ok(
+        request_id,
+        workspace.bom(
+            _require_str(params, "assembly_id"), params.get("mode", "hierarchical")
+        ),
+    )
+
+
+def _solve_assembly(session: Session, params: dict, request_id: object) -> dict:
+    workspace, _handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    return _ok(request_id, workspace.solve(_require_str(params, "assembly_id")))
+
+
+def _list_connectors(session: Session, params: dict, request_id: object) -> dict:
+    workspace, _handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    part_id = params.get("part_definition_id")
+    connectors = workspace._ordered(workspace.connector_definitions)
+    if part_id is not None:
+        if not isinstance(part_id, str):
+            raise _BadRequest("'part_definition_id' must be a string or null")
+        connectors = [
+            item for item in connectors if item["part_definition_id"] == part_id
+        ]
+    return _ok(
+        request_id,
+        {"revision": workspace.revision, "connector_definitions": connectors},
+    )
+
+
+def _preview_assembly_mate(
+    session: Session, params: dict, request_id: object
+) -> dict:
+    workspace, _handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    return _ok(
+        request_id,
+        workspace.preview_mate(
+            _require_str(params, "assembly_id"), params.get("mate")
+        ),
+    )
+
+
+def _assembly_mutation(
+    method: str, session: Session, params: dict, request_id: object
+) -> dict:
+    workspace, handle, error = _workspace_or_error(session, params, request_id)
+    if error is not None:
+        return error
+    expected_revision = _require_str(params, "expected_revision")
+    return _ok(
+        request_id, workspace.mutate(method, params, expected_revision, handle)
+    )
+
+
+def _workspace_mutation_verb(method: str) -> Callable:
+    def mutate(session: Session, params: dict, request_id: object) -> dict:
+        return _assembly_mutation(method, session, params, request_id)
+
+    return mutate
+
+
+def _preview_mate_dispatch(
+    session: Session, params: dict, request_id: object
+) -> dict:
+    handle = params.get("handle")
+    if isinstance(handle, str) and session.get_workspace(handle) is not None:
+        return _preview_assembly_mate(session, params, request_id)
+    return _preview_mate(session, params, request_id)
+
+
+def _rig_or_workspace_mutation(
+    method: str, rig_verb: Callable, session: Session, params: dict,
+    request_id: object
+) -> dict:
+    handle = params.get("handle")
+    if isinstance(handle, str) and session.get_workspace(handle) is not None:
+        return _assembly_mutation(method, session, params, request_id)
+    return rig_verb(session, params, request_id)
+
+
+def _rig_or_workspace_mutation_verb(method: str, rig_verb: Callable) -> Callable:
+    def mutate(session: Session, params: dict, request_id: object) -> dict:
+        return _rig_or_workspace_mutation(
+            method, rig_verb, session, params, request_id
+        )
+
+    return mutate
+
+
 def _release(session: Session, params: dict, request_id: object) -> dict:
     # Idempotent: dropping an unknown handle is not an error, so a client
     # can release freely without tracking exactly what the engine holds.
-    session.drop(_require_str(params, "handle"))
+    handle = _require_str(params, "handle")
+    session.drop(handle)
+    session.drop_workspace(handle)
+    session.drop_canvas(handle)
     return _ok(request_id, {})
 
 
@@ -1602,18 +1845,53 @@ _VERBS = {
     "solve_ik": _solve_ik,
     "mate_types": _mate_types,
     "relation_types": _relation_types,
-    "preview_mate": _preview_mate,
-    "add_mate": _add_mate,
+    "preview_mate": _preview_mate_dispatch,
+    "add_mate": _rig_or_workspace_mutation_verb("add_mate", _add_mate),
     "add_part": _add_part,
     "update_part": _update_part,
     "remove_part": _remove_part,
-    "update_mate": _update_mate,
-    "remove_mate": _remove_mate,
-    "add_relation": _add_relation,
-    "update_relation": _update_relation,
-    "remove_relation": _remove_relation,
+    "update_mate": _rig_or_workspace_mutation_verb("update_mate", _update_mate),
+    "remove_mate": _rig_or_workspace_mutation_verb("remove_mate", _remove_mate),
+    "add_relation": _rig_or_workspace_mutation_verb(
+        "add_relation", _add_relation
+    ),
+    "update_relation": _rig_or_workspace_mutation_verb(
+        "update_relation", _update_relation
+    ),
+    "remove_relation": _rig_or_workspace_mutation_verb(
+        "remove_relation", _remove_relation
+    ),
     "serialize_character": _serialize_character,
     "serialize_scene": _serialize_scene,
+    "new_workspace": _new_workspace,
+    "load_workspace": _load_workspace,
+    "save_workspace": _save_workspace,
+    "describe_workspace": _describe_workspace,
+    "describe_assembly": _describe_assembly,
+    "project_bom": _project_bom,
+    "solve_assembly": _solve_assembly,
+    "list_connectors": _list_connectors,
+    "add_part_definition": _workspace_mutation_verb("add_part_definition"),
+    "update_part_definition": _workspace_mutation_verb(
+        "update_part_definition"
+    ),
+    "remove_part_definition": _workspace_mutation_verb(
+        "remove_part_definition"
+    ),
+    "add_instance": _workspace_mutation_verb("add_instance"),
+    "update_instance": _workspace_mutation_verb("update_instance"),
+    "remove_instance": _workspace_mutation_verb("remove_instance"),
+    "move_instance": _workspace_mutation_verb("move_instance"),
+    "set_instance_grounded": _workspace_mutation_verb(
+        "set_instance_grounded"
+    ),
+    "set_instance_suppressed": _workspace_mutation_verb(
+        "set_instance_suppressed"
+    ),
+    "add_connector": _workspace_mutation_verb("add_connector"),
+    "update_connector": _workspace_mutation_verb("update_connector"),
+    "remove_connector": _workspace_mutation_verb("remove_connector"),
+    "set_dof_value": _workspace_mutation_verb("set_dof_value"),
     "canvas2d.describe": _canvas2d_describe,
     "canvas2d.new": _canvas2d_new,
     "canvas2d.load": _canvas2d_load,
@@ -1656,6 +1934,8 @@ def handle_request(session: Session, request: dict) -> dict:
         return verb(session, params, request_id)
     except _BadRequest as error:
         return _error(request_id, "bad_request", str(error))
+    except AetherWorkspaceError as error:
+        return _error(request_id, error.code, error.message, error.path)
 
 
 # stdio loop ------------------------------------------------------------------

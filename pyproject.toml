@@ -37,7 +37,8 @@ where = ["."]
 include = ["animacore*"]
 
 [tool.pytest.ini_options]
-testpaths = ["animacore/tests"]
+testpaths = ["animacore/tests", "core/host/tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 88

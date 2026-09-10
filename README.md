@@ -1,139 +1,92 @@
-<h1 align="center">Anima Studio</h1>
+# Aether Studio
 
-<p align="center">
-  <em>Open-source unified character animation system for AI robots — digital avatars and physical animatronics from one rig, one format, one authoring tool.</em>
-</p>
+## Open Aether Studio
 
-<p align="center">
-  <a href="https://github.com/JenkinsRobotics/AnimaStudio/releases"><img src="https://img.shields.io/badge/version-0.1.0-2EA44F?style=for-the-badge" alt="Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-2EA44F?style=for-the-badge" alt="License"></a>
-  <img src="https://img.shields.io/badge/python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+">
-</p>
+The independent local host and admin workspace are implemented. Open the root
+**Aether Studio.app**, or run `zsh core/host/install-macos.sh` to build/install the
+background service and browser shortcuts. Default: **http://localhost:8780**.
+First run opens a guided Welcome → Workspace → Administrator → Applications → Review
+setup. Afterward the default home shows app cards and Sign in; direct app links
+return to their destination after authentication. Double-click **Install Aether
+Studio.command** for installation with prerequisite checks and numbered progress.
+Use Safari **File → Add to Dock** for application windows.
 
----
+The admin sidebar manages bundled apps, users, teams, roles, service accounts,
+backups, network settings and activity. Community plugins remain planned.
+See [host installation, administration and recovery](core/host/README.md).
 
-## What it is
 
-Anima Studio is the character performance layer of the
-[Jaeger ecosystem](https://github.com/JenkinsRobotics/JaegerOS). It bridges
-two worlds that have always been separate:
 
-- **Digital avatar animation** — Live2D / VRM characters on screens, AI
-  companions, VTubers
-- **Physical animatronic control** — servo motors, stepper actuators, LED
-  expressions, robotic bodies
+A collection of high-quality open-source creative and engineering applications.
+Our direction is web-based software: install Aether Studio on a locally hosted
+computer or server, then use its applications from browsers across devices.
 
-These two worlds share ~90% of their infrastructure: the character rig, the
-expression system (ARKit's 52 blend shapes), the scene scripting, the audio
-sync, the AI integration. Only the output target differs. Anima Studio
-implements that shared 90% once and routes to whichever outputs a project
-uses — so a robot like JP01 can have its screen face and physical body
-driven simultaneously from one character file and one scene script.
+**One installation, multiple application packages is the target, not a shipped
+installer today.** The repository already contains working web applications and
+shared foundations. See [current status](dev/docs/reality/STATUS.md) and the
+[Aether Studio suite plan](dev/docs/roadmap/Aether_Studio_Suite.md).
 
-| Software | Digital avatar | Physical animatronic | Open source | AI integration |
-|----------|:-:|:-:|:-:|:-:|
-| Bottango | ✗ | ✓ | ✗ (driver only) | ✗ |
-| Open-LLM-VTuber | ✓ | ✗ | ✓ | ✓ (limited) |
-| VTube Studio | ✓ | ✗ | ✗ | ✗ |
-| Disney DACS | ✓ | ✓ | ✗ | ✗ |
-| **Anima Studio** | **✓** | **✓** | **✓** | **✓** |
+Shared infrastructure lives under [`core/`](core/README.md), with separately
+importable engine and UI packages.
 
-## The three components
+## Applications and shared code
 
-- **AnimaCore** (`animacore/`, Python) — the headless animation **engine**:
-  loads `.character.anima` files into a typed parts/joints/DOF mechanism rig
-  (Onshape-mate model), evaluates clips with limits and gear/rack/screw/linear
-  relations, runs `.scene.anima` shows, and streams normalized channel targets
-  over the open Anima Wire Protocol to real or simulated devices. The
-  cross-platform core the app and firmware author for. JaegerOS integration
-  remains **(planned)**.
-- **Anima Studio app** (`app/`, Swift/SwiftUI, macOS) — the native
-  authoring app: CAD-style workspaces, model import, proxy components,
-  two-click connector-authored mates, face/edge selection, timeline with
-  scrubbing and looping playback. Persistence, editable curves, and live
-  hardware output remain **(planned)**.
-- **Anima firmware** (`firmware/`, Arduino/ESP32) — the open device firmware
-  speaking the wire protocol: servo config, interpolated frames, e-stop,
-  heartbeat failsafe. Compiles for Uno and ESP32.
-- **The `.anima` format** — an open, human-readable YAML format for
-  mechanism rigs (`.character.anima`) and performance scenes
-  (`.scene.anima`, planned). The format is the lasting contribution — any
-  compatible runtime can execute it. Specs in
-  [dev/docs/roadmap/](dev/docs/roadmap/).
+| Component | Location | Current state |
+| --- | --- | --- |
+| Aether CAD | `Aether CAD/` | React/TypeScript editor, exact OCCT/WASM Part modeling, engine-backed Assembly workflows |
+| Aether Animation (formerly Anima Studio) | `aether-animation/web/` | React/TypeScript authoring rebuild using the Python engine; earlier Swift app archived |
+| Aether Dynamics | `aether-dynamics/` | Product scaffold; simulation application planned |
+| Aether Core | `core/engine/` | Shared TypeScript contracts, sketch/document/geometry/assembly modules and OCCT kernel adapter |
+| Aether UI | `core/ui/` | Shared React widgets, design tokens and workspace chrome |
+| AnimaCore | `animacore/` | Canonical Python animation engine and persistent Assembly workspace producer; consolidation into Core remains planned |
+| Onshape-style mockup | `onshape mockup/` | React/TypeScript/Three.js interaction prototype; fixture geometry, not a CAD engine |
+| Hardware firmware | `firmware/` | Animation output device firmware |
 
-## Install
+## Development
 
-```bash
-git clone https://github.com/JenkinsRobotics/AnimaStudio.git
-cd AnimaStudio
-python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+The local folder is **Aether Studio**. The GitHub remote retains its existing
+name until a separate repository rename.
+
+```sh
+git clone https://github.com/JenkinsRobotics/AnimaStudio.git "Aether Studio"
+cd "Aether Studio"
+python3.11 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/python -m animacore.httpbridge
 ```
 
-## Launch the macOS app
+With the engine running, start an application in another terminal:
 
-On a Mac with Xcode installed, double-click **Anima Studio.app** at the
-repository root after it has been assembled, or build it at any time with:
-
-```bash
-cd app
-./Scripts/build-root-app.sh
-open "../Anima Studio.app"
+```sh
+cd core/ui
+npm install
+cd "../../Aether CAD"
+npm install
+npm run dev
 ```
 
-For SwiftUI development and live Canvas previews, open
-`app/AnimaStudio.xcodeproj` and run the **AnimaStudio** scheme on **My Mac**.
+For Animation, use `aether-animation/web/` instead and run `npm install` and
+`npm run dev`. These are development entry points, not the planned suite
+installer. Current loopback transport and development configuration need work
+before using the same installation from another device.
 
-## Documentation
+## Architecture and documentation
 
-Planning and design docs live under [dev/docs/](dev/docs/):
+React owns application presentation. Aether UI supplies shared controls.
+Aether Core and the existing Python engine own their respective authoritative
+semantics; view code must not duplicate them. Hardware adapters consume evaluated
+motion. The mockup guides interaction design while production engine behavior is
+preserved. Swift is an archived behavior reference or optional launcher, not
+the primary product UI.
 
-- [Overview](dev/docs/vision/Overview.md) — positioning and product summary
-- [Whitepaper](dev/docs/vision/Whitepaper.md) — problem, prior art,
-  architecture, use cases
-- [References](dev/docs/vision/References.md) — prior art and standards
-- [Architecture](dev/docs/roadmap/Architecture.md) — three-layer model,
-  runtime design, output nodes
-- [Studio app plan](dev/docs/roadmap/Studio_App.md) — Swift app architecture,
-  RealityKit viewport, plugin system, and first build slice
-- [CAD rendering](dev/docs/roadmap/CAD_Rendering.md) — STEP/Open CASCADE
-  boundary, retained renderer roles, settings, and packaging contract
-- [Hardware animation milestone](dev/docs/roadmap/Hardware_Animation_Milestone.md)
-  — workspace, model import, rigging, timeline, and first output loop
-- [Character format](dev/docs/roadmap/Character_Format.md) —
-  `.character.anima` spec with a full JP01 example
-- [Scene format](dev/docs/roadmap/Scene_Format.md) — `.scene.anima` spec,
-  action types, logic gates
-- [STATUS](dev/docs/reality/STATUS.md) — what actually works right now
-
-Repo conventions: [CONVENTIONS.md](CONVENTIONS.md). Agent/contributor
-contract: [AGENTS.md](AGENTS.md).
-
-## Repository map
-
-| Path | What it is |
-|---|---|
-| `animacore/` | **AnimaCore** — the Python animation engine: `.anima` loader, rig/DOF/relations evaluation, `.scene.anima` execution, wire protocol host, device simulator, extensions, tests |
-| `app/` | Swift macOS app — `App/` (thin app target), `Sources/` (`AnimaModel`, `AnimaEvaluation`, `AnimaStudioUI`, and viewport packages), `Tests/` |
-| `firmware/` | Arduino/ESP32 firmware speaking the wire protocol |
-| `examples/` | Sample `.anima` files + extension bundles (the only place domain-specific naming lives) |
-| `dev/briefings/` | Multi-agent coordination: mailboxes, claims, handoff log |
-| `dev/docs/` | `reality/STATUS.md` (shipped truth) · `roadmap/` (planned) · `vision/` (why) |
-| `docs/` | GitHub Pages site source |
-
-> **AnimaCore is the engine; Anima Studio is one app that authors for it.**
-> The `.anima` format and wire protocol in `dev/docs/roadmap/` are the
-> contract both `animacore/` (Python) and the Swift app implement.
-
-## Ecosystem links
-
-- [JaegerOS](https://github.com/JenkinsRobotics/JaegerOS) — the robot
-  framework (bus, nodes, modules/slots, supervisor, safety)
-- [Jaeger-AI](https://github.com/JenkinsRobotics/Jaeger-AI) — the agentic
-  Mind that triggers and authors `.anima` scenes
-- [JP01](https://github.com/JenkinsRobotics/JP01) — the reference hardware
-  Jaeger, the first body Anima Studio will drive
+- [Suite architecture and migration plan](dev/docs/roadmap/Aether_Studio_Suite.md)
+- [Shared UI decision](dev/docs/roadmap/UI_Framework_Decision.md)
+- [Core architecture](core/engine/ARCHITECTURE.md)
+- [Animation product](aether-animation/README.md)
+- [Shipped status](dev/docs/reality/STATUS.md)
+- [Contributor contract](AGENTS.md) and [conventions](CONVENTIONS.md)
 
 ## License
 
-[Apache-2.0](LICENSE) © Jenkins Robotics
+[Apache-2.0](LICENSE) © Jenkins Robotics. Imported third-party references and
+dependencies retain their own licenses.

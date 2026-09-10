@@ -1,0 +1,13 @@
+{
+  "length": {"label":"Length", "default":"mm", "options":{"mm":0.001,"cm":0.01,"m":1,"in":0.0254,"ft":0.3048}},
+  "acceleration": {"label":"Linear acceleration", "default":"m/s²", "options":{"mm/s²":0.001,"m/s²":1,"in/s²":0.0254,"ft/s²":0.3048}},
+  "angle": {"label":"Angle", "default":"deg", "options":{"deg":0.017453292519943295,"rad":1}},
+  "angularVelocity": {"label":"Angular velocity", "default":"deg/s", "options":{"deg/s":0.017453292519943295,"rad/s":1,"rpm":0.10471975511965977}},
+  "mass": {"label":"Mass", "default":"kg", "options":{"g":0.001,"kg":1,"lb":0.45359237}},
+  "density": {"label":"Density", "default":"kg/m³", "options":{"kg/m³":1,"g/cm³":1000,"lb/in³":27679.90471020312}},
+  "force": {"label":"Force", "default":"N", "options":{"N":1,"kN":1000,"lbf":4.4482216152605}},
+  "frequency": {"label":"Frequency", "default":"Hz", "options":{"Hz":1,"kHz":1000}},
+  "moment": {"label":"Moment", "default":"N·m", "options":{"N·m":1,"N·mm":0.001,"in·lbf":0.1129848290276167,"ft·lbf":1.3558179483314004}},
+  "pressure": {"label":"Pressure", "default":"Pa", "options":{"Pa":1,"kPa":1000,"MPa":1000000,"psi":6894.757293168}},
+  "energy": {"label":"Energy", "default":"J", "options":{"J":1,"kJ":1000,"ft·lbf":1.3558179483314004}}
+}

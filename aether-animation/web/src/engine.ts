@@ -8,7 +8,7 @@ export const ENGINE_URL =
   (import.meta.env.VITE_ENGINE_URL as string | undefined) ??
   (window.location.port === "5178"
     ? "http://127.0.0.1:8787"
-    : window.location.origin);
+    : window.location.origin + (window.location.pathname.startsWith("/animation/") ? "/animation" : ""));
 
 export interface DofSummary {
   path: string;
@@ -84,9 +84,13 @@ export function assetURL(characterPath: string, model: string): string {
   return `${ENGINE_URL}/workspace/${directory}/${model}`;
 }
 
+const fileRevisions = new Map<string, string>();
+
 export async function fetchCharacterText(path: string): Promise<string> {
   const response = await fetch(`${ENGINE_URL}/workspace/${path}`);
   if (!response.ok) throw new Error(`could not read ${path}`);
+  const revision = response.headers.get("X-Aether-Revision");
+  if (revision) fileRevisions.set(path, revision);
   return response.text();
 }
 
@@ -114,9 +118,11 @@ export async function saveFile(path: string, text: string): Promise<void> {
   const response = await fetch(`${ENGINE_URL}/files/save`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path, text }),
+    body: JSON.stringify({ path, text, expected_revision: fileRevisions.get(path) ?? null }),
   });
-  if (!response.ok) throw new Error("save failed");
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? "Save failed");
+  if (result.revision) fileRevisions.set(path, result.revision);
 }
 
 export interface MateTypeSchema {

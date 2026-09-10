@@ -12,6 +12,7 @@ let enginePort = 8791
 final class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
   WKNavigationDelegate
 {
+  private let windowChrome = StudioWindowChrome()
   private var window: NSWindow!
   private var webView: WKWebView!
   private var engine: Process?
@@ -22,6 +23,7 @@ final class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     startEngine(repoRoot: repoRoot)
 
     let configuration = WKWebViewConfiguration()
+    windowChrome.install(in: configuration)
     webView = WKWebView(frame: .zero, configuration: configuration)
     webView.navigationDelegate = self
 
@@ -30,6 +32,7 @@ final class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
       styleMask: [.titled, .closable, .miniaturizable, .resizable],
       backing: .buffered, defer: false)
     window.title = "Aether Animation"
+    windowChrome.attach(to: window)
     window.contentView = webView
     window.center()
     window.delegate = self

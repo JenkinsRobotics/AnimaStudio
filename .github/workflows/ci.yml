@@ -17,7 +17,7 @@ jobs:
           node-version: "22"
 
       - name: Aether UI — tests + typecheck + build
-        working-directory: aether-ui
+        working-directory: core/ui
         run: |
           npm ci
           npm test
@@ -26,6 +26,12 @@ jobs:
 
       - name: Aether Animation web — build
         working-directory: aether-animation/web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Aether Studio admin — build
+        working-directory: studio
         run: |
           npm ci
           npm run build
@@ -49,4 +55,4 @@ jobs:
         run: ruff check .
 
       - name: Test
-        run: pytest animacore/tests -q
+        run: python -m pytest animacore/tests core/host/tests -q

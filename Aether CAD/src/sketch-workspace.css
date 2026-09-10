@@ -1,0 +1,77 @@
+/* The shared CAD shell owns viewport positioning; this sheet only styles sketch content. */
+.cad-sketch-workspace { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) 260px; background:var(--aether-color-bg-app,#111922); z-index:12; }
+.cad-sketch-workspace.choosing-plane { background:transparent; pointer-events:none; }
+.cad-sketch-workspace aside { pointer-events:auto; overflow:auto; border-left:1px solid var(--aether-color-border); padding:16px; background:var(--aether-color-bg-panel,#202832); color:var(--aether-color-text); font:12px system-ui; }
+.cad-sketch-workspace h2 { font-size:16px; }
+.cad-sketch-workspace p { line-height:1.6; }
+.cad-sketch-workspace button { padding:7px 10px; margin:3px; border:1px solid var(--aether-color-border); border-radius:5px; background:var(--aether-color-bg-control); color:var(--aether-color-text); cursor:pointer; }
+.cad-sketch-workspace input, .cad-sketch-workspace textarea { width:100%; box-sizing:border-box; padding:6px; background:var(--aether-color-bg-control); color:var(--aether-color-text); border:1px solid var(--aether-color-border); }
+.cad-sketch-workspace label { display:block; margin:8px 0; }
+.cad-sketch-workspace svg { width:100%; height:100%; min-height:0; cursor:crosshair; touch-action:none; }
+.cad-sketch-workspace .sketch-grid { stroke:var(--aether-color-border,#304354); stroke-width:.2; }
+.cad-sketch-workspace .sketch-axis { stroke:#6590b0; stroke-width:.35; }
+.cad-sketch-workspace .sketch-contour { stroke:#56baff; stroke-width:1.8px; vector-effect:non-scaling-stroke; fill:none; }
+.cad-sketch-workspace .closed { fill:#3b9bd52a; }
+.cad-sketch-workspace .hole { fill:var(--aether-color-bg-app); stroke:#e6aa64; }
+.cad-sketch-workspace .open { stroke:#ffb366; }
+.cad-sketch-workspace .sketch-point { fill:#eef7ff; }
+.sketch-contours { margin:15px 0; }
+.sketch-contours > div { border-top:1px solid var(--aether-color-border); padding:8px 0; }
+
+.cad-sketch-workspace .sketch-preview-layer { pointer-events:none; }
+.cad-sketch-workspace .sketch-preview { stroke:#66ceff; stroke-width:2px; stroke-dasharray:6 3; vector-effect:non-scaling-stroke; fill:#41b7f01a; }
+.cad-sketch-workspace .sketch-preview-guide { stroke:#e9b26a; stroke-width:1px; stroke-dasharray:3 3; vector-effect:non-scaling-stroke; }
+.cad-sketch-workspace .sketch-preview-point { fill:#f6fbff; stroke:#148bd1; stroke-width:1px; vector-effect:non-scaling-stroke; }
+.cad-sketch-workspace .sketch-preview-dimension { fill:var(--aether-color-text,#edf6ff); stroke:var(--aether-color-bg-app,#111922); stroke-width:3px; paint-order:stroke; stroke-linejoin:round; vector-effect:non-scaling-stroke; font-family:system-ui; }
+.cad-sketch-workspace select { width:100%; padding:6px; background:var(--aether-color-bg-control); color:var(--aether-color-text); border:1px solid var(--aether-color-border); }
+.cad-sketch-workspace input[type="checkbox"] { width:auto; margin-right:6px; }
+.sketch-constraints { border-top:1px solid var(--aether-color-border); margin-top:16px; padding-top:8px; }
+.sketch-constraints h3 { font-size:13px; }
+
+.cad-sketch-workspace .sketch-contour.construction { stroke-dasharray: 2 1; fill: none; opacity: .7; }
+.cad-sketch-workspace .sketch-fillet-handle, .cad-sketch-workspace .sketch-offset-handle, .cad-sketch-workspace .sketch-slot-handle { fill:var(--aether-color-accent,#399cff); stroke:var(--aether-color-text,#edf6ff); stroke-width:2px; vector-effect:non-scaling-stroke; cursor:ns-resize; pointer-events:all; }
+
+.cad-sketch-workspace .sketch-selection { fill:none; stroke:var(--aether-color-accent,#55b9ff); stroke-width:3px; vector-effect:non-scaling-stroke; }
+.cad-sketch-workspace .sketch-selection > * { vector-effect:non-scaling-stroke; }
+
+.cad-sketch-workspace .sketch-vertex { fill:var(--aether-color-accent,#399cff); pointer-events:none; }
+
+.sketch-constraint-state {font-weight:600;}
+.sketch-constraint-state[data-state="fully-constrained"] {color:var(--aether-color-success,#51b887);}
+.sketch-constraint-state[data-state="over-constrained"],.sketch-constraint-state[data-state="invalid"] {color:var(--aether-color-danger,#ed7878);}
+
+.cad-sketch-workspace svg[data-constraint-state="fully-constrained"] .sketch-contour {stroke:var(--aether-color-text,#edf6ff);}
+.cad-sketch-workspace svg[data-constraint-state="over-constrained"] .sketch-contour {stroke:var(--aether-color-danger,#ed7878);}
+
+.cad-sketch-workspace svg[data-constraint-state="fully-constrained"] .sketch-vertex {fill:var(--aether-color-text,#edf6ff);}
+.cad-sketch-workspace svg[data-constraint-state="over-constrained"] .sketch-vertex {fill:var(--aether-color-danger,#ed7878);}
+
+.cad-sketch-workspace .sketch-dimension line { stroke:var(--aether-color-accent,#399cff); stroke-width:1; vector-effect:non-scaling-stroke; stroke-dasharray:3 2; pointer-events:none; }
+.cad-sketch-workspace .sketch-dimension text { fill:var(--aether-color-text,#edf6ff); stroke:var(--aether-color-bg-app,#111922); stroke-width:3px; paint-order:stroke; stroke-linejoin:round; vector-effect:non-scaling-stroke; font-family:system-ui; cursor:pointer; pointer-events:auto; }
+.cad-sketch-workspace .sketch-dimension text:hover,.cad-sketch-workspace .sketch-dimension text:focus { fill:var(--aether-color-accent,#399cff); }
+.cad-sketch-workspace .sketch-dimension path { fill:none; stroke:var(--aether-color-accent,#399cff); stroke-width:1; vector-effect:non-scaling-stroke; pointer-events:none; }
+
+/* Per-entity state overrides whole-sketch color; geometry fills and selection stay separate. */
+.cad-sketch-workspace svg .sketch-region-fill.sketch-contour { stroke: none; }
+.cad-sketch-workspace .sketch-entity-edge { fill:none; stroke-width:1.8px; vector-effect:non-scaling-stroke; pointer-events:none; }
+.cad-sketch-workspace .sketch-entity-edge.construction { stroke-dasharray:2 1; opacity:.7; }
+.cad-sketch-workspace svg [data-entity-constraint-state="under-constrained"] { stroke:var(--aether-color-accent,#399cff); }
+.cad-sketch-workspace svg [data-entity-constraint-state="fully-constrained"] { stroke:var(--aether-color-text,#edf6ff); }
+.cad-sketch-workspace svg [data-entity-constraint-state="over-constrained"] { stroke:var(--aether-color-danger,#ed7878); }
+.cad-sketch-workspace svg [data-entity-constraint-state="invalid"] { stroke:var(--aether-color-text-faint,#8995a5); }
+.cad-sketch-workspace svg .sketch-vertex[data-entity-constraint-state="under-constrained"] { fill:var(--aether-color-accent,#399cff); }
+.cad-sketch-workspace svg .sketch-vertex[data-entity-constraint-state="fully-constrained"] { fill:var(--aether-color-text,#edf6ff); }
+.cad-sketch-workspace svg .sketch-vertex[data-entity-constraint-state="over-constrained"] { fill:var(--aether-color-danger,#ed7878); }
+.cad-sketch-workspace svg .sketch-vertex[data-entity-constraint-state="invalid"] { fill:var(--aether-color-text-faint,#8995a5); }
+
+.cad-sketch-workspace svg .sketch-point[data-entity-constraint-state="under-constrained"] { fill:var(--aether-color-accent,#399cff); }
+.cad-sketch-workspace svg .sketch-point[data-entity-constraint-state="fully-constrained"] { fill:var(--aether-color-text,#edf6ff); }
+.cad-sketch-workspace svg .sketch-point[data-entity-constraint-state="over-constrained"] { fill:var(--aether-color-danger,#ed7878); }
+.cad-sketch-workspace svg .sketch-point[data-entity-constraint-state="invalid"] { fill:var(--aether-color-text-faint,#8995a5); }
+
+.cad-sketch-workspace .sketch-modification-source-selection { fill:none; stroke:var(--aether-color-accent,#55b9ff); stroke-width:3px; }
+.cad-sketch-workspace .sketch-modification-source-selection > * { vector-effect:non-scaling-stroke; }
+
+.sketch-projected-background { fill: none; stroke: var(--accent, #86aaf0); stroke-width: 1.5; opacity: .65; }
+
+.cad-sketch-workspace textarea { font:inherit; min-height:4.5em; resize:vertical; }

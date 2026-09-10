@@ -44,3 +44,8 @@ body {
 }
 .mate-row { display: flex; align-items: center; gap: 8px; color: var(--aether-color-text-dim); }
 .mate-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+.animation-view-cube { position: absolute; right: 16px; top: 16px; z-index: 6; }
+.app-brand { white-space: nowrap; }
+@media (max-width: 1000px) { .app-project { display: none; } }
+@media (max-width: 780px) { .app-brand { display: none; } }

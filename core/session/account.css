@@ -1,0 +1,119 @@
+aether-account {
+  display: inline-flex;
+  align-items: center;
+  font: 12px var(--aether-font-family, system-ui);
+  color: var(--aether-color-text);
+}
+.suite-account {
+  position: relative;
+}
+.suite-account summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+  padding: 4px;
+}
+.suite-account summary::-webkit-details-marker {
+  display: none;
+}
+.suite-avatar {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: #3269ff;
+  color: white;
+  font-weight: 650;
+}
+.suite-account-name {
+  max-width: 125px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.suite-account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 260px;
+  padding: 18px;
+  border: 1px solid var(--aether-color-border);
+  border-radius: 12px;
+  background: var(--aether-color-bg-panel);
+  box-shadow: 0 10px 35px #0005;
+}
+.suite-account-menu small {
+  color: var(--aether-color-text-dim);
+  overflow-wrap: anywhere;
+}
+.suite-account-menu label {
+  display: grid;
+  gap: 8px;
+}
+.suite-account-menu button,
+.suite-account-menu select {
+  border: 1px solid var(--aether-color-border);
+  border-radius: 6px;
+  background: var(--aether-color-bg-control);
+  color: inherit;
+  padding: 7px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.suite-account-menu input {
+  max-width: 100%;
+  font: inherit;
+}
+.suite-account-menu a {
+  color: var(--aether-color-accent);
+  text-decoration: none;
+}
+.suite-account-menu p:empty {
+  display: none;
+}
+.suite-account-menu p {
+  color: var(--aether-color-error);
+  margin: 0;
+}
+html[data-aether-theme="light"],
+html[data-aether-theme="light"] .aether-home-theme {
+  color-scheme: light;
+  --aether-color-bg-app: #f5f6f8;
+  --aether-color-bg-shell: #fff;
+  --aether-color-bg-bar: #fff;
+  --aether-color-bg-panel: #fff;
+  --aether-color-bg-rail: #f1f3f6;
+  --aether-color-bg-inset: #edf0f4;
+  --aether-color-bg-control: #fff;
+  --aether-color-bg-control-hover: #e8edf5;
+  --aether-color-bg-hover: #edf1f7;
+  --aether-color-bg-row-hover: #edf1f7;
+  --aether-color-bg-selected: #dce9ff;
+  --aether-color-border: #d4dae2;
+  --aether-color-border-control: #bcc7d5;
+  --aether-color-border-control-hover: #8294ab;
+  --aether-color-text: #202b39;
+  --aether-color-text-soft: #35445a;
+  --aether-color-text-dim: #58677b;
+  --aether-color-text-faint: #718198;
+  --aether-color-accent: #235fdf;
+  --aether-color-accent-icon: #235fdf;
+}
+html[data-aether-theme="dark"] {
+  color-scheme: dark;
+}
+@media (max-width: 1000px) {
+  .suite-account-name {
+    display: none;
+  }
+}

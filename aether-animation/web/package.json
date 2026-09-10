@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aether/ui": "file:../../aether-ui",
+    "@aether/ui": "file:../../core/ui",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.180.0"

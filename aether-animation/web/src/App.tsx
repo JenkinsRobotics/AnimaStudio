@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
+  AppIcon,
+  AetherIcon,
+  IconButton,
   DocumentBar,
   LayoutPresetButton,
   Ribbon,
@@ -11,6 +14,9 @@ import {
   Tabs,
   Tree,
   ViewportCanvas,
+  ViewportNavigationCube,
+  type ViewportOrientation,
+  type AetherIconName,
   WorkspaceShell,
 } from "@aether/ui";
 import type { LayoutPreset, StatusKind, TreeNode, WorkspacePanel } from "@aether/ui";
@@ -41,19 +47,15 @@ import type { DofState } from "./PosePanel";
 const DEFAULT_CHARACTER = "examples/pan_tilt_head.character.anima";
 const PRESET_KEY = "aether.layoutPreset";
 
-const TOOL_GLYPHS: Record<string, string> = {
-  fastened: "▣",
-  revolute: "↻",
-  prismatic: "↔",
-  cylindrical: "⌀",
-  planar: "▱",
-  ball: "●",
-  pin_slot: "⌖",
-  parallel: "∥",
+const TOOL_ICONS: Record<string, AetherIconName> = {
+  fastened: "fastened", parallel: "parallel", revolute: "revolute",
+  prismatic: "slider", cylindrical: "cylindrical", pin_slot: "pin_slot",
+  planar: "planar", ball: "ball",
 };
 
 export function App() {
   const viewportRef = useRef<AnimationViewport | null>(null);
+  const [cameraOrientation, setCameraOrientation] = useState<ViewportOrientation>([0, 0, 0, 1]);
   const [status, setStatus] = useState("connecting to engine…");
   const [statusKind, setStatusKind] = useState<StatusKind>("busy");
   // Deep links for review: ?workspace=assets|modeling|animate&clip=<name>
@@ -354,7 +356,7 @@ export function App() {
       rig?.parts.map((part) => ({
         id: part.name,
         label: part.name,
-        icon: "▫",
+        icon: <AetherIcon name="model" />,
         badge: part.grounded ? "⏚" : undefined,
         dimmed: part.suppressed,
       })) ?? [],
@@ -365,7 +367,7 @@ export function App() {
       rig?.joints.map((joint) => ({
         id: `mate:${joint.name}`,
         label: `${joint.name} · ${joint.type}`,
-        icon: "⛓",
+        icon: <AetherIcon name="mate" />,
       })) ?? [],
     [rig]
   );
@@ -374,7 +376,7 @@ export function App() {
       rig?.clips.map((clip) => ({
         id: `clip:${clip.name}`,
         label: `${clip.name} · ${clip.duration_s.toFixed(2)}s${clip.loop ? " ⟳" : ""}`,
-        icon: "▷",
+        icon: <AetherIcon name="play" />,
         badge: clip.name === activeClip?.name ? "●" : undefined,
       })) ?? [],
     [rig, activeClip]
@@ -456,13 +458,13 @@ export function App() {
     {
       id: "character",
       title: "Character",
-      icon: "◆",
+      icon: <AetherIcon name="aether" />,
       content: characterPanel,
     },
     {
       id: "parts",
       title: "Parts",
-      icon: "▣",
+      icon: <AetherIcon name="items" />,
       content: (
         <Tree nodes={partNodes} selectedIDs={selection} onSelect={select} />
       ),
@@ -470,7 +472,7 @@ export function App() {
     {
       id: "mates",
       title: "Mates",
-      icon: "⛓",
+      icon: <AetherIcon name="mate" />,
       content: (
         <Tree
           nodes={mateNodes}
@@ -483,7 +485,7 @@ export function App() {
     {
       id: "clips",
       title: "Clips",
-      icon: "▷",
+      icon: <AetherIcon name="play" />,
       content: (
         <Tree
           nodes={clipNodes}
@@ -499,11 +501,11 @@ export function App() {
   ];
 
   const rightPanels: WorkspacePanel[] = [
-    { id: "inspector", title: "Inspector", icon: "☰", content: inspector },
+    { id: "inspector", title: "Inspector", icon: <AetherIcon name="document" />, content: inspector },
     {
       id: "pose",
       title: "Pose",
-      icon: "⚙",
+      icon: <AetherIcon name="settings" />,
       content: <PosePanel dofs={dofs} onChange={onDofChange} onReset={onDofReset} />,
     },
   ];
@@ -517,7 +519,7 @@ export function App() {
             {mateSchemas.map((schema) => (
               <RibbonTool
                 key={schema.type}
-                icon={TOOL_GLYPHS[schema.type] ?? "◇"}
+                icon={<AetherIcon name={TOOL_ICONS[schema.type] ?? "mate"} />}
                 label={schema.label}
                 active={mateDraft?.schema.type === schema.type}
                 onClick={() =>
@@ -530,7 +532,7 @@ export function App() {
           </RibbonGroup>
           <RibbonGroup label="Edit">
             <RibbonTool
-              icon="✕"
+              icon={<AetherIcon name="delete" />}
               label="Remove"
               disabled={!selectedMate}
               onClick={() => selectedMate && deleteMate(selectedMate.name)}
@@ -539,12 +541,12 @@ export function App() {
         </>
       ) : workspace === "animate" ? (
         <RibbonGroup label="Pose">
-          <RibbonTool icon="⟲" label="Reset" onClick={onDofReset} />
+          <RibbonTool icon={<AetherIcon name="undo" />} label="Reset" onClick={onDofReset} />
         </RibbonGroup>
       ) : (
         <RibbonGroup label="Character">
-          <RibbonTool icon="⟳" label="Reload" onClick={() => void boot()} />
-          <RibbonTool icon="💾" label="Save" onClick={() => void save()} />
+          <RibbonTool icon={<AetherIcon name="history" />} label="Reload" onClick={() => void boot()} />
+          <RibbonTool icon={<AetherIcon name="save" />} label="Save" onClick={() => void save()} />
         </RibbonGroup>
       )}
     </Ribbon>
@@ -556,7 +558,9 @@ export function App() {
       <DocumentBar
         leading={
           <>
-            <strong className="app-brand">◆ AETHER</strong>
+            {window.location.pathname.startsWith("/animation/") && <a href="/animation/" title="Aether Animation" aria-label="Aether Animation" style={{ display: "inline-flex", color: "inherit" }}><AppIcon app="animation" size={30} /></a>}
+            <IconButton label="Aether Animation assets" onClick={() => setWorkspace("assets")}><AetherIcon name="home" /></IconButton>
+            <strong className="app-brand">Aether Animation</strong>
             <span className="app-project">
               {rig ? rig.identity.display_name ?? rig.identity.name : "…"}
             </span>
@@ -566,9 +570,11 @@ export function App() {
         center={
           <Tabs
             tabs={[
-              { id: "assets", label: "Assets" },
-              { id: "modeling", label: "3D Modeling" },
-              { id: "animate", label: "Animate" },
+              { id: "assets", label: "Assets", icon: <AetherIcon name="import" /> },
+              { id: "modeling", label: "3D Modeling", icon: <AetherIcon name="design" /> },
+              { id: "animate", label: "Animate", icon: <AetherIcon name="animate" /> },
+              { id: "show", label: "Show", icon: <AetherIcon name="show" />, disabled: true, title: "Show workspace is awaiting the web session bridge." },
+              { id: "hardware", label: "Hardware", icon: <AetherIcon name="hardware" />, disabled: true, title: "Hardware workspace is awaiting the web output session bridge." },
             ]}
             activeID={workspace}
             onSelect={setWorkspace}
@@ -580,11 +586,14 @@ export function App() {
               Save
             </Button>
             <LayoutPresetButton preset={preset} onChange={choosePreset} />
+            <div data-aether-account="" />
           </>
         }
       />
       <WorkspaceShell
         preset={preset}
+        preservePanelContent
+        storageKey="aether.animation.panels.v1"
         style={{ flex: 1, minHeight: 0 }}
         toolbar={toolbar}
         leftPanels={leftPanels}
@@ -646,8 +655,9 @@ export function App() {
               }
             });
             viewportRef.current = viewport;
-            // Preset switches remount the canvas (the shell's docked and
-            // floating trees differ); rehydrate from the live rig.
+            viewport.setOrientationHandler(setCameraOrientation);
+            // The shared shell retains this canvas across layout changes.
+            // A fresh mount still hydrates from the active engine projection.
             const current = rigRef.current;
             if (current) {
               void viewport
@@ -662,6 +672,13 @@ export function App() {
             };
           }}
         />
+        <div className="animation-view-cube">
+          <ViewportNavigationCube orientation={cameraOrientation}
+            onSelectView={(view) => viewportRef.current?.setStandardView(view)}
+            onFit={() => viewportRef.current?.fitView()}
+            onNudge={(horizontal, vertical) => viewportRef.current?.nudgeView(horizontal, vertical)}
+            onRoll={(turns) => viewportRef.current?.rollView(turns)} />
+        </div>
         {mateDraft ? (
           <MateDialog
             draft={mateDraft}

@@ -17,7 +17,7 @@ The product is being REBUILT as a web app (per Jonathan, 2026-08-01):
 - `archive/` — the previous Swift application (`swift-app/`) and its
   native engine seam (`AetherKit/`), frozen as the behavior reference.
   A native Swift shell remains a future option; it would re-consume the
-  same tokens (`aether-ui/tokens/tokens.json`) and engine.
+  same tokens (`core/ui/tokens/tokens.json`) and engine.
 
 The Python semantics engine remains at `/animacore/` (canonical) until its
 move into Core is scheduled.
@@ -25,4 +25,14 @@ move into Core is scheduled.
 Product-specific = timelines, show control, performance capture, avatar and
 blendshape mapping, character-library UX, hardware panels, output buses, and
 raw device adapters. Mathematical state/evaluation shared by multiple products
-belongs in `/aether-core/`.
+belongs in `/core/engine/`.
+
+
+## Current launcher and shared interface
+
+Open **Aether Animation.app** at the repository root. It now uses the shared
+Studio theme, WorkspaceShell and camera ViewCube in `core/ui/`. The prior native
+**Anima Studio.app** is preserved in `archive/` as a migration reference.
+The web port is not yet full native-feature parity; the remaining workflow and
+mockup-retirement gates are in
+[`Aether_Studio_UI_Convergence.md`](../dev/docs/roadmap/Aether_Studio_UI_Convergence.md).

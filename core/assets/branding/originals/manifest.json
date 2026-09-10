@@ -1,0 +1,80 @@
+{
+  "preserved": "2026-09-08",
+  "files": [
+    {
+      "file": "aether-cad/AppIconSource.svg",
+      "source": "core/assets/branding/aether-cad.svg",
+      "sha256": "f717b8f53866b91a99df92f9a3467443f0e6fff6f20fe39cddab681a6f0654a6"
+    },
+    {
+      "file": "anima-studio/AppIconSource.svg",
+      "source": "aether-animation/archive/swift-app/App/Resources/AppIconSource.svg",
+      "sha256": "ec12cee0b803f7e78977439292b892bcd2f42d9fb34fb99c4fea2426d82f5a94"
+    },
+    {
+      "file": "anima-studio/AppIcon.icns",
+      "source": "aether-animation/archive/Anima Studio.app/Contents/Resources/AppIcon.icns",
+      "sha256": "ae223df25d7c92c8b9a951d6339420eb5d7e3818748531632728acff94118e67"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/Contents.json",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "sha256": "62b2154049419e8e3a6c5e8895ea9887af847a39a78e115f5da73e9601a3fdaf"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_128x128.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+      "sha256": "963777b2a7ec223eb7c444a5acb2f3b1be2408a7cb718da9baba354533d4c108"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_128x128@2x.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png",
+      "sha256": "e783e74d4ded1118d4c1adcb27bdfce55051482ad81bbf0fa14ed78a24447730"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_16x16.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+      "sha256": "b44e84ef3540770e03e5ff6e702226d9da8d7fa2fac31c71b18393cd776094b7"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_16x16@2x.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+      "sha256": "ceb91fa6845c477b30704bb5404b91d3902da9a993a5484917856e501209fbdf"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_256x256.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+      "sha256": "e783e74d4ded1118d4c1adcb27bdfce55051482ad81bbf0fa14ed78a24447730"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_256x256@2x.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png",
+      "sha256": "dccc6d6c3a87860500f6271e1f35f215242a83bd6874a37dbb53bd5376664a19"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_32x32.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+      "sha256": "ceb91fa6845c477b30704bb5404b91d3902da9a993a5484917856e501209fbdf"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_32x32@2x.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png",
+      "sha256": "0b9f459862f326af6d8bf8763dfeeb6ef510bb7cfdc9a6a6e74110e7afe1b2cf"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_512x512.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+      "sha256": "dccc6d6c3a87860500f6271e1f35f215242a83bd6874a37dbb53bd5376664a19"
+    },
+    {
+      "file": "anima-studio/AppIcon.appiconset/icon_512x512@2x.png",
+      "source": "aether-animation/archive/swift-app/App/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png",
+      "sha256": "cdb97373aa4fdd29010bd488824cc1ff1020ecb85474b202215182a71b2ef566"
+    },
+    {
+      "file": "aether-cad/AetherCADIcon.icns",
+      "source": "/var/folders/sw/9gk79bcn0r30dr3vk76whpxc0000gn/T/AetherCADBuild/Aether CAD.app/Contents/Resources/AetherCADIcon.icns",
+      "sha256": "b3c6983facc91998e1116c8167161c20e35f356bd561a18d1633a96e98b9ff46"
+    }
+  ]
+}

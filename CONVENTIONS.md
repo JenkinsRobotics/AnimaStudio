@@ -1,5 +1,20 @@
 # Conventions
 
+## Current suite direction — 2026-09-08
+
+Aether Studio is the umbrella suite; the animation product is **Aether Animation**.
+The primary applications are web-based React/TypeScript: `Aether CAD/` and
+`aether-animation/web/`, sharing `core/ui/` and `core/engine/`. The independent host and admin workspace now live in `core/host/` and `studio/`;
+community plugin distribution remains planned. See
+`dev/docs/roadmap/Aether_Studio_Suite.md`. The Onshape mockup is an interaction
+reference, not the production CAD engine. Codex owns web GUI and cross-lane review;
+Claude owns the Python backend/protocol. Older Swift lane/path instructions below
+are historical and superseded: Swift is archived at `aether-animation/archive/`.
+The `core/` parent groups shared infrastructure: `core/engine/` remains the
+UI-independent `@aether/core` package, and `core/ui/` remains `@aether/ui`.
+Existing semantic ownership and file-claim rules still apply.
+
+
 The operating checklist for this repo. Inherited from the Jaeger
 ecosystem's rules, trimmed to what Anima Studio actually uses.
 
@@ -22,6 +37,16 @@ ecosystem's rules, trimmed to what Anima Studio actually uses.
    never import UI or AI layers;
    hardware adapters consume evaluated targets and never reach into
    authoring state; firmware failsafes cannot be disabled from above.
+
+3. **One file, one subsystem.** Every file owns one clearly named
+   job; group related files in a module directory (the pattern:
+   `Aether CAD/src/sketch/` — twelve focused files, not one editor
+   blob). A file that accumulates a second subsystem, or grows past
+   the point a human can read and edit it confidently (~500 lines is
+   the smell threshold, not a hard cap), gets split — behind
+   behavior-pinning tests, before new features land in it. God files
+   block concurrent team work: two agents cannot safely edit one
+   2,000-line file.
 
 ## Where things live
 
