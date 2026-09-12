@@ -59,8 +59,49 @@ let dirty = false;
 configureDocumentSession(() => active, () => {
   if (dirty || saving) throw new Error("Save your current edits before changing document settings.");
 });
+/* Continuous saving (PDM): edits autosave in the background as revisions;
+ * explicit Commit annotates a revision with a name + message. */
+let autosaveFlush: (() => Promise<void>) | null = null;
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+export function configureAutosave(flush: () => Promise<void>) {
+  autosaveFlush = flush;
+}
+async function runAutosave() {
+  if (!autosaveFlush || !dirty) return;
+  if (saving) {
+    scheduleAutosave();
+    return;
+  }
+  await autosaveFlush();
+}
+function scheduleAutosave() {
+  if (!autosaveFlush) return;
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    autosaveTimer = null;
+    void runAutosave();
+  }, 1200);
+}
+export async function flushAutosaveNow() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+  }
+  await runAutosave();
+}
+export async function commitHosted(name: string, message: string) {
+  if (!active) throw new Error("Open a server document to commit.");
+  await flushAutosaveNow();
+  await request("version", {
+    id: active.id,
+    expected_revision: active.revision,
+    name,
+    message,
+  });
+}
 export function markHostedDirty() {
   dirty = true;
+  scheduleAutosave();
 }
 export function markHostedClean() {
   dirty = false;
@@ -97,6 +138,7 @@ export async function loadHostedFile(): Promise<File | null> {
   active = await request(query.has("revision") ? "read_revision" : "read", {
     id,
     revision: Number(query.get("revision")),
+    branch: query.get("branch") ?? undefined,
   });
   if (isProjectFile(active.name)) {
     const result = (await request("project_read", {
@@ -140,6 +182,11 @@ export async function saveHostedFile(
   if (saving) throw new Error("A save is already in progress.");
   saving = true;
   try {
+    if (query.get("branch") && activePartId) {
+      throw new Error(
+        "Branch editing supports standalone parts today; project packages branch after the workspace contract lands.",
+      );
+    }
     if (activePartId && active && isPartFile(name)) {
       if (!active.writable || linkedPartReadOnly)
         throw new Error(
@@ -175,6 +222,7 @@ export async function saveHostedFile(
         id: active.id,
         expected_revision: active.revision,
         data_base64,
+        branch: query.get("branch") ?? undefined,
       });
     } else
       active = await request("create", {

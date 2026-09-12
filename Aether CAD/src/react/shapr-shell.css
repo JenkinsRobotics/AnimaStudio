@@ -30,22 +30,16 @@
 .toolbar-traditional .viewport-bottom-tools,
 .toolbar-traditional .viewport-right-tools { display: none; }
 
-.cad-traditional-ribbon { display: grid; grid-template-rows: 33px minmax(0, 1fr) 28px; min-width: 0; min-height: 0; border-bottom: 1px solid var(--aether-color-bg-app); background: var(--aether-color-bg-panel); }
-.cad-ribbon-navigation { display: grid; grid-template-columns: minmax(420px, 1fr) auto; align-items: stretch; min-width: 0; border-bottom: 1px solid var(--aether-color-border); background: var(--aether-color-border); }
+.cad-traditional-ribbon { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: 33px minmax(0, 1fr); min-width: 0; min-height: 0; border-bottom: 1px solid var(--aether-color-bg-app); background: var(--aether-color-bg-panel); }
+.cad-ribbon-navigation { grid-column: 2; grid-row: 1; display: grid; grid-template-columns: minmax(420px, 1fr) auto; align-items: stretch; min-width: 0; border-bottom: 1px solid var(--aether-color-border); background: var(--aether-color-border); }
 .cad-toolbar-mode-command,
-.cad-document-strip button { border: 0; background: transparent; color: var(--aether-color-text-dim); font: inherit; font-size: 9px; cursor: pointer; }
 .cad-ribbon-navigation > .aui-tabs { min-width: 0; overflow-x: auto; }
 .cad-ribbon-navigation .aui-tab { min-width: max-content; padding-inline: 13px; color: var(--aether-color-text-dim); font-size: 10px; }
 .cad-ribbon-navigation .aui-tab--active { color: var(--aether-color-text); }
 .cad-toolbar-mode-command { border-left: 1px solid var(--aether-color-border); padding: 0 12px; white-space: nowrap; }
 .cad-toolbar-mode-command:hover { background: var(--aether-color-border); color: white; }
-.cad-ribbon-scroll { min-width: 0; min-height: 0; overflow-x: auto; overflow-y: hidden; }
+.cad-ribbon-scroll { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow-x: auto; overflow-y: hidden; }
 .cad-ribbon-tool-wrap { display: contents; }
-.cad-document-strip { display: flex; align-items: stretch; min-width: 0; border-top: 1px solid var(--aether-color-border); background: var(--aether-color-bg-panel); }
-.cad-document-strip button { min-width: 72px; max-width: 220px; overflow: hidden; border-right: 1px solid var(--aether-color-border); padding: 0 12px; text-overflow: ellipsis; white-space: nowrap; }
-.cad-document-strip button.active { background: var(--aether-color-border); color: var(--aether-color-text); box-shadow: inset 0 2px #69c9f1; }
-.cad-document-strip button span { margin-right: 6px; color: #7fd8ff; }
-.cad-document-strip > span { margin-left: auto; align-self: center; padding: 0 10px; color: var(--aether-color-text-faint); font-size: 8px; }
 .cad-start-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; max-width: 1120px; margin: 0 auto 42px; }
 .cad-start-header > div { display: flex; align-items: center; gap: 12px; }
 .cad-start-header > div > div { display: flex; flex-direction: column; gap: 3px; }
@@ -98,7 +92,7 @@
 .cad-document-bar .home-command { border-color: transparent; background: transparent; color: var(--aether-color-accent-icon); }
 .cad-document-bar .home-command:hover { border-color: transparent; background: var(--aether-color-bg-hover); color: var(--aether-color-text); }
 .cad-document-identity { display: flex; min-width: 0; align-items: center; gap: 7px; }
-.cad-document-identity strong { max-width: min(25vw, 180px); overflow: hidden; color: var(--aether-color-text); font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.cad-document-identity strong { max-width: min(25vw, 180px); overflow: hidden; color: var(--aether-color-text); font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .cad-document-identity span { border-radius: 99px; padding: 2px 6px; background: color-mix(in srgb, var(--aether-color-accent-icon) 12%, transparent); color: var(--aether-color-accent-icon); font-size: 8px; font-weight: 760; letter-spacing: .08em; white-space: nowrap; }
 .cad-header-divider { width: 1px; height: 18px; margin-inline: 1px; background: var(--aether-color-border); }
 .home-command:focus-visible,
@@ -116,6 +110,7 @@
 .header-command { width: 29px; height: 29px; padding: 0; border-color: var(--aether-color-border); background: var(--aether-color-border); }
 .header-command.accent { color: #80d9ff; }
 .backend { justify-self: auto; }
+.cad-app-name { font-weight: 600; color: var(--aether-color-text); }
 .share-button { border: 1px solid var(--aether-color-border); border-radius: 7px; padding: 6px 11px; background: var(--aether-color-border); color: var(--aether-color-text); font-size: 10px; cursor: pointer; }
 .share-button:hover { background: var(--aether-color-border); color: white; }
 .share-button:disabled { opacity: .38; cursor: not-allowed; }
@@ -189,7 +184,9 @@
 .shapr-shell .sidebar { grid-row: 1 / 3; }
 .shapr-shell .inspector-sidebar { grid-column: 3; grid-row: 1; border-left: 1px solid var(--aether-color-bg-app); }
 .shapr-shell .aui-dock-panel { height: 100%; border: 0; background: transparent; }
-.shapr-shell .aui-dock-panel-body { height: 100%; }
+/* height:100% would fight the heading for the column; the shared body now
+   grows into the remaining space on its own. */
+.shapr-shell .aui-dock-panel-body { min-height: 0; }
 .shapr-shell .inspector-sidebar .aui-panel-heading {
   min-height: 50px;
   padding: 0 13px;
@@ -201,14 +198,14 @@
 }
 .shapr-shell .inspector-sidebar .aui-property-grid { height: calc(100% - 50px); overflow: auto; }
 .shapr-shell .inspector-sidebar output { color: var(--aether-color-text); font-size: 10px; }
-.cad-bottom-workbench { grid-column: 2 / 4; grid-row: 2; min-width: 0; max-height: 190px; overflow: hidden; border-left: 1px solid var(--aether-color-bg-app); }
+.cad-bottom-workbench { grid-column: 2 / 4; grid-row: 2; min-width: 0; max-height: 88px; overflow: hidden; border-left: 1px solid var(--aether-color-bg-app); }
 .cad-panel-placement-menu { display: grid; place-items: center; width: 24px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--aether-color-text-dim); font-size: 10px; cursor: pointer; }
 .cad-panel-placement-menu:hover { background: var(--aether-color-border); color: white; }
 .sidebar > .cad-panel-placement-menu { position: absolute; z-index: 24; top: 13px; right: 8px; }
 .cad-bottom-workbench { position: relative; }
 .cad-bottom-workbench > .cad-panel-placement-menu { position: absolute; z-index: 24; top: 5px; right: 8px; }
 .cad-bottom-workbench .aui-bottom-panel { height: 100%; min-height: 32px; }
-.cad-bottom-workbench .aui-bottom-panel:not(.aui-bottom-panel--collapsed) { height: 190px; }
+.cad-bottom-workbench .aui-bottom-panel:not(.aui-bottom-panel--collapsed) { height: 88px; }
 .cad-bottom-workbench .history-list, .cad-bottom-workbench .problems-list { min-height: 0; padding: 6px 10px 10px; }
 
 .shapr-shell .browser-title { min-height: 50px; padding: 10px 13px; border-color: var(--aether-color-border); }
@@ -331,7 +328,9 @@
 .visualization-unavailable button { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--aether-color-border); border-radius: 7px; padding: 9px; background: var(--aether-color-bg-inset); color: var(--aether-color-text-dim); text-align: left; opacity: .55; }
 .visualization-unavailable b { font-size: 10px; }
 .visualization-unavailable span { color: var(--aether-color-text-faint); font-size: 9px; }
-.sidebar-footer { position: absolute; inset: auto 0 0; display: flex; justify-content: space-between; padding: 9px 11px; border-top: 1px solid var(--aether-color-border); background: var(--aether-color-bg-panel); }
+.sidebar-footer { display: flex; justify-content: space-between; padding: 9px 11px; border-top: 1px solid var(--aether-color-border); background: var(--aether-color-bg-panel); }
+.browser-panel[data-panel="items"].active { display: flex; flex-direction: column; overflow: hidden; }
+.browser-panel[data-panel="items"] .parts-list { flex: 1; min-height: 0; overflow: auto; }
 .sidebar-footer button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; background: transparent; color: var(--aether-color-text-dim); cursor: pointer; }
 .sidebar-footer button:disabled { opacity: .32; cursor: not-allowed; }
 .sidebar-footer svg { width: 15px; height: 15px; }
@@ -435,7 +434,7 @@
 }
 .workspace.layout-expanded .sidebar { inset: 12px auto 12px 12px; width: var(--cad-left-width); }
 .workspace.layout-expanded .inspector-sidebar { inset: 12px 12px 12px auto; width: var(--cad-inspector-width); }
-.workspace.layout-expanded .cad-bottom-workbench { right: calc(var(--cad-inspector-width) + 24px); bottom: 12px; left: calc(var(--cad-left-width) + 24px); height: 190px; }
+.workspace.layout-expanded .cad-bottom-workbench { right: calc(var(--cad-inspector-width) + 24px); bottom: 12px; left: calc(var(--cad-left-width) + 24px); height: 88px; }
 .workspace.layout-expanded .viewport-mode-tools { left: calc(var(--cad-left-width) + 38px); }
 .workspace.layout-expanded .selection-filter-hud { right: calc(var(--cad-inspector-width) + 36px); }
 .workspace.layout-expanded .viewport-authoring-tools { left: calc(var(--cad-left-width) + 188px); }
@@ -453,7 +452,7 @@
 }
 .workspace.layout-docked.panel-browser-floating .sidebar { inset: 12px auto 12px 12px; width: var(--cad-left-width); }
 .workspace.layout-docked.panel-inspector-floating .inspector-sidebar { inset: 12px 12px 12px auto; width: var(--cad-inspector-width); }
-.workspace.layout-docked.panel-bottom-floating .cad-bottom-workbench { right: calc(var(--cad-inspector-track) + 24px); bottom: 12px; left: calc(var(--cad-browser-track) + 24px); height: 190px; }
+.workspace.layout-docked.panel-bottom-floating .cad-bottom-workbench { right: calc(var(--cad-inspector-track) + 24px); bottom: 12px; left: calc(var(--cad-browser-track) + 24px); height: 88px; }
 .workspace.panel-browser-hidden .sidebar,
 .workspace.panel-inspector-hidden .inspector-sidebar,
 .workspace.panel-bottom-hidden .cad-bottom-workbench { display: none; }
@@ -543,7 +542,7 @@
 .cad-studio-viewport { position: absolute; inset: 0; }
 .cad-studio-viewport > .viewport { width: 100%; height: 100%; }
 .studio-shell .cad-start-center { inset: var(--aether-size-topbar) 0 var(--aether-size-statusbar); }
-.studio-shell .cad-traditional-ribbon { display: grid; grid-template-rows: auto auto auto; background: var(--aether-color-bg-bar); border-color: var(--aether-color-border); }
+.studio-shell .cad-traditional-ribbon { display: grid; grid-template-rows: auto auto; background: var(--aether-color-bg-bar); border-color: var(--aether-color-border); }
 .studio-shell .cad-ribbon-navigation { grid-template-columns: minmax(0, 1fr) auto; background: var(--aether-color-bg-bar); border-color: var(--aether-color-border); }
 .studio-shell .cad-ribbon-scroll { max-width: 100%; }
 .studio-shell .cad-ribbon-scroll .aui-ribbon { width: max-content; min-width: 100%; }
@@ -552,7 +551,9 @@
 .studio-shell .cad-document-strip { background: var(--aether-color-bg-bar); border-color: var(--aether-color-border); }
 .studio-shell .cad-document-strip button { color: var(--aether-color-text-dim); border-color: var(--aether-color-border); }
 .studio-shell .cad-document-strip button.active { background: var(--aether-color-bg-selected); color: var(--aether-color-text); box-shadow: none; }
-.studio-shell .aui-shell-panel-body { max-height: 65vh; }
+/* Floating panels must not swallow the viewport; a DOCKED panel fills its
+   rail — clamping both was what stopped the Feature tree short of the bottom. */
+.studio-shell .aui-float .aui-shell-panel-body { max-height: 65vh; }
 .studio-shell .inspector-sidebar { border: 0; background: transparent; box-shadow: none; }
 .studio-shell .browser-title { background: var(--aether-color-bg-panel); border-color: var(--aether-color-border); }
 .studio-shell .browser-title strong { color: var(--aether-color-text); }
@@ -569,7 +570,7 @@
 .cad-suite-ribbon {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
 }
 .cad-suite-workspace {
   grid-column: 1;
@@ -584,7 +585,6 @@
 .cad-suite-workspace button { min-height: 50px; width: 100%; text-transform: uppercase; font-weight: 650; }
 .cad-suite-ribbon .cad-ribbon-navigation { grid-column: 2; grid-row: 1; min-width: 0; }
 .cad-suite-ribbon .cad-ribbon-scroll { grid-column: 2; grid-row: 2; min-width: 0; }
-.cad-suite-ribbon .cad-document-strip { grid-column: 1 / -1; grid-row: 3; }
 .cad-sidebar-history { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .cad-sidebar-history .history-list, .cad-sidebar-history .problems-list { overflow: auto; max-height: none; }
 .cad-versions-panel { padding: 12px; font-size: 12px; line-height: 1.5; overflow: auto; height: 100%; box-sizing: border-box; }
@@ -634,4 +634,84 @@
 .cad-ribbon-tool-wrap:has(> .aui-menu-trigger) { display: inline-flex; align-items: stretch; }
 .cad-ribbon-tool-wrap > .aui-menu-trigger { padding: 0 4px; min-width: 18px; border: 0; background: transparent; color: inherit; }
 
-.aui-tree-icon .aui-tool-icon { width: 16px; height: 16px; vertical-align: middle; }
+
+.cad-mock-panel { display: flex; flex-direction: column; gap: 10px; padding: 12px; font-size: 12px; color: var(--aether-color-text-dim); }
+.cad-mock-toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+.cad-mock-input { border: 1px solid var(--aether-color-border); background: transparent; color: inherit; border-radius: var(--aether-radius-control); padding: 6px 8px; font: inherit; resize: none; }
+.cad-mock-input:disabled { opacity: .5; }
+.cad-mock-empty { display: grid; place-items: center; gap: 8px; padding: 26px 8px; text-align: center; color: var(--aether-color-text-faint); }
+.cad-mock-empty svg { width: 42px; height: 42px; opacity: .45; }
+.cad-mock-note { margin: 0; font-size: 11px; color: var(--aether-color-text-faint); }
+
+.cad-history-timeline-wrap { min-height: 0; }
+.cad-history-timeline { display: flex; align-items: center; gap: 6px; padding: 5px 10px; min-width: 0; }
+.cad-history-empty { margin: 0; padding: 8px 12px; font-size: 12px; color: var(--aether-color-text-faint); }
+.cad-history-controls { display: flex; gap: 1px; flex: none; border-right: 1px solid var(--aether-color-border); padding-right: 6px; }
+.cad-history-controls button { display: grid; place-items: center; width: 22px; height: 24px; border: 0; background: transparent; color: var(--aether-color-text-dim); font-size: 10px; cursor: pointer; }
+.cad-history-controls button:hover:not(:disabled) { color: var(--aether-color-text); }
+.cad-history-controls button:disabled { opacity: .35; cursor: default; }
+.cad-history-strip { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; padding: 2px 0; }
+.cad-history-chip { display: grid; place-items: center; width: 27px; height: 27px; flex: none; border: 0; border-radius: 5px; background: transparent; color: var(--aether-color-text-dim); cursor: pointer; padding: 0; }
+.cad-history-chip svg { width: 19px; height: 19px; }
+.cad-history-chip:hover { background: var(--aether-color-bg-hover); }
+.cad-history-chip--dimmed { opacity: .4; }
+.cad-history-marker { position: relative; width: 9px; height: 27px; flex: none; border: 0; padding: 0; background: transparent; cursor: col-resize; }
+.cad-history-marker::after { content: ""; position: absolute; inset: 0 3px; border-radius: 2px; background: var(--aether-color-accent); }
+.cad-history-marker:hover::after, .cad-history-marker:focus-visible::after { filter: brightness(1.2); }
+
+/* Versions-and-history graph (Onshape reference) */
+.cad-versions-panel { display: flex; flex-direction: column; gap: 10px; padding: 12px; font-size: 12px; min-height: 0; overflow: auto; }
+.cad-version-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.cad-version-branches { display: flex; gap: 6px; flex-wrap: wrap; }
+.cad-version-branch { padding: 3px 9px; border: 1px solid var(--aether-color-border); border-radius: 99px; color: var(--aether-color-text-soft); text-decoration: none; font-size: 11px; }
+.cad-version-branch--active { background: var(--aether-color-bg-selected); color: var(--aether-color-text-on-selected); border-color: transparent; }
+.cad-version-toggle { display: flex; gap: 6px; align-items: center; color: var(--aether-color-text-dim); font-size: 11px; }
+.cad-version-graph { list-style: none; margin: 0; padding: 0; position: relative; }
+.cad-version-graph::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--aether-color-border); }
+.cad-version-node { position: relative; display: flex; gap: 12px; padding: 7px 0 7px 2px; }
+.cad-version-marker { position: relative; z-index: 1; width: 12px; height: 12px; flex: none; margin-top: 2px; border-radius: 50%; border: 2px solid var(--aether-color-accent); background: var(--aether-color-bg-panel); display: inline-block; }
+.cad-version-node--commit > .cad-version-marker, i.cad-version-node--commit { background: var(--aether-color-accent); }
+.cad-version-node--change > .cad-version-marker, i.cad-version-node--change { width: 8px; height: 8px; margin-left: 2px; border-color: var(--aether-color-text-faint); }
+.cad-version-body strong { font-size: 12px; }
+.cad-version-message { margin: 2px 0; color: var(--aether-color-text-dim); }
+.cad-version-body small { display: block; color: var(--aether-color-text-faint); }
+.cad-version-links { display: flex; gap: 10px; margin-top: 3px; font-size: 11px; }
+.cad-version-links a { color: var(--aether-color-accent); text-decoration: none; }
+.cad-version-links button { border: 0; padding: 0; background: none; color: var(--aether-color-accent); font: inherit; cursor: pointer; }
+.cad-version-links button:disabled { opacity: .5; cursor: default; }
+.cad-version-legend { display: flex; gap: 14px; margin-top: 4px; color: var(--aether-color-text-dim); font-size: 11px; }
+.cad-version-legend span { display: inline-flex; gap: 6px; align-items: center; }
+
+/* Feature windows dock at the top-LEFT of the viewport, the way Onshape puts
+   them beside the feature tree. The right side is taken by the ViewCube and the
+   tool rail, and the top by the ribbon; the left edge is the only place a
+   300px panel does not cover something. The header stays drag-to-move. */
+.shapr-shell {
+  --aether-feature-window-top: 116px;
+  --aether-feature-window-right: auto;
+  --aether-feature-window-left: 16px;
+}
+
+/* Items panel owns its layout: the feature list scrolls inside its own area
+   instead of pushing Bodies and the footer off the panel. Each section keeps
+   its own box and overflows relative to itself. */
+.browser-panel[data-panel="items"].active { display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+.browser-panel[data-panel="items"] .parts-list { flex: 1 1 auto; min-height: 120px; overflow: auto; padding-bottom: 8px; }
+.browser-panel[data-panel="items"] .cad-bodies-section { flex: 0 0 auto; max-height: 38%; min-height: 76px; overflow: auto; }
+.browser-panel[data-panel="items"] .sidebar-footer { flex: 0 0 auto; }
+.shapr-shell .browser-panel[data-panel="items"] .parts-list { padding-bottom: 8px; }
+
+/* Under-defined sketch badge: a small dot on the corner of the shared sketch
+   icon, the way Onshape marks a sketch that still has free degrees of freedom.
+   An overlay, not a second icon, so the base glyph can never drift. */
+.cad-tree-icon { position: relative; display: inline-flex; }
+.cad-tree-icon-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--aether-color-bg-panel);
+  border-radius: 50%;
+  background: var(--aether-color-accent);
+}

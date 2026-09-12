@@ -1,7 +1,8 @@
-import {CreateMenu} from "./CreateMenu";
+import {CreateMenu, type CreateMenuChoices, type CreateChoice} from "./CreateMenu";
+import {ContextMenu} from "./ContextMenu";
 import { DocumentHistory } from "./DocumentHistory";
 import { useEffect, useRef, useState } from "react";
-import { AppIcon, AetherIcon, Button, TextField } from "@aether/ui";
+import { CollapsibleSidebar, SidebarLabel, SidebarToggle, AppIcon, AetherIcon, Button, TextField , type AetherIconName } from "@aether/ui";
 import { api } from "./api";
 import "./library.css";
 
@@ -18,20 +19,206 @@ type Entry = {
   size: number;
   data_base64?: string;
 };
-type View = "home" | "personal" | "recent" | "workspace";
+type View = "home" | "personal" | "recent" | "workspace" | "shared" | "trash";
+
+
+function ToolMenu({
+  label,
+  icon,
+  items,
+  onPick,
+}: {
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  items: { id: string; label: string; icon?: React.ReactNode; checked?: boolean }[];
+  onPick: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", dismiss);
+    return () => window.removeEventListener("pointerdown", dismiss);
+  }, [open]);
+  return (
+    <div ref={root} className="library-toolmenu">
+      <button
+        type="button"
+        className="library-tool"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        {icon}
+        {label}
+        <AetherIcon name="chevron" width={11} height={11} />
+      </button>
+      {open && (
+        <div role="menu" className="library-toolmenu-list">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={item.checked}
+              onClick={() => {
+                setOpen(false);
+                onPick(item.id);
+              }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              {item.checked ? <span className="library-toolmenu-check">✓</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export interface LibraryAppType {
+  id: string;
+  label: string;
+  icon: AetherIconName;
+  test: RegExp;
+}
+export interface LibraryAppConfig {
+  brand: string;
+  appIcon: "cad" | "animation";
+  appUrl: string;
+  accept: string;
+  uploadPattern: RegExp;
+  uploadHint: string;
+  heroLead: string;
+  emptyHint: string;
+  fallbackIcon: AetherIconName;
+  types: readonly LibraryAppType[];
+  menu: CreateMenuChoices;
+  start: readonly {
+    kind: string;
+    title: string;
+    tagline: string;
+    icon: AetherIconName;
+    action?: "new-doc" | "dialog" | "import";
+    tooltip?: string;
+  }[];
+}
+const LIBRARY_APPS: Record<"cad" | "animation", LibraryAppConfig> = {
+  cad: {
+    brand: "Aether CAD",
+    appIcon: "cad",
+    appUrl: "/cad/index.html",
+    accept: ".acpart,.acad,.acasm,.cadpart,.aether,.step,.stp",
+    uploadPattern: /\.(acpart|acad|acasm|cadpart|aether|step|stp)$/i,
+    uploadHint: "Import an .acpart, .acad, .acasm, .step or legacy CAD file.",
+    heroLead: "Create a part, pick up recent work, or bring an existing design into your library.",
+    emptyHint: "Create a Part or import a design to get started.",
+    fallbackIcon: "file-part",
+    types: [
+      { id: "part", label: "Parts", icon: "file-part", test: /\.(acpart|cadpart)$/ },
+      { id: "assembly", label: "Assemblies", icon: "file-assembly", test: /\.(acasm|aether)$/ },
+      { id: "drawing", label: "Drawings", icon: "file-drawing", test: /\.acdraw$/ },
+      { id: "project", label: "Projects", icon: "file-project", test: /\.acad$/ },
+    ],
+    menu: [["project","Project document","document"],["folder","Folder","folder"],["part","Part","design"],["assembly","Assembly","assembly"],["import","Import file…","import"]],
+    start: [
+      { kind: "part", title: "Part", tagline: "Model exact solid geometry", icon: "file-part", action: "new-doc" },
+      { kind: "assembly", title: "Assembly", tagline: "Mate parts into mechanisms", icon: "file-assembly", action: "dialog" },
+      { kind: "drawing", title: "Drawing", tagline: "Dimensioned sheets — open a document", icon: "file-drawing", tooltip: "Drawing sheets are created inside an open Part or Assembly document." },
+      { kind: "project", title: "Project", tagline: "Group related documents", icon: "file-project", action: "dialog" },
+    ],
+  },
+  animation: {
+    brand: "Aether Animation",
+    appIcon: "animation",
+    appUrl: "/animation/index.html",
+    accept: ".anima,.aether",
+    uploadPattern: /\.(anima|aether)$/i,
+    uploadHint: "Import an .anima character or .aether workspace file.",
+    heroLead: "Create a character, pick up recent work, or bring an existing rig into your library.",
+    emptyHint: "Create a Character or import a rig to get started.",
+    fallbackIcon: "file-character",
+    types: [
+      { id: "character", label: "Characters", icon: "file-character", test: /\.anima$/ },
+      { id: "workspace", label: "Workspaces", icon: "file-assembly", test: /\.aether$/ },
+      { id: "show", label: "Shows", icon: "file-show", test: /\.show$/ },
+    ],
+    menu: [["folder","Folder","folder"],["character","Character","design"],["import","Import file…","import"]],
+    start: [
+      { kind: "character", title: "Character", tagline: "Rig and pose a machine", icon: "file-character", action: "new-doc" },
+      { kind: "clip", title: "Clip", tagline: "Author motion inside a character", icon: "file-clip", tooltip: "Clips are authored inside an open character." },
+      { kind: "show", title: "Show", tagline: "Sequence clips for playback", icon: "file-show", tooltip: "Show authoring arrives with the web session bridge." },
+      { kind: "project", title: "Project", tagline: "Group related documents", icon: "file-project", tooltip: "Projects are a CAD library feature today." },
+    ],
+  },
+};
+
+
 const titles = {
   home: "Home",
   personal: "My files",
   recent: "Recently opened",
-  workspace: "Workspace shared",
+  workspace: "Workspace",
+  shared: "Shared",
+  trash: "Recycle bin",
 };
-export function LibraryHome({ workspace }: { workspace: string }) {
+export function LibraryHome({ workspace, app = "cad" }: { workspace: string; app?: "cad" | "animation" }) {
+  const cfg = LIBRARY_APPS[app];
+  const typeOf = (file: { kind: string; name: string }) => file.kind === "folder" ? "folder" : (cfg.types.find((type) => type.test.test(file.name.toLowerCase()))?.id ?? "import");
+  const iconOf = (file: { kind: string; name: string }): AetherIconName => file.kind === "folder" ? "folder" : (cfg.types.find((type) => type.test.test(file.name.toLowerCase()))?.icon ?? cfg.fallbackIcon);
   const [view, setView] = useState<View>("home");
+  const [userName, setUserName] = useState("");
+  useEffect(() => {
+    const sync = (event: Event) => {
+      const detail = (event as CustomEvent<{ full_name?: string; username?: string } | null>).detail;
+      setUserName(detail ? detail.full_name || detail.username || "" : "");
+    };
+    document.addEventListener("aether-account", sync);
+    void api<{ user: { full_name?: string; username?: string } | null }>("/api/status").then(
+      (status) => setUserName(status.user ? status.user.full_name || status.user.username || "" : ""),
+      () => undefined,
+    );
+    return () => document.removeEventListener("aether-account", sync);
+  }, []);
   const [files, setFiles] = useState<Entry[]>([]);
   const [folders, setFolders] = useState<Entry[]>([]);
   const [selected, setSelected] = useState<Entry | null>(null);
   const [query, setQuery] = useState("");
   const [grid, setGrid] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [nameFilter, setNameFilter] = useState("");
+  const [menu, setMenu] = useState<{ x: number; y: number; file?: Entry } | null>(null);
+  const [showDetails, setShowDetails] = useState(true);
+  const [sortKey, setSortKey] = useState<"name" | "opened" | "owner">("opened");
+  const [sortAsc, setSortAsc] = useState(false);
+  const filterText = nameFilter.trim().toLowerCase();
+  const compareShown = (a: Entry, b: Entry) => {
+    const result =
+      sortKey === "name"
+        ? a.name.localeCompare(b.name)
+        : sortKey === "owner"
+          ? a.owner.localeCompare(b.owner) || a.name.localeCompare(b.name)
+          : a.modified - b.modified;
+    return sortAsc ? result : -result;
+  };
+  const shown = files.filter((file) => {
+    const type = typeOf(file);
+    if (typeFilter !== "all" && !(type === typeFilter || (type === "import" && typeFilter === cfg.types[0].id))) return false;
+    if (filterText && !file.name.toLowerCase().includes(filterText) && !file.owner.toLowerCase().includes(filterText)) return false;
+    return true;
+  }).sort(compareShown);
+  const startCreate = (choice: CreateChoice) => {
+    if (choice === "part" || choice === "character") newDocument(choice);
+    else if (choice === "import") input.current?.click();
+    else {
+      setName("");
+      setDialog(choice);
+    }
+  };
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<
@@ -42,8 +229,9 @@ export function LibraryHome({ workspace }: { workspace: string }) {
   const input = useRef<HTMLInputElement>(null);
   const parent = folders.at(-1)?.id ?? null;
   const list = async () => {
+    if (view === "trash" || view === "shared") { setFiles([]); setSelected(null); return; }
     const result = await api<{ files: Entry[] }>("/api/library/list", {
-      app: "cad",
+      app,
       view: view === "home" ? (query ? "personal" : "recent") : view,
       parent,
       query,
@@ -56,8 +244,9 @@ export function LibraryHome({ workspace }: { workspace: string }) {
   useEffect(() => {
     let live = true;
     setError("");
+    if (view === "trash" || view === "shared") { setFiles([]); setSelected(null); return; }
     api<{ files: Entry[] }>("/api/library/list", {
-      app: "cad",
+      app,
       view: view === "home" ? (query ? "personal" : "recent") : view,
       parent,
       query,
@@ -95,13 +284,13 @@ export function LibraryHome({ workspace }: { workspace: string }) {
       setQuery("");
       return;
     }
-    location.assign("/cad/index.html?document=" + encodeURIComponent(file.id));
+    location.assign(cfg.appUrl + "?document=" + encodeURIComponent(file.id));
   };
   const scope = view === "workspace" ? "workspace" : "personal";
   const upload = async (file: File) => {
-    if (!/\.(acpart|acad|acasm|cadpart|aether|step|stp)$/i.test(file.name))
+    if (!cfg.uploadPattern.test(file.name))
       throw new Error(
-        "Import an .acpart, .acad, .acasm, .step or legacy CAD file.",
+        cfg.uploadHint,
       );
     if (file.size > 6 * 1024 * 1024)
       throw new Error("Choose a file up to 6 MB.");
@@ -110,7 +299,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
     for (let i = 0; i < bytes.length; i += 32768)
       binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
     await api("/api/library/create", {
-      app: "cad",
+      app,
       name: file.name,
       scope,
       parent,
@@ -123,7 +312,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
   const edit = async () => {
     if (dialog === "project" || dialog === "assembly") {
       const project = await api<Entry>("/api/library/project_create", {
-        app: "cad",
+        app,
         name,
         scope,
         parent,
@@ -134,7 +323,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
     }
     if (dialog === "folder")
       await api("/api/library/create", {
-        app: "cad",
+        app,
         name,
         kind: "folder",
         scope,
@@ -142,7 +331,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
       });
     else if (selected)
       await api("/api/library/rename", {
-        app: "cad",
+        app,
         id: selected.id,
         name,
         expected_revision: selected.revision,
@@ -156,7 +345,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
     run(async () => {
       if (!selected) return;
       await api("/api/library/share", {
-        app: "cad",
+        app,
         id: selected.id,
         scope: selected.scope === "personal" ? "workspace" : "personal",
         expected_revision: selected.revision,
@@ -167,7 +356,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
     run(async () => {
       if (!selected) return;
       const file = await api<Entry>("/api/library/read", {
-        app: "cad",
+        app,
         id: selected.id,
       });
       const bytes = Uint8Array.from(atob(file.data_base64!), (c) =>
@@ -180,48 +369,48 @@ export function LibraryHome({ workspace }: { workspace: string }) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
-  const createPart = () =>
+  const newDocument = (kind: string) =>
     location.assign(
-      "/cad/index.html?new=part" +
+      cfg.appUrl + "?new=" + kind +
         (parent ? "&folder=" + encodeURIComponent(parent) : "") +
         "&scope=" +
         scope,
     );
   return (
-    <div className="studio library-root">
+    <div className={"studio library-root" + (showDetails ? "" : " details-closed")}>
       <header className="library-top">
         <a href="/" className="library-brand" title="Aether Studio">
-          <AppIcon app="cad" size={36} />
+          <AppIcon app={cfg.appIcon} size={36} />
         </a>
-        <strong>Aether CAD</strong>
+        <strong>{cfg.brand}</strong>
         <span className="library-workspace">{workspace}</span>
         <TextField
-          aria-label="Search CAD files"
+          aria-label={"Search " + cfg.brand + " files"}
           placeholder="Search files and folders"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div data-aether-account="" />
       </header>
-      <aside className="library-nav">
-        <CreateMenu disabled={busy} onChoose={choice=>{
-          if(choice === "part")createPart();
-          else if(choice === "import")input.current?.click();
-          else {setName("");setDialog(choice);}
-        }}/>
+      <CollapsibleSidebar id="cad-library" ariaLabel="CAD library sidebar" className="library-nav" toggle="custom">
+        <CreateMenu disabled={busy} onChoose={startCreate} items={cfg.menu}/>
         <input
           ref={input}
           type="file"
           hidden
-          accept=".acpart,.acad,.acasm,.cadpart,.aether,.step,.stp"
+          accept={cfg.accept}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void run(() => upload(file));
             e.target.value = "";
           }}
         />
+        <div className="library-user-row">
+          <SidebarLabel><strong>{userName || workspace}</strong></SidebarLabel>
+          <SidebarToggle />
+        </div>
         <nav aria-label="CAD library">
-          {(["home", "personal", "recent", "workspace"] as View[]).map((id) => (
+          {(["home", "personal", "shared", "trash"] as View[]).map((id) => (
             <button
               key={id}
               aria-current={view === id ? "page" : undefined}
@@ -233,28 +422,77 @@ export function LibraryHome({ workspace }: { workspace: string }) {
                     ? "home"
                     : id === "recent"
                       ? "history"
-                      : id === "workspace"
-                        ? "assembly"
-                        : "folder"
+                      : id === "shared"
+                        ? "link"
+                        : id === "trash"
+                          ? "delete"
+                          : "folder"
                 }
               />
-              {titles[id]}
+              <SidebarLabel>{titles[id]}</SidebarLabel>
             </button>
           ))}
         </nav>
-        <div className="library-nav-footer">
-          <AetherIcon name="save" />
-          <span>
-            Saved on your server
-            <br />
-            <small>Available across your devices</small>
-          </span>
+        <div className="library-section-title"><SidebarLabel>Workspaces</SidebarLabel></div>
+        <div className="library-workspaces">
+          <button
+            type="button"
+            aria-current={view === "workspace" ? "page" : undefined}
+            title={workspace}
+            onClick={() => navigate("workspace")}
+          >
+            <span className="library-workspace-tile" aria-hidden="true">{workspace.slice(0, 1).toUpperCase()}</span>
+            <SidebarLabel>{workspace}</SidebarLabel>
+          </button>
+          <button type="button" disabled title="Planned — not functional yet."><AetherIcon name="new" /><SidebarLabel>New workspace…</SidebarLabel></button>
         </div>
-        <a href="/">← Aether Studio</a>
-      </aside>
-      <main className="library-main">
-        <div className="library-breadcrumb">
-          <button onClick={() => setFolders([])}>{titles[view]}</button>
+        <div className="library-nav-spacer" />
+
+      </CollapsibleSidebar>
+      <main
+        className="library-main"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
+        {menu && (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            onClose={() => setMenu(null)}
+            onPick={(id) => {
+              const target = menu.file;
+              setMenu(null);
+              if (id === "open" && target) open(target);
+              else if (id === "details" && target) setSelected(target);
+              else if (id.startsWith("new-"))
+                startCreate(id.slice(4) as CreateChoice);
+            }}
+            items={
+              menu.file
+                ? [
+                    { id: "open", label: "Open", icon: <AetherIcon name="open" width={15} height={15} /> },
+                    { id: "details", label: "Details", icon: <AetherIcon name="document" width={15} height={15} /> },
+                  ]
+                : [
+                    {
+                      id: "add",
+                      label: "Add New",
+                      icon: <span className="library-context-plus">+</span>,
+                      children: cfg.menu.map(([id, label, icon]) => ({
+                        id: "new-" + id,
+                        label,
+                        icon: <AetherIcon name={icon} width={15} height={15} />,
+                      })),
+                    },
+                    { id: "details", label: "Details", icon: <AetherIcon name="document" width={15} height={15} />, disabled: !selected },
+                  ]
+            }
+          />
+        )}
+        {folders.length > 0 && <div className="library-breadcrumb">
+          <button onClick={() => setFolders([])}>{view === "workspace" ? workspace : titles[view]}</button>
           {folders.map((folder, index) => (
             <span key={folder.id}>
               {" "}
@@ -264,7 +502,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
               </button>
             </span>
           ))}
-        </div>
+        </div>}
         {error && (
           <div className="message error" role="alert">
             {error}
@@ -276,43 +514,177 @@ export function LibraryHome({ workspace }: { workspace: string }) {
               <span className="library-eyebrow">YOUR DESIGN WORKSPACE</span>
               <h1>Make room for your next idea.</h1>
               <p>
-                Create a part, pick up recent work, or bring an existing design
-                into your library.
+                {cfg.heroLead}
               </p>
 
             </div>
             <div className="library-hero-art" aria-hidden="true">
-              <AppIcon app="cad" size={135} />
+              <AppIcon app={cfg.appIcon} size={135} />
+            </div>
+          </section>
+        )}
+        {(view === "home" || (view === "personal" && !parent && !query)) && (
+          <section className="library-start" aria-label="Get started">
+            <h2>Get started</h2>
+            <div className="library-start-cards">
+              {cfg.start.map((card) => (
+                <button
+                  key={card.kind}
+                  type="button"
+                  disabled={busy || !card.action}
+                  title={card.tooltip}
+                  onClick={() => {
+                    if (card.action === "new-doc") newDocument(card.kind);
+                    else if (card.action === "dialog") { setName(""); setDialog(card.kind as "project" | "assembly" | "folder"); }
+                    else if (card.action === "import") input.current?.click();
+                  }}
+                >
+                  <AetherIcon name={card.icon} width={34} height={34} />
+                  <span><strong>{card.title}</strong><small>{card.tagline}</small></span>
+                </button>
+              ))}
             </div>
           </section>
         )}
         <div className="library-list-heading">
-          <h2>{view === "home" ? "Recently opened" : titles[view]}</h2>
-          <span>{files.length} items</span>
+          <h2>{view === "home" ? "Recently opened" : view === "workspace" ? workspace : titles[view]}</h2>
+          <span>{shown.length} items</span>
+
+        </div>
+        <div className="library-filter-row">
+          {selected ? (
+          <div className="library-filter-left library-command-bar">
+            <button type="button" className="library-tool" onClick={() => open(selected)}>
+              <AetherIcon name="open" width={15} height={15} /> Open
+            </button>
+            {selected.writable && (
+              <button type="button" className="library-tool" onClick={() => { setName(selected.name); setDialog("rename"); }}>
+                <AetherIcon name="document" width={15} height={15} /> Rename
+              </button>
+            )}
+            {selected.kind === "file" && (
+              <>
+                <button type="button" className="library-tool" disabled={busy} onClick={download}>
+                  <AetherIcon name="import" width={15} height={15} /> Download
+                </button>
+                <button
+                  type="button"
+                  className="library-tool"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      await api("/api/library/copy", { app, id: selected.id });
+                      if (view === "personal" && !parent && !query) await list();
+                      else navigate("personal");
+                    })
+                  }
+                >
+                  <AetherIcon name="save" width={15} height={15} /> Duplicate
+                </button>
+                {selected.writable && (
+                  <button type="button" className="library-tool" disabled={busy} onClick={share}>
+                    <AetherIcon name="link" width={15} height={15} /> {selected.scope === "workspace" ? "Make private" : "Share"}
+                  </button>
+                )}
+                <button type="button" className="library-tool" onClick={() => setShowHistory(true)}>
+                  <AetherIcon name="history" width={15} height={15} /> History
+                </button>
+              </>
+            )}
+            <button type="button" className="library-tool" disabled title="Recycle bin arrives with library delete support.">
+              <AetherIcon name="delete" width={15} height={15} /> Delete
+            </button>
+          </div>
+          ) : (
+          <div className="library-filter-left">
+            <ToolMenu
+              label={typeFilter === "all" ? "All" : (cfg.types.find((type) => type.id === typeFilter)?.label ?? "All")}
+              icon={typeFilter !== "all" ? <AetherIcon name={cfg.types.find((type) => type.id === typeFilter)?.icon ?? cfg.fallbackIcon} width={15} height={15} /> : null}
+              onPick={(id) => setTypeFilter(id)}
+              items={[
+                { id: "all", label: "All", checked: typeFilter === "all" },
+                ...cfg.types.map((type) => ({
+                  id: type.id,
+                  label: type.label,
+                  icon: <AetherIcon name={type.icon} width={15} height={15} />,
+                  checked: typeFilter === type.id,
+                })),
+              ]}
+            />
+            <input
+              className="library-name-filter"
+              aria-label="Filter by name or person"
+              placeholder="Filter by name or person"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
+          </div>
+          )}
           <div className="library-list-tools">
-            <Button
-              aria-label="List view"
-              aria-pressed={!grid}
-              onClick={() => setGrid(false)}
+            {selected && (
+              <button
+                type="button"
+                className="library-tool library-selected-chip"
+                aria-label="Clear selection"
+                onClick={() => setSelected(null)}
+              >
+                ✕ 1 selected
+              </button>
+            )}
+            <ToolMenu
+              label="Sort"
+              icon={<span className="library-tool-glyph">⇅</span>}
+              onPick={(id) => {
+                if (id === "asc" || id === "desc") setSortAsc(id === "asc");
+                else setSortKey(id as "name" | "opened" | "owner");
+              }}
+              items={[
+                { id: "opened", label: "Opened", checked: sortKey === "opened" },
+                { id: "name", label: "Name", checked: sortKey === "name" },
+                { id: "owner", label: "Owner", checked: sortKey === "owner" },
+                { id: "asc", label: "Ascending", checked: sortAsc },
+                { id: "desc", label: "Descending", checked: !sortAsc },
+              ]}
+            />
+            <ToolMenu
+              label=""
+              icon={<AetherIcon name={grid ? "layout" : "items"} />}
+              onPick={(id) => setGrid(id === "grid")}
+              items={[
+                { id: "list", label: "List view", icon: <AetherIcon name="items" width={15} height={15} />, checked: !grid },
+                { id: "grid", label: "Grid view", icon: <AetherIcon name="layout" width={15} height={15} />, checked: grid },
+              ]}
+            />
+            <button
+              type="button"
+              className="library-tool"
+              aria-pressed={showDetails}
+              onClick={() => setShowDetails(!showDetails)}
             >
-              <AetherIcon name="items" />
-            </Button>
-            <Button
-              aria-label="Grid view"
-              aria-pressed={grid}
-              onClick={() => setGrid(true)}
-            >
-              <AetherIcon name="layout" />
-            </Button>
+              <AetherIcon name="sidebar" /> Details
+            </button>
           </div>
         </div>
         {view === "workspace" && (
           <p className="library-note">
-            Files shared with this Studio workspace. Owners edit originals;
+            The {workspace} workspace library. Owners edit originals;
             everyone with CAD access can open or copy them.
           </p>
         )}
-        {files.length === 0 ? (
+        {view === "shared" && (
+          <p className="library-note">
+            Files individually shared with you will appear here once
+            per-user sharing lands on the host. Workspace files live under
+            your workspace in the sidebar.
+          </p>
+        )}
+        {view === "trash" && (
+          <p className="library-note">
+            Deleted files will be recoverable here once host-side deletion
+            lands.
+          </p>
+        )}
+        {shown.length === 0 ? (
           <div className="library-empty">
             <AetherIcon name="folder" width={48} height={48} />
             <h3>
@@ -325,20 +697,26 @@ export function LibraryHome({ workspace }: { workspace: string }) {
             <p>
               {query
                 ? "Try another search."
-                : "Create a Part or import a design to get started."}
+                : cfg.emptyHint}
             </p>
           </div>
         ) : grid ? (
           <div className="library-grid">
-            {files.map((file) => (
+            {shown.map((file) => (
               <button
                 key={file.id}
                 className={selected?.id === file.id ? "selected" : ""}
                 onClick={() => setSelected(file)}
                 onDoubleClick={() => open(file)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelected(file);
+                  setMenu({ x: e.clientX, y: e.clientY, file });
+                }}
               >
                 <AetherIcon
-                  name={file.kind === "folder" ? "folder" : "design"}
+                  name={iconOf(file)}
                   width={56}
                   height={56}
                 />
@@ -352,18 +730,23 @@ export function LibraryHome({ workspace }: { workspace: string }) {
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Modified</th>
+                <th>Opened</th>
                 <th>Owner</th>
-                <th>Location</th>
               </tr>
             </thead>
             <tbody>
-              {files.map((file) => (
+              {shown.map((file) => (
                 <tr
                   key={file.id}
                   className={selected?.id === file.id ? "selected" : ""}
                   onClick={() => setSelected(file)}
                   onDoubleClick={() => open(file)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelected(file);
+                    setMenu({ x: e.clientX, y: e.clientY, file });
+                  }}
                 >
                   <td>
                     <button
@@ -372,34 +755,26 @@ export function LibraryHome({ workspace }: { workspace: string }) {
                         if (e.key === "Enter") open(file);
                       }}
                     >
-                      <AetherIcon
-                        name={file.kind === "folder" ? "folder" : "design"}
-                      />
-                      {file.name}
+                      <AetherIcon name={iconOf(file)} width={28} height={28} />
+                      <span className="library-file-name">
+                        <strong>{file.name}</strong>
+                        <small>{file.scope === "workspace" ? "Workspace shared" : "My files"}</small>
+                      </span>
                     </button>
                   </td>
                   <td>{new Date(file.modified * 1000).toLocaleDateString()}</td>
                   <td>{file.owner}</td>
-                  <td>
-                    {file.scope === "workspace"
-                      ? "Workspace shared"
-                      : "My files"}
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </main>
-      <aside className="library-details">
+      <aside className="library-details" aria-hidden={!showDetails}>
         <h2>Details</h2>
         {selected ? (
           <>
-            <AetherIcon
-              name={selected.kind === "folder" ? "folder" : "design"}
-              width={64}
-              height={64}
-            />
+            <AetherIcon name={iconOf(selected)} width={64} height={64} />
             <h3>{selected.name}</h3>
             <dl>
               <dt>Owner</dt>
@@ -445,7 +820,7 @@ export function LibraryHome({ workspace }: { workspace: string }) {
                   onClick={() =>
                     run(async () => {
                       await api("/api/library/copy", {
-                        app: "cad",
+                        app,
                         id: selected.id,
                       });
                       if (view === "personal" && !parent && !query)

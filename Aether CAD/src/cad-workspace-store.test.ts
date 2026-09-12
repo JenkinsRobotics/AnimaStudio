@@ -6,7 +6,8 @@ describe("CADWorkspaceStore", () => {
     const store = new CADWorkspaceStore();
     const listener = vi.fn();
     store.subscribe(listener);
-    store.publish({ itemNodes: [], selectedItemIDs: new Set(["part/a"]), expandedItemIDs: new Set(), historyItems: [], connectorItems: [], mateItems: [], problemItems: [], inspectorSections: [], selectedConnectorIDs: new Set(), partCount: 1 });
+    store.publish({ itemNodes: [], bodyNodes: [], selectedItemIDs: new Set(["part/a"]), expandedItemIDs: new Set(), historyItems: [],
+    rollbackIndex: 0, connectorItems: [], mateItems: [], problemItems: [], inspectorSections: [], selectedConnectorIDs: new Set(), partCount: 1 });
     expect(store.snapshot().partCount).toBe(1);
     expect(store.snapshot().selectedItemIDs.has("part/a")).toBe(true);
     expect(listener).toHaveBeenCalledOnce();

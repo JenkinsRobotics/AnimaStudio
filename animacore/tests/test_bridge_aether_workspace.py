@@ -526,3 +526,221 @@ def test_wrong_dof_unit_family_is_atomic():
         assembly_id=state["assembly_id"],
     )
     assert after == before
+
+
+def test_failed_mutation_leaves_state_untouched():
+    """A rejected mutation must not advance the revision.
+
+    Regression: mutate() swapped the draft in before validating the target,
+    so a failed call bumped the revision and the client's natural retry hit a
+    spurious revision_conflict.
+    """
+    state = populated_workspace(Session())
+    session, handle = state["session"], state["handle"]
+    before = rpc(session, "describe_workspace", handle=handle)
+    response = handle_request(
+        session,
+        {
+            "id": "request-bad-assembly",
+            "method": "set_dof_value",
+            "params": {
+                "handle": handle,
+                "expected_revision": state["revision"],
+                "assembly_id": "no-such-assembly",
+                "dof_id": "missing-dof",
+                "value_rad": 0.5,
+            },
+        },
+    )
+    assert not response["ok"]
+    after = rpc(session, "describe_workspace", handle=handle)
+    assert after == before
+    # The same call with the unchanged revision must still be accepted.
+    assert rpc(session, "describe_assembly", handle=handle,
+               assembly_id=state["assembly_id"])["revision"] == before["revision"]
+
+
+def test_limit_violation_surfaces_in_issues_and_diagnostic_ids_resolve():
+    """Projection issues must carry the diagnostics the solve reports.
+
+    Regression: the issue filter excluded exactly the diagnostics the solve
+    had just produced, so `issues` was always empty while `diagnostic_ids`
+    referenced entries that existed nowhere.
+    """
+    state = populated_workspace(Session())
+    session, handle = state["session"], state["handle"]
+    mate = mate_payload(
+        "revolute", "Shoulder",
+        (state["base"], state["base_connector"]),
+        (state["arm1"], state["arm_connector"]),
+        minimum=-1.0, maximum=1.0,
+    )
+    result = mutate(session, handle, state["revision"], "add_mate",
+                    assembly_id=state["assembly_id"], mate=mate)
+    dof_id = result["assembly"]["mates"][0]["dofs"][0]["id"]
+    result = mutate(session, handle, result["revision"], "set_dof_value",
+                    assembly_id=state["assembly_id"], dof_id=dof_id, value_rad=2.0)
+
+    issues = result["assembly"]["issues"]
+    violations = [issue for issue in issues if issue["code"] == "limit_violation"]
+    assert violations, issues
+    assert dof_id in violations[0]["entity_ids"]
+    # Every id the solution reports resolves to a real issue entry.
+    published = {issue["id"] for issue in issues}
+    assert set(result["solution"]["diagnostic_ids"]) <= published
+
+
+def test_bom_parent_links_never_dangle():
+    """Rows may only point at parents that are themselves in the BOM.
+
+    Regression: suppressing a parent removed its row but left children
+    referencing `instance:<suppressed-id>`.
+    """
+    state = populated_workspace(Session())
+    session, handle = state["session"], state["handle"]
+    result = mutate(session, handle, state["revision"], "move_instance",
+                    assembly_id=state["assembly_id"],
+                    instance_id=state["arm1"], parent_instance_id=state["base"])
+    rows = result["bom"]["rows"]
+    assert any(row["parent_row_id"] == f"instance:{state['base']}" for row in rows), rows
+
+    result = mutate(session, handle, result["revision"], "set_instance_suppressed",
+                    assembly_id=state["assembly_id"],
+                    instance_id=state["base"], suppressed=True)
+    rows = result["bom"]["rows"]
+    present = {row["row_id"] for row in rows}
+    for row in rows:
+        assert row["parent_row_id"] is None or row["parent_row_id"] in present, row
+
+
+def test_a_second_child_cannot_hide_a_mate_cycle():
+    """The cycle guard must see every edge, not one per parent.
+
+    Regression: the walk was keyed by parent instance, so a parent with two
+    children kept only its last edge and a back edge behind that second child
+    was accepted. arm2 -> arm1 plus arm1 -> arm2 is a cycle; adding
+    arm2 -> arm3 in between used to hide it.
+    """
+    state = populated_workspace(Session())
+    session, handle, assembly_id = state["session"], state["handle"], state["assembly_id"]
+    result, arm3 = add_instance(
+        session, handle, state["revision"], assembly_id, state["arm_part"],
+        "Arm:3", position_m=(0, 0, 3),
+    )
+    for name, parent, child in (
+        ("Elbow", state["arm2"], state["arm1"]),
+        ("Wrist", state["arm2"], arm3),
+    ):
+        result = mutate(
+            session, handle, result["revision"], "add_mate",
+            assembly_id=assembly_id,
+            mate=mate_payload("revolute", name,
+                              (parent, state["arm_connector"]),
+                              (child, state["arm_connector"])),
+        )
+    revision_before = result["revision"]
+    response = handle_request(session, {
+        "id": "request-add_mate", "method": "add_mate",
+        "params": {
+            "handle": handle, "expected_revision": revision_before,
+            "assembly_id": assembly_id,
+            "mate": mate_payload("revolute", "Back edge",
+                                 (state["arm1"], state["arm_connector"]),
+                                 (state["arm2"], state["arm_connector"])),
+        },
+    })
+    assert not response["ok"], response
+    assert response["error"]["message"] == "mate graph contains a cycle"
+    # Rejected before mutation: the graph and revision are untouched.
+    after = rpc(session, "describe_workspace", handle=handle)
+    assert after["revision"] == revision_before
+    assert len(rpc(session, "describe_assembly", handle=handle,
+                   assembly_id=assembly_id)["mates"]) == 2
+
+
+def test_unresolved_mates_project_failed_not_satisfied():
+    """A mate the solver could not place must not read "satisfied".
+
+    Regression: `solve_state` was only suppressed|warning|satisfied, so a
+    mate the solve left in its `pending` list — reporting
+    `status: "unconverged"` and naming those mates in a diagnostic — showed
+    as green in the projection while its instance never moved. The verbs
+    reject a cycle up front, so this pins the projection itself: state that
+    arrives any other way must still be described truthfully.
+    """
+    state = populated_workspace(Session())
+    session, handle, assembly_id = state["session"], state["handle"], state["assembly_id"]
+    result = mutate(
+        session, handle, state["revision"], "add_mate",
+        assembly_id=assembly_id,
+        mate=mate_payload("revolute", "Shoulder",
+                          (state["base"], state["base_connector"]),
+                          (state["arm1"], state["arm_connector"])),
+    )
+    # A solvable mate reads satisfied, so "failed" is not the new default.
+    assert result["solution"]["status"] == "solved"
+    assert result["assembly"]["mates"][0]["solve_state"] == "satisfied"
+
+    workspace = session._workspaces[handle]
+    shoulder = next(iter(workspace.mates.values()))
+    # arm1 <-> arm2 with neither grounded: the tree walk can seed neither, so
+    # both mates stay in `pending` and the solve reports unconverged.
+    forward = copy.deepcopy(shoulder)
+    forward["id"], forward["name"] = "mate-cycle-a", "Elbow"
+    forward["endpoint_a"] = {"instance_id": state["arm1"],
+                             "connector_definition_id": state["arm_connector"]}
+    forward["endpoint_b"] = {"instance_id": state["arm2"],
+                             "connector_definition_id": state["arm_connector"]}
+    backward = copy.deepcopy(forward)
+    backward["id"], backward["name"] = "mate-cycle-b", "Wrist"
+    backward["endpoint_a"], backward["endpoint_b"] = forward["endpoint_b"], forward["endpoint_a"]
+    for index, item in enumerate((forward, backward)):
+        for dof_index, dof in enumerate(item["dofs"]):
+            dof["id"] = f"dof-cycle-{index}-{dof_index}"
+    workspace.mates = {item["id"]: item for item in (forward, backward)}
+
+    solution = workspace.solve(assembly_id)
+    assert solution["status"] == "unconverged"
+    projection = workspace.projection(assembly_id)
+    states = [mate["solve_state"] for mate in projection["mates"]]
+    assert states == ["failed", "failed"], projection["mates"]
+    published = {issue["id"] for issue in projection["issues"]}
+    for mate in projection["mates"]:
+        assert mate["diagnostic_ids"], mate
+        assert set(mate["diagnostic_ids"]) <= published
+
+
+def test_instance_parent_cycles_are_rejected():
+    """Parenting an instance inside its own subtree would orphan the tree.
+
+    Regression: the check only rejected a self-parent, so A→B→A was accepted,
+    both instances dropped out of root_instance_ids, and the cycle survived
+    save/reload.
+    """
+    state = populated_workspace(Session())
+    session, handle = state["session"], state["handle"]
+    result = mutate(session, handle, state["revision"], "move_instance",
+                    assembly_id=state["assembly_id"],
+                    instance_id=state["arm1"], parent_instance_id=state["base"])
+    response = handle_request(
+        session,
+        {
+            "id": "request-cycle",
+            "method": "move_instance",
+            "params": {
+                "handle": handle,
+                "expected_revision": result["revision"],
+                "assembly_id": state["assembly_id"],
+                "instance_id": state["base"],
+                "parent_instance_id": state["arm1"],
+            },
+        },
+    )
+    assert not response["ok"]
+    assert response["error"]["path"] == "parent_instance_id"
+    # The rejection left the tree intact at the unchanged revision.
+    projection = rpc(session, "describe_assembly", handle=handle,
+                     assembly_id=state["assembly_id"])
+    assert projection["revision"] == result["revision"]
+    base = next(item for item in projection["instances"] if item["id"] == state["base"])
+    assert base["parent_instance_id"] is None

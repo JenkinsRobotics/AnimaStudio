@@ -248,3 +248,20 @@ test("large visible hierarchies render a fixed-row window", () => {
     "30000px"
   );
 });
+
+test("row className lands on the row element and pinned actions carry the pinned class", () => {
+  const { container } = renderTree({
+    nodes: [
+      { id: "bar", label: "Rollback", className: "cad-rollback-row" },
+      { id: "plane", label: "Top Plane", actions: [
+        { id: "show", label: "Show Top Plane", icon: "eye", pinned: true },
+        { id: "edit", label: "Edit Top Plane", icon: "pen" },
+      ] },
+    ],
+  });
+  const bar = container.querySelector(".cad-rollback-row");
+  expect(bar?.getAttribute("role")).toBe("treeitem");
+  const pinned = screen.getByLabelText("Show Top Plane");
+  expect(pinned.className).toContain("aui-tree-action--pinned");
+  expect(screen.getByLabelText("Edit Top Plane").className).toBe("aui-tree-action");
+});

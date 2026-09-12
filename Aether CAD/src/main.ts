@@ -2,9 +2,10 @@ import { registerSketchTextCommand } from "./sketch/text-command";
 import { registerSketchImportCommand } from "./sketch/import-command";
 import { contextualDrawingTools } from "./sketch/tangent-arc-tool";
 import { directModificationTools,modificationTools } from "./sketch/tool-instructions";
-import { constructionPlaneFrame } from "../../core/engine/src/document/solid-features";
-import { sketchVariantTools } from "@aether/core/sketch";
-import { drawingConstraintKinds } from "@aether/core/sketch";
+import { constructionPlaneFrame } from "@aether/core/document";
+import { sketchProfilePolylines, sketchVariantTools } from "@aether/core/sketch";
+import { principalFrame, rollbackPosition } from "@aether/core/document";
+import { sketchConstraintCommandKinds } from "./cad-command-registry";
 import { unitChoice } from "@aether/core/units";
 import { documentUnits, subscribeDocumentUnits } from "./document-preferences";
 import { configureDocumentPrint } from "./document-print";
@@ -22,9 +23,10 @@ import {
   type SketchPlane,
 } from "./aether-core";
 import { savePartDocument, serializePartDocument } from "./part-file";
-import { hostedCAD, loadHostedFile, saveHostedFile, detachHostedFile, markHostedDirty, markHostedClean } from "./host-library";
+import { hostedCAD, loadHostedFile, saveHostedFile, detachHostedFile, markHostedDirty, markHostedClean, configureAutosave, flushAutosaveNow, commitHosted } from "./host-library";
 import {
   sketchPlaneForReference,
+  parseReferenceVisibility,
   type ReferenceGeometryId,
 } from "./reference-geometry";
 import { SketchEditor } from "./sketch-editor";
@@ -66,9 +68,10 @@ const partHeightInput = document.querySelector<HTMLInputElement>("#part-height")
 const partDepthInput = document.querySelector<HTMLInputElement>("#part-depth")!;
 const mates: AppliedMate[] = [];
 const expandedDocuments = new Set<string>();
+const collapsedFolders = new Set<string>();
 const knownDocuments = new Set<string>();
 let activePartDocument: PartDocument | null = null;
-let selectedFeatureID:string|null=null;
+const selectedFeatureIDs=new Set<string>();
 let untitledPartNumber = 1;
 let awaitingSketchPlane = false;
 let pendingPartName: string | null = null;
@@ -78,10 +81,27 @@ let cancelSTEPImportRequested = false;
 let activeWorkspaceKind: "part" | "assembly" = "part";
 const referenceVisibility: Record<ReferenceGeometryId, boolean> = {
   origin: false,
+  axes: false,
   "top-plane": false,
   "front-plane": false,
   "right-plane": false,
 };
+// Show/hide of reference geometry is a workspace preference, not document data:
+// it must survive a reload, like the panel layout next to it.
+const referenceVisibilityKey = "aether-cad.reference-visibility.v1";
+let sketchPlaneVisibilityBefore: typeof referenceVisibility | null = null;
+try {
+  Object.assign(referenceVisibility, parseReferenceVisibility(localStorage.getItem(referenceVisibilityKey)));
+} catch {
+  // Storage is an optional presentation convenience, never a CAD dependency.
+}
+function persistReferenceVisibility(): void {
+  try {
+    localStorage.setItem(referenceVisibilityKey, JSON.stringify(referenceVisibility));
+  } catch {
+    // Storage is an optional presentation convenience, never a CAD dependency.
+  }
+}
 const presentationPreferenceKey = "aether-cad.presentation.v1";
 
 try {
@@ -218,14 +238,33 @@ function syncRibbonAvailability(): void {
   const rows = viewer.getPartRows();
   const connectors = viewer.getConnectorRows();
   cadCommands.setEnabled("save-part", activePartDocument !== null);
+  cadCommands.setEnabled("commit-part", activePartDocument !== null && hostedCAD);
   cadCommands.setEnabled("connector", rows.length > 0);
   cadCommands.setEnabled("fastened", connectors.length >= 2);
   cadCommands.setEnabled("fit-view", rows.length > 0);
   cadCommands.setEnabled("clear-mates", mates.length > 0);
 }
 
+// Draft feature being authored (declared before updateLists reads it).
+let draftSketch: { id: string; name: string; hasPlane: boolean; existing: boolean } | null = null;
 function updateLists(): void {
   viewer.setConstructionPlanes(activePartDocument);
+  // Finished sketches stay visible in the viewport (native parity): every
+  // unsuppressed sketch before the rollback line renders its curves.
+  viewer.setSketchCurves(
+    activePartDocument
+      ? activePartDocument.features
+          .slice(0, rollbackPosition(activePartDocument))
+          .filter((feature) => (feature.type === "sketch" || feature.type === "profile") && !feature.suppressed)
+          .map((feature) => ({
+            id: feature.id,
+            frame:
+              ("frame" in feature && feature.frame) ||
+              principalFrame(("plane" in feature ? feature.plane : "XY") as "XY" | "XZ" | "YZ"),
+            polylines: "profile" in feature ? sketchProfilePolylines(feature.profile) : [],
+          }))
+      : [],
+  );
   window.dispatchEvent(new Event("aether-part-updated"));
   const rows = viewer.getPartRows();
   const importedRows = activePartDocument
@@ -251,7 +290,9 @@ function updateLists(): void {
       first?.id ?? null,
       topology,
       new Set(rows.filter((row) => row.selected).map((row) => row.id)),
-      selectedFeatureID,
+      selectedFeatureIDs,
+      collapsedFolders,
+      draftSketch && !draftSketch.existing ? draftSketch : null,
     ),
   );
 
@@ -311,6 +352,10 @@ cadCameraPresentation.registerActionHandler((action) => {
     case "roll":
       viewer.rollCamera(action.quarterTurns);
       break;
+    case "set-field-of-view":
+      viewer.setFieldOfView(action.degrees);
+      cadCameraPresentation.setFieldOfView(action.degrees);
+      break;
   }
 });
 let appearanceInitialized = false;
@@ -338,7 +383,8 @@ cadAppearance.registerApplyHandler((appearance) => {
   const backgroundCommands = {
     graphite: "background-graphite",
     midnight: "background-midnight",
-    slate: "background-slate",
+    "cad-light": "background-cad-light",
+    blueprint: "background-blueprint",
   } as const;
   Object.entries(backgroundCommands).forEach(([background, command]) => {
     cadCommands.setActive(command, appearance.background === background);
@@ -406,6 +452,12 @@ sketchEditor = new SketchEditor(viewportElement, {
 function toggleReferenceVisibility(id: ReferenceGeometryId): void {
   referenceVisibility[id] = !referenceVisibility[id];
   viewer.setReferenceGeometryVisibility(id, referenceVisibility[id]);
+  persistReferenceVisibility();
+  // Picking a sketch plane force-shows the planes and restores the previous
+  // state on exit. Toggling during that window is the user overriding it, so it
+  // becomes the state to restore — otherwise finishing the sketch undoes it.
+  if (sketchPlaneVisibilityBefore) sketchPlaneVisibilityBefore[id] = referenceVisibility[id];
+  if (id === "origin") cadCommands.setActive("toggle-origin", referenceVisibility.origin);
   updateLists();
 }
 
@@ -435,10 +487,23 @@ function selectReference(id: ReferenceGeometryId): void {
 }
 
 cadWorkspace.registerActionHandler((action) => {
-  if(action.type==="move-item"||(action.type==="item-action"&&["edit-feature","suppress-feature","rollback-before","rollback-start","rollback-end","body-visibility","body-rename"].includes(action.actionID))){
-    window.dispatchEvent(new CustomEvent('aether-feature-action',{detail:action}));return;
+  if(action.type==="move-item"||action.type==="create-folder"||action.type==="rollback-to"||(action.type==="item-action"&&["edit-feature","suppress-feature","rollback-before","rollback-start","rollback-end","body-visibility","body-rename","folder-rename","folder-delete","folder-unnest","rollback-back","rollback-forward","rename-feature","delete-feature"].includes(action.actionID))){
+    window.dispatchEvent(new CustomEvent('aether-feature-action',{detail:{...action,selectedFeatureIDs:[...selectedFeatureIDs]}}));return;
   }
 
+  if (action.type === "toggle-item"
+      && (action.id === "reference-folder" || action.id.startsWith("bodies/"))) {
+    if (collapsedFolders.has(action.id)) collapsedFolders.delete(action.id);
+    else collapsedFolders.add(action.id);
+    updateLists();
+    return;
+  }
+  if (action.type === "toggle-item" && action.id.startsWith("folder/")) {
+    if (collapsedFolders.has(action.id)) collapsedFolders.delete(action.id);
+    else collapsedFolders.add(action.id);
+    updateLists();
+    return;
+  }
   if (action.type === "toggle-item" && action.id.startsWith("document/")) {
     const id = action.id.slice("document/".length);
     if (expandedDocuments.has(id)) expandedDocuments.delete(id);
@@ -447,7 +512,29 @@ cadWorkspace.registerActionHandler((action) => {
     return;
   }
   if (action.type === "select-item") {
-    selectedFeatureID=null;
+    const mode = action.mode ?? "single";
+    const rowFeatureIDs = (action.ids ?? [action.id])
+      .filter((id) => id.startsWith("feature/") && !id.startsWith("feature/body/"))
+      .map((id) => id.split("/").slice(2).join("/"))
+      .filter((id) => activePartDocument?.features.some((feature) => feature.id === id));
+    // ponytail: only feature rows multi-select; a modified click anywhere else
+    // behaves like a plain click rather than growing a second selection model.
+    if (rowFeatureIDs.length && (mode !== "single" || rowFeatureIDs.length > 1)) {
+      if (mode === "range" || mode === "single") {
+        selectedFeatureIDs.clear();
+        rowFeatureIDs.forEach((id) => selectedFeatureIDs.add(id));
+      } else
+        rowFeatureIDs.forEach((id) =>
+          selectedFeatureIDs.has(id) ? selectedFeatureIDs.delete(id) : selectedFeatureIDs.add(id),
+        );
+      cadSelection.dispatch({type:"replace",items:[]});
+      setStatus(selectedFeatureIDs.size === 1
+        ? `1 feature selected.`
+        : `${selectedFeatureIDs.size} features selected.`);
+      updateLists();
+      return;
+    }
+    selectedFeatureIDs.clear();
     if (action.id.startsWith("reference/")) {
       selectReference(action.id.slice("reference/".length) as ReferenceGeometryId);
     } else if (action.id.startsWith("part/")) {
@@ -458,10 +545,13 @@ cadWorkspace.registerActionHandler((action) => {
       if (kind === "body") viewer.selectPart(featureID);
       else {
         const feature = activePartDocument.features.find((item) => item.id === featureID);
-        if (feature?.type==='plane' && !feature.suppressed && document.querySelector('.cad-sketch-workspace.choosing-plane') && activePartDocument.features.indexOf(feature)<(activePartDocument.rollbackIndex??activePartDocument.features.length)){
-          window.dispatchEvent(new CustomEvent('aether-sketch-face',{detail:{frame:constructionPlaneFrame(feature)}}));return;
+        if (feature?.type==='plane' && !feature.suppressed && document.querySelector('.cad-plane-window') && activePartDocument.features.indexOf(feature)<(activePartDocument.rollbackIndex??activePartDocument.features.length)){
+          window.dispatchEvent(new CustomEvent('aether-plane-feature-picked',{detail:{featureId:feature.id}}));return;
         }
-        if (feature) {selectedFeatureID=feature.id;cadSelection.dispatch({type:"replace",items:[]});setStatus(`${feature.name} selected. Double-click or press Enter to edit.`);updateLists();}
+        if (feature?.type==='plane' && !feature.suppressed && document.querySelector('.cad-sketch-workspace.choosing-plane') && activePartDocument.features.indexOf(feature)<(activePartDocument.rollbackIndex??activePartDocument.features.length)){
+          window.dispatchEvent(new CustomEvent('aether-sketch-face',{detail:{frame:constructionPlaneFrame(feature,activePartDocument.features.slice(0,activePartDocument.features.indexOf(feature)))}}));return;
+        }
+        if (feature) {selectedFeatureIDs.add(feature.id);cadSelection.dispatch({type:"replace",items:[]});setStatus(`${feature.name} selected. Double-click or press Enter to edit.`);updateLists();}
       }
     }
     return;
@@ -940,7 +1030,20 @@ assemblyPicker.addEventListener("change", async () => {
 
 configureDocumentPrint(() => viewer.capturePrintImage());
 
+// Continuous saving: every edit autosaves as a revision. The command is a
+// PDM Commit — it flushes the autosave and names an annotated checkpoint.
+if (hostedCAD) configureAutosave(async () => {
+  if (!activePartDocument) return;
+  try {
+    await saveHostedFile(`${activePartDocument.name}.acpart`, new TextEncoder().encode(serializePartDocument(activePartDocument)));
+    setStatus("All changes saved.");
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), "error");
+  }
+});
 cadCommands.register("save-part", async () => {
+  // Save persists the working state (VS Code ⌘S); it never prompts. Commits
+  // are the separate, deliberate checkpoints.
   if (!activePartDocument) return;
   try {
     const fileName = `${activePartDocument.name}.acpart`;
@@ -949,6 +1052,19 @@ cadCommands.register("save-part", async () => {
     setStatus(`Saved ${fileName}${hostedCAD ? " to your server" : ""}; editable feature history preserved.`, "success");
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return;
+    setStatus(error instanceof Error ? error.message : String(error), "error");
+  }
+});
+cadCommands.register("commit-part", async () => {
+  if (!activePartDocument || !hostedCAD) return;
+  try {
+    await flushAutosaveNow();
+    const name = prompt("Commit name", `${activePartDocument.name} — ${new Date().toLocaleDateString()}`);
+    if (!name?.trim()) return;
+    const message = prompt("Commit message (optional)", "") ?? "";
+    await commitHosted(name.trim(), message.trim());
+    setStatus(`Committed "${name.trim()}"; the checkpoint is listed in Version control.`, "success");
+  } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), "error");
   }
 });
@@ -985,7 +1101,8 @@ const registerBackground = (command: Parameters<typeof cadCommands.register>[0],
   cadCommands.register(command, () => cadAppearance.dispatch({ type: "set-background", background }));
 registerBackground("background-graphite", "graphite");
 registerBackground("background-midnight", "midnight");
-registerBackground("background-slate", "slate");
+registerBackground("background-cad-light", "cad-light");
+registerBackground("background-blueprint", "blueprint");
 const registerMaterialFinish = (command: Parameters<typeof cadCommands.register>[0], finish: CADMaterialFinish) =>
   cadCommands.register(command, () => cadAppearance.dispatch({ type: "set-material-finish", finish }));
 registerMaterialFinish("finish-matte", "matte");
@@ -1042,6 +1159,13 @@ window.addEventListener("keydown", (event) => {
     cadCommands.execute("selection-next-filter");
   }
   if (event.key.toLowerCase() === "f") cadCommands.execute("fit-view");
+  if (event.key === " " && !document.querySelector(".cad-sketch-workspace")) {
+    // Spacebar: SolidWorks-style orientation box around the bodies —
+    // click a face to look from that side. Space again or Esc closes.
+    event.preventDefault();
+    viewer.toggleOrientationBox();
+  }
+  if (event.key === "Escape") viewer.hideOrientationBox();
   if (event.key.toLowerCase() === "r" && !sketchEditor?.active) {
     event.preventDefault();
     cadCommands.execute("sketch");
@@ -1103,20 +1227,65 @@ mountFeatureAuthoring(()=>activePartDocument,async doc=>{
  if(activePartDocument!==doc)throw new Error(cadPresentation.snapshot().statusMessage);
 });
 
+// Point and edge picks for the plane methods that need them (Three point,
+// Angle). Selection already produces vertex/edge items; this hands back their
+// exact topology geometry so a feature can store the reference.
+window.addEventListener("aether-plane-geometry-request", () => {
+  window.dispatchEvent(new CustomEvent("aether-plane-geometry", {
+    detail: { points: viewer.selectedPoints(), axis: viewer.selectedAxis() },
+  }));
+});
+
 window.addEventListener("aether-sketch-face-request", () => {
   const frame = viewer.selectedSketchFrame();
-  window.dispatchEvent(new CustomEvent("aether-sketch-face", {detail: frame ? {frame} : {error:"Select a flat face first. Curved surfaces cannot support a planar sketch."}}));
+  // Carry WHICH face was picked, not only its frame: a sketch needs the frame,
+  // but a plane feature stores the reference so the tree can name it.
+  const face = viewer.selectedFaceIdentity();
+  window.dispatchEvent(new CustomEvent("aether-sketch-face", {detail: frame ? {frame, ...face} : {error:"Select a flat face first. Curved surfaces cannot support a planar sketch."}}));
 });
 for (const tool of ["select", "line", "arc", "circle", "rectangle", ...sketchVariantTools, ...contextualDrawingTools, ...modificationTools,...directModificationTools] as const) {
   cadCommands.register(`sketch-${tool}`, () => { window.dispatchEvent(new CustomEvent("aether-sketch-tool", {detail:tool})); });
   cadCommands.setEnabled(`sketch-${tool}`, false);
 }
+window.addEventListener("aether-sketch-editing", event => {
+  const detail = (event as CustomEvent).detail as typeof draftSketch;
+  draftSketch = detail;
+  viewer.setEditingSketch(detail?.id ?? null);
+  updateLists();
+});
 window.addEventListener("aether-sketch-mode", event => {
   const active=Boolean((event as CustomEvent).detail);
   for(const tool of ["select", "line", "arc", "circle", "rectangle", ...sketchVariantTools, ...contextualDrawingTools, ...modificationTools,...directModificationTools] as const) cadCommands.setEnabled(`sketch-${tool}`, active);
 });
 
-let sketchPlaneVisibilityBefore: typeof referenceVisibility | null = null;
+window.addEventListener("aether-sketch-surface", event => {
+  const detail = (event as CustomEvent).detail;
+  if (!detail?.svg || !detail.frame || typeof detail.connect !== "function") return;
+  viewer.beginSketchSurface(detail.frame, detail.svg, detail.bounds);
+  detail.connect({
+    toSketch: (clientX: number, clientY: number) => viewer.sketchPointFromClient(clientX, clientY),
+    scaleAt: (clientX?: number, clientY?: number) => viewer.sketchScaleAt(clientX, clientY),
+    updateBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+      viewer.updateSketchSurfaceBounds(bounds),
+  });
+});
+window.addEventListener("aether-sketch-surface-end", () => viewer.endSketchSurface());
+
+// Live plane preview: the plane feature already exists in the document, so its
+// window moves the real construction plane as references are picked instead of
+// leaving the viewport showing the seeded definition until commit.
+// Orange = selected, everywhere. A feature window says what it is using; the
+// viewport highlights exactly that.
+window.addEventListener("aether-plane-highlight", event => {
+  const detail = (event as CustomEvent).detail;
+  if (Array.isArray(detail?.references)) viewer.setHighlightedPlanes(detail.references);
+});
+window.addEventListener("aether-plane-preview", event => {
+  const detail = (event as CustomEvent).detail;
+  if (typeof detail?.featureId !== "string") return;
+  viewer.setConstructionPlanePreview(detail.featureId, detail.frame ?? null);
+});
+
 window.addEventListener("aether-sketch-plane-selection", event => {
   const selecting=Boolean((event as CustomEvent).detail);
   viewer.setSketchPlaneSelection(selecting);
@@ -1126,17 +1295,28 @@ window.addEventListener("aether-sketch-plane-selection", event => {
   }else if(!selecting && sketchPlaneVisibilityBefore){
     for(const id of ["top-plane","front-plane","right-plane"] as const){referenceVisibility[id]=sketchPlaneVisibilityBefore[id];viewer.setReferenceGeometryVisibility(id,referenceVisibility[id]);}
     sketchPlaneVisibilityBefore=null;
+    persistReferenceVisibility();
   }
   updateLists();
 });
 
-for(const kind of drawingConstraintKinds){
+for(const kind of sketchConstraintCommandKinds){
   cadCommands.register(`sketch-constraint-${kind}`,()=>{window.dispatchEvent(new CustomEvent("aether-sketch-constraint",{detail:kind}));});
   cadCommands.setEnabled(`sketch-constraint-${kind}`,false);
 }
 window.addEventListener("aether-sketch-mode",event=>{
-  for(const kind of drawingConstraintKinds)cadCommands.setEnabled(`sketch-constraint-${kind}`,Boolean((event as CustomEvent).detail));
+  for(const kind of sketchConstraintCommandKinds)cadCommands.setEnabled(`sketch-constraint-${kind}`,Boolean((event as CustomEvent).detail));
 });
+
+// Reference-geometry visibility as commands: the camera + display panel
+// toggles them and reads their state from the registry.
+cadCommands.register("toggle-origin", () => toggleReferenceVisibility("origin"));
+cadCommands.setActive("toggle-origin", referenceVisibility.origin);
+// Push the restored preference into the viewer, which starts everything hidden.
+for (const id of Object.keys(referenceVisibility) as ReferenceGeometryId[])
+  viewer.setReferenceGeometryVisibility(id, referenceVisibility[id]);
+cadCommands.register("toggle-axes", () => {});
+cadCommands.setEnabled("toggle-axes", false);
 
 registerSketchImportCommand();
 registerSketchTextCommand();

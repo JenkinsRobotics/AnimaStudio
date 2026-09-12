@@ -7,6 +7,10 @@ import {
 } from "@aether/core/sketch";
 import { contourPath } from "./svg-geometry";
 import { renderDimensionAnnotations } from "./dimension-annotations";
+/** The sketch plane square: half-width in millimetres, centred on the frame
+ * origin. Larger than the 110 mm datum planes so it frames them. */
+export const SKETCH_PLANE_HALF_MILLIMETRES = 80;
+export const SKETCH_GRID_MILLIMETRES = 10;
 export function renderSketchCanvas(
   svg: SVGSVGElement,
   drawing: SketchDrawing,
@@ -26,44 +30,41 @@ export function renderSketchCanvas(
     "viewBox",
     `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`,
   );
-  const gridStep = Math.max(10,10 ** Math.ceil(Math.log10(Math.max(bounds.width,bounds.height)/100)));
-  for (
-    let v = Math.ceil(bounds.x / gridStep) * gridStep;
-    v < bounds.x + bounds.width;
-    v += gridStep
-  )
-    el("line", {
-      x1: v,
-      y1: bounds.y,
-      x2: v,
-      y2: bounds.y + bounds.height,
-      class: "sketch-grid",
-    });
-  for (
-    let v = Math.ceil(bounds.y / gridStep) * gridStep;
-    v < bounds.y + bounds.height;
-    v += gridStep
-  )
-    el("line", {
-      x1: bounds.x,
-      y1: v,
-      x2: bounds.x + bounds.width,
-      y2: v,
-      class: "sketch-grid",
-    });
-  el("line", {
-    x1: bounds.x,
-    y1: 0,
-    x2: bounds.x + bounds.width,
-    y2: 0,
-    class: "sketch-axis",
+  // The sketch plane is one square: an origin, a size, an area. Everything that
+  // describes the plane — face, grid, axes, origin — is drawn inside it, so it
+  // reads as a drawn object, not as viewport decoration. It never moves or
+  // resizes with pan/zoom; it is the selected plane (or planar face) frame.
+  const half = SKETCH_PLANE_HALF_MILLIMETRES;
+  el("rect", {
+    x: -half,
+    y: -half,
+    width: half * 2,
+    height: half * 2,
+    class: "sketch-plane-face",
   });
-  el("line", {
-    x1: 0,
-    y1: bounds.y,
-    x2: 0,
-    y2: bounds.y + bounds.height,
-    class: "sketch-axis",
+  const name = svg.dataset.sketchName;
+  if (name) {
+    const label = el("text", {
+      x: -half * 0.96,
+      y: -half * 0.9,
+      "font-size": half / 14,
+      class: "sketch-plane-title",
+    });
+    label.textContent = name;
+  }
+  for (let v = -half + SKETCH_GRID_MILLIMETRES; v < half; v += SKETCH_GRID_MILLIMETRES) {
+    el("line", { x1: v, y1: -half, x2: v, y2: half, class: "sketch-grid" });
+    el("line", { x1: -half, y1: v, x2: half, y2: v, class: "sketch-grid" });
+  }
+  el("line", { x1: -half, y1: 0, x2: half, y2: 0, class: "sketch-axis" });
+  el("line", { x1: 0, y1: -half, x2: 0, y2: half, class: "sketch-axis" });
+  // The sketch origin IS the plane frame origin — mark it so the alignment is
+  // visible, as Onshape does.
+  el("circle", {
+    cx: 0,
+    cy: 0,
+    r: half / 100,
+    class: "sketch-origin",
   });
   const regions = drawing.contours
     .map((c, index) => ({ c, index }))

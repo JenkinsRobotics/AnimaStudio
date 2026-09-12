@@ -3,7 +3,7 @@
 // name a product concept or call an engine verb.
 export { Button, type ButtonProps } from "./Button";
 export { IconButton, type IconButtonProps } from "./IconButton";
-export { AetherIcon, aetherIconNames, type AetherIconName, type AetherIconProps } from "./AetherIcon";
+export { AetherIcon, registerIconPack, aetherIconNames, type AetherIconName, type AetherIconProps } from "./AetherIcon";
 export { Ribbon, RibbonGroup, RibbonTool, type RibbonToolProps } from "./Ribbon";
 export { Rail, RailButton, type RailProps, type RailButtonProps } from "./Rail";
 export { Tabs, type TabDefinition, type TabsProps } from "./Tabs";
@@ -44,6 +44,8 @@ export {
   type WorkspaceShellProps,
   type FloatingPanelProps,
 } from "./WorkspaceShell";
+export { StudioModeButton, WorkspaceWindowMenu, AppearanceToggle, setAetherTheme, activeAetherTheme, installAetherTheme, type AetherThemeManifest, type AppearanceMode } from "./StudioChrome";
+export { CollapsibleSidebar, SidebarLabel, SidebarToggle } from "./CollapsibleSidebar";
 export { DocumentBar, type DocumentBarProps } from "./DocumentBar";
 export { Timeline, type TimelineProps, type TimelineTrack } from "./Timeline";
 export {
@@ -137,3 +139,5 @@ export {
 export { AppIcon } from "./AppIcon";
 
 export { ToolIcon, toolIconNames, type ToolIconName, type ToolIconProps } from "./ToolIcon";
+export { openFeatureWindow, type FeatureWindow, type FeatureWindowOptions } from "./FeatureWindow";
+export { SettingsWindow, SettingsCard, SettingsRow, type SettingsPane, type SettingsSection, type SettingsWindowProps } from "./SettingsWindow";

@@ -14,8 +14,12 @@ an application from a browser on a desktop, laptop, or tablet. No mandatory clou
 account is part of this direction. Browser access does not itself promise phone
 usability, offline editing, simultaneous collaboration, or identical GPU support.
 
-The local repository directory is `Aether Studio`. Shared packages now live at `core/engine/` and `core/ui/`, retaining the import
-names `@aether/core` and `@aether/ui`. Product paths and engine protocol/format
+The local repository directory is `Aether Studio`, and **Aether Studio is the
+server** — accounts, sessions, documents and protocol in `core/host/` and
+`core/session/`. The one genuinely shared package is `core/ui/` (`@aether/ui`),
+with shared artwork in `core/assets/`. The CAD engine (`@aether/core`) is
+product-owned at `Aether CAD/engine/` as of 2026-09-11; the import name is
+unchanged. Product paths and engine protocol/format
 names remain unchanged. The remote is still
 `JenkinsRobotics/AnimaStudio`. A compatibility symlink at the old local directory
 preserves existing development paths and Python virtual-environment entry points.

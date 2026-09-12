@@ -518,6 +518,15 @@ class AetherWorkspace:
         violation_ids = {
             item["dof_id"] for item in solution["limit_violations"]
         }
+        # A mate the solver could not place must not read "satisfied": the
+        # solve reports the unplaced mates by id in its diagnostic, and the
+        # contract reserves "failed" for exactly this.
+        unresolved_diagnostic_ids = [
+            item["id"]
+            for item in solution["diagnostics"]
+            if item["code"] == "solve_unconverged"
+            and mate["id"] in item["entity_ids"]
+        ]
         mate_violation_ids = [
             self._diagnostic(
                 "limit_violation",
@@ -530,10 +539,13 @@ class AetherWorkspace:
         ]
         result["solve_state"] = (
             "suppressed" if effective_suppression
+            else "failed" if unresolved_diagnostic_ids
             else "warning" if mate_violation_ids
             else "satisfied"
         )
-        result["diagnostic_ids"] = sorted(mate_violation_ids)
+        result["diagnostic_ids"] = sorted(
+            mate_violation_ids + unresolved_diagnostic_ids
+        )
         return result
 
     def _dof_projection(
@@ -555,23 +567,18 @@ class AetherWorkspace:
 
     def _current_issues(self, assembly_id: str,
                         solution: dict[str, Any]) -> list[dict[str, Any]]:
+        """Persisted issues plus this solve's diagnostics, deduplicated.
+
+        Every id in ``solution["diagnostic_ids"]`` must resolve to an entry
+        here: the projection's issue list is what clients select on.
+        """
         relevant = [copy.deepcopy(issue) for issue in self.issues]
-        relevant_ids = set(solution["diagnostic_ids"])
-        relevant.extend(
-            self._diagnostic(
-                "limit_violation",
-                f"DOF {violation['dof_id']} is outside its authored limits.",
-                [violation["dof_id"]],
-                field_path="dof.value",
-            )
-            for violation in solution["limit_violations"]
-            if self._diagnostic(
-                "limit_violation",
-                f"DOF {violation['dof_id']} is outside its authored limits.",
-                [violation["dof_id"]],
-                field_path="dof.value",
-            )["id"] not in relevant_ids
-        )
+        seen = {issue["id"] for issue in relevant}
+        for diagnostic in solution.get("diagnostics", ()):
+            if diagnostic["id"] in seen:
+                continue
+            seen.add(diagnostic["id"])
+            relevant.append(copy.deepcopy(diagnostic))
         return sorted(relevant, key=lambda item: item["id"])
 
     def solve(self, assembly_id: str, *, candidate_mate: dict[str, Any] | None = None,
@@ -675,6 +682,7 @@ class AetherWorkspace:
             "residual": None if unconverged else 0.0,
             "iterations": len(effective_mates) if effective_mates else 0,
             "limit_violations": violations,
+            "diagnostics": [copy.deepcopy(item) for item in diagnostics],
             "diagnostic_ids": sorted(item["id"] for item in diagnostics),
         }
 
@@ -781,11 +789,14 @@ class AetherWorkspace:
                 for part_id in sorted(grouped)
             ]
         else:
+            # Parent links may only reference rows that survived filtering;
+            # a suppressed or non-part parent would otherwise dangle.
+            included = {item["id"] for item in instances}
             rows = [
                 self._bom_row(
                     f"instance:{item['id']}",
                     f"instance:{item['parent_instance_id']}"
-                    if item["parent_instance_id"] in self.instances else None,
+                    if item["parent_instance_id"] in included else None,
                     item["definition_id"],
                     1,
                 )
@@ -815,7 +826,7 @@ class AetherWorkspace:
             "part_number": part["part_number"],
             "name": part["name"],
             "description": part["description"],
-            "material_name": None,
+            "material_name": part.get("material_id"),
             "unit_mass_kg": mass,
             "extended_mass_kg": mass * quantity if mass is not None else None,
             "source_label": part["source"]["label"],
@@ -846,9 +857,13 @@ class AetherWorkspace:
         draft = self.clone()
         draft._apply(method, params)
         draft.revision_number += 1
+        # Atomic: validate the target and build the projection from the draft
+        # first. A failure here must leave the canonical state untouched, or a
+        # client's retry hits a spurious revision_conflict.
+        assembly_id = _string(params.get("assembly_id", draft.root_assembly_id), "assembly_id")
+        result = draft.mutation_result(handle, assembly_id)
         self.__dict__.update(draft.__dict__)
-        assembly_id = _string(params.get("assembly_id", self.root_assembly_id), "assembly_id")
-        return self.mutation_result(handle, assembly_id)
+        return result
 
     def mutation_result(self, handle: str, assembly_id: str,
                         *, bom_mode: str = "hierarchical") -> dict[str, Any]:
@@ -1041,6 +1056,20 @@ class AetherWorkspace:
             parent_id = _string(parent_id, "parent_instance_id")
             if parent_id not in self.instances or parent_id == instance["id"]:
                 raise AetherWorkspaceError("unknown_entity", "invalid parent instance", "parent_instance_id")
+            # A parent inside the moved instance's own subtree would form a
+            # cycle: the instances vanish from the tree and the cycle survives
+            # save/reload.
+            ancestor = parent_id
+            seen = {instance["id"]}
+            while ancestor is not None:
+                if ancestor in seen:
+                    raise AetherWorkspaceError(
+                        "bad_request",
+                        "an instance may not be parented inside its own subtree",
+                        "parent_instance_id",
+                    )
+                seen.add(ancestor)
+                ancestor = self.instances[ancestor]["parent_instance_id"] if ancestor in self.instances else None
         instance["parent_instance_id"] = parent_id
 
     def _set_instance_grounded(self, params: dict[str, Any]) -> None:
@@ -1242,18 +1271,23 @@ class AetherWorkspace:
         child_ids = [item["endpoint_b"]["instance_id"] for item in active]
         if len(child_ids) != len(set(child_ids)):
             raise AetherWorkspaceError("validation_error", "an instance may have only one incoming mate in Assembly v1", "mate.endpoint_b")
-        edges = {
-            item["endpoint_a"]["instance_id"]: item["endpoint_b"]["instance_id"]
+        # Walk child -> parent, not parent -> child: a parent may have several
+        # children, so keying by parent silently dropped every edge but the
+        # last and hid cycles behind a second child. One incoming mate per
+        # instance is enforced above, so the parent of a child is unique and
+        # this walk is complete.
+        parent_of = {
+            item["endpoint_b"]["instance_id"]: item["endpoint_a"]["instance_id"]
             for item in active
         }
-        for start in edges:
+        for start in parent_of:
             seen: set[str] = set()
             current = start
-            while current in edges:
+            while current in parent_of:
                 if current in seen:
                     raise AetherWorkspaceError("validation_error", "mate graph contains a cycle", "mate")
                 seen.add(current)
-                current = edges[current]
+                current = parent_of[current]
 
     def _remove_mate(self, params: dict[str, Any]) -> None:
         mate_id = _string(params.get("mate_id"), "mate_id")

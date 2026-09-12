@@ -156,3 +156,24 @@ def test_smtp_secrets_and_encryption(tmp_path, security):
         connection.login.assert_called_once_with("smtp-user", "smtp-secret")
         connection.send_message.assert_called_once()
     assert "smtp-secret" not in json.dumps(mailer.public_config())
+
+
+def test_loopback_failures_never_lock_out_other_users(tmp_path):
+    """Ten bad attempts from 127.0.0.1 must not lock the whole install.
+
+    Regression: failures counted against the address, and a success cleared
+    only the username counter — so on a local install, where every browser is
+    loopback, one user's typos locked out everyone.
+    """
+    store = Store(tmp_path)
+    store.create_user("owner", PASSWORD, "admin", full_name="Owner")
+    store.create_user("member", PASSWORD, "member", full_name="Member")
+    for _ in range(12):
+        with pytest.raises(Problem):
+            store.sign_in("owner", "wrong-password", "127.0.0.1")
+    # A second local user is unaffected …
+    assert store.user_for(store.sign_in("member", PASSWORD, "127.0.0.1"))["id"]
+    # … and the throttled account still reports its own lockout.
+    with pytest.raises(Problem) as locked:
+        store.sign_in("owner", PASSWORD, "127.0.0.1")
+    assert locked.value.status == 429

@@ -1,7 +1,7 @@
 import { mountConstraintFormula } from "./constraint-formula";
 import type { DocumentVariable } from "@aether/core/document";
 import { bindDimensionInput } from "./dimension-input";
-import { quadrantFrame, quadrantSpan } from "@aether/core/sketch";
+import { quadrantFrame, quadrantSpan, sketchPolygonDefinition } from "@aether/core/sketch";
 import { renderSavedConstraints } from "./saved-constraints";
 import { mountPolygonControls } from "./polygon-controls";
 import { mountOriginControl } from "./origin-control";
@@ -210,6 +210,7 @@ export function mountConstraintPanel({
     const name = (event as CustomEvent).detail;
     if (drawingConstraintKinds.includes(name)) {
       chooseTool("select");
+      details.open = true;
       kind.value = name;
       updateConstraintInputs();
       tangency.parentElement!.hidden = name !== "tangent";
@@ -275,9 +276,11 @@ export function mountConstraintPanel({
     }
   };
   window.addEventListener("aether-sketch-edit-dimension", editDimensionEvent);
-  button(
-    "Apply constraint",
-    () => {
+  /** The Apply button's behaviour, callable directly. The constraint controls
+   *  live in an offscreen container (the ribbon owns the commands), so the
+   *  ribbon needs a way to complete the action the canvas selection started —
+   *  select two entities, press the constraint, done, as Onshape does. */
+  const applyConstraint = () => {
       try {
         if (!entityA.value) throw new Error("Draw and select geometry first.");
         const a = JSON.parse(entityA.value) as SketchEntityRef,
@@ -340,9 +343,17 @@ export function mountConstraintPanel({
       } catch (error) {
         message.textContent = (error as Error).message;
       }
-    },
-    constraintBox,
-  );
+  };
+  button("Apply constraint", applyConstraint, constraintBox);
+  // Entity-target helpers only appear when the sketch contains that entity
+  // type; an empty or line-only sketch shows none of them.
+  const targetGroup = () => {
+    const group = document.createElement("div");
+    group.hidden = true;
+    constraintBox.append(group);
+    return group;
+  };
+  const pointGroup = targetGroup();
   button(
     "Set selected point / circle center",
     () => {
@@ -376,11 +387,16 @@ export function mountConstraintPanel({
         message.textContent = (error as Error).message;
       }
     },
-    constraintBox,
+    pointGroup,
   );
 
+  const polygonGroup = targetGroup();
+  const originGroup = targetGroup();
+  const centerGroup = targetGroup();
+  const splineGroup = targetGroup();
+  const ellipseAxisGroup = targetGroup();
   const polygon = mountPolygonControls(
-    constraintBox,
+    polygonGroup,
     svg,
     entityA,
     getDrawing,
@@ -388,15 +404,15 @@ export function mountConstraintPanel({
     message,
   );
   mountOriginControl(
-    constraintBox,
+    originGroup,
     entityB,
     getDrawing,
     commit,
     chooseTool,
     message,
   );
-  mountCenterControls(
-    constraintBox,
+  const centers = mountCenterControls(
+    centerGroup,
     entityA,
     getDrawing,
     commit,
@@ -404,7 +420,7 @@ export function mountConstraintPanel({
     message,
   );
   mountSplineHandleControls(
-    constraintBox,
+    splineGroup,
     entityA,
     getDrawing,
     commit,
@@ -412,13 +428,57 @@ export function mountConstraintPanel({
     message,
   );
   mountEllipseAxisControls(
-    constraintBox,
+    ellipseAxisGroup,
     entityA,
     getDrawing,
     commit,
     chooseTool,
     message,
   );
+
+  const syncTargetVisibility = () => {
+    const current = getDrawing();
+    const any = current.contours.length > 0;
+    let arc = false,
+      ellipse = false,
+      cubic = false;
+    for (const contour of current.contours) {
+      if (contour.type !== "path") continue;
+      for (const segment of contour.segments) {
+        if (segment.type === "arc") arc = true;
+        else if (segment.type === "ellipse") ellipse = true;
+        else if (segment.type === "bezier") cubic = true;
+      }
+    }
+    let polygonAny = false;
+    for (let i = 0; i < current.contours.length && !polygonAny; i += 1) {
+      try {
+        polygonAny = Boolean(sketchPolygonDefinition(current, i));
+      } catch {
+        // Not a polygon contour.
+      }
+    }
+    pointGroup.hidden = !any;
+    originGroup.hidden = !any;
+    polygonGroup.hidden = !polygonAny;
+    centerGroup.hidden = !arc && !ellipse;
+    centers.buttons.arc.hidden = !arc;
+    centers.buttons.ellipse.hidden = !ellipse;
+    splineGroup.hidden = !cubic;
+    ellipseAxisGroup.hidden = !ellipse;
+  };
+  syncTargetVisibility();
+
+  // The full constraint editor collapses behind one disclosure; picking an
+  // entity on the canvas or a ribbon constraint command reveals it.
+  const details = document.createElement("details");
+  details.className = "sketch-constraints-details";
+  const summary = document.createElement("summary");
+  summary.textContent = "Sketch constraints";
+  details.append(summary);
+  constraintTitle.remove();
+  while (constraintBox.firstChild) details.append(constraintBox.firstChild);
+  constraintBox.append(details);
 
   return {
     entityA,
@@ -437,6 +497,7 @@ export function mountConstraintPanel({
       );
     },
     refresh() {
+      syncTargetVisibility();
       polygon.refresh();
       for (const selector of [entityA, entityB, axis]) {
         const previous = selector.value;

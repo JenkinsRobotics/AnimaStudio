@@ -15,7 +15,7 @@ async function document() {
   doc.variables = definitions("O");
   const font = readFileSync(
     new URL(
-      "../../../assets/fonts/noto-sans/NotoSans-Regular.ttf",
+      "../../../../core/assets/fonts/noto-sans/NotoSans-Regular.ttf",
       import.meta.url,
     ),
   );

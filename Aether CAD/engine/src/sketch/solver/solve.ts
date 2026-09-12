@@ -5,8 +5,33 @@ import { contactParameterCoordinates } from "./contact-parameters";
 import { dimensionDriver } from "./dimension-links";
 import type { SketchDrawing, SketchPoint } from "../drawing";
 import { constraintResiduals } from "./residuals";
+/** SPIKE (2026-09-12): see solver/planegcs-spike.ts. Delete with the spike. */
+type SolverComparisonHost = {
+  __aetherSolverComparison?: (
+    source: SketchDrawing,
+    options: { fixedContours?: ReadonlySet<number> },
+    outcome: SketchDrawing | Error,
+  ) => void;
+};
 /** Damped least-squares solve. Never mutates input or silently accepts conflicts. */
 export function solveDrawingConstraints(source: SketchDrawing, options: { fixedContours?: ReadonlySet<number> } = {}): SketchDrawing {
+  // SPIKE (2026-09-12): a harness may register a comparison hook here to run
+  // every real solve through FreeCAD's PlaneGCS as well. Nothing in production
+  // sets it and nothing is imported, so browser bundles are untouched.
+  const compare = (globalThis as SolverComparisonHost).__aetherSolverComparison;
+  if (!compare) return solveDrawingConstraintsCore(source, options);
+  const given = structuredClone(source);
+  try {
+    const solved = solveDrawingConstraintsCore(source, options);
+    compare(given, options, solved);
+    return solved;
+  } catch (error) {
+    compare(given, options, error as Error);
+    throw error;
+  }
+}
+
+function solveDrawingConstraintsCore(source: SketchDrawing, options: { fixedContours?: ReadonlySet<number> } = {}): SketchDrawing {
   const d = structuredClone(source),
     constraints = d.constraints ?? [];
   const parameters=contactParameterCoordinates(d);

@@ -21,8 +21,8 @@ SVG boundary.
 | Delete, hole, construction controls | `contour-list.ts` |
 | Session lifecycle, plane selection, undo, input binding, save | `../sketch-workspace.ts` |
 | Ribbon groups/variants and command IDs | `../cad-tool-catalog.ts`, `../cad-command-registry.ts` |
-| Constraint entities/equations/numerical solving | `core/engine/src/sketch/solver/` (repository root) |
-| Shared exact geometry/operations | `core/engine/src/sketch/` (repository root) |
+| Constraint entities/equations/numerical solving | `../../engine/src/sketch/solver/` (this product owns its engine) |
+| Shared exact geometry/operations | `../../engine/src/sketch/` |
 
 Core geometry is renderer/UI independent. The workspace controller wires the
 pieces together; new geometry algorithms do not belong there or in `main.ts`.
@@ -53,8 +53,8 @@ limited tool is not full parity.
 ## Checks from the repository root
 
 ```sh
-npm test --prefix core/engine
-npm run check --prefix core/engine
+npm test --prefix engine
+npm run check --prefix engine
 npm test --prefix 'Aether CAD'
 npm run build --prefix 'Aether CAD'
 ```

@@ -4,14 +4,17 @@
 
 Aether Studio is the umbrella suite; the animation product is **Aether Animation**.
 The primary applications are web-based React/TypeScript: `Aether CAD/` and
-`aether-animation/web/`, sharing `core/ui/` and `core/engine/`. The independent host and admin workspace now live in `core/host/` and `studio/`;
+`aether-animation/web/`, sharing `core/ui/`. The independent host and admin workspace now live in `core/host/` and `studio/`;
 community plugin distribution remains planned. See
 `dev/docs/roadmap/Aether_Studio_Suite.md`. The Onshape mockup is an interaction
 reference, not the production CAD engine. Codex owns web GUI and cross-lane review;
 Claude owns the Python backend/protocol. Older Swift lane/path instructions below
 are historical and superseded: Swift is archived at `aether-animation/archive/`.
-The `core/` parent groups shared infrastructure: `core/engine/` remains the
-UI-independent `@aether/core` package, and `core/ui/` remains `@aether/ui`.
+The `core/` parent groups shared infrastructure: `core/ui/` is `@aether/ui`,
+the design system, and `core/assets/` holds shared artwork. The CAD engine
+(`@aether/core`) moved to `Aether CAD/engine/` on 2026-09-11 — a product owns
+its kernel binding, solver and feature layer; only one product used it. The
+server (accounts, sessions, documents) is `core/host/` + `core/session/`.
 Existing semantic ownership and file-claim rules still apply.
 
 
@@ -47,6 +50,14 @@ ecosystem's rules, trimmed to what Anima Studio actually uses.
    behavior-pinning tests, before new features land in it. God files
    block concurrent team work: two agents cannot safely edit one
    2,000-line file.
+
+4. **Three tool surfaces.** Every tool launches from exactly one of:
+   the left sidebar, the right sidebar, or the top ribbon — all tool
+   icons live on those three surfaces. Floating editor windows are
+   ribbon-launched tools; properties-style inspectors are right-sidebar
+   tools. The window header carries only app chrome (settings, account,
+   theme, layout/window menus) — never modeling tools, and never a
+   duplicate launcher for a tool that already has a surface.
 
 ## Where things live
 

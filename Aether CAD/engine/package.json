@@ -11,7 +11,8 @@
     "./geometry": "./src/geometry/index.ts",
     "./kernel": "./src/kernel/index.ts",
     "./sketch": "./src/sketch/index.ts",
-    "./units": "./src/units.ts"
+    "./units": "./src/units.ts",
+    "./transform": "./src/transform/index.ts"
   },
   "scripts": {
     "check": "tsc --noEmit --pretty false",
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
+    "@salusoft89/planegcs": "^1.2.0",
     "harfbuzzjs": "1.6.1",
     "opentype.js": "2.0.0",
     "replicad": "^0.23.0",

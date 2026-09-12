@@ -152,6 +152,8 @@ Definition of done for a core widget:
 | ViewportNavigationCube | **v1** | full | full | controlled product-free camera chrome; quaternion display plus accessible face, fit, 15-degree nudge, and quarter-turn roll intent; renderer behavior remains app-owned |
 | WorkspaceShell | **v1** | full | full | app-window chrome ported from Swift `StudioWorkspaceScaffold`: docked / floating / canvas presets around one persistent center/viewport subtree; controlled or uncontrolled stable-ID panel placement/coordinates; rail-toggled panel stacks, tear-off drag/clamp/restack, canvas edge reveal. Deferred: drag-reorder of stacked panels, panels-on-outer-edge option, chrome shape presets |
 | FloatingPanel | v1 | yes | via shell | draggable by header; also standalone for short-lived tools |
+| FeatureWindow | v1 | yes | gallery | suite-standard feature editor: ✓/✕ header, Enter commits, Entities box, parameter rows, opacity slider; imperative DOM (openFeatureWindow) |
+| SettingsWindow | v1 | yes | gallery | suite-standard per-app settings: macOS anatomy (traffic-light close, grouped sidebar, cards, rows); products supply sections/panes |
 | DocumentBar | v1 | yes | none | 48px top row: leading/trailing clusters + window-centered tabs. Deferred: responsive breakpoint collapse (1320/1060/880) |
 | LayoutPresetButton | v1 | yes | yes | the studio button — cycles floating → docked → canvas. Deferred: dropdown menu listing all modes |
 | Timeline / DopeSheet | **v1** | yes | full | labeled tracks, keyframe diamonds, adaptive ruler, scrub/playhead, transport, keyframe select. Deferred until engine clip-CRUD: keyframe drag/add/delete, curves view |

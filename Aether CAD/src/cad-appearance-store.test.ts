@@ -44,3 +44,21 @@ describe("CADAppearanceStore", () => {
     expect(apply).toHaveBeenCalledTimes(2);
   });
 });
+
+it("environment themes apply as bundles and manual edits mark custom", () => {
+  const onshape = reduceCADAppearance(defaultCADAppearance, { type: "apply-environment-theme", theme: "onshape" });
+  expect(onshape).toMatchObject({
+    environmentTheme: "onshape",
+    background: "onshape",
+    floorMode: "none",
+    lightingPreset: "daylight",
+    contactShadowsVisible: false,
+  });
+  const tweaked = reduceCADAppearance(onshape, { type: "set-floor-mode", mode: "grid" });
+  expect(tweaked.environmentTheme).toBe("custom");
+  const back = reduceCADAppearance(tweaked, { type: "apply-environment-theme", theme: "aether" });
+  expect(back).toMatchObject({ environmentTheme: "aether", background: "graphite", floorMode: "grid", lightingPreset: "studio" });
+  const dimmed = reduceCADAppearance(defaultCADAppearance, { type: "set-grid-opacity-percent", percent: 40 });
+  expect(dimmed.gridOpacityPercent).toBe(40);
+  expect(dimmed.environmentTheme).toBe("custom");
+});

@@ -119,7 +119,7 @@ it("rejects variable conflicts, stale caches and malformed payloads without touc
 it("retains embedded editable text and frame constraints across documents", async () => {
   const bytes = readFileSync(
     new URL(
-      "../../../assets/fonts/noto-sans/NotoSans-Regular.ttf",
+      "../../../../core/assets/fonts/noto-sans/NotoSans-Regular.ttf",
       import.meta.url,
     ),
   );

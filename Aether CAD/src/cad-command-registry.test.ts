@@ -3,7 +3,7 @@ import { cadCommandIDs, CADCommandRegistry, isCADCommandID } from "./cad-command
 
 describe("CADCommandRegistry", () => {
   it("publishes one unique catalog including standard views and display styles", () => {
-    expect(cadCommandIDs).toHaveLength(123);
+    expect(cadCommandIDs).toHaveLength(127);
     expect(isCADCommandID("sketch-text")).toBe(true);
     expect(isCADCommandID("sketch-elliptical-arc")).toBe(true);
     expect(isCADCommandID("sketch-constraint-ellipse-locus")).toBe(true);
@@ -72,4 +72,10 @@ describe("CADCommandRegistry", () => {
       registered: false,
     });
   });
+});
+
+it("seeds every sketch-constraint command id that boot registration uses", async () => {
+  const { cadCommandIDs, sketchConstraintCommandKinds } = await import("./cad-command-registry");
+  for (const kind of sketchConstraintCommandKinds)
+    expect(cadCommandIDs).toContain(`sketch-constraint-${kind}`);
 });

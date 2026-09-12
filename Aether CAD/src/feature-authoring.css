@@ -106,18 +106,7 @@
   color: #acbed2;
 }
 
-.aui-tree-row:has([aria-label="Roll back to start"]) {
-  cursor: ns-resize;
-  border-top: 4px solid #8ca9c9;
-  margin-top: 4px;
-  background: #243447;
-  color: #d5e8ff;
-  font-size: 10px;
-  min-height: 25px;
-}
-.aui-tree-row:has([aria-label="Roll back to start"]) .aui-tree-icon {
-  visibility: hidden;
-}
+
 
 .feature-command-error { position:absolute; left:16px; bottom:24px; z-index:15; color:var(--aether-color-text); background:var(--aether-color-bg-panel); padding:8px; }
 .feature-command-error:empty { display:none; }

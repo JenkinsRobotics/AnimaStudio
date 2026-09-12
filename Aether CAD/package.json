@@ -12,7 +12,7 @@
     "smoke:browser": "node scripts/e2e-import.mjs"
   },
   "dependencies": {
-    "@aether/core": "file:../core/engine",
+    "@aether/core": "file:./engine",
     "@aether/ui": "file:../core/ui",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

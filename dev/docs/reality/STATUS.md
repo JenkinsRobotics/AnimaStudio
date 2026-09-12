@@ -4,6 +4,101 @@
 > this file in the same commit — see `CONVENTIONS.md` → "STATUS stays
 > truthful."
 
+## Product-owned CAD engine, and sketch-plane fixes — 2026-09-11
+
+- **The CAD engine moved to `Aether CAD/engine/`.** It was `core/engine/`, named `@aether/core` as though suite-shared, but its only consumers were Aether CAD (104 files) and two `core/ui/gallery` demos — `aether-animation/web` never imported it. Aether Studio is the server (`core/host/`, `core/session/`); products own their engines, the way Onshape owns its kernel binding and feature library. Import name `@aether/core` is unchanged, so no consumer source changed; only dependency wiring and two asset paths that reached out of the package. `core/ui` now carries the engine as a **devDependency** for its gallery demos only, so the shared design system no longer sits downstream of one product's engine — `aether-animation/web/node_modules/@aether/` contains only `ui`. Verified: 462 CAD tests + typecheck + build, 719 engine tests, 163 core/ui tests + typecheck + build, animation web build.
+- **Sketches render again, and the sketch plane is a real object.** The in-world sketch SVG is reparented into the viewer's CSS3D layer, but 40 geometry CSS rules were still scoped to the workspace ancestor, so every line drew with `stroke:none` — nothing appeared. The plane is now one 160 mm square anchored to the selected plane's (or planar face's) frame origin, with face, grid, axes, origin marker and name label all drawn inside it; it no longer follows the pan/zoom viewport. The world floor grid hides while a sketch is open, so a sketch on XY no longer shows a second, perpendicular grid beside it.
+- **Reference-plane visibility persists** across reloads and is no longer discarded when a sketch finishes. **Placing a sketch plane no longer arms the line tool** — the first click selects until a tool is chosen.
+- **The sketch feature window matches the Aether UI gallery again.** Nine bare-element rules under `.cad-sketch-workspace` outranked the shared widget's own styling and repainted it (the green accept and red discard had become neutral bordered boxes); every control the app creates there is `display:none`, so those rules styled nothing else. Also `index.html` pinned `color-scheme: dark`, painting native checkboxes as black squares inside light panels.
+
+## Universal collapsible sidebar — 2026-09-10
+
+- Shared `CollapsibleSidebar`/`SidebarLabel` in @aether/ui collapse any sidebar to an icon rail with persisted per-sidebar preference; the CAD Home library nav adopts it (210px ↔ 56px). Header-size standard moved to the larger 56px bar with 36px app tiles; selected items use the new paired text-on-selected token; the Studio sidebar shows one identity block.
+
+## PDM v1: continuous saving, commits, branches — 2026-09-10
+
+- CAD documents autosave continuously (debounced revisions on the content-addressed history; failures surface, success is quiet) and the Save command is now an annotated **Commit** (name + message, listed in Version control). The host models branches as a revision DAG (branch heads, parent pointers) with branch-aware save/read isolated from Main, all under the existing optimistic-revision guards. Design and staged path to simultaneous editing: dev/docs/roadmap/PDM_Versioning.md.
+
+## Team-scale host and workspace themes — 2026-09-10
+
+- The host no longer serializes requests behind one global lock: suite assets are lock-free and app bundles stream outside it, with SQLite in WAL mode — sized for a ~200-person team. Workspace theme administration ships end to end: admin Appearance page sets the company base theme and per-application overrides; members can set a personal override on My account; precedence personal > application > base, applied on every host page with light/dark working inside any theme.
+
+## Hot-swap themes and icon packs — 2026-09-10
+
+- Themes install and activate at runtime (installAetherTheme + setAetherTheme; injected scoped CSS, persisted, cross-tab) and icon packs hot-swap every mounted icon through the registry store with per-icon fallback — no rebuilds. Asset layout is formalized (themes/, icons/, icon-packs/) with contributor READMEs.
+
+## Default theme and icon pack shipped — 2026-09-10
+
+- The default theme is a JSON manifest (both modes) generating tokens.css via `dev/build-theme-css.mjs` (parity-verified); the default icon pack is manifested with a registry↔artwork drift guard; row/icon-slot/grid geometry tokens make the sidebar block system reusable for toolbars and tables. New themes and packs are data, not CSS rewrites.
+
+## Theme contract enforced — 2026-09-10
+
+- Studio stylesheets contain zero raw color literals: structure uses --aether-* tokens, decoration uses scoped theme variables with dark and light values. `dev/check-theme-literals.mjs` gates the studio build; the theming/icon-pack contract and expansion plan live in the roadmap.
+
+## Suite-wide appearance — 2026-09-10
+
+- Appearance (System/Light/Dark) now applies on every suite page at load via a shared bootstrap, follows OS scheme changes live in System mode, syncs across open tabs, and cascades into the Studio home-theme wrappers. Default is System.
+
+## Account popover and account page — 2026-09-10
+
+- The suite account popover matches the Onshape reference: identity header plus uniform button rows (My account, Aether Studio, Sign out); appearance and profile-picture controls moved out. Appearance is a single device-local system (shared toggle + light tokens); the legacy per-user server theme path is removed. The Studio account page now covers name, email, password, and profile picture with upload validation.
+
+## Focus halo disabled and tokenized — 2026-09-10
+
+- The focused-field glow halo is disabled suite-wide as the named `--aether-focus-halo` token (default `none`); every application point references it, so grep finds them and any future placement is a scoped one-line override. Focus border colors and keyboard focus outlines remain.
+
+## Modern document bar and native header trio — 2026-09-10
+
+- Document-bar controls render as plain macOS-style glyphs (no boxes; hover highlight; accent when active); the redundant New/Open/Save/Insert header buttons are gone — the ribbon owns them, with data-command anchors on ribbon tools.
+- The native header trio is imported faithfully into shared `@aether/ui` StudioChrome: preset-colored studio-mode button (click cycles, menu with reset and product extras), workspace windows/tabs menu (browser-managed entries visibly disabled), and the System→Light→Dark appearance toggle with persisted, immediately-applied theme. CAD uses all three; native semantic palette tokens and seven icons back them.
+- Verification: core/ui 156 tests, typecheck, build; CAD 443 tests, typecheck, production build; live header confirmed by screenshot.
+
+## Studio pages bottom tray — 2026-09-10
+
+- Every Studio host page (home, library, sign-in, admin) now shows the shared bottom tray — connection light, "Aether Studio", site name, and the signed-in identity — matching the native app's always-visible status bar. CAD already showed its tray on all screens; Animation's regional tray remains for its convergence pass.
+- Verification: studio typecheck and production build; the host serves the new bundle.
+
+## History timeline and feature context menu — 2026-09-10
+
+- The bottom History tab is a Fusion-style horizontal timeline: icons-only feature strip, rollback playback controls, and a draggable rollback marker, all through the undoable document path; the bottom panel shrank to fit. The sidebar History keeps its vertical list.
+- Feature tree rows have a right-click context menu: Rename (new), Edit, Suppress, Roll back before, visibility and folder operations work today; the remaining Onshape-reference entries are visible but disabled pending build-out.
+- Verification: CAD 443 tests, typecheck, production build; live reload with visual confirmation of the timeline.
+
+## Ribbon workspace dropdown — 2026-09-10
+
+- The DESIGN ▾ workspace switcher renders at the ribbon's left in both chrome themes (previously suite-only); the interim bottom-tray workspace menu is removed so there is one switcher, matching the Fusion-style reference.
+- Verification: CAD 439 tests and production build; live tab reloaded.
+
+## Universal tree folders — 2026-09-10
+
+- `@aether/core` now provides a universal, validated tree folder organization (create, rename, dissolve, assign, cycle-safe nesting, generic foldered display builder); `PartDocument.organization` persists it in `.acpart`, and folders never affect feature evaluation order.
+- The CAD Feature tree uses it end to end: footer button creates folders from the selection, drag in/out/nest, rename and dissolve actions, per-folder expansion, top-level rollback line — all undoable and save/reopen-safe.
+- Feature tree polish: the search sits in the fixed top section like the native app, and tree badges show state only (Suppressed / Rolled back / Under-defined) instead of parameter summaries.
+- Verification: engine 710 tests and typecheck; CAD 439 tests, typecheck, production build; core/ui 153 tests; live tab reloaded.
+
+## Feature tree header and rollback polish — 2026-09-10
+
+- The left Model panel is renamed Feature tree with a single clean header (icon, name, count) — no subtitle, float/close buttons or placement menu; shared WorkspaceShell supports per-panel `chromeless` docked presentation. The tree filter shows its count only while filtering.
+- The rollback bar is a plain draggable accent line (unselectable, no row chrome or hover buttons); under-defined sketch features render red in the tree.
+- Verification: core/ui 153 tests, typecheck, build; CAD 436 tests and production build; live tab reloaded.
+
+## CAD left-rail buildup — 2026-09-09
+
+- The left rail now carries Version control in both chromes plus three visibly-mocked panels — Comments, Document notes and Action items — with greyed-out tools and a "Planned — not functional yet" note; new shared `comment`/`notes`/`tasks` icons back them.
+- Verification: core/ui 152 tests, typecheck and build; CAD 435 tests and production build; live tab reloaded.
+
+## CAD Model panel and workspace switcher convergence — 2026-09-09
+
+- The Items panel matches the native tree: features list flat (no document wrapper folder) between Reference Geometry and Bodies; the rollback position is a slim draggable accent line; hidden reference planes, bodies and imported parts show a pinned slashed-eye icon (shared `visible`/`hidden` icons) instead of a "Visible" text badge; the folder/commands footer attaches to the bottom of the slide-out panel.
+- The Design/Animate/Show/Hardware switcher left the top document bar and is a Workspace dropdown beside the app name in the bottom tray (disabled entries keep their suite-routing explanations).
+- Shared tree gains per-node `className` and pinned action support; both are unit-tested. Verification: core/ui 152 tests, typecheck, build; CAD 434 tests and production build; live browser reload confirmed the panel.
+
+## CAD suite status tray — 2026-09-09
+
+- The CAD bottom tray now leads with app identity: connection light (backend state), the "Aether CAD" name and the renderer label, moved down from the top document bar. The center is a flexible truncating notification area with the live status message and background-task control; workspace metrics and the interface-theme menu (now opening upward) trail.
+- Shared `@aether/ui` StatusBar supports optional leading/center/trailing regions; the plain-children form is unchanged, so Aether Animation and the gallery render as before until they adopt regions.
+- Verification: core/ui 151 tests, typecheck and build; CAD 434 tests and production build passed; the served app was reloaded in Safari and the tray visually confirmed.
+
 ## Reflected editable text frames — 2026-09-09
 
 - Added optional `placementReflected` to retained text placement. Reflection now applies to the entire local coordinate system; construction corners/edges keep their ordering and identities. Existing documents default to unchanged placement. Letter flip controls remain independent.
@@ -4568,3 +4663,929 @@ MFA, email recovery, organization tenancy, scheduled backups, team-shared
 projects, universal CAD project migration or collaborative editing. Browser-local
 unsaved projects and TLS files are outside host backups. See `core/host/README.md`
 for supported setup, network, storage and recovery behavior.
+
+## 2026-09-09 — Aether CAD: in-world sketch editing (Onshape-style)
+
+Sketch editing now happens inside the 3D viewport instead of a separate 2D
+overlay world. On plane/face selection the sketch SVG mounts as a
+world-anchored, perspective-correct plane card (Three.js CSS3DRenderer) at
+the sketch frame; the camera aligns square-on to the plane (sketch y up) and
+normal navigation stays live throughout — middle-drag pans, right-drag
+orbits, wheel zooms, ViewCube works. Left input routes from the viewport
+canvas to the existing sketch machinery through a plane-raycast bridge
+(`aether-sketch-surface` event: viewer supplies `toSketch`, `scaleAt`,
+`updateBounds`), so all drawing tools, snapping, constraints, and gestures
+operate on true plane coordinates from any camera angle. The plane card
+grows automatically as the drawing expands. With no viewer present (tests,
+gallery) the workspace falls back to the legacy flat overlay unchanged.
+Verified: 433 CAD tests (2 new in-world DOM tests pinning the frame handoff,
+raycast drawing, bounds growth, fallback, and surface teardown), typecheck,
+production build.
+
+Limits: the sketch card composites above the WebGL scene, so bodies in front
+of the sketch plane do not occlude sketch curves during editing (upgrade
+path: native WebGL sketch curve rendering); dimension-label drag, text-box
+placement, and DXF placement still convert pointer positions with flat-
+screen math and drift when the camera is orbited off-normal (they are exact
+square-on); camera alignment is instant rather than animated.
+
+## 2026-09-09 — Aether CAD: boot-crash fix + in-world sketch verified in Chrome
+
+Fixed a startup crash that disabled sketching entirely: boot registered
+`sketch-constraint-pattern` while the command registry's seed list filtered
+"pattern" out, so `register()` crashed mid-`main.ts` and every command wired
+after it (including the ribbon Sketch tool) stayed dead. The filtered list
+is now exported once as `sketchConstraintCommandKinds` and used by both the
+seed and boot registration (one copy of truth), with a registry test pinning
+that every boot-registered constraint id is seeded. Also fixed the in-world
+sketch surface swallowing viewport input: CSS3DObject's constructor forces
+`pointerEvents:"auto"` on its element, which blocked the canvas beneath —
+now reset to "none" after construction.
+
+Verified end-to-end in real Chrome (puppeteer + Metal WebGPU) against the
+built app: New Part → Sketch → Top (XY) opens in-world; two clicks draw an
+open line contour on the plane; right-drag orbits mid-sketch and a third
+click still lands on true plane coordinates; zero console errors. 434 CAD
+tests (registry seed test added), typecheck, production build pass.
+
+## 2026-09-09 — Aether CAD: compact floating sketch window (Anima Studio chrome)
+
+Per Jonathan: the sketch inspector was an overloaded fixed sidebar; sketch,
+plane and mate authoring should reuse the small focused windows built for
+Anima Studio. The sketch workspace panel is now a compact draggable floating
+window using the shared `aui-float-panel` chrome from `@aether/ui` (drag by
+header, scrollable body, top-right default clear of the ViewCube).
+Progressive disclosure replaces the always-visible control pile: the full
+constraint editor collapses behind one "Sketch constraints" disclosure that
+auto-opens when an entity is picked on canvas or a ribbon constraint command
+runs, and every entity-target helper now appears only when the sketch
+contains that entity type (arc/ellipse centers, ellipse axes, spline
+handles, polygon sides, point/origin targets) — an empty or line-only
+sketch shows none of them. All controls keep their identities; 434 CAD
+tests, typecheck, production build pass; real-Chrome walkthrough
+re-verified (in-world draw, orbit mid-sketch, draw again).
+
+Next: plane and mate dialogs adopt the same floating-window chrome; tool
+option fields (Arc direction / Polygon sides / Secondary radius) could gate
+tighter per active tool.
+
+## 2026-09-09 — Aether CAD: empty sketches are valid
+
+Per Jonathan: finishing a sketch without drawing is allowed — selecting the
+plane alone defines the sketch. Removed the app-side "Draw a contour before
+finishing" gate; Core already stores contour-less sketches and skips them
+during solid evaluation. Pinned by a workspace DOM test (finish empty →
+feature saved with zero contours). 435 CAD tests, typecheck, build pass.
+
+## 2026-09-09 — Aether CAD: instant plane creation with a floating window
+
+Per Jonathan: clicking the Plane tool must create the feature immediately —
+no modal, no forced naming. The Plane command now inserts an auto-named
+construction plane (Plane N, XY, 10 mm) instantly and opens a compact
+draggable floating window (shared panel chrome) with just Reference plane
+and Offset; Apply commits edits, ✕ discards a freshly created plane
+(editing an existing plane, ✕ only closes). Behavior pins updated: instant
+create + window edit + discard. 436 CAD tests, typecheck, build pass.
+
+## 2026-09-10 — Aether CAD: entity-based plane definitions (Offset, Mid plane)
+
+Per Jonathan: the plane window must be an entities list plus a method
+dropdown, not a hardcoded XY/XZ/YZ choice. Core owns the new semantics in a
+dedicated module (`core/engine/src/document/construction-planes.ts`):
+`PlaneReference` (principal or earlier plane feature), `PlaneDefinition`
+(`offset` with distance, `mid` between two parallel planes), recursive
+frame resolution, and validation (references must be earlier construction
+planes; non-parallel mid planes reject at resolve). Legacy planes without a
+definition still resolve as principal+offset — no migration needed; the
+definition round-trips through `.acpart` serialization. The plane window
+(dedicated `Aether CAD/src/plane-window.ts`, extracted from
+feature-authoring) shows the method dropdown, a removable-entities list,
+and an add-reference picker offering principals and earlier planes; Apply
+builds the definition (legacy fields stay synced for principal offsets).
+5 new Core tests + 2 plane-window DOM tests + updated pins: 703 Core /
+438 CAD tests, typechecks, build pass.
+
+Limits: references are planes only (no faces/edges/points yet), so Plane
+point / Line angle / Three point / Tangent methods remain future work;
+entity adding is via the window's picker, not viewport clicking; no live
+3D preview while editing.
+
+## 2026-09-10 — Aether CAD: standard feature window (Onshape anatomy)
+
+Per Jonathan: the feature window is the standard design for many features
+and must copy Onshape's widget exactly, re-themed dark macOS. New dedicated
+module `Aether CAD/src/feature-window.ts`: draggable header with title +
+green ✓ accept + red ✕ discard, Enter anywhere commits, captioned bordered
+Entities box with per-row ×, inline parameter rows, status line, and a
+universal window-opacity slider footer. `plane-window.ts` rebuilt on it:
+Entities first (added by clicking planes in the viewport or Items tree —
+the picker widget is gone; window enables plane-select mode while open),
+then the method dropdown (Offset / Mid plane), an "Offset distance … mm ⇅"
+row (⇅ flips the offset sign), and a Flip normal checkbox backed by a new
+`flip` flag in Core plane definitions (negates the resolved normal;
+round-trips; tested). Tree clicks on plane features route through a new
+`aether-plane-feature-picked` event in main.ts. Verified in real Chrome:
+instant Plane 1 + window with Top plane entity, zero console errors.
+710 Core / 438 CAD tests, typechecks, build pass.
+
+Not copied from Onshape (features we don't have yet): the "Final" feature-
+state button and help icon; the slider maps to window opacity per Jonathan.
+
+## 2026-09-10 — FeatureWindow promoted to Aether UI + all CAD feature dialogs converted + gallery section
+
+The standard feature window moved into the shared design system:
+`core/ui/src/FeatureWindow.ts` (`openFeatureWindow`, `aui-feature-*`
+classes in widgets.css, WIDGETS.md row) — imperative DOM, product-free,
+consumed by Aether CAD via `@aether/ui`. Every remaining CAD feature
+dialog (extrude, revolve, mirror, fillet, chamfer, legacy profile)
+dropped its modal `<dialog>` and now mounts in the standard window
+(✓ = Apply and rebuild, ✕ = Cancel; Enter defers to native form submission
+inside forms). The Aether UI gallery gained a "Feature windows" section
+showing Plane, Extrude, and Mate windows side by side; the mate demo is
+faithful to the archived Anima Studio MatePlacementOverlay anatomy
+(Moving/Fixed connector chips, kind picker, flip primary axis, reorient
+secondary 0/90/180/270°, offset XYZ) per the Swift-archive inventory.
+Verified: 153 core/ui tests, 439 CAD tests, 710 core/engine tests,
+typechecks, builds; gallery section screenshotted live.
+
+Swift-archive inventory findings (dev/briefings handoff has details):
+extrude/sketch windows never existed natively — they are web-first and now
+standard-window based. NOT yet on web: the full mate EDIT inspector
+(connector flip, offset XYZ + rotate-about, DOF neutral/min/max limits,
+simulation connection), relation creation/editor windows, import-units
+sheet, per-part appearance editor. These are the next faithful-import
+targets.
+
+## 2026-09-10 — Aether UI: seven-window reference set in the gallery
+
+Per Jonathan's Onshape reference of seven feature windows: FeatureWindow
+gained a segmented `tabs()` primitive (Solid/Surface/Thin and
+New/Add/Remove/Intersect rows) and empty entity boxes read as hint fields.
+The gallery "Feature windows" section now shows nine standard windows side
+by side — Sketch, Extrude (full reference anatomy: tabs, end-type
+dropdown, depth, direction/offset/symmetric/draft/second-end rows),
+Revolve (axis box + full-revolve), Sweep (path box, profile control,
+twist/scale), Loft (profiles, end conditions, guides/path/isocurves),
+Thicken (mid plane, thickness 1/2, keep tools), Enclose, plus the earlier
+Plane and Mate windows. These are design-system specimens; wiring the real
+extrude/revolve editors to the reference anatomy (end-type semantics,
+direction/draft) is Core work queued behind them. 153 UI tests, typecheck,
+build pass; live gallery screenshot verified.
+
+## 2026-09-10 — Suite settings window (Anima Studio import) + CAD settings
+
+The Anima Studio Settings window is now the suite-standard per-app
+settings shell: `core/ui/src/SettingsWindow.tsx` (+SettingsCard/
+SettingsRow) with macOS anatomy — traffic-light close, grouped sidebar
+(General / Viewport / Advanced), centered title, card-based panes,
+Escape/scrim close; gallery specimen section added. Aether CAD's existing
+header gear now opens `CADSettingsWindow` (dedicated file) replacing the
+old Preferences dialog, with the Swift pane structure: Workspace, Layout,
+UI, Renderer, Appearance, Materials & Edges, Lighting, Navigation,
+Developer. Wired today: toolbars traditional/floating, window chrome
+suite/classic, reset panel placements, display style, background, ground,
+contact shadows, reset appearance, material finish, feature edges,
+lighting preset, environment intensity, backend/kernel readouts.
+Everything the web app cannot honor yet is present but greyed out and
+disabled, faithful to the Swift originals per the archive inventory
+(project location/Change…, unitless import units, autosave, frame rate,
+design preset/accent/density, render engine picker, coordinated CAD
+themes, reflections, environment rotation, roughness/metallic/edge
+definition, light rig, navigation profiles/speeds, developer toggles).
+156 UI / 443 CAD tests, typechecks, builds pass; live Chrome screenshot
+verified with zero console errors.
+
+## 2026-09-10 — Aether CAD: Commands and Help moved into the settings tray
+
+Per Jonathan: the header keeps only Settings (plus Export/account); the
+Commands and Help icon buttons are gone. The settings sidebar gained a
+"Reference" section with two panes. Commands: an "Open command palette"
+row (⌘K still works globally) plus a filterable, category-grouped list of
+the full command catalog with shortcuts and Run buttons — disabled
+commands grey out with their reason. Help: the former help dialog content
+restyled as settings cards (Part workflow, Assembly workflow, keyboard/
+viewport rows, notice card). `show-help` now opens the settings tray on
+the Help pane; the old Preferences/Help dialogs and UtilityDialogs are
+removed. Settings icon asset fixed from a sun glyph to a real gear
+(shared core/assets icon, all apps rebuilt). 443 CAD tests, typecheck,
+build pass; live Chrome screenshots verified.
+
+## 2026-09-10 — Settings window: faithful macOS rendering pass
+
+Per Jonathan against the Anima Studio reference: sidebar pane items now
+carry icons (nine new shared stroke icons — sidebar, cube, palette,
+layers, lighting, mouse, hammer, plus existing folder/layout/commands/
+help; settings gear fixed earlier). SettingsCard renders the Anima Studio
+section header (accent icon + bold title + muted caption); SettingsRow
+gained icon/value/stacked variants — stacked renders the full-width
+slider row with a right-aligned value label ("Orbit speed — Standard");
+checkboxes replaced by a macOS pill switch (`input.aui-switch`).
+Navigation pane is now faithful: Navigation Profile card, Motion Response
+card (orbit/pan/zoom sliders + reverse-wheel switch, disabled until input
+mapping lands), Keyboard card. 156 UI / 443 CAD tests, builds pass;
+live screenshot matches the reference anatomy.
+
+## 2026-09-10 — Aether CAD home: Get started cards + OneDrive-style recents
+
+Per Jonathan's OneDrive reference: the CAD library home (studio
+LibraryHome, served at /cad/) keeps its hero and gains a "Get started"
+row of file-type cards — Part, Assembly, Drawing, Project — using four
+new colored tile icons added to the shared icon library (file-part,
+file-assembly, file-drawing, file-project). Part/Assembly/Project cards
+run the same create flows as the sidebar Create menu; Drawing is a
+disabled placeholder (sheets are created inside an open document). The
+recents list gained OneDrive anatomy: type filter chips (All / Parts /
+Assemblies / Drawings / Projects), a right-aligned "Filter by name or
+person" field, and table rows with the colored type tile plus a
+"My files / Workspace shared" subline under the name; columns are now
+Name / Opened / Owner. Grid view uses the same type tiles. File types
+derive from extensions (.acpart/.cadpart → Part, .acasm/.aether →
+Assembly, .acad → Project, .acdraw reserved for Drawing). Studio build
+passes; the page is sign-in protected so review is in-browser after
+refresh.
+
+## 2026-09-10 — CAD home: right-click menu + OneDrive table controls
+
+The library's middle section now has an OneDrive-style right-click menu
+(new studio/src/ContextMenu.tsx): empty space shows "Add New ▸"
+(Part / Assembly / Project / Folder / Import file…, wired to the same
+create flows) plus Details; right-clicking a row selects it and offers
+Open / Details. Submenu, Escape/outside-click dismissal, shadows through
+theme tokens (build's color-literal guard enforced). The list heading
+gained the OneDrive control cluster right of the search: Sort dropdown
+(Opened / Name / Owner) with an ascending/descending toggle applied to
+the visible list, the list/grid switch, and a Details button that shows
+or hides the right details rail. Studio build green.
+
+## 2026-09-10 — Library file management: selection command bar + collapsing details rail
+
+Selecting a file swaps the control row's left side into a OneDrive-style
+command bar of borderless tools — Open, Rename (writable), Download,
+Duplicate, Share/Make private (writable), History, and a disabled Delete
+placeholder (recycle-bin backend not wired) — with an "✕ 1 selected"
+clear chip joining the right cluster. The details rail no longer wastes
+its column when closed: it stays mounted and the root grid animates
+grid-template-columns 255px ↔ 0 (0.25s), so the workspace expands and
+shrinks smoothly with the Details toggle. Studio build green.
+
+## 2026-09-10 — Studio: redundant page-title bars removed
+
+The admin workspace's top bar (page title duplicating the sidebar's
+active item, "Aether Studio" caption duplicating the brand, lone refresh
+button) is gone; the refresh control now sits beside the Online badge in
+the Home page heading. The public home's equivalent bar (title + a
+Sign-in button the sidebar already provides) is removed too. The library
+header (brand · search · account) is functional and stays. Studio build
+and color guard green.
+
+## 2026-09-10 — Library home is app-parameterized; Aether Animation gets its home
+
+The library sidebar dropped its footer note ("Saved on your server…") and
+the "← Aether Studio" back link (the brand icon already links home).
+LibraryHome is now config-driven per app (brand, app icon, hero copy,
+accepted extensions, file types with tile icons, Create-menu choices,
+Get-started cards, deep-link URLs); CreateMenu accepts a choices list.
+/animation/ now serves the identical home page (host router carve-out +
+studio route): Aether Animation branding, Get started cards — Character
+(creates via /animation/index.html?new=character), Clip / Show / Project
+as honest disabled placeholders — recents/filters/commands identical,
+with new file-character / file-clip / file-show tile icons in the shared
+library. Types: .anima → Character, .aether → Workspace, .show reserved.
+40 host tests, studio/ui builds, ruff pass; host restarted healthy
+(/animation/ now 302s to sign-in like /cad/).
+
+Known gap (animation app lane): the Animation app does not yet read
+?document= or ?new=character deep links — Open/Create land in the app but
+load the default character until the app wires host-library documents.
+
+## 2026-09-10 — Aether CAD: per-document-type ribbon layouts (Parts first)
+
+The ribbon now renders a layout keyed by the open document type
+(dedicated `cad-toolbar-layouts.ts`; the shared tool catalog remains the
+single definition of every tool — layouts only select and filter).
+"Project" (and the Start screen) preserves the complete legacy
+arrangement. The first refinement is Parts: the Assembly tab is dropped
+and assembly-scoped Home tools (New Assembly, Component selection) are
+filtered out; excluded active tabs fall back to Home. The shell derives
+the type live: canonical Assembly ready → assembly; Part open → part;
+otherwise project. Assembly and Drawing layouts intentionally keep the
+full set until their own passes. 4 layout pins + 447 CAD tests,
+typecheck, build; live Chrome check confirms the tab switch with zero
+console errors.
+
+## 2026-09-10 — Aether CAD: Fusion-style Part ribbon
+
+Part documents now mirror Fusion's Design workspace. Tabs: Solid,
+Surface, Mesh, Sheet Metal, Plastic, Manage, Utilities. Each tab is
+sections in the Fusion anatomy — prominent tools above a "Create ▾ /
+Modify ▾ / Construct ▾ / Inspect ▾ / Insert ▾ / Select ▾" label that
+drops the section's complete tool list (overflow tools live only in the
+menu). All entries reference the shared tool catalog by id (one
+definition per tool; unimplemented ones stay honestly disabled with
+their producer reasons). Editing a sketch appends a contextual Sketch
+tab (catalog sketch tools as sections), auto-activates it, and shows a
+green "✓ Finish Sketch" that finishes via a new aether-sketch-finish
+event; on finish the tab reverts to Solid. The Design ▾ workspace
+switcher is re-themed to app tokens and lists Fusion's modes —
+Generative Design, Render, Animation, Simulation, Manufacture, Drawing,
+Electronics — all disabled with honest reasons until built. Project (and
+Start screen) keep the legacy ribbon unchanged; assembly/drawing types
+still pending their passes. 9 new pins (452 CAD total), typecheck,
+build; live Chrome run verified tabs, contextual sketch flow, finish,
+and revert with zero console errors.
+
+## 2026-09-10 — Ribbon polish, toolbar density, boot-crash guard
+
+Fusion ribbon polish per Jonathan: the floating toolbar card border is
+gone (dividers only), section labels ("Create ▾" …) dropped to the
+header-tab type size, tool icons enlarged. New toolbar density setting:
+right-click the ribbon for a Density menu — Compact (icons only, larger)
+or Standard (icons and labels) — persisted per browser; applies to both
+the Fusion and legacy ribbons. Boot hardening: the command-palette
+builder now degrades unseeded catalog ids to disabled entries instead of
+crashing the shell at boot (this exact class hit twice: the
+sketch-constraint-pattern incident and today's background-slate registry
+refactor landing mid-write during parallel agent work). Live Chrome:
+boot clean, density menu applies compact, zero console errors. Note:
+two AetherCADShell test pins (palette count, Visualization strings) are
+transiently red from Codex's in-flight claim — its lane to settle.
+
+## 2026-09-10 — Aether CAD: spacebar orientation snap
+
+Pressing Space in the viewport (outside text fields and sketch editing)
+snaps to the isometric view and zooms to fit the model — the
+SolidWorks-style "cube view around the object". Routed through the
+existing view-isometric and fit-view commands. 452 CAD tests, build,
+live check pass. Codex's two transient shell pins settled green in the
+same run.
+
+## 2026-09-10 — Aether CAD: spacebar orientation box (SolidWorks-style)
+
+Space now toggles a real-3D orientation box in the scene: a translucent
+cube sized to engulf the rendered bodies (minimum side when the part is
+empty — the earlier silent behavior came from fit-view being a no-op on
+empty parts), camera pulled back so the whole box is visible. Hovering a
+face highlights it; clicking snaps the camera to that side (Right/Left/
+Top/Bottom/Front/Back via the standard view definitions) and closes the
+box; Space again or Esc dismisses. Viewport picking is suspended while
+the box is open. Live-verified: box appears on Space, face click landed
+"Right view", zero console errors. 452 CAD tests, build pass.
+
+## 2026-09-10 — Orientation box restyled to SolidWorks paddles; camera stays live
+
+The orientation box is now six rounded translucent paddles floating just
+off each face of the model bounds (grey, accent-highlight on hover, edge
+outlines), replacing the plain blue cube. While open, orbit / pan / zoom
+work normally and the paddles persist — only a stationary left click
+acts (orbit-drag releases no longer dismissed or reoriented the view);
+left-click on a paddle snaps to that side, left-click on empty space,
+Space, or Esc closes. Live-verified: box survives orbit, paddle click
+landed "Top view", zero console errors.
+
+## 2026-09-10 — Orientation box: edge and corner paddles
+
+Added to the face paddles (unchanged): 12 rounded edge strips and 8
+corner squares floating at the bounds' edge and corner diagonals. Faces
+keep their standard-view snaps; edges and corners orient the camera
+along their diagonal via a new arbitrary-direction camera helper (up
+vector handled for near-vertical directions). Same hover highlight,
+same stationary-left-click rule, same dismissal. 26 pickable plates
+total; live check green (orbit survival + snap, zero console errors).
+
+## 2026-09-10 — Orientation envelope: true filleted-box construction
+
+Rebuilt per Jonathan: the orientation box is now a single continuous
+filleted envelope — bounding box offset outward, flat faces inset by the
+fillet radius, quarter-cylinder edge fillets, sphere-patch corners, all
+tangent with seam outlines (canonical octant/quadrant geometry mirrored
+by sign). Same interaction contract (hover tint, stationary-left-click
+snap: faces → standard views, edges/corners → diagonal directions;
+orbit-safe; Space/Esc/click-off closes). Live green.
+
+## 2026-09-10 — Aether CAD: Environment panel + viewport themes
+
+New Environment panel in the workspace shell (dedicated
+CADEnvironmentPanel.tsx, Anima Studio demo anatomy on the shared
+settings-card components): Environment card — theme picker, ground
+segmented control (None/Grid/Floor/Both), background preset, live grid
+opacity slider, disabled grid spacing/extent placeholders; Object card —
+lighting preset, live brightness, contact-shadow and feature-edge
+switches, disabled key/fill/rim sliders, reset. The appearance store
+gained named environment themes: "Aether" (today's exact defaults) and
+"Onshape" (new near-white background preset, no ground, daylight
+lighting, no contact shadows — matches the reference render); manual
+tweaks mark the theme "custom", and themes re-apply as bundles. Grid
+opacity multiplies the per-preset baked opacity in the viewer. 453 CAD
+tests (bundle/custom/reset reducer pins), typecheck, build; live-verified
+theme switch to a clean white viewport with zero console errors.
+
+## 2026-09-11 — Environment controls merged into the Appearance rail panel
+
+Correction after review: the standalone Environment panel was removed —
+its controls merged into the existing right-rail Appearance
+(Visualization) panel where Jonathan expected them: Environment theme
+picker (Aether / Onshape / Custom) at the top of DISPLAY, Onshape added
+to the background Theme options, Grid opacity slider under Ground. The
+duplicate CADEnvironmentPanel file and its dockable-panel entry were
+deleted (one representation only). 453 CAD tests, build, live check
+green (theme select present, Onshape switch verified).
+
+## 2026-09-11 — Three-surface tool law codified and enforced
+
+Per Jonathan, now CONVENTIONS.md law 4: every tool launches from exactly
+one of the left sidebar, right sidebar, or top ribbon; floating editor
+windows are ribbon tools; properties-style inspectors are right-sidebar
+tools; the header carries only app chrome. Compliance audit: left rail =
+Feature tree/Versions/History/Comments/Notes/Tasks; right rail =
+Properties/Parameters/Assembly/Inspect/Appearance (environment lives
+there); ribbon = all modeling tools and their floating feature windows.
+The header's duplicate Export launcher was removed (Utilities → Export
+Center is its home); Settings gear, theme toggle, window/layout menus,
+and account remain as chrome. 453 CAD tests, build green.
+
+## 2026-09-11 — Onshape theme: reference-plane presentation
+
+Reference-plane visuals now follow the render environment (separate from
+the UI theme): plane-visual accepts fill/border/label styling, the
+viewer carries per-background plane styles, and switching backgrounds
+rebuilds the principal planes in place (visibility preserved) and styles
+custom plane features on creation. The Onshape environment renders
+Onshape's look — pale translucent blue fills, light-blue borders, blue
+label text on the near-white background — verified live during plane
+selection with zero console errors. Label color is theme-driven today; a
+user-adjustable plane/label color control in the Appearance panel is the
+noted follow-up. 453 CAD tests, build green.
+
+## 2026-09-11 — Origin as a point, axes split out; Anima right-rail tools imported
+
+Origin/axes (per Jonathan): the origin renders as a point in space (small
+sphere) instead of the three coloured lines; those lines are now separate
+"Axes" reference geometry, hidden and listed disabled in the tree until
+the camera/display tool owns them.
+
+Right rail imports from the archived Anima Studio "view sidebar"
+(inventory: View, Environment, Appearance, Performance, Inspector):
+- **View** (new CADViewPanel.tsx) — the camera + display tool, deliberately
+  separate from the render environment. CAMERA: projection (perspective;
+  orthographic disabled), field of view (wired through the camera store to
+  the live camera), frame-selection / isometric buttons, named views
+  (disabled), orientation-box hint. DISPLAY: surface style, edges, grid,
+  **Origin toggle** (new toggle-origin command reflecting reference
+  visibility), plus disabled Axes / Section view / High quality rows.
+- **Performance** (new CADPerformancePanel.tsx) — renderer/kernel/document
+  status; frame-timing HUD disabled pending renderer counters.
+- Environment and Appearance remain the existing Visualization panel;
+  Inspector remains Properties. Consolidation is Jonathan's next pass.
+
+Onshape is now the shipped default environment (white background, no
+ground, daylight lighting, no contact shadows); the previous look is the
+"Aether" bundle, selectable from the Appearance panel. Verified live:
+default boot renders the Onshape environment, View panel opens with FOV
+42°, Origin row present, disabled rows greyed, zero console errors.
+Claude-lane suites green (registry/reference/projection/appearance/
+camera/shell = 38 pins); the sketch DOM suites are transiently red from
+Codex's in-flight sketch-workspace rewrite (its lane, untouched).
+
+## 2026-09-11 — Performance panel made functional (live metrics + overlay)
+
+Correction after review: the imported Performance panel was a stub. It
+now publishes and displays measured values from a dedicated
+`cad-viewport-metrics-store.ts`: the renderer samples every frame and
+rolls FPS, mean frame time, and render-budget share into the store twice
+a second, plus JS heap (Chromium), and republishes geometry counts
+(bodies, faces, edge segments, triangles) with the last upload duration
+whenever parts are added or removed. The panel shows LIVE STATUS and
+GEOMETRY sections, and "Show detailed CAD metrics" pins Anima's
+monospace metrics card over the viewport (persisted per browser). Figures
+the browser cannot expose (process CPU, true GPU frame timing) read
+"Unavailable" instead of fabricating numbers. Rail icon changed to a new
+shared gauge icon. Live-verified: 60.0 fps / 16.66 ms / 2.5% budget /
+10.9 MB heap, overlay renders, zero console errors. 456 CAD tests
+(2 new store pins), typecheck, build green.
+
+## 2026-09-11 — 3D transform gizmo: Core semantics + Aether UI demo
+
+Imported the Anima Studio CAD transform gizmo (archive inventory:
+CADTransformGizmoOverlay + CADToolGeometry.gizmoLineVertices). Meaning
+lives in Core as a new renderer-neutral module
+(`core/engine/src/transform/`, exported as `@aether/core/transform`):
+handle kinds (axis / plane / ring), ray-based handle picking with
+tolerances, drag begin/update returning a total delta from the anchor
+(translation in millimetres, rotation in radians about the handle axis),
+optional translation/rotation snapping, and Rodrigues delta application
+about a pivot. No renderer types — Three.js/WebGPU adapters supply rays
+and draw handles. 6 deterministic pins.
+
+Aether UI gallery gained a live "3D transform gizmo" demo
+(`gallery/TransformGizmoDemo.tsx`, Three.js via new gallery-only
+devDependencies): all nine handles live at once like the native gizmo —
+axis arrows (X #F24336, Y #4DD963, Z #408CFF), rotation rings at 0.82 ·
+arm, plane tabs (XY yellow, YZ cyan, ZX purple) — screen-constant ~72 px
+sizing, orange hover highlight (the unshipped Anima lab's intent), an
+optional snap toggle (10 mm / 15°), and a live mm/degree readout (the
+"intended-but-missing" feature in the native build). Verified live in the
+gallery: handles render, dragging moves the body (−76 mm reported), zero
+console errors. 719 Core / 163 UI tests, typechecks, builds green.
+
+Deliberate deviations from the native build, all documented: ray/plane
+math instead of screen-delta projection (equivalent result, robust under
+perspective), plus snapping and the readout which the native gizmo never
+shipped. Not yet built: CAD/Animation wiring (selection pivot at the AABB
+centre, the locked/grounded grey state, and the debounced part-transform
+commit path) — that is the next packet.
+
+## 2026-09-11 — Transform gizmo restyled: Onshape/Anima hybrid
+
+The gallery gizmo now blends Onshape's triad with the Anima anatomy:
+thin outline artwork (axis lines, open triangular arrowheads, small tip
+circles as the per-axis rotation handles, diamond plane handles, centre
+pivot dot) carrying Anima's axis colours (X red, Y green, Z blue) and
+plane colours. Picking rides invisible solids beneath the artwork — the
+same visible-lines/hit-layer split the native gizmo used — and hover
+tints the artwork by handle. Handles render over the model
+(depthTest off, high render order) so they never disappear inside a
+body, and stay screen-constant (~96 px arm). Snap and the mm/degree
+readout remain. Verified live: drag reported −46.3 mm, zero console
+errors.
+
+## 2026-09-11 — Aether UI: workspace shell demo aligned with Aether CAD
+
+The gallery's workspace-shell specimen now mirrors the CAD app instead of
+the retired Animation arrangement: CAD app icon with document name/branch/
+saved state, a Create/Modify ribbon of real tool icons (Sketch, Extrude,
+Revolve, Fillet, Chamfer), a left Feature tree carrying CAD's actual
+structure (Reference Geometry with Origin plus the disabled Axes row, Part
+features with a suppressed fillet, Bodies), a Version control panel, right
+Properties / Appearance / Performance panels, and the CAD status line.
+The document bar's centre control is now the studio layout modes —
+Docked / Floating / Hidden — driving the shell preset directly (the
+duplicate layout-preset button was removed, per the one-launcher rule).
+Verified live: tabs read Docked/Floating/Hidden, switching to Floating
+re-lays the shell and the status line follows, zero console errors.
+163 UI tests, typecheck, build green.
+
+## 2026-09-11 — Feature windows: real validation, no opacity slider, distinct accept
+
+Per Jonathan, the gallery's feature windows are now functional demos of
+the pipeline the apps run, not static specimens. The Sketch and Extrude
+demos build a real `PartDocument` and run Core's own
+`validatePartDocument`: removing the sketch plane from the Entities box
+puts the window in the error state with the engine's actual message
+("Sketch plane or offset is invalid.") and disables accept. The other
+windows (Revolve, Sweep, Loft, Thicken, Enclose, Plane, Mate) validate
+their own reference requirements the same way, and every window starts
+valid so the error state is something the reviewer produces. Shared
+FeatureWindow changes: the universal window-opacity slider is removed
+(it dimmed the whole editor — unwanted), and the accept control is now a
+distinct green "✓ OK" button with a bordered ✕ discard, plus a new
+`setError()` API that reddens the title/border and blocks accept.
+163 UI / 458 CAD tests (plane-window pin updated for the removed
+slider), typechecks, builds; live-verified in the gallery with zero
+console errors.
+
+## 2026-09-11 — Feature window: one control system, consistent widths
+
+Per Jonathan: the entities box is the reference width, and every control
+now follows it. Body-level controls (the method pickers — "Blind",
+"Offset", mate kind) span the full body width so they line up exactly
+with the entities box above them; in-row controls share fixed tracks
+(text/number inputs 104 px right-aligned, selects 132 px) so every row
+lines up down the window and shrinks gracefully on narrow panels. All
+inputs and selects share one visual system — 26 px height, the shared
+border/radius/background tokens, and the shared type ramp — replacing the
+undersized, differently-styled dropdown. Applies everywhere the standard
+window is used: verified in the gallery (Extrude: entities box 274 px,
+method select 274 px, depth input 104 px) and in Aether CAD's plane
+window. 163 UI / 458 CAD tests, builds green.
+
+## 2026-09-11 — Feature windows: Onshape ordering restored, accept/discard final
+
+Correction after review: the functional rewrite had reordered Extrude
+(selection box ahead of the body-type/boolean tabs) and dropped rows.
+The demo builder now lets each feature place its selection box where the
+Onshape feature does, and the control sets are complete again: Extrude
+runs Solid/Surface/Thin → New/Add/Remove/Intersect → selection → end
+type → Depth → Direction / Starting offset / Symmetric / Draft / Second
+end position; Revolve lists regions before the axis; Sweep regained
+Scale; Loft regained Guides and continuity / Path / Connections / Show
+isocurves; Thicken regained Keep tools. Accept is now a compact filled
+green ✓ (the "OK" label removed) and discard is a plain unboxed red ✕.
+163 UI / 458 CAD tests, builds, live check green.
+
+## 2026-09-11 — Feature windows: nested sub-settings driven by the parent
+
+Per Jonathan: settings that belong to another setting now nest, and the
+end type decides which sub-settings exist. The shared FeatureWindow gained
+`subsection(label, {kind})` — a checkbox or disclosure row whose children
+indent beneath it behind a rule, the way Onshape nests dependent options.
+The Extrude demo now behaves like the real feature: Blind/Symmetric show
+Depth, the "Up to …" types swap Depth for an "Up to entity" selection box,
+Through all shows neither; Draft reveals a nested Draft angle; Direction
+(disclosure) reveals Flip direction and Direction reference; Starting
+offset reveals Offset distance and Opposite direction; Second end position
+reveals its own end type and depth, and disappears entirely for Symmetric
+and Through all. Also fixed a real CSS bug found while verifying: the
+window's `display` rules were overriding the UA `[hidden]` rule, so
+"hidden" rows and closed sub-settings still rendered. Order stays
+Onshape's: body type → boolean → selection → end type → parameters.
+163 UI / 459 CAD tests, builds, live check green.
+
+## 2026-09-11 — Feature windows: anchored dropdowns, expanded sub-settings
+
+Native `<select>` popups overlay their own control on macOS (the current
+value is centred under the pointer), which read as misaligned inside a
+feature window. The shared FeatureWindow gained `picker()` — a dropdown
+whose popup opens directly beneath its field, left-aligned and exactly
+the field's width, with a check on the active option, outside-click and
+Escape dismissal. Measured live: 0 px left offset, 0 px width difference,
+4 px below the trigger. Every feature-window dropdown now uses it — the
+gallery demos and Aether CAD's plane window (its DOM pins updated to
+drive the picker). Also per review: disclosure sub-settings now start
+expanded (checkbox groups still follow their box), and the disclosure
+chevron is larger and full-contrast. 163 UI / 461 CAD tests, typechecks,
+builds green.
+
+## 2026-09-11 — Dropdown chevron enlarged
+
+The picker chevron was still the small faint glyph; it is now full-size
+and full-contrast, matching the enlarged disclosure arrow. Applies to
+every feature-window dropdown in the gallery and Aether CAD.
+
+## 2026-09-11 — Feature properties live in a card footer
+
+Per Jonathan: a feature's id is a property (it names the title card), not
+a setting, so it no longer sits among the controls. The shared
+FeatureWindow gained `meta(label, value)` — a muted, monospaced footer
+pinned to the bottom of the card, separated by a rule — and the Sketch
+demo reports its Feature id and Feature type there. Any feature editor
+can now surface revision, owner, or source metadata the same way without
+mixing it into the settings list. 163 UI / 461 CAD tests, builds green.
+
+## 2026-09-11 — Feature editors split into one file per feature
+
+Per Jonathan's organisation standard (CONVENTIONS law 3), the nine
+feature editors no longer live inside gallery/main.tsx. They now sit in
+`core/ui/gallery/features/` — `sketch.ts`, `extrude.ts`, `revolve.ts`,
+`sweep.ts`, `loft.ts`, `thicken.ts`, `enclose.ts`, `plane.ts`, `mate.ts`,
+each owning that feature's layout, controls, dependent sub-settings and
+validation — with `shared.ts` for the common plumbing, `index.ts` for
+re-export, and a README stating the pattern. main.tsx dropped ~340 lines
+and now imports them. Each editor is built from exactly two shared
+pieces: `@aether/ui`'s openFeatureWindow (chrome) and `@aether/core`
+(types + validators). 163 UI tests, typecheck, build, live check green.
+
+Honest state: these are gallery reference implementations, not yet the
+app's editors. `Aether CAD/src/plane-window.ts` is the first app-side
+editor on the same window API; porting the rest into
+`Aether CAD/src/features/` is the follow-up packet.
+
+## 2026-09-11 — Backend blockers fixed: atomic mutations, real diagnostics, BOM integrity
+
+The three defects the 2026-09-09 review verified by execution are fixed in
+`animacore/aether_workspace.py`, each with a regression test that fails on
+the old behaviour:
+
+- **A1 — failed mutations committed.** `mutate()` swapped the draft into
+  canonical state before validating the target, so a rejected call still
+  advanced the revision and the client's retry hit a spurious
+  `revision_conflict`. The draft is now validated and projected first;
+  nothing commits unless both succeed.
+- **A2 — diagnostics never surfaced.** `_current_issues` excluded exactly
+  the diagnostics the solve had just produced (identical inputs hash to
+  identical ids), so `projection.issues` was always empty while
+  `solution.diagnostic_ids` referenced entries that existed nowhere.
+  `solve()` now publishes the diagnostic objects it already builds and the
+  projection merges them, deduplicated — limit violations and
+  `solve_unconverged` both reach clients, and every published id resolves.
+- **B1 — dangling BOM parents.** Rows referenced `instance:<id>` for
+  parents that filtering had removed (suppressed or non-part). Parent
+  links now resolve only against rows present in the same BOM.
+
+Verified: 1200 animacore tests (3 new pins), ruff clean, 41 host tests.
+
+Still open from that review: B2 (instance parent cycles accepted), B3
+(unconverged mates project "satisfied"), B4 (no numeric ground-truth
+kinematics tests), B5 (BOM material_name always null), and the C/D items
+(single mutation discipline for `aether_project`, `/rpc` CORS exposure,
+host slowloris + shared-IP lockout).
+
+## 2026-09-11 — Feature property footer removed
+
+Per Jonathan the id/type footer is gone from the feature cards; the
+window now ends at its settings. The unused meta() API and its styles
+were deleted with it rather than left as dead code. 163 UI tests,
+typecheck, build green.
+
+## 2026-09-11 — Correction: the app is the richer implementation
+
+Measurement corrects an earlier plan of mine. Aether CAD's
+feature-authoring.ts already presents the full Onshape feature anatomy
+wired to real documents; the gallery feature files are design specs with
+demo controls. Promoting gallery files into the app would have been a
+downgrade. The correct direction is to split feature-authoring.ts into
+one file per feature under Aether CAD/src/features/ keeping the real
+wiring, move sketch/plane/mate editors alongside them, and have the
+gallery import those real editors instead of its duplicates. Sweep, loft,
+thicken and enclose have no engine support (no SolidFeature members, no
+evaluator path) and stay designs until the engine can build them.
+Ownership handed to Codex; feature-authoring.ts is unclaimed by Claude.
+
+## 2026-09-11 — Gallery fixed after the engine move
+
+The engine's move to Aether CAD/engine broke the gallery: npm's symlink
+resolves, but the target sits outside the gallery project root so Vite
+could not resolve @aether/core subpaths. core/ui/vite.config.ts now
+aliases @aether/core (and its subpaths) straight to the engine source and
+allows the dev server to read from it. Gallery typecheck, 163 tests,
+build and live checks (feature-window validation, transform gizmo drag)
+all pass again.
+
+## 2026-09-11 — Feature tree: collapsible groups, divided Bodies, header, chevrons
+
+Reference Geometry and Bodies now collapse (the projection was hardcoding
+Reference Geometry expanded, and the toggle handler only routed folder/
+ids). Bodies is separated from the feature history by its own divider, the
+way Onshape pins Parts below the feature list. The Feature tree header
+groups its icon and title instead of spreading them across the panel
+(title 126px to 80px). The shared Tree disclosure chevron is larger and
+full-contrast, matching the enlarged feature-window disclosure. 488 CAD
+tests (2 pins updated, 1 added) and 163 UI tests green.
+
+Open: the rollback bar cannot be dropped past the last feature (canMove
+rejects non-feature targets; the handler resolves -1 for them) — handed to
+Codex with the diagnosis since both files are in its active split. Also
+queued: multi-select actions in the tree; the shared Tree already reports
+single/toggle/range selection, the app wiring is what is missing.
+
+## 2026-09-11 — Bodies section and rollback latch
+
+Bodies are now their own pinned section below the feature history, like
+Onshape's Parts pane: the projection publishes bodyNodes separately and
+the shell renders them in their own bordered, scrollable tree with its own
+expander. This also removed the accidental second rollback-looking bar
+(the divider row) and restored the rollback bar's drop path — with the
+bodies rows gone from the feature list, the last row is a feature again.
+The drop handler was hardened besides: a drop resolving to no feature now
+means end-of-list rather than index -1, and rollbackIndex is clamped.
+490 CAD tests, typecheck and build green.
+
+Open: multi-select and delete in the feature tree. The shared Tree already
+reports single/toggle/range selection; the app still tracks a single
+selectedFeatureID, so the work is app-side state plus delete/suppress
+acting on a set.
+
+## 2026-09-11 — Items panel: sections scroll independently
+
+The items panel was display:block, so the flex:1 on the feature list never
+applied — a long history simply pushed Bodies and the footer off the
+bottom. The panel is now a flex column: the feature list scrolls inside
+its own area, Bodies keeps its own box (max 38 percent, own scroll), and
+the footer stays pinned. 490 CAD tests and build green.
+
+Open in this area, both verified as still-broken:
+- Panel height to the bottom edge is fixed as of 2026-09-12 (above).
+- Multi-select and delete in the feature tree shipped 2026-09-11 (above).
+
+## 2026-09-12 — FreeCAD inheritance: PlaneGCS spiked against the real corpus
+
+Jonathan's direction: keep our design, inherit the engine. Plan and verified
+findings are in `dev/docs/roadmap/FreeCAD_Inheritance.md`.
+
+Measured cause of the slow feature-by-feature grind: the OCCT-backed kernel
+binding is 893 lines, while our hand-rolled `sketch/` is 15,389 — 2,599 of
+them a constraint solver. The hardest part of CAD is our smallest module
+because we borrowed it.
+
+- **PlaneGCS (FreeCAD's Sketcher solver, WASM, LGPL) is viable.** A spike maps
+  our drawing model behind the existing `solveDrawingConstraints` seam, and a
+  harness ran the existing corpus — 539 tests, 1,878 real solves — through
+  both solvers. Of the 1,287 solves carrying constraints: 202 agreed to 1e-6,
+  26 disagreed, 163 hit spike mapping bugs, 867 were geometry or constructs
+  the spike deliberately does not map. **Fifteen of our twenty-seven
+  constraint kinds produced identical geometry** (horizontal, vertical, fix,
+  radius, diameter, length, distance, angle, coincident, concentric, parallel,
+  perpendicular, equal, tangent, symmetric). Nothing failed because planegcs
+  could not express it.
+- The 26 disagreements are *different valid solutions* (10–16 mm drift on
+  under-determined systems, with `fix` unimplemented in the spike), so a
+  migration re-settles existing sketches and re-pins their tests. That is the
+  real cost, and it is the only one found.
+- **OCCT hidden-line removal is already in the WASM build we ship** —
+  `HLRBRep_Algo` (23 refs) and `HLRAlgo_Projector` (14) in
+  `replicad-opencascadejs`, plus `BRepMesh_IncrementalMesh`,
+  `BRepOffsetAPI_MakeOffset`, `GeomAPI_Interpolate`, `ShapeUpgrade` and
+  `STEPControl_Writer`. The queued Drawing packet currently assigns
+  hidden-line classification to hand-written Core code; it should call HLR
+  instead. `IGESControl_Reader` is **not** exposed.
+
+The spike is instrumentation, not a migration: the default solver is
+unchanged, the comparison runs only when a harness registers a `globalThis`
+hook, and nothing is imported from production code — verified by 733 engine
+tests, 519 CAD tests, engine typecheck and a CAD production build in which
+`planegcs` appears in no built asset.
+
+## 2026-09-12 — B3 closed, plus a hole in the mate-cycle guard
+
+- **B3 — unconverged mates projected `satisfied`.** The solve already
+  reported `status: "unconverged"` and named the mates it could not place
+  in a `solve_unconverged` diagnostic, but `_mate_projection` derived
+  `solve_state` from limit violations alone, so a mate whose instance
+  never moved showed as green. Those mates now project `failed` and carry
+  the diagnostic id, so the reason is reachable from the mate. No contract
+  change: `solve_state: "satisfied" | "warning" | "failed" | "suppressed"`
+  was already frozen and `Aether CAD/src/cad-assembly-bridge.ts` already
+  validates and renders `failed` — the producer was simply never honest.
+- **Found while testing it: the cycle guard could be fooled by a second
+  child.** `_validate_mate_tree` walked parent to child through a
+  `dict[parent] = child`, so a parent with two children kept only its last
+  edge. Adding arm2→arm1, then arm2→arm3, then arm1→arm2 was accepted
+  even though the first and last form a cycle — and the resulting graph is
+  exactly what makes an unconverged solve reachable. The walk now goes
+  child to parent, which is complete because one incoming mate per
+  instance is already enforced, so a child's parent is unique.
+
+1245 Python tests (2 added: the guard rejection leaves graph and revision
+untouched; the projection reports `failed` for both mates of a cycle built
+in state, while a solvable mate still reads `satisfied`) and ruff clean.
+
+Still open from the 2026-09-09 review: B4 (numeric kinematics ground-truth
+tests), D1 (pre-auth slowloris on the host lock), C1/C3 (decisions).
+
+## 2026-09-12 — Docked panels reach the bottom edge
+
+The Feature tree stopped ~430 px short in a 900 px window. Two causes, both
+measured in a real browser rather than reasoned about:
+
+- `.studio-shell .aui-shell-panel-body { max-height: 65vh }` in the CAD
+  stylesheet clamped every panel body to 585 px — exactly the measured
+  height. The earlier CAD-side `height: 100%` override could never win:
+  `max-height` clamps a resolved height. The clamp is now scoped to
+  floating panels (`.aui-float`), which is what it was for; torn-off
+  panels keep their own `.aui-float-panel { max-height: 70% }` bound.
+- `WorkspaceShell`'s preserved-content host was an unclassed
+  `document.createElement("div")` between the panel slot and the app's own
+  panel, so the `height: 100%` chain broke there. It is now
+  `.aui-shell-panel-host`, and @aether/ui owns the docked chain:
+  `.aui-shell-stack > .aui-shell-panel { flex: 1 1 auto }`, a growing
+  panel body, and both portal links passing the definite height down. The
+  redundant CAD overrides are deleted.
+
+Measured at 1440x900, docked Feature tree: panel body 585 to 817 px, items
+panel 339 to 817, feature list 188 to 666, footer bottom 395 to 873 — the
+bottom of the shell area, where the status bar begins. Both rails report
+817. Verification: core/ui 163 tests + typecheck + build, 514 CAD tests +
+typecheck + build, animation web build, plus live measurement of the CAD
+app and the @aether/ui gallery (gallery panels fill their embedded shell,
+no horizontal overflow).
+
+Layout cannot be tested in jsdom, so this was verified by driving
+Playwright's cached headless shell over CDP with Node's built-in
+WebSocket — no new dependency. Script: `dev/measure-layout.mjs`.
+
+## 2026-09-11 — Feature tree: multi-select, suppress and delete on a set
+
+Shift/Cmd-click now selects several features in the Feature tree, and
+suppress and delete act on the whole selection in one undoable commit.
+The shared Tree already reported single/toggle/range selection; the app
+kept a single `selectedFeatureID`, so every reported id but the first was
+dropped. main.ts now holds a set, the projection takes the set, and the
+shell forwards every reported row plus the mode. Only feature rows carry a
+set — a modified click on reference geometry, a body or an imported part
+behaves like a plain click rather than growing a second selection model.
+
+Delete also reaches the tree for the first time (it existed only as a
+button inside a feature's edit dialog): context-menu **Delete** plus the
+Delete/Backspace key over the tree, one confirmation naming the count and
+any dependent features, and a row being renamed keeps its own Backspace.
+A clicked row outside the current selection acts on itself alone, matching
+Onshape. Suppress derives its target state from the clicked row, so a
+mixed selection lands on one state instead of toggling each row.
+
+511 CAD tests (5 added), typecheck and production build green. The
+feature-authoring dom test had to mount once: each mount adds a window
+listener for the file's lifetime, and the second listener re-handled the
+same event against the document the first had just committed, toggling
+suppression straight back.
+
+## 2026-09-11 — Review items closed: B2, B5, D2
+
+- **B2 — instance parent cycles.** move_instance only rejected a self-parent,
+  so A to B to A was accepted, both instances dropped out of the root list,
+  and the cycle survived save/reload. Parenting into your own subtree is now
+  rejected by walking the ancestor chain. Regression test asserts the reject
+  and that the tree and revision are untouched.
+- **B5 — BOM material_name.** Rows always reported null though the part
+  definition carries material_id; the row now reports it.
+- **D2 — shared-address lockout.** Sign-in failures counted against the
+  address, and a success cleared only the username counter, so on a local
+  install (every browser is loopback) ten typos locked out every user.
+  Loopback no longer counts as a shared bucket, and a success clears every
+  counter it was throttled by. Regression test proves a second local user
+  signs in while the throttled account stays locked.
+
+1243 Python tests (animacore + host) and ruff clean for the product code;
+the 11 remaining ruff findings are pre-existing style debt in examples/.
+
+Still open: B4 (numeric kinematics ground-truth tests), D1 (pre-auth
+slowloris on the host lock), C1/C3 (single mutation discipline, /rpc
+CORS). B3 closed 2026-09-12.

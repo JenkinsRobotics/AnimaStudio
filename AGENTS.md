@@ -2,16 +2,47 @@
 
 ## Current suite direction — 2026-09-08
 
-Aether Studio is the umbrella suite; the animation product is **Aether Animation**.
-The primary applications are web-based React/TypeScript: `Aether CAD/` and
-`aether-animation/web/`, sharing `core/ui/` and `core/engine/`. The single locally
+**Aether Studio is the server** (Jonathan, 2026-09-11). The repo root is not a
+grab-bag of shared code: it holds the backend — accounts, sessions, document
+storage, the wire protocol — in `core/host/` and `core/session/`. Products are
+self-contained and sit beside it.
+
+| Tier | Path | Owns |
+|---|---|---|
+| Server | `core/host/`, `core/session/` | accounts, sessions, documents, protocol |
+| Product | `Aether CAD/` | its kernel binding, solver, feature layer, UI |
+| Product | `aether-animation/` (+ `animacore/`) | its own engine and UI |
+| Shared | `core/ui/`, `core/assets/` | design system and artwork — nothing else |
+
+A product owns everything specific to it, the way Onshape owns its kernel
+binding and feature library. Do not add a third tier of "shared logic": if only
+one product uses it, it belongs to that product. The animation product is
+**Aether Animation**. The primary applications are web-based React/TypeScript:
+`Aether CAD/` and `aether-animation/web/`, sharing `core/ui/`. The single locally
 hosted installation and multiple application packages remain planned; see
 `dev/docs/roadmap/Aether_Studio_Suite.md`. The Onshape mockup is an interaction
 reference, not the production CAD engine. Codex owns web GUI and cross-lane review;
 Claude owns the Python backend/protocol. Older Swift lane/path instructions below
 are historical and superseded: Swift is archived at `aether-animation/archive/`.
-The `core/` parent groups shared infrastructure: `core/engine/` remains the
-UI-independent `@aether/core` package, and `core/ui/` remains `@aether/ui`.
+The `core/` parent groups shared infrastructure. `core/ui/` is `@aether/ui`,
+the only genuinely cross-product asset — Aether CAD, `studio/`, and
+`aether-animation/web/` all consume it.
+
+**`Aether CAD/engine/` is the CAD engine** (`@aether/core`), owned by the CAD
+product — not suite-shared. It was `core/engine/` until 2026-09-11; measured
+then, its only consumers were Aether CAD (104 files) and two `core/ui/gallery`
+demos, and `aether-animation/web` never imported it (the animation lane's
+engine is `animacore/`, Python). Moved per Jonathan's Onshape-product-shape
+decision; record and acceptance gates in
+`dev/briefings/2026-09-11-engine-ownership-move.md`. Do not move it back on
+the strength of older wording elsewhere, and do not add a consumer of
+`@aether/core` outside Aether CAD — if a second product needs a capability,
+that is a design conversation, not an import.
+
+`core/ui` must never depend on a product's engine. Its `@aether/core` entry is
+a **devDependency** used only by the gallery's validated feature demos;
+`core/ui/src/` stays clean of it. Verified 2026-09-11:
+`aether-animation/web/node_modules/@aether/` contains only `ui`.
 Shared artwork belongs in `core/assets/`: SVG interface icons in `icons/`,
 identity artwork in `branding/`. `core/ui/` supplies the presentation components;
 products must not copy icon geometry or substitute emoji for shared icons.

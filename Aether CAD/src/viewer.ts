@@ -1,9 +1,24 @@
 import { createPlaneVisual } from "./plane-visual";
-import { rollbackPosition } from "@aether/core/document";
+import type { SketchPlane } from "@aether/core/document";
+/** Orange is the app-wide "selected" colour, matching Onshape: whatever a
+ *  feature is currently using reads orange in the viewport. */
+const SELECTION_COLOR = 0xf59f42;
+/** Principal sketch plane -> the reference geometry that draws it. Inverse of
+ *  sketchPlaneForReference, so highlighting and picking agree. */
+const REFERENCE_FOR_PLANE: Record<SketchPlane, ReferenceGeometryId> = {
+  XY: "top-plane",
+  XZ: "front-plane",
+  YZ: "right-plane",
+};
+import { canonicalPlaneXDirection, principalFrame } from "@aether/core/document";
+import { sketchPlaneForReference } from "./reference-geometry";
+import { cadViewportMetrics } from "./cad-viewport-metrics-store";
+import { constructionPlaneFrame, rollbackPosition } from "@aether/core/document";
 import type { PartDocument as PlaneDocument } from "@aether/core/document";
 import * as THREE from "three/webgpu";
 import { MOUSE } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { CSS3DObject, CSS3DRenderer } from "three/addons/renderers/CSS3DRenderer.js";
 import type { AssemblyPartRow } from "./assembly-tree";
 import {
   connectorKindPreference,
@@ -28,6 +43,7 @@ import {
 } from "./connector-visuals";
 import {
   cadDisplayStylePolicy,
+  cadFloorVisibility,
   createPartEdgeMaterial,
   viewportMaterials,
 } from "./viewport-appearance";
@@ -146,6 +162,23 @@ export class MateViewport {
   private markerScale = 10;
   private pointerDown: { x: number; y: number } | null = null;
   private appearance: CADAppearanceSnapshot | null = null;
+  private frameSample = { frames: 0, renderMs: 0, since: 0, last: 0 };
+  private appliedPlaneBackground: CADAppearanceSnapshot["background"] | null = null;
+  private planeTheme: {
+    colors?: Partial<Record<"top" | "front" | "right" | "custom", number>>;
+    style: { fillOpacity: number; borderOpacity: number; labelColor: string };
+  } | null = null;
+  private cssRenderer: CSS3DRenderer | null = null;
+  private readonly cssScene = new THREE.Scene();
+  private orientationBox: { group: THREE.Group; plates: THREE.Mesh[]; hover: number } | null = null;
+  private sketchSurface: {
+    object: CSS3DObject;
+    svg: SVGSVGElement;
+    origin: THREE.Vector3;
+    xDir: THREE.Vector3;
+    yDir: THREE.Vector3;
+    normal: THREE.Vector3;
+  } | null = null;
 
   constructor(
     private readonly container: HTMLElement,
@@ -198,16 +231,26 @@ export class MateViewport {
     this.scene.add(this.floor, this.grid);
     this.buildReferenceGeometry();
 
-    this.renderer.domElement.addEventListener("pointermove", (event) =>
-      this.pointerMoved(event),
-    );
+    this.renderer.domElement.addEventListener("pointermove", (event) => {
+      if (this.forwardToSketch(event)) return;
+      this.pointerMoved(event);
+    });
     this.renderer.domElement.addEventListener("pointerdown", (event) => {
+      if (this.forwardToSketch(event)) return;
       if (event.button === 0) this.pointerDown = { x: event.clientX, y: event.clientY };
     });
-    this.renderer.domElement.addEventListener("pointerup", (event) =>
-      this.pointerUp(event),
-    );
-    this.renderer.domElement.addEventListener("pointerleave", () => {
+    this.renderer.domElement.addEventListener("pointerup", (event) => {
+      if (this.forwardToSketch(event)) return;
+      this.pointerUp(event);
+    });
+    this.renderer.domElement.addEventListener("click", (event) => {
+      this.forwardToSketch(event);
+    });
+    this.renderer.domElement.addEventListener("dblclick", (event) => {
+      this.forwardToSketch(event);
+    });
+    this.renderer.domElement.addEventListener("pointerleave", (event) => {
+      if (this.forwardToSketch(event)) return;
       if (this.tool !== "none") return;
       this.selectionHover = null;
       cadSelection.dispatch({ type: "set-hovered", item: null });
@@ -237,21 +280,60 @@ export class MateViewport {
 
   setAppearance(appearance: CADAppearanceSnapshot): void {
     this.appearance = appearance;
-    const backgrounds = {
-      graphite: 0x151718,
-      midnight: 0x0c1c29,
-      slate: 0x2a3238,
+    // Ported exactly from the native PreviewAppearance (RealityKitViewport):
+    // background, minor/major grid colors, and the CAD Light intensity boost.
+    const themes = {
+      midnight: { background: 0x090d18, gridMinor: 0x949494, gridMajor: 0x4580c7, gridOpacity: 0.3, lightBoost: 1 },
+      graphite: { background: 0x26292e, gridMinor: 0xb8b8b8, gridMajor: 0xc7c7c7, gridOpacity: 0.27, lightBoost: 1 },
+      "cad-light": { background: 0xc7cfd6, gridMinor: 0x292929, gridMajor: 0x1f1f1f, gridOpacity: 0.25, lightBoost: 16 / 12 },
+      blueprint: { background: 0x062945, gridMinor: 0x26a8d1, gridMajor: 0x2ec7f0, gridOpacity: 0.33, lightBoost: 1 },
+      onshape: { background: 0xf2f5f7, gridMinor: 0x9aa4ad, gridMajor: 0x7f8a94, gridOpacity: 0.18, lightBoost: 1.28 },
     } as const;
+    // Reference-plane presentation follows the render environment, not the UI
+    // theme: Onshape uses pale translucent fills with blue labels.
+    const planeStyles: Partial<Record<CADAppearanceSnapshot["background"], {
+      colors?: Partial<Record<"top" | "front" | "right" | "custom", number>>;
+      style: { fillOpacity: number; borderOpacity: number; labelColor: string };
+    }>> = {
+      onshape: {
+        colors: { top: 0x7d9fd9, front: 0x7d9fd9, right: 0x7d9fd9, custom: 0x7d9fd9 },
+        style: { fillOpacity: 0.14, borderOpacity: 0.7, labelColor: "#2f5bd7" },
+      },
+    };
+    const planeTheme = planeStyles[appearance.background];
+    this.planeTheme = planeTheme ?? null;
+    if (this.appliedPlaneBackground !== appearance.background) {
+      this.appliedPlaneBackground = appearance.background;
+      this.rebuildReferencePlanes(planeTheme);
+    }
+    const sketchStrokes = { midnight: 0xcfe4ff, graphite: 0xdbe4ee, "cad-light": 0x24466e, blueprint: 0xaee9ff, onshape: 0x24466e } as const;
+    const theme = themes[appearance.background] ?? themes.graphite;
+    this.sketchCurveMaterial.color.setHex(sketchStrokes[appearance.background] ?? sketchStrokes.graphite);
     const finishes = {
       matte: { roughness: 0.78, metalness: 0.02 },
       satin: { roughness: 0.56, metalness: 0.05 },
       gloss: { roughness: 0.24, metalness: 0.08 },
     } as const;
-    const background = backgrounds[appearance.background];
+    const background = theme.background;
     const policy = cadDisplayStylePolicy(appearance.displayStyle, appearance.edgesVisible);
     this.scene.background = new THREE.Color(background);
-    this.grid.visible = appearance.floorMode === "grid" || appearance.floorMode === "both";
-    this.floor.visible = appearance.floorMode === "floor" || appearance.floorMode === "both";
+    const gridMaterial = this.grid.material as THREE.LineBasicMaterial;
+    gridMaterial.transparent = true;
+    gridMaterial.opacity = theme.gridOpacity * ((appearance.gridOpacityPercent ?? 100) / 100);
+    {
+      // GridHelper bakes its two colors into vertex colors; repaint them.
+      const colors = this.grid.geometry.getAttribute("color");
+      if (colors) {
+        const minor = new THREE.Color(theme.gridMinor);
+        const major = new THREE.Color(theme.gridMajor);
+        for (let index = 0; index < colors.count; index += 1) {
+          const source = index < 4 ? major : minor;
+          colors.setXYZ(index, source.r, source.g, source.b);
+        }
+        colors.needsUpdate = true;
+      }
+    }
+    this.applyFloorVisibility();
     this.floor.receiveShadow = appearance.contactShadowsVisible;
     this.keyLight.castShadow = appearance.contactShadowsVisible;
     this.floor.material.color.setHex(background).offsetHSL(0, 0, 0.025);
@@ -298,9 +380,74 @@ export class MateViewport {
     this.fillLight.color.setHex(profile.fillColor);
     this.rimLight.color.setHex(profile.rimColor);
     this.hemisphereLight.intensity = profile.hemisphere * lightScale;
-    this.keyLight.intensity = profile.key * lightScale;
-    this.fillLight.intensity = profile.fill * lightScale;
+    this.keyLight.intensity = profile.key * lightScale * theme.lightBoost;
+    this.fillLight.intensity = profile.fill * lightScale * theme.lightBoost;
     this.rimLight.intensity = profile.rim * lightScale;
+  }
+
+  /** Exact topology candidates behind the current vertex selections, in world
+   *  space. Three of these define a plane. */
+  selectedPoints(): { partId: string; candidateId: string; label: string; positionMillimeters: [number, number, number] }[] {
+    const picked: ReturnType<MateViewport["selectedPoints"]> = [];
+    for (const item of cadSelection.snapshot().items) {
+      if (item.kind !== "vertex") continue;
+      const found = this.candidateFor(item);
+      if (!found) continue;
+      const { part, candidate } = found;
+      const origin = new THREE.Vector3(...candidate.origin).applyMatrix4(part.group.matrixWorld);
+      picked.push({
+        partId: item.partId,
+        candidateId: candidate.id,
+        label: item.label,
+        positionMillimeters: [origin.x, origin.y, origin.z],
+      });
+    }
+    return picked;
+  }
+
+  /** The selected edge as an origin and direction, for an angled plane. */
+  selectedAxis(): { partId: string; candidateId: string; label: string; originMillimeters: [number, number, number]; directionMillimeters: [number, number, number] } | null {
+    const item = cadSelection.snapshot().items.find((entry) => entry.kind === "edge");
+    if (!item) return null;
+    const found = this.candidateFor(item);
+    if (!found) return null;
+    const { part, candidate } = found;
+    part.group.updateWorldMatrix(true, false);
+    const origin = new THREE.Vector3(...candidate.origin).applyMatrix4(part.group.matrixWorld);
+    // An edge candidate's X axis runs along the edge.
+    const direction = new THREE.Vector3(...candidate.xAxis).transformDirection(part.group.matrixWorld);
+    return {
+      partId: item.partId,
+      candidateId: candidate.id,
+      label: item.label,
+      originMillimeters: [origin.x, origin.y, origin.z],
+      directionMillimeters: [direction.x, direction.y, direction.z],
+    };
+  }
+
+  /** Selection ids are `kind:partId:candidateId`; recover the candidate. */
+  private candidateFor(item: { id: string; partId: string }) {
+    const part = this.parts.get(item.partId);
+    if (!part) return null;
+    const candidateId = item.id.split(":").slice(2).join(":");
+    for (const face of part.topology.values()) {
+      const candidate = face.candidates.find((entry) => entry.id === candidateId);
+      if (candidate) return { part, candidate };
+    }
+    return null;
+  }
+
+  /** Which face is selected, for features that store the reference rather than
+   *  just its geometry. Null when the selection is not a single face. */
+  selectedFaceIdentity(): { partId: string; faceId: number; label: string } | null {
+    const selected = cadSelection.snapshot().items.find((item) => item.kind === "face");
+    if (!selected || selected.faceId === undefined) return null;
+    const part = this.parts.get(selected.partId);
+    return {
+      partId: selected.partId,
+      faceId: selected.faceId,
+      label: `${part?.data.name ?? "Part"} · Face ${selected.faceId}`,
+    };
   }
 
   selectedSketchFrame(): import("@aether/core/sketch").SketchFrame | null {
@@ -312,9 +459,14 @@ export class MateViewport {
     if(!candidate) return null;
     part.group.updateWorldMatrix(true,false);
     const origin=new THREE.Vector3(...candidate.origin).applyMatrix4(part.group.matrixWorld);
-    const x=new THREE.Vector3(...candidate.xAxis).transformDirection(part.group.matrixWorld);
     const normal=new THREE.Vector3(...candidate.zAxis).transformDirection(part.group.matrixWorld);
-    return {originMillimeters:[origin.x,origin.y,origin.z],xDirection:[x.x,x.y,x.z],normal:[normal.x,normal.y,normal.z]};
+    // NOT the kernel's candidate.xAxis: that is the face's own surface
+    // parameterization, so two coplanar faces can report different in-plane
+    // rotations and a sketch on a face would sit rotated against the identical
+    // sketch on a datum plane. Derive it from the normal instead — the same
+    // rule principalFrame follows, so every plane in the document agrees.
+    const x=canonicalPlaneXDirection([normal.x,normal.y,normal.z]);
+    return {originMillimeters:[origin.x,origin.y,origin.z],xDirection:x,normal:[normal.x,normal.y,normal.z]};
   }
 
   getPartRows(): AssemblyPartRow[] {
@@ -515,6 +667,201 @@ export class MateViewport {
     this.controls.update();
   }
 
+  /** SolidWorks-style orientation box: a translucent cube engulfing the
+   * bodies (minimum size when empty); click a face to reorient. Real 3D —
+   * it lives in the scene, not screen space. */
+  toggleOrientationBox(): void {
+    if (this.orientationBox) this.hideOrientationBox();
+    else this.showOrientationBox();
+  }
+
+  showOrientationBox(): void {
+    this.hideOrientationBox();
+    const bounds = this.renderedPartBounds();
+    const center = bounds.isEmpty() ? new THREE.Vector3() : bounds.getCenter(new THREE.Vector3());
+    const size = bounds.isEmpty() ? new THREE.Vector3() : bounds.getSize(new THREE.Vector3());
+    // The envelope is the model's bounding box, offset outward, with real
+    // fillets: flat faces + quarter-cylinder edges + sphere-patch corners,
+    // all tangent — one continuous rounded box, not floating plates.
+    const outer = new THREE.Vector3(
+      Math.max(size.x, 60) / 2 * 1.16 + 2,
+      Math.max(size.y, 60) / 2 * 1.16 + 2,
+      Math.max(size.z, 60) / 2 * 1.16 + 2,
+    );
+    const r = Math.min(outer.x, outer.y, outer.z) * 0.32;
+    const inner = new THREE.Vector3(outer.x - r, outer.y - r, outer.z - r);
+    const group = new THREE.Group();
+    group.position.copy(center);
+    const plates: THREE.Mesh[] = [];
+    const material = () =>
+      new THREE.MeshBasicMaterial({ color: 0x9aa7b5, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
+    const seams = (geometry: THREE.BufferGeometry) =>
+      new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry, 40),
+        new THREE.LineBasicMaterial({ color: 0xb9c3cf, transparent: true, opacity: 0.6 }),
+      );
+    const addPlate = (
+      geometry: THREE.BufferGeometry,
+      configure: (plate: THREE.Mesh) => void,
+      action: { view?: StandardCameraView; direction?: readonly number[] },
+    ) => {
+      const plate = new THREE.Mesh(geometry, material());
+      configure(plate);
+      plate.userData.view = action.view;
+      plate.userData.direction = action.direction;
+      plate.add(seams(geometry));
+      group.add(plate);
+      plates.push(plate);
+    };
+
+    // 6 flat faces (inset by the fillet radius, tangent to the fillets).
+    const faceDefs: readonly { axis: "x" | "y" | "z"; sign: 1 | -1; view: StandardCameraView }[] = [
+      { axis: "x", sign: 1, view: "right" }, { axis: "x", sign: -1, view: "left" },
+      { axis: "y", sign: 1, view: "top" }, { axis: "y", sign: -1, view: "bottom" },
+      { axis: "z", sign: 1, view: "front" }, { axis: "z", sign: -1, view: "back" },
+    ];
+    for (const face of faceDefs) {
+      const [a, b] = (["x", "y", "z"] as const).filter((axis) => axis !== face.axis);
+      const geometry = new THREE.PlaneGeometry(inner[a] * 2, inner[b] * 2);
+      addPlate(geometry, (plate) => {
+        if (face.axis === "x") plate.rotation.y = (Math.PI / 2) * face.sign;
+        else if (face.axis === "y") plate.rotation.x = (-Math.PI / 2) * face.sign;
+        else if (face.sign < 0) plate.rotation.y = Math.PI;
+        if (face.axis === "x") plate.rotation.z = Math.PI / 2; // keep a/b mapping consistent
+        plate.position[face.axis] = outer[face.axis] * face.sign;
+      }, { view: face.view });
+    }
+
+    // 12 quarter-cylinder edge fillets (canonical quadrant, mirrored by scale).
+    const edgeAxes: readonly ("x" | "y" | "z")[] = ["x", "y", "z"];
+    for (const along of edgeAxes) {
+      const [a, b] = edgeAxes.filter((axis) => axis !== along) as ["x" | "y" | "z", "x" | "y" | "z"];
+      for (const sa of [1, -1] as const)
+        for (const sb of [1, -1] as const) {
+          const geometry = new THREE.CylinderGeometry(r, r, inner[along] * 2, 10, 1, true, 0, Math.PI / 2);
+          const direction = new THREE.Vector3();
+          direction[a] = sa;
+          direction[b] = sb;
+          direction.normalize();
+          addPlate(geometry, (plate) => {
+            if (along === "x") {
+              plate.rotation.z = -Math.PI / 2; // canonical quadrant (-y, +z)
+              plate.scale.y = a === "y" ? -sa : 1;
+              plate.scale.z = b === "z" ? sb : 1;
+            } else if (along === "z") {
+              plate.rotation.x = Math.PI / 2; // canonical quadrant (+x, -y)
+              plate.scale.x = a === "x" ? sa : 1;
+              plate.scale.y = b === "y" ? -sb : 1;
+            } else {
+              plate.scale.x = a === "x" ? sa : 1; // canonical quadrant (+x, +z)
+              plate.scale.z = b === "z" ? sb : 1;
+            }
+            plate.position[a] = inner[a] * sa;
+            plate.position[b] = inner[b] * sb;
+          }, { direction: direction.toArray() });
+        }
+    }
+
+    // 8 sphere-patch corner fillets (canonical +x+y+z octant, mirrored).
+    for (const sx of [1, -1] as const)
+      for (const sy of [1, -1] as const)
+        for (const sz of [1, -1] as const) {
+          const geometry = new THREE.SphereGeometry(r, 8, 8, 0, Math.PI / 2, 0, Math.PI / 2);
+          addPlate(geometry, (plate) => {
+            plate.scale.set(sx, sy, sz);
+            plate.position.set(inner.x * sx, inner.y * sy, inner.z * sz);
+          }, { direction: new THREE.Vector3(sx, sy, sz).normalize().toArray() });
+        }
+
+    this.overlayRoot.add(group);
+    this.orientationBox = { group, plates, hover: -1 };
+    const viewDirection = this.camera.position.clone().sub(this.controls.target);
+    if (viewDirection.lengthSq() < 1e-6) viewDirection.set(1, 0.72, 1);
+    viewDirection.normalize();
+    this.controls.target.copy(center);
+    this.camera.position.copy(center).addScaledVector(viewDirection, Math.max(outer.x, outer.y, outer.z) * 3.6);
+    this.controls.update();
+    this.callbacks.onStatus("Orientation: click a face, edge, or corner of the envelope. Orbit and zoom freely — click empty space, Space, or Esc closes.");
+  }
+
+  hideOrientationBox(): void {
+    const box = this.orientationBox;
+    if (!box) return;
+    this.orientationBox = null;
+    this.overlayRoot.remove(box.group);
+    for (const plate of box.plates) {
+      plate.geometry.dispose();
+      (plate.material as THREE.Material).dispose();
+      for (const child of plate.children)
+        if (child instanceof THREE.LineSegments) {
+          child.geometry.dispose();
+          (child.material as THREE.Material).dispose();
+        }
+    }
+    this.renderer.domElement.style.cursor = "";
+  }
+
+  private orientationFaceAt(event: PointerEvent): number {
+    const box = this.orientationBox;
+    if (!box) return -1;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return -1;
+    this.pointer.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hit = this.raycaster.intersectObjects(box.plates, false)[0];
+    return hit ? box.plates.indexOf(hit.object as THREE.Mesh) : -1;
+  }
+
+  private orientationHover(event: PointerEvent): void {
+    const box = this.orientationBox;
+    if (!box) return;
+    const face = this.orientationFaceAt(event);
+    if (face === box.hover) return;
+    box.hover = face;
+    box.plates.forEach((plate, index) => {
+      const material = plate.material as THREE.MeshBasicMaterial;
+      material.color.setHex(index === face ? 0x399cff : 0x9aa7b5);
+      material.opacity = index === face ? 0.42 : 0.26;
+    });
+    this.renderer.domElement.style.cursor = face >= 0 ? "pointer" : "";
+  }
+
+  private orientationClick(event: PointerEvent): void {
+    // Only a stationary LEFT click acts; orbit/pan/zoom releases keep the box.
+    if (event.button !== 0) return;
+    const down = this.pointerDown;
+    this.pointerDown = null;
+    if (!down || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6) return;
+    const box = this.orientationBox;
+    const face = this.orientationFaceAt(event);
+    const plate = face >= 0 ? box?.plates[face] : undefined;
+    this.hideOrientationBox();
+    if (!plate) return;
+    if (plate.userData.view) this.setCameraView(plate.userData.view as StandardCameraView);
+    else if (plate.userData.direction) this.setCameraDirection(new THREE.Vector3(...(plate.userData.direction as [number, number, number])));
+  }
+
+  /** Orient the camera along an arbitrary unit direction (edge/corner views). */
+  private setCameraDirection(direction: THREE.Vector3): void {
+    const bounds = this.renderedPartBounds();
+    const center = bounds.isEmpty() ? this.controls.target.clone() : bounds.getCenter(new THREE.Vector3());
+    const size = bounds.isEmpty() ? new THREE.Vector3(100, 100, 100) : bounds.getSize(new THREE.Vector3());
+    const distance = Math.max(
+      this.camera.position.distanceTo(this.controls.target),
+      Math.max(size.x, size.y, size.z, 1) * 1.8,
+    );
+    const up = Math.abs(direction.y) > 0.99 ? new THREE.Vector3(0, 0, -Math.sign(direction.y)) : new THREE.Vector3(0, 1, 0);
+    this.camera.up.copy(up);
+    this.controls.target.copy(center);
+    this.camera.position.copy(center).addScaledVector(direction, distance);
+    this.camera.lookAt(center);
+    this.controls.update();
+    this.callbacks.onStatus("Oriented view.");
+  }
+
   setCameraView(view: StandardCameraView): void {
     const definition = cameraViewDefinition(view);
     const bounds = this.renderedPartBounds();
@@ -535,6 +882,13 @@ export class MateViewport {
     this.camera.lookAt(center);
     this.controls.update();
     this.callbacks.onStatus(`${definition.label} view.`);
+  }
+
+  /** Perspective field of view in degrees (camera + display tool). */
+  setFieldOfView(degrees: number): void {
+    if (!Number.isFinite(degrees)) return;
+    this.camera.fov = Math.min(120, Math.max(10, degrees));
+    this.camera.updateProjectionMatrix();
   }
 
   nudgeCamera(horizontalSteps: number, verticalSteps: number): void {
@@ -581,6 +935,7 @@ export class MateViewport {
   }
 
   private addPart(data: PartGeometryData, placement: THREE.Matrix4): void {
+    const uploadStarted = performance.now();
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(data.vertices, 3));
     geometry.setAttribute("normal", new THREE.BufferAttribute(data.normals, 3));
@@ -629,6 +984,54 @@ export class MateViewport {
       faceRanges: data.faceRanges,
     });
     this.initialMatrices.set(data.id, placement.clone());
+    this.publishGeometryMetrics(performance.now() - uploadStarted);
+  }
+
+  private sketchCurveKey = "";
+  private editingSketchID: string | null = null;
+  /** The sketch open in the editor draws through its live surface, so its
+   * persisted curves are suppressed to avoid a stale double image. */
+  setEditingSketch(id: string | null): void {
+    if (this.editingSketchID === id) return;
+    this.editingSketchID = id;
+    this.sketchCurveKey = "";
+    this.applySketchCurves();
+  }
+  private lastSketchCurves: readonly { id: string; frame: { originMillimeters: [number, number, number]; xDirection: [number, number, number]; normal: [number, number, number] }; polylines: readonly (readonly [number, number][])[] }[] = [];
+  private applySketchCurves(): void {
+    this.renderSketchCurves(this.lastSketchCurves.filter((sketch) => sketch.id !== this.editingSketchID));
+  }
+  private sketchCurveGroup = new THREE.Group();
+  private sketchCurveMaterial = new THREE.LineBasicMaterial({ color: 0xd7e6f5 });
+  /** Finished sketches drawn as world-anchored polylines (mm, y-up in-plane). */
+  setSketchCurves(sketches: readonly { id: string; frame: { originMillimeters: [number, number, number]; xDirection: [number, number, number]; normal: [number, number, number] }; polylines: readonly (readonly [number, number][])[] }[]): void {
+    this.lastSketchCurves = sketches;
+    this.applySketchCurves();
+  }
+
+  private renderSketchCurves(sketches: readonly { id: string; frame: { originMillimeters: [number, number, number]; xDirection: [number, number, number]; normal: [number, number, number] }; polylines: readonly (readonly [number, number][])[] }[]): void {
+    const key = JSON.stringify(sketches);
+    if (key === this.sketchCurveKey) return;
+    this.sketchCurveKey = key;
+    for (const child of [...this.sketchCurveGroup.children]) {
+      child.traverse((object) => { if (object instanceof THREE.Line) object.geometry.dispose(); });
+      this.sketchCurveGroup.remove(child);
+    }
+    if (!this.sketchCurveGroup.parent) this.referenceRoot.add(this.sketchCurveGroup);
+    for (const sketch of sketches) {
+      const origin = new THREE.Vector3(...sketch.frame.originMillimeters);
+      const xDir = new THREE.Vector3(...sketch.frame.xDirection).normalize();
+      const normal = new THREE.Vector3(...sketch.frame.normal).normalize();
+      const yDir = new THREE.Vector3().crossVectors(normal, xDir).normalize();
+      const lift = normal.clone().multiplyScalar(0.05);
+      for (const polyline of sketch.polylines) {
+        if (polyline.length < 2) continue;
+        const points = polyline.map(([px, py]) =>
+          origin.clone().addScaledVector(xDir, px).addScaledVector(yDir, py).add(lift),
+        );
+        this.sketchCurveGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), this.sketchCurveMaterial));
+      }
+    }
   }
 
   private constructionPlaneKey="";
@@ -637,15 +1040,20 @@ export class MateViewport {
     const key=JSON.stringify(document?.features.slice(0,rollbackPosition(document)).filter(f=>f.type==="plane")??[]);if(key===this.constructionPlaneKey)return;this.constructionPlaneKey=key;
     for(const child of [...this.constructionPlanes.children]){child.traverse(object=>{if(object instanceof THREE.Mesh||object instanceof THREE.LineSegments){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials){if('map' in material)(material.map as THREE.Texture|null)?.dispose();material.dispose();}}});this.constructionPlanes.remove(child);}
     if(!this.constructionPlanes.parent)this.referenceRoot.add(this.constructionPlanes);
-    for(const feature of document?.features.slice(0,rollbackPosition(document))??[]){
+    const features = document?.features.slice(0,rollbackPosition(document)) ?? [];
+    for(const feature of features){
       if(feature.type!=='plane'||feature.suppressed)continue;
-      const rotation:[number,number,number]=feature.plane==='XZ'?[-Math.PI/2,0,0]:feature.plane==='YZ'?[0,Math.PI/2,0]:[0,0,0];
-      const group=createPlaneVisual(feature.name,0x89aaff,rotation);
-      const normal=new THREE.Vector3(0,0,1).applyEuler(group.rotation);
-      group.position.copy(normal.multiplyScalar(feature.offsetMillimeters));
+      // Frames come from the engine's canonical resolver so plane visuals,
+      // sketch surfaces, and built bodies always agree.
+      const frame=constructionPlaneFrame(feature,features.slice(0,features.indexOf(feature)));
+      const group=createPlaneVisual(feature.name,this.planeTheme?.colors?.custom ?? 0x89aaff,[0,0,0],this.planeTheme?.style ?? {});
+      const x=new THREE.Vector3(...frame.xDirection),n=new THREE.Vector3(...frame.normal);
+      const y=new THREE.Vector3().crossVectors(n,x);
+      group.setRotationFromMatrix(new THREE.Matrix4().makeBasis(x,y,n));
+      group.position.set(...frame.originMillimeters);
       group.updateMatrixWorld(true);
-      const x=new THREE.Vector3(1,0,0).applyEuler(group.rotation),n=new THREE.Vector3(0,0,1).applyEuler(group.rotation);
-      group.userData.sketchFrame={originMillimeters:group.position.toArray(),xDirection:x.toArray(),normal:n.toArray()};
+      group.userData.sketchFrame={originMillimeters:frame.originMillimeters,xDirection:frame.xDirection,normal:frame.normal};
+      group.userData.featureId=feature.id;
       this.constructionPlanes.add(group);
     }
   }
@@ -663,14 +1071,65 @@ export class MateViewport {
       this.referenceObjects.set(id, group);
     };
 
-    const origin = new THREE.AxesHelper(45);
+    // The origin is a point in space; the coloured axis lines are separate
+    // reference geometry, hidden until the camera/display tool owns them.
+    const origin = new THREE.Mesh(
+      new THREE.SphereGeometry(1.6, 20, 14),
+      new THREE.MeshBasicMaterial({ color: 0x6f7b8a }),
+    );
     origin.name = "Origin";
     origin.visible = false;
     this.referenceRoot.add(origin);
     this.referenceObjects.set("origin", origin);
+
+    const axes = new THREE.AxesHelper(45);
+    axes.name = "Axes";
+    axes.visible = false;
+    this.referenceRoot.add(axes);
+    this.referenceObjects.set("axes", axes);
     createPlane("top-plane", "Top Plane", 0x4f8dff, [0, 0, 0]);
     createPlane("front-plane", "Front Plane", 0xef6976, [-Math.PI / 2, 0, 0]);
     createPlane("right-plane", "Right Plane", 0x4ccf8a, [0, Math.PI / 2, 0]);
+  }
+
+  /** Recreate the principal reference planes with the environment's plane
+   *  styling, preserving per-plane visibility. */
+  private rebuildReferencePlanes(theme?: {
+    colors?: Partial<Record<"top" | "front" | "right" | "custom", number>>;
+    style: { fillOpacity: number; borderOpacity: number; labelColor: string };
+  }): void {
+    // Orientation comes from the engine's principalFrame, never a hand-written
+    // Euler triple: the old table had Front flipped 180° and Right rotated 90°
+    // in-plane against the frame a sketch on that plane actually uses, so a
+    // sketch card and its datum plane disagreed about which way was up.
+    const defaults: readonly { id: ReferenceGeometryId; name: string; color: number; key: "top" | "front" | "right" }[] = [
+      { id: "top-plane", name: "Top Plane", color: 0x4f8dff, key: "top" },
+      { id: "front-plane", name: "Front Plane", color: 0xef6976, key: "front" },
+      { id: "right-plane", name: "Right Plane", color: 0x4ccf8a, key: "right" },
+    ];
+    for (const plane of defaults) {
+      const existing = this.referenceObjects.get(plane.id);
+      const visible = existing?.visible ?? false;
+      if (existing) this.referenceRoot.remove(existing);
+      const group = createPlaneVisual(
+        plane.name,
+        theme?.colors?.[plane.key] ?? plane.color,
+        [0, 0, 0],
+        theme?.style ?? {},
+      );
+      // Same basis the sketch surface and custom plane features build.
+      const sketchPlane = sketchPlaneForReference(plane.id);
+      if (sketchPlane) {
+        const frame = principalFrame(sketchPlane);
+        const x = new THREE.Vector3(...frame.xDirection);
+        const n = new THREE.Vector3(...frame.normal);
+        const y = new THREE.Vector3().crossVectors(n, x);
+        group.setRotationFromMatrix(new THREE.Matrix4().makeBasis(x, y, n));
+      }
+      group.visible = visible;
+      this.referenceRoot.add(group);
+      this.referenceObjects.set(plane.id, group);
+    }
   }
 
   private publishCameraOrientation(): void {
@@ -693,6 +1152,7 @@ export class MateViewport {
     });
     this.parts.delete(part.data.id);
     this.initialMatrices.delete(part.data.id);
+    this.publishGeometryMetrics();
     cadSelection.dispatch({
       type: "replace",
       items: cadSelection.snapshot().items.filter((item) => item.partId !== part.data.id),
@@ -719,20 +1179,268 @@ export class MateViewport {
     return bounds;
   }
 
+  /** While a sketch surface is active, route left-button/hover input to its
+   * SVG (which is pointer-events:none inside the CSS3D layer) and swallow the
+   * viewer's own picking. Middle/right/wheel stay with OrbitControls. */
+  private forwardToSketch(event: MouseEvent): boolean {
+    const surface = this.sketchSurface;
+    if (!surface) return false;
+    const positional = event.type !== "pointermove" && event.type !== "pointerleave";
+    if (positional && event.button !== 0) return true;
+    const copy =
+      typeof PointerEvent !== "undefined" && event instanceof PointerEvent
+        ? new PointerEvent(event.type, event)
+        : new MouseEvent(event.type, event);
+    surface.svg.dispatchEvent(copy);
+    return true;
+  }
+
+  /** Mount the sketch SVG as a world-anchored plane at the given frame and
+   * aim the camera square-on at it. Drawing space is y-up along normal×x. */
+  /** Show a construction plane at a frame it does not yet have in the document,
+   *  while its feature window is open. `frame: null` hides it — an incomplete
+   *  definition must not leave a stale plane on screen. Committing the feature
+   *  re-renders it from the document and supersedes this. */
+  setConstructionPlanePreview(
+    featureId: string,
+    frame: { originMillimeters: [number, number, number]; xDirection: [number, number, number]; normal: [number, number, number] } | null,
+  ): void {
+    const group = this.constructionPlanes.children.find(
+      (child) => child.userData.featureId === featureId,
+    );
+    if (!group) return;
+    if (!frame) {
+      group.visible = false;
+      this.tintPlane(group, null);
+      return;
+    }
+    const x = new THREE.Vector3(...frame.xDirection);
+    const n = new THREE.Vector3(...frame.normal);
+    const y = new THREE.Vector3().crossVectors(n, x);
+    group.setRotationFromMatrix(new THREE.Matrix4().makeBasis(x, y, n));
+    group.position.set(...frame.originMillimeters);
+    group.updateMatrixWorld(true);
+    group.userData.sketchFrame = { ...frame };
+    group.visible = true;
+  }
+
+  /** Highlight the planes a feature is currently referencing. Orange means
+   *  "selected" everywhere in the app — the same signal Onshape uses — so the
+   *  entity chips in a feature window and the geometry in the viewport always
+   *  agree about what is being used. Passing an empty list clears it. */
+  setHighlightedPlanes(
+    references: readonly ({ kind: "principal"; plane: SketchPlane } | { kind: "feature"; featureId: string })[],
+  ): void {
+    const wanted = new Set<THREE.Object3D>();
+    for (const reference of references) {
+      const group =
+        reference.kind === "feature"
+          ? this.constructionPlanes.children.find((c) => c.userData.featureId === reference.featureId)
+          : this.referenceObjects.get(REFERENCE_FOR_PLANE[reference.plane]);
+      if (group) wanted.add(group);
+    }
+    for (const group of [...this.constructionPlanes.children, ...this.referenceObjects.values()])
+      this.tintPlane(group, wanted.has(group) ? SELECTION_COLOR : null);
+  }
+
+  /** Recolour a plane visual's surface and outline, remembering the colour it
+   *  had so clearing the highlight restores exactly what it was. */
+  private tintPlane(group: THREE.Object3D, color: number | null): void {
+    for (const child of group.children) {
+      const material = (child as THREE.Mesh | THREE.LineSegments).material as
+        | THREE.MeshBasicMaterial
+        | THREE.LineBasicMaterial
+        | undefined;
+      if (!material?.color) continue;
+      if (child.userData.baseColor === undefined)
+        child.userData.baseColor = material.color.getHex();
+      material.color.setHex(color ?? (child.userData.baseColor as number));
+      // The authoring plane reads stronger than a resting datum.
+      if ("opacity" in material) {
+        if (child.userData.baseOpacity === undefined)
+          child.userData.baseOpacity = material.opacity;
+        material.opacity = color === null
+          ? (child.userData.baseOpacity as number)
+          : Math.min(1, (child.userData.baseOpacity as number) * 2.2);
+      }
+    }
+  }
+
+  private applyFloorVisibility(): void {
+    const { grid, floor } = cadFloorVisibility(
+      this.appearance?.floorMode ?? "none",
+      Boolean(this.sketchSurface),
+    );
+    this.grid.visible = grid;
+    this.floor.visible = floor;
+  }
+
+  beginSketchSurface(
+    frame: {
+      originMillimeters: [number, number, number];
+      xDirection: [number, number, number];
+      normal: [number, number, number];
+    },
+    svg: SVGSVGElement,
+    bounds: { x: number; y: number; width: number; height: number },
+  ): void {
+    this.endSketchSurface();
+    if (!this.cssRenderer) {
+      this.cssRenderer = new CSS3DRenderer();
+      const el = this.cssRenderer.domElement;
+      el.style.position = "absolute";
+      el.style.inset = "0";
+      el.style.pointerEvents = "none";
+      this.container.append(el);
+      this.resize();
+    }
+    const origin = new THREE.Vector3(...frame.originMillimeters);
+    const xDir = new THREE.Vector3(...frame.xDirection).normalize();
+    const normal = new THREE.Vector3(...frame.normal).normalize();
+    const yDir = new THREE.Vector3().crossVectors(normal, xDir).normalize();
+    svg.style.pointerEvents = "none";
+    svg.style.display = "block";
+    const holder = document.createElement("div");
+    holder.style.display = "inline-block";
+    holder.append(svg);
+    const object = new CSS3DObject(holder);
+    // CSS3DObject's constructor forces pointerEvents to "auto"; input must fall
+    // through to the WebGL canvas, which forwards left input back to the svg.
+    holder.style.pointerEvents = "none";
+    object.setRotationFromMatrix(new THREE.Matrix4().makeBasis(xDir, yDir, normal));
+    this.sketchSurface = { object, svg, origin, xDir, yDir, normal };
+    this.applyFloorVisibility();
+    this.cssScene.add(object);
+    this.updateSketchSurfaceBounds(bounds);
+    // The camera is never moved when a sketch opens (Jonathan, 2026-09-11):
+    // the plane appears in place and stays where you are looking, exactly
+    // like Onshape. Use View → Normal to when square-on is wanted.
+  }
+
+  updateSketchSurfaceBounds(bounds: { x: number; y: number; width: number; height: number }): void {
+    const s = this.sketchSurface;
+    if (!s) return;
+    // CSS3D rasterizes the SVG at its layout size (1px = 1mm) and the camera
+    // magnifies that raster, which reads as heavy pixelation. Rasterize at a
+    // higher internal resolution and scale the 3D object back down — vector
+    // SVG stays crisp, input is unaffected (picking raycasts the plane).
+    const resolution = Math.min(8, 4096 / Math.max(bounds.width, bounds.height, 1));
+    s.svg.style.width = `${bounds.width * resolution}px`;
+    s.svg.style.height = `${bounds.height * resolution}px`;
+    s.object.scale.setScalar(1 / resolution);
+    const cx = bounds.x + bounds.width / 2;
+    const cy = bounds.y + bounds.height / 2;
+    // viewBox y runs down; drawing y (up) = -viewBox y.
+    s.object.position.copy(s.origin).addScaledVector(s.xDir, cx).addScaledVector(s.yDir, -cy);
+  }
+
+  endSketchSurface(): void {
+    const s = this.sketchSurface;
+    if (!s) return;
+    this.sketchSurface = null;
+    this.applyFloorVisibility();
+    this.cssScene.remove(s.object);
+    s.object.element.remove();
+    s.svg.remove();
+    this.camera.up.set(0, 1, 0);
+    this.controls.update();
+  }
+
+  /** Ray through the client point intersected with the active sketch plane,
+   * in drawing coordinates (mm, y-up). */
+  sketchPointFromClient(clientX: number, clientY: number): [number, number] | null {
+    const s = this.sketchSurface;
+    if (!s) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    this.pointer.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(s.normal, s.origin);
+    const hit = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    if (!hit) return null;
+    hit.sub(s.origin);
+    return [hit.dot(s.xDir), hit.dot(s.yDir)];
+  }
+
+  /** Local mm-per-CSS-pixel of the sketch plane around a client point (viewport center by default). */
+  sketchScaleAt(clientX?: number, clientY?: number): number | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const cx = clientX ?? rect.left + rect.width / 2;
+    const cy = clientY ?? rect.top + rect.height / 2;
+    const a = this.sketchPointFromClient(cx - 4, cy);
+    const b = this.sketchPointFromClient(cx + 4, cy);
+    return a && b ? Math.hypot(b[0] - a[0], b[1] - a[1]) / 8 : null;
+  }
+
   private resize(): void {
     const width = Math.max(this.container.clientWidth, 1);
     const height = Math.max(this.container.clientHeight, 1);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    this.cssRenderer?.setSize(width, height);
   }
 
   private render(): void {
+    const started = performance.now();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    if (this.sketchSurface && this.cssRenderer)
+      this.cssRenderer.render(this.cssScene, this.camera);
+    this.sampleFrame(started, performance.now());
+  }
+
+  /** Roll frame timings into the metrics store about twice a second. */
+  private sampleFrame(started: number, finished: number): void {
+    const sample = this.frameSample;
+    if (!sample.since) sample.since = started;
+    sample.frames += 1;
+    sample.renderMs += finished - started;
+    sample.last = finished;
+    const elapsed = finished - sample.since;
+    if (elapsed < 500) return;
+    const memory = (performance as { memory?: { usedJSHeapSize: number } }).memory;
+    cadViewportMetrics.publish({
+      fps: Math.round((sample.frames / elapsed) * 1000 * 10) / 10,
+      frameMilliseconds: Math.round((elapsed / sample.frames) * 100) / 100,
+      frameBudgetPercent: Math.round((sample.renderMs / elapsed) * 1000) / 10,
+      memoryMegabytes: memory ? Math.round((memory.usedJSHeapSize / 1_048_576) * 10) / 10 : null,
+      backend: this.backendLabel,
+    });
+    sample.frames = 0;
+    sample.renderMs = 0;
+    sample.since = finished;
+  }
+
+  /** Publish geometry counts after parts change. */
+  private publishGeometryMetrics(uploadMilliseconds?: number): void {
+    let faces = 0;
+    let triangles = 0;
+    let edgeSegments = 0;
+    for (const part of this.parts.values()) {
+      faces += part.topology.size;
+      const index = part.surface.geometry.getIndex();
+      triangles += index ? index.count / 3 : 0;
+      const edgePositions = part.edges.geometry.getAttribute("position");
+      edgeSegments += edgePositions ? edgePositions.count / 2 : 0;
+    }
+    cadViewportMetrics.publish({
+      bodies: this.parts.size,
+      faces,
+      triangles: Math.round(triangles),
+      edgeSegments: Math.round(edgeSegments),
+      ...(uploadMilliseconds === undefined ? {} : { lastUploadMilliseconds: Math.round(uploadMilliseconds * 10) / 10 }),
+    });
   }
 
   private pointerMoved(event: PointerEvent): void {
+    if (this.orientationBox) {
+      this.orientationHover(event);
+      return;
+    }
     if (this.tool === "none") {
       if (event.buttons === 0) this.updateSelectionHover(event);
       else if ((event.buttons & 1) === 1) this.updateSelectionBox(event);
@@ -777,6 +1485,10 @@ export class MateViewport {
   }
 
   private pointerUp(event: PointerEvent): void {
+    if (this.orientationBox) {
+      this.orientationClick(event);
+      return;
+    }
     if (event.button !== 0) return;
     const down = this.pointerDown;
     this.pointerDown = null;

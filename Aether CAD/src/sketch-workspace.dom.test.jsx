@@ -143,21 +143,29 @@ it('Plane command opens real offset controls and saves a construction feature',a
  dom.window.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
  const {mountFeatureAuthoring}=await import('./feature-authoring');mountFeatureAuthoring(()=>doc,apply);
  cadCommands.execute('feature-plane');
- const dialog=document.querySelector('dialog');expect(dialog).toBeTruthy();
- dialog.querySelector('[aria-label="Reference plane"]').value='XZ';
- dialog.querySelector('[aria-label="Offset (mm)"]').value='25';
- dialog.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));
- await vi.waitFor(()=>expect(apply).toHaveBeenCalledTimes(1));
- const saved=parsePartDocument(serializePartDocument(doc));
- expect(saved.features[0]).toMatchObject({type:'plane',plane:'XZ',offsetMillimeters:25});
+ // Planes create instantly (auto-named) and edit in a floating window — no modal.
+ await vi.waitFor(()=>expect(doc.features).toHaveLength(1));
+ expect(doc.features[0]).toMatchObject({type:'plane',name:'Plane 1',plane:'XY',offsetMillimeters:10});
  expect(document.querySelector('dialog')).toBeNull();
+ const win=document.querySelector('.cad-plane-window');expect(win).toBeTruthy();
+ // The Entities list starts EMPTY — a new plane pre-selects nothing — so the
+ // reference is picked before the offset can be applied.
+ expect(win.querySelector('.aui-feature-entity')).toBeNull();
+ window.dispatchEvent(new CustomEvent('aether-sketch-plane',{detail:'XY'}));
+ expect(win.querySelector('.aui-feature-entity').textContent).toContain('Top plane');
+ win.querySelector('[aria-label="Offset distance"]').value='25';
+ win.querySelector('[aria-label="Apply plane"]').click();
+ await vi.waitFor(()=>expect(apply).toHaveBeenCalledTimes(2));
+ const saved=parsePartDocument(serializePartDocument(doc));
+ expect(saved.features[0]).toMatchObject({type:'plane',plane:'XY',offsetMillimeters:25,definition:{method:'offset',distanceMillimeters:25}});
+ expect(document.querySelector('.cad-plane-window')).toBeNull();
 });
 it('starts a sketch on a saved offset construction plane and preserves its frame on reopen',async()=>{
  doc.features.push({id:'plane',type:'plane',name:'Plane 1',plane:'XZ',offsetMillimeters:25,suppressed:false});
  open(()=>doc,apply);click('Plane 1');tool('circle');point(0,0);point(5,0);
  click('Finish sketch');await vi.waitFor(()=>expect(apply).toHaveBeenCalledTimes(1));
  const saved=parsePartDocument(serializePartDocument(doc));
- expect(saved.features[1].frame).toEqual({originMillimeters:[0,25,0],normal:[0,1,0],xDirection:[1,0,0]});
+ expect(saved.features[1].frame).toEqual({originMillimeters:[0,-25,0],normal:[0,-1,0],xDirection:[1,0,0]});
  open(()=>doc,apply,saved.features[1]);expect(document.querySelectorAll('.sketch-contour')).toHaveLength(1);
 });
 it('previews and commits mirror/pattern/transform operations with undo and persistence',async()=>{
@@ -946,7 +954,9 @@ it('moves axis guides during drag and restores them on cancellation',()=>{
  doc.features.push(feature);open(()=>doc,apply,feature);move(0,0);
  const svg=document.querySelector('[aria-label="2D sketch canvas"]'),label=document.querySelector('.sketch-dimension text'),line=document.querySelector('[data-dimension-measure]');
  const original=line.getAttribute('y1');label.dispatchEvent(new dom.window.MouseEvent('pointerdown',{clientX:7,clientY:-21,bubbles:true}));move(20,40);
- expect(line.getAttribute('y1')).toBe('-38');
+ // Stand-off is 2 * (viewWidth / 120) mm below the label, so it is constant on
+ // screen; the mm value tracks the default view width (200 mm).
+ expect(line.getAttribute('y1')).toBe(String(-(40 - 2 * (200 / 120))));
  svg.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));expect(line.getAttribute('y1')).toBe(original);expect(document.querySelector('[data-dimension-leader]')).toBeNull();
 });
 it('creates a read-only reference dimension without changing sketch geometry',async()=>{
@@ -1259,7 +1269,7 @@ it('rejects spline insertion at an endpoint without creating an undo step',()=>{
 
 it('inserts a fit-spline point with preview, undo and saved parameter intervals',async()=>{
  open(()=>doc,apply);click('Top (XY)');tool('fit-spline');point(0,0);point(10,8);point(20,0);click('Finish spline');
- const {segmentPoint}=await import('../../core/engine/src/sketch/curves/parameterization');
+ const {segmentPoint}=await import('../engine/src/sketch/curves/parameterization');
  // Symmetric natural spline passes through its middle fit point; select a span interior.
  const {fitSketchSpline}=await import('@aether/core/sketch');const shape=fitSketchSpline([[0,0],[10,8],[20,0]]);const p=segmentPoint(shape.start,shape.segments[0],.5);
  tool('insert-spline-point');move(...p);expect(document.querySelector('[data-spline-insertion-point]')).toBeTruthy();point(...p);

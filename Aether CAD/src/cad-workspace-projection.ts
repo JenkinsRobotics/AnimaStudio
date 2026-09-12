@@ -1,7 +1,44 @@
 import { createElement } from "react";
-import { ToolIcon, type ToolIconName } from "@aether/ui";
+import { AetherIcon, ToolIcon, type ToolIconName } from "@aether/ui";
 const treeIcon=(name:ToolIconName)=>createElement(ToolIcon,{name});
-import {rollbackPosition,availableBodies} from "@aether/core/document";
+/** Onshape marks an under-defined sketch in the tree. Overlay a badge on the
+ *  shared sketch icon rather than shipping a second icon, so the two can never
+ *  drift apart. */
+const sketchTreeIcon = (state: "under-constrained" | "fully-constrained" | "other") =>
+  state === "fully-constrained" || state === "other"
+    ? treeIcon("sketch")
+    : createElement(
+        "span",
+        {
+          className: "cad-tree-icon cad-tree-icon--under-defined",
+          title: "Under-defined sketch",
+          "aria-label": "Under-defined sketch",
+        },
+        treeIcon("sketch"),
+        createElement("span", { className: "cad-tree-icon-badge", "aria-hidden": true }),
+      );
+
+/** A sketch feature's constraint state, for the tree badge. Only drawings carry
+ *  constraints; legacy circle/polygon profiles report "other". */
+const sketchState = (feature: { type: string; profile?: unknown }) => {
+  const profile = (feature as { profile?: { type?: string } }).profile;
+  if (!profile || profile.type === "circle" || profile.type === "polygon" || profile.type === "projection")
+    return "other" as const;
+  try {
+    // "empty" is not under-defined: a sketch with no geometry has nothing to
+    // constrain, and badging it would cry wolf on every new sketch.
+    const { state } = sketchConstraintState(profile as never);
+    if (state === "empty" || state === "invalid") return "other" as const;
+    return state === "fully-constrained"
+      ? ("fully-constrained" as const)
+      : ("under-constrained" as const);
+  } catch {
+    return "other" as const;
+  }
+};
+const eyeIcon=(visible:boolean)=>createElement(AetherIcon,{name:visible?"visible":"hidden"});
+import {rollbackPosition,availableBodies,buildFolderedTree} from "@aether/core/document";
+import { sketchConstraintState } from "@aether/core/sketch";
 import type { ListBoxItem, TreeNode } from "@aether/ui";
 import type {
   AppliedMate,
@@ -21,9 +58,12 @@ import {
 
 export interface CADWorkspaceProjection {
   itemNodes: readonly TreeNode[];
+  /** Bodies live in their own pinned section, like Onshape's Parts list. */
+  bodyNodes: readonly TreeNode[];
   selectedItemIDs: ReadonlySet<string>;
   expandedItemIDs: ReadonlySet<string>;
   historyItems: readonly ListBoxItem[];
+  rollbackIndex: number;
   connectorItems: readonly ListBoxItem[];
   mateItems: readonly ListBoxItem[];
   problemItems: readonly ListBoxItem[];
@@ -43,10 +83,16 @@ export function buildCADWorkspaceProjection(
   selectedConnectorID: string | null,
   topology: { faceCount: number; candidateCount: number },
   selectedPartIDs: ReadonlySet<string> = new Set(),
-  selectedFeatureID: string | null = null,
+  selectedFeatureIDs: ReadonlySet<string> = new Set(),
+  collapsedFolders: ReadonlySet<string> = new Set(),
+  /** A feature created but not yet committed; invalid until it has a plane. */
+  draftSketch: { id: string; name: string; hasPlane: boolean } | null = null,
 ): CADWorkspaceProjection {
   const selected = new Set<string>();
-  const expanded = new Set<string>(["reference-folder"]);
+  const bodyNodes: TreeNode[] = [];
+  const expanded = new Set<string>();
+  // Reference Geometry collapses like any other folder.
+  if (!collapsedFolders.has("reference-folder")) expanded.add("reference-folder");
   const references: TreeNode = {
     id: "reference-folder",
     label: "Reference Geometry",
@@ -58,17 +104,25 @@ export function buildCADWorkspaceProjection(
         selectedPlane !== null &&
         sketchPlaneForReference(item.id) === selectedPlane
       ) selected.add(id);
+      if (item.unavailableReason)
+        return {
+          id,
+          label: item.label,
+          icon: treeIcon(item.id === "axes" ? "point" : "plane"),
+          dimmed: true,
+          badge: "—",
+        };
       return {
         id,
         label: item.label,
         icon: treeIcon(item.id === "origin" ? "point" : "plane"),
-        badge: referenceVisibility[item.id] ? "Visible" : undefined,
         dimmed: !referenceVisibility[item.id],
         actions: [
           {
             id: "toggle-visibility",
             label: `${referenceVisibility[item.id] ? "Hide" : "Show"} ${item.label}`,
-            icon: referenceVisibility[item.id] ? "◉" : "○",
+            icon: eyeIcon(referenceVisibility[item.id]),
+            pinned: !referenceVisibility[item.id],
           },
         ],
       };
@@ -78,33 +132,72 @@ export function buildCADWorkspaceProjection(
   const authored: TreeNode[] = [];
   if (partDocument) {
     const root = buildPartFeatureTree(partDocument);
-    const rootID = `document/${partDocument.documentId}`;
-    if (expandedDocuments.has(partDocument.documentId)) expanded.add(rootID);
-    authored.push({
-      id: rootID,
-      label: root.name,
-      icon: treeIcon("plane"),
-      badge: String(root.children.length),
-      children: root.children.filter(f=>f.kind!=="body").map((feature) => {
-        const id = `feature/${feature.kind}/${feature.id}`;
-        if(feature.id===selectedFeatureID)selected.add(id);
-        if (
-          feature.kind === "body" &&
-          selectedPartIDs.has(`${partDocument.documentId}:body-1`)
-        ) selected.add(id);
-        return {
-          id,
-          label: feature.name,
-          badge: feature.detail,
-          dimmed: feature.detail === "Suppressed" || feature.detail === "Rolled back",
-          actions:[{id:"edit-feature",label:`Edit ${feature.name}`,icon:"✎"},{id:"suppress-feature",label:`${feature.detail === "Suppressed"?"Unsuppress":"Suppress"} ${feature.name}`,icon:feature.detail === "Suppressed"?"▶":"Ⅱ"},{id:"rollback-before",label:`Roll back before ${feature.name}`,icon:"↥"}],
-          icon: treeIcon(feature.kind === "sketch" || feature.kind === "profile" ? "sketch" : feature.kind === "plane" ? "plane" : feature.kind === "extrude" ? "extrude" : feature.kind === "revolve" ? "revolve" : feature.kind === "mirror" ? "mirror" : feature.kind === "fillet" ? "fillet" : feature.kind === "chamfer" ? "chamfer" : "part"),
-        };
-      }),
-    } as TreeNode);
-    const children=[...(authored[0].children??[])];children.splice(rollbackPosition(partDocument),0,{id:"rollback-bar",label:`Rollback · ${rollbackPosition(partDocument)} / ${partDocument.features.length}`,icon:"━━━━",actions:[{id:"rollback-start",label:"Roll back to start",icon:"⇡"},{id:"rollback-end",label:"Roll forward to end",icon:"⇣"}]});authored[0]={...authored[0],children};
-    const bodies=availableBodies(partDocument);for(const body of bodies)if(selectedPartIDs.has(body.id))selected.add(`feature/body/${body.id}`);const bodiesID=`bodies/${partDocument.documentId}`;expanded.add(bodiesID);
-    authored.push({id:bodiesID,label:`Bodies (${bodies.length})`,icon:treeIcon("part"),children:bodies.map(body=>({id:`feature/body/${body.id}`,label:body.name,dimmed:!body.visible,actions:[{id:"body-visibility",label:`${body.visible?"Hide":"Show"} ${body.name}`,icon:body.visible?"◉":"○"},{id:"body-rename",label:`Rename ${body.name}`,icon:"✎"}]}))});
+    const firstSketch = partDocument.features.find((feature) => feature.type === "sketch");
+    const sketchUnderDefined = firstSketch ? !sketchDefinitionState(firstSketch).fullyDefined : false;
+    // Everything in a Part document is the part itself: features list flat like the native tree.
+    const features = root.children.filter(f=>f.kind!=="body").map<TreeNode>((feature) => {
+      const id = `feature/${feature.kind}/${feature.id}`;
+      if(selectedFeatureIDs.has(feature.id))selected.add(id);
+      if (
+        feature.kind === "body" &&
+        selectedPartIDs.has(`${partDocument.documentId}:body-1`)
+      ) selected.add(id);
+      return {
+        id,
+        label: feature.name,
+        tone: sketchUnderDefined && feature.id === firstSketch?.id ? "error" : undefined,
+        badge: feature.detail === "Suppressed" || feature.detail === "Rolled back" ? feature.detail : sketchUnderDefined && feature.id === firstSketch?.id ? "Under-defined" : undefined,
+        dimmed: feature.detail === "Suppressed" || feature.detail === "Rolled back",
+        actions:[{id:"edit-feature",label:`Edit ${feature.name}`,icon:"✎"},{id:"suppress-feature",label:`${feature.detail === "Suppressed"?"Unsuppress":"Suppress"} ${feature.name}`,icon:feature.detail === "Suppressed"?"▶":"Ⅱ"},{id:"rollback-before",label:`Roll back before ${feature.name}`,icon:"↥"}],
+        icon: treeIcon(feature.kind === "sketch" || feature.kind === "profile" ? "sketch" : feature.kind === "plane" ? "plane" : feature.kind === "extrude" ? "extrude" : feature.kind === "revolve" ? "revolve" : feature.kind === "mirror" ? "mirror" : feature.kind === "fillet" ? "fillet" : feature.kind === "chamfer" ? "chamfer" : "part"),
+      };
+    });
+    const rowIDByFeature = new Map(root.children.filter(f=>f.kind!=="body").map(f=>[f.id,`feature/${f.kind}/${f.id}`] as const));
+    const organization = partDocument.organization;
+    const rowOrganization = organization ? {
+      folders: organization.folders,
+      membership: Object.fromEntries(Object.entries(organization.membership).flatMap(([featureID, folderID]) => {
+        const rowID = rowIDByFeature.get(featureID);
+        return rowID ? [[rowID, folderID] as const] : [];
+      })),
+    } : undefined;
+    const foldered = buildFolderedTree(features, rowOrganization, (folder, children) => {
+      const rowID = `folder/${folder.id}`;
+      if (!collapsedFolders.has(rowID)) expanded.add(rowID);
+      return {
+        id: rowID,
+        label: folder.name,
+        icon: createElement(AetherIcon, { name: "folder" }),
+        badge: String(children.length),
+        actions: [
+          { id: "folder-rename", label: `Rename ${folder.name}`, icon: "✎" },
+          ...(folder.parentID !== null ? [{ id: "folder-unnest", label: `Move ${folder.name} to top level`, icon: "⤴" }] : []),
+          { id: "folder-delete", label: `Dissolve ${folder.name}`, icon: "✕" },
+        ],
+        children,
+      } as TreeNode;
+    });
+    // ponytail: rollback stays a top-level line; a folder straddling the boundary keeps the line after it.
+    const countRows = (node: TreeNode): number => node.id.startsWith("folder/") ? (node.children ?? []).reduce((sum, child) => sum + countRows(child), 0) : node.id.startsWith("feature/") ? 1 : 0;
+    let remaining = rollbackPosition(partDocument);
+    let insertAt = foldered.length;
+    for (let i = 0; i < foldered.length; i++) {
+      if (remaining <= 0) { insertAt = i; break; }
+      remaining -= countRows(foldered[i]);
+    }
+    foldered.splice(insertAt, 0, {id:"rollback-bar",label:`Rollback · ${rollbackPosition(partDocument)} / ${partDocument.features.length}`,variant:"divider"});
+    authored.push(...foldered);
+    if (draftSketch) {
+      authored.push({
+        id: `feature/profile/${draftSketch.id}`,
+        label: draftSketch.name,
+        icon: treeIcon("sketch"),
+        tone: draftSketch.hasPlane ? undefined : "error",
+        badge: draftSketch.hasPlane ? "Editing" : "No plane",
+      });
+    }
+    const bodies=availableBodies(partDocument);for(const body of bodies)if(selectedPartIDs.has(body.id))selected.add(`feature/body/${body.id}`);const bodiesID=`bodies/${partDocument.documentId}`;if(!collapsedFolders.has(bodiesID))expanded.add(bodiesID);
+    bodyNodes.push({id:bodiesID,label:`Bodies (${bodies.length})`,icon:treeIcon("part"),children:bodies.map(body=>({id:`feature/body/${body.id}`,label:body.name,dimmed:!body.visible,actions:[{id:"body-visibility",label:`${body.visible?"Hide":"Show"} ${body.name}`,icon:eyeIcon(body.visible),pinned:!body.visible},{id:"body-rename",label:`Rename ${body.name}`,icon:"✎"}]}))});
   }
 
   const imported = buildAssemblyDocumentTree([...importedParts]).map<TreeNode>((document) => {
@@ -128,7 +221,8 @@ export function buildCADWorkspaceProjection(
             {
               id: "toggle-visibility",
               label: `${part.visible ? "Hide" : "Show"} ${part.name}`,
-              icon: part.visible ? "◉" : "○",
+              icon: eyeIcon(part.visible),
+              pinned: !part.visible,
             },
           ],
         };
@@ -140,7 +234,9 @@ export function buildCADWorkspaceProjection(
     id: `history/feature/${feature.id}`,
     label: feature.name,
     description: feature.suppressed?"Suppressed":partDocument!.features.indexOf(feature)>=rollbackPosition(partDocument!)?"Rolled back":["sketch","profile"].includes(feature.type)?"Sketch feature":"Solid feature",
-    icon: treeIcon(feature.type === "sketch" || feature.type === "profile" ? "sketch" : feature.type === "plane" ? "plane" : "extrude"),
+    icon: feature.type === "sketch" || feature.type === "profile"
+      ? sketchTreeIcon(sketchState(feature))
+      : treeIcon(feature.type === "plane" ? "plane" : "extrude"),
     group: "Part history",
   }));
   const importedHistory: ListBoxItem[] = [
@@ -236,10 +332,12 @@ export function buildCADWorkspaceProjection(
     : partDocument ? [{id:"document",label:"Part document",badge:".acpart",properties:[{id:"name",label:"Name",value:partDocument.name},{id:"features",label:"Features",value:String(partDocument.features.length)},{id:"units",label:"Units",value:"Millimeters"}]}] : [];
 
   return {
+    bodyNodes,
     itemNodes: [references, ...authored, ...imported],
     selectedItemIDs: selected,
     expandedItemIDs: expanded,
     historyItems: [...featureHistory, ...importedHistory, ...mateHistory],
+    rollbackIndex: partDocument ? rollbackPosition(partDocument) : 0,
     connectorItems,
     mateItems,
     problemItems,

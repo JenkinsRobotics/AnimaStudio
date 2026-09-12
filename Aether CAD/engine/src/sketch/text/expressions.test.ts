@@ -19,7 +19,7 @@ const variables = (expression: string) =>
 const create = async () => {
   const font = readFileSync(
     new URL(
-      "../../../../assets/fonts/noto-sans/NotoSans-Regular.ttf",
+      "../../../../../core/assets/fonts/noto-sans/NotoSans-Regular.ttf",
       import.meta.url,
     ),
   );

@@ -1,5 +1,6 @@
 import { sketchRegionGroups } from "../sketch/regions/groups";
 import { resolveProfileDrawing } from "../document/profile-projection";
+import { principalFrame } from "../document/construction-planes";
 import { sketchRegionOrder } from "../sketch/regions/order";
 import { solveDrawingConstraints } from "../sketch/drawing-constraints";
 import { contourClosed } from "../sketch/drawing";
@@ -141,8 +142,19 @@ export function evaluatePartDocument(
           }
           profiles.set(feature.id, {
             drawing: own(drawing),
-            plane: feature.frame ? own(new Plane(feature.frame.originMillimeters,feature.frame.xDirection,feature.frame.normal)) : feature.plane,
-            offset: feature.frame ? 0 : feature.offsetMillimeters,
+            // Always sketch on an explicit principalFrame plane: replicad's
+            // named-plane table disagrees with the engine's frame authority
+            // (XZ mirrored, YZ rotated), so plane strings must never reach
+            // the kernel — what the UI displays is what gets built.
+            plane: own(
+              feature.frame
+                ? new Plane(feature.frame.originMillimeters, feature.frame.xDirection, feature.frame.normal)
+                : (() => {
+                    const resolved = principalFrame(feature.plane, feature.offsetMillimeters);
+                    return new Plane(resolved.originMillimeters, resolved.xDirection, resolved.normal);
+                  })(),
+            ),
+            offset: 0,
           });
           continue;
         }

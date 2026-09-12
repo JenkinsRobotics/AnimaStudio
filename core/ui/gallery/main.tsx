@@ -1,8 +1,24 @@
-import { StrictMode, useRef, useState } from "react";
+import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "../tokens/tokens.css";
 import "../src/widgets.css";
 import "./gallery.css";
+import { AppIcon } from "../src/AppIcon";
+import { CollapsibleSidebar, SidebarLabel, SidebarToggle } from "../src/CollapsibleSidebar";
+import { StudioModeButton, WorkspaceWindowMenu, AppearanceToggle } from "../src/StudioChrome";
+import { SettingsCard, SettingsRow, SettingsWindow } from "../src/SettingsWindow";
+import { TransformGizmoDemo } from "./TransformGizmoDemo";
+import {
+  buildSketchDemo,
+  buildExtrudeDemo,
+  buildRevolveDemo,
+  buildSweepDemo,
+  buildLoftDemo,
+  buildThickenDemo,
+  buildEncloseDemo,
+  buildPlaneDemo,
+  buildMateDemo,
+} from "./features/index";
 import {
   ToolIcon,
   toolIconNames,
@@ -230,9 +246,70 @@ function reorderDocuments<T extends { id: string }>(items: readonly T[], sourceI
   return next;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+
+function SettingsWindowDemo() {
+  const [pane, setPane] = useState("workspace");
   return (
-    <section data-gallery-section={title} style={{ display: "grid", gap: 10, minWidth: 0, maxWidth: "calc(100vw - 48px)" }}>
+    <div className="aui-settings-inline" style={{ width: "min(880px, 100%)" }}>
+      <SettingsWindow
+        open
+        title="App Settings"
+        activePaneID={pane}
+        onSelectPane={setPane}
+        onClose={() => {}}
+        sections={[
+          { title: "General", panes: [{ id: "workspace", label: "Workspace" }, { id: "layout", label: "Layout" }, { id: "ui", label: "UI" }] },
+          { title: "Viewport", panes: [{ id: "renderer", label: "Renderer" }, { id: "appearance", label: "Appearance" }, { id: "lighting", label: "Lighting" }, { id: "navigation", label: "Navigation", disabled: true }] },
+          { title: "Advanced", panes: [{ id: "developer", label: "Developer", disabled: true }] },
+        ]}
+      >
+        <SettingsCard title="Project Workspace" caption="Choose where new project folders are created by default.">
+          <SettingsRow label="Default project location" caption="New Project, Open Project, and Save As begin in this folder.">
+            <input aria-label="Demo project location" value="~/Documents/AetherStudio" readOnly />
+            <Button>Change…</Button>
+          </SettingsRow>
+        </SettingsCard>
+        <SettingsCard title="Authoring Defaults">
+          <SettingsRow label="Unitless model units">
+            <select aria-label="Demo units" defaultValue="mm">
+              <option value="mm">Millimeters (mm)</option>
+              <option value="cm">Centimeters (cm)</option>
+              <option value="in">Inches (in)</option>
+            </select>
+          </SettingsRow>
+          <SettingsRow label="Autosave after import">
+            <input type="checkbox" aria-label="Demo autosave" defaultChecked />
+          </SettingsRow>
+          <SettingsRow label="Default frame rate" disabled caption="Disabled placeholder row.">
+            <input type="range" aria-label="Demo frame rate" min={12} max={60} defaultValue={30} disabled />
+            <output>30 fps</output>
+          </SettingsRow>
+        </SettingsCard>
+        <SettingsCard tone="notice" title="Plain project folders" caption="Each project remains a browsable folder containing portable assets." />
+      </SettingsWindow>
+    </div>
+  );
+}
+function FeatureWindowDemo({ build }: { build: (host: HTMLElement) => void }) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    build(el);
+    const panel = el.querySelector<HTMLElement>(".aui-feature-window");
+    if (panel) {
+      panel.style.position = "relative";
+      panel.style.top = "0";
+      panel.style.right = "auto";
+    }
+    return () => el.replaceChildren();
+  }, [build]);
+  return <div ref={host} style={{ minWidth: 300 }} />;
+}
+
+function Section({ title, tab = "Widgets", children }: { title: string; tab?: string; children: React.ReactNode }) {
+  return (
+    <section data-gallery-section={title} data-gallery-tab={tab} style={{ display: "grid", gap: 10, minWidth: 0, maxWidth: "calc(100vw - 48px)" }}>
       <h2
         style={{
           margin: 0,
@@ -255,22 +332,44 @@ function WorkspaceDemo() {
   // Deep link for design review: gallery/#layout=floating|docked|canvas
   const [preset, setPreset] = useState<LayoutPreset>(() => {
     const requested = new URLSearchParams(location.hash.slice(1)).get("layout");
-    return requested === "floating" || requested === "canvas"
-      ? requested
-      : "docked";
+    return requested === "floating" || requested === "canvas" ? requested : "docked";
   });
-  const [tab, setTab] = useState("modeling");
-  const [tool, setTool] = useState<string | null>("revolute");
-  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set(["yoke"]));
+  const [tool, setTool] = useState<string | null>("extrude");
+  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set(["body-1"]));
+
+  // Studio layout modes — the same presets Aether CAD exposes.
+  const MODES: { id: LayoutPreset; label: string }[] = [
+    { id: "docked", label: "Docked" },
+    { id: "floating", label: "Floating" },
+    { id: "canvas", label: "Hidden" },
+  ];
 
   const toolbar = (
     <Ribbon>
-      <RibbonGroup label="Mate">
-        {["fastened", "revolute", "slider"].map((id) => (
+      <RibbonGroup label="Create">
+        {[
+          ["sketch", "Sketch"],
+          ["extrude", "Extrude"],
+          ["revolve", "Revolve"],
+        ].map(([id, label]) => (
           <RibbonTool
             key={id}
-            icon={id === "revolute" ? "↻" : id === "slider" ? "↔" : "▣"}
-            label={id[0].toUpperCase() + id.slice(1)}
+            icon={<ToolIcon name={id as Parameters<typeof ToolIcon>[0]["name"]} />}
+            label={label}
+            active={tool === id}
+            onClick={() => setTool(tool === id ? null : id)}
+          />
+        ))}
+      </RibbonGroup>
+      <RibbonGroup label="Modify">
+        {[
+          ["fillet", "Fillet"],
+          ["chamfer", "Chamfer"],
+        ].map(([id, label]) => (
+          <RibbonTool
+            key={id}
+            icon={<ToolIcon name={id as Parameters<typeof ToolIcon>[0]["name"]} />}
+            label={label}
             active={tool === id}
             onClick={() => setTool(tool === id ? null : id)}
           />
@@ -278,6 +377,40 @@ function WorkspaceDemo() {
       </RibbonGroup>
     </Ribbon>
   );
+
+  const featureTree: TreeNode[] = [
+    {
+      id: "reference",
+      label: "Reference Geometry",
+      badge: "5",
+      icon: <AetherIcon name="design" />,
+      children: [
+        { id: "origin", label: "Origin", icon: <ToolIcon name="point" /> },
+        { id: "axes", label: "Axes", icon: <ToolIcon name="axis" />, dimmed: true, badge: "—" },
+        { id: "top", label: "Top Plane", icon: <ToolIcon name="plane" /> },
+        { id: "front", label: "Front Plane", icon: <ToolIcon name="plane" /> },
+        { id: "right", label: "Right Plane", icon: <ToolIcon name="plane" /> },
+      ],
+    },
+    {
+      id: "part",
+      label: "Part 1",
+      badge: "3",
+      icon: <AetherIcon name="design" />,
+      children: [
+        { id: "sketch-1", label: "Sketch 1", icon: <ToolIcon name="sketch" /> },
+        { id: "extrude-1", label: "Extrude 1", icon: <ToolIcon name="extrude" /> },
+        { id: "fillet-1", label: "Fillet 1", icon: <ToolIcon name="fillet" />, dimmed: true, badge: "Suppressed" },
+      ],
+    },
+    {
+      id: "bodies",
+      label: "Bodies",
+      badge: "1",
+      icon: <AetherIcon name="model" />,
+      children: [{ id: "body-1", label: "Body 1", icon: <AetherIcon name="model" /> }],
+    },
+  ];
 
   return (
     <div
@@ -294,25 +427,25 @@ function WorkspaceDemo() {
       <DocumentBar windowChrome={false}
         leading={
           <>
-            <IconButton label="Home">⌂</IconButton>
-            <strong style={{ fontSize: 12 }}>demo_project</strong>
-            <span style={{ color: "var(--aether-color-ok)", fontSize: 10 }}>
-              SAVED
-            </span>
+            <AppIcon app="cad" size={26} />
+            <strong style={{ fontSize: 12 }}>Part 1</strong>
+            <span style={{ color: "var(--aether-color-text-faint)", fontSize: 11 }}>Main</span>
+            <span style={{ color: "var(--aether-color-ok)", fontSize: 10 }}>SAVED</span>
           </>
         }
         center={
           <Tabs
-            tabs={[
-              { id: "assets", label: "Assets" },
-              { id: "modeling", label: "3D Modeling" },
-              { id: "animate", label: "Animate" },
-            ]}
-            activeID={tab}
-            onSelect={setTab}
+            tabs={MODES.map(({ id, label }) => ({ id, label }))}
+            activeID={preset}
+            onSelect={(id) => setPreset(id as LayoutPreset)}
           />
         }
-        trailing={<><LayoutPresetButton preset={preset} onChange={setPreset} /><div data-aether-account="" /></>}
+        trailing={
+          <>
+            <IconButton label="Settings"><AetherIcon name="settings" /></IconButton>
+            <div data-aether-account="" />
+          </>
+        }
       />
       <WorkspaceShell
         preset={preset}
@@ -320,35 +453,35 @@ function WorkspaceDemo() {
         toolbar={toolbar}
         leftPanels={[
           {
-            id: "parts",
-            title: "Parts",
-            icon: "▣",
+            id: "tree",
+            title: "Feature tree",
+            icon: <AetherIcon name="design" />,
             content: (
               <Tree
-                nodes={sampleTree}
+                nodes={featureTree}
                 selectedIDs={selection}
                 onSelect={(ids) => setSelection(new Set(ids))}
               />
             ),
           },
           {
-            id: "mates",
-            title: "Mates",
-            icon: "⛓",
+            id: "versions",
+            title: "Version control",
+            icon: <AetherIcon name="document" />,
             content: (
-              <div style={{ padding: 12, fontSize: 11, color: "var(--aether-color-text-dim)" }}>
-                pan · revolute
-                <br />
-                tilt · revolute
+              <div style={{ padding: 12, fontSize: 11, color: "var(--aether-color-text-dim)", display: "grid", gap: 6 }}>
+                <span>Main · current</span>
+                <span>v3 · Fillet added</span>
+                <span>v2 · Extrude 1</span>
               </div>
             ),
           },
         ]}
         rightPanels={[
           {
-            id: "inspector",
-            title: "Inspector",
-            icon: "☰",
+            id: "properties",
+            title: "Properties",
+            icon: <AetherIcon name="settings" />,
             content: (
               <div style={{ display: "grid", gap: 8, padding: 12 }}>
                 <TextField unit="mm" defaultValue="12.5" />
@@ -356,13 +489,33 @@ function WorkspaceDemo() {
               </div>
             ),
           },
+          {
+            id: "appearance",
+            title: "Appearance",
+            icon: <AetherIcon name="palette" />,
+            content: (
+              <div style={{ padding: 12, fontSize: 11, color: "var(--aether-color-text-dim)" }}>
+                Environment theme · Onshape
+              </div>
+            ),
+          },
+          {
+            id: "performance",
+            title: "Performance",
+            icon: <AetherIcon name="gauge" />,
+            content: (
+              <div style={{ padding: 12, fontSize: 11, color: "var(--aether-color-text-dim)" }}>
+                60.0 fps · 16.7 ms
+              </div>
+            ),
+          },
         ]}
-        defaultOpenLeft={["parts"]}
-        defaultOpenRight={["inspector"]}
+        defaultOpenLeft={["tree"]}
+        defaultOpenRight={["properties"]}
         statusBar={
           <StatusBar>
             <StatusDot kind="ok" />
-            Engine ready · layout: {preset}
+            Aether CAD · Three.js WebGPU · OCCT ready · layout: {preset}
           </StatusBar>
         }
       >
@@ -375,7 +528,7 @@ function WorkspaceDemo() {
             fontSize: 12,
           }}
         >
-          viewport canvas — flip the layout with the ❏/▥/⛶ button above
+          viewport canvas — switch Docked / Floating / Hidden above
         </div>
       </WorkspaceShell>
     </div>
@@ -472,11 +625,69 @@ function Gallery() {
         alignContent: "start",
       }}
     >
-      <Section title="Workspace shell — document bar, sidebars, floating panels, layout presets">
+      <Section title="3D transform gizmo — move and rotate a model (shared Core math)" tab="Workspace chrome">
+        <TransformGizmoDemo />
+      </Section>
+      <Section title="Settings window — universal per-app settings (macOS anatomy)" tab="Feature windows">
+        <SettingsWindowDemo />
+      </Section>
+      <Section title="Feature windows — the standard editor window (sketch, extrude, revolve, sweep, loft, thicken, enclose, plane, mate)" tab="Feature windows">
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <FeatureWindowDemo build={buildSketchDemo} />
+          <FeatureWindowDemo build={buildExtrudeDemo} />
+          <FeatureWindowDemo build={buildRevolveDemo} />
+          <FeatureWindowDemo build={buildSweepDemo} />
+          <FeatureWindowDemo build={buildLoftDemo} />
+          <FeatureWindowDemo build={buildThickenDemo} />
+          <FeatureWindowDemo build={buildEncloseDemo} />
+          <FeatureWindowDemo build={buildPlaneDemo} />
+          <FeatureWindowDemo build={buildMateDemo} />
+        </div>
+      </Section>
+      <Section title="Collapsible sidebars — the universal rail (expanded and collapsed)" tab="Workspace chrome">
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+          {(["expanded", "collapsed"] as const).map((state) => (
+            <div key={state} style={{ height: 300, display: "flex", border: "1px solid var(--aether-color-border)", borderRadius: 8, overflow: "hidden", background: "var(--aether-color-bg-shell)" }}>
+              <CollapsibleSidebar id={`gallery-${state}`} ariaLabel={`${state} sidebar`} toggle="custom" className="gallery-sidebar" footer={<SidebarLabel>Saved on your server</SidebarLabel>}>
+                <div className="aui-sidebar-row" style={{ display: "flex", alignItems: "center" }}>
+                  <SidebarLabel><strong style={{ marginLeft: 10 }}>Jonathan Jenkins</strong></SidebarLabel>
+                  <span style={{ marginLeft: "auto" }}><SidebarToggle /></span>
+                </div>
+                <nav aria-label={`${state} navigation`}>
+                  {[["home", "Home"], ["folder", "My files"], ["link", "Shared"], ["delete", "Recycle bin"]].map(([icon, label]) => (
+                    <button key={label} type="button" style={{ display: "flex", alignItems: "center", border: 0, background: "transparent", color: "var(--aether-color-text-soft)", font: "inherit", textAlign: "left", cursor: "pointer" }}>
+                      <AetherIcon name={icon as "home"} />
+                      <SidebarLabel>{label}</SidebarLabel>
+                    </button>
+                  ))}
+                </nav>
+              </CollapsibleSidebar>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title="Header chrome — studio mode, workspace windows, appearance" tab="Workspace chrome">
+        <div className="aui-studio-chrome-group" style={{ padding: 8, border: "1px solid var(--aether-color-border)", borderRadius: 8 }}>
+          <StudioModeButton preset="docked" onChange={() => {}} />
+          <WorkspaceWindowMenu />
+          <AppearanceToggle />
+        </div>
+      </Section>
+      <Section title="Application icons — core/assets/branding" tab="Assets">
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          {(["studio", "cad", "animation", "ui"] as const).map((app) => (
+            <div key={app} style={{ display: "grid", gap: 6, justifyItems: "center", font: "11px var(--aether-font-family)", color: "var(--aether-color-text-dim)" }}>
+              <AppIcon app={app} size={44} />
+              {app}
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title="Workspace shell — document bar, sidebars, floating panels, layout presets" tab="Workspace chrome">
         <WorkspaceDemo />
       </Section>
 
-      <Section title="Illustrated ribbon tools — Core assets">
+      <Section title="Illustrated ribbon tools — Core assets" tab="Assets">
         {(["dark", "light"] as const).map(theme => <div key={theme} data-aether-theme={theme}
           style={{background: theme === "light" ? "#f5f7fa" : "#202832", color: theme === "light" ? "#283949" : "#e1ebf4", padding: 16, borderRadius: 8, marginBottom: 12}}>
           <strong>{theme === "light" ? "Light" : "Dark"} palette</strong>
@@ -487,7 +698,7 @@ function Gallery() {
           </div>
         </div>)}
       </Section>
-      <Section title="Shared vector icons — core/assets/icons">
+      <Section title="Shared vector icons — core/assets/icons" tab="Assets">
         <div style={{ display: "grid", width: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 12 }}>
           {aetherIconNames.map((name) => <div key={name} style={{ display: "grid", justifyItems: "center", gap: 8, padding: 12, border: "1px solid var(--aether-color-border)", borderRadius: 7 }}>
             <AetherIcon name={name} width={24} height={24} />
@@ -537,7 +748,7 @@ function Gallery() {
         </Ribbon>
       </Section>
 
-      <Section title="Rail + Dock panel + Tree">
+      <Section title="Rail + Dock panel + Tree" tab="Workspace chrome">
         <div
           style={{
             display: "flex",
@@ -877,7 +1088,7 @@ function Gallery() {
         </div>
       </Section>
 
-      <Section title="Resizable workspace + bottom panel">
+      <Section title="Resizable workspace + bottom panel" tab="Workspace chrome">
         <div style={{ display: "grid", gridTemplateRows: "250px minmax(0, 1fr)", width: 780, height: 430, border: "1px solid var(--aether-color-border)", borderRadius: 8, overflow: "hidden" }}>
           <SplitPane
             primary={
@@ -1043,7 +1254,7 @@ function Gallery() {
         />
       </Section>
 
-      <Section title="Document tabs">
+      <Section title="Document tabs" tab="Workspace chrome">
         <div style={{ display: "grid", gap: 8, width: 760, maxWidth: "100%" }}>
           <strong style={{ fontSize: 11 }}>CAD documents</strong>
           <DocumentTabs
@@ -1100,11 +1311,11 @@ function Gallery() {
         />
       </Section>
 
-      <Section title="Timeline (dope sheet)">
+      <Section title="Timeline (dope sheet)" tab="Workspace chrome">
         <TimelineDemo />
       </Section>
 
-      <Section title="Status bar">
+      <Section title="Status bar" tab="Workspace chrome">
         <div style={{ width: 420 }}>
           <StatusBar>
             <StatusDot kind="ok" />
@@ -1113,7 +1324,7 @@ function Gallery() {
         </div>
       </Section>
 
-      <Section title="Viewport navigation cube">
+      <Section title="Viewport navigation cube" tab="Workspace chrome">
         <div
           style={{
             position: "relative",
@@ -1139,7 +1350,7 @@ function Gallery() {
         </div>
       </Section>
 
-      <Section title="Viewport canvas (imperative mount)">
+      <Section title="Viewport canvas (imperative mount)" tab="Workspace chrome">
         <ViewportCanvas
           style={{ width: 420, height: 140 }}
           onMount={(canvas) => {
@@ -1180,10 +1391,32 @@ function GalleryApplication() {
   const [category, setCategory] = useState("components");
   const [selected, setSelected] = useState("Buttons");
   const content = useRef<HTMLDivElement>(null);
+  // Every gallery section belongs to exactly one category so the shell nav
+  // and Library list cover the whole component set (no orphans).
   const sections = {
-    components: ["Buttons", "Tabs", "Ribbon", "Fields + Dialog", "Flat collections", "Authoring fields", "Tabular data", "Property inspectors", "Timeline (dope sheet)"],
-    icons: ["Shared vector icons — core/assets/icons"],
-    workspace: ["Workspace shell — document bar, sidebars, floating panels, layout presets", "Rail + Dock panel + Tree", "Resizable workspace + bottom panel", "Viewport navigation cube"],
+    components: [
+      "Buttons", "Tabs", "Ribbon", "Fields + Dialog", "Flat collections", "Authoring fields",
+      "Extended field family", "Tabular data", "Property inspectors", "Search fields + breadcrumbs",
+      "Large hierarchy windowing", "Menus + Popover", "Command palettes", "Toasts + notification history",
+      "Help + workflow states", "Status bar", "Timeline (dope sheet)",
+    ],
+    features: [
+      "Feature windows — the standard editor window (sketch, extrude, revolve, sweep, loft, thicken, enclose, plane, mate)",
+      "Settings window — universal per-app settings (macOS anatomy)",
+      "3D transform gizmo — move and rotate a model (shared Core math)",
+    ],
+    icons: [
+      "Shared vector icons — core/assets/icons",
+      "Illustrated ribbon tools — Core assets",
+      "Application icons — core/assets/branding",
+    ],
+    workspace: [
+      "Workspace shell — document bar, sidebars, floating panels, layout presets",
+      "Collapsible sidebars — the universal rail (expanded and collapsed)",
+      "Header chrome — studio mode, workspace windows, appearance",
+      "Rail + Dock panel + Tree", "Resizable workspace + bottom panel", "Document tabs",
+      "Viewport navigation cube", "Viewport canvas (imperative mount)",
+    ],
   };
   const navigate = (title: string) => {
     setSelected(title);
@@ -1194,7 +1427,7 @@ function GalleryApplication() {
   return <div className="gallery-application">
     <DocumentBar
       leading={<>{window.location.pathname.startsWith("/ui/") && <a href="/" aria-label="Aether Studio" style={{ display: "inline-flex", color: "inherit" }}><AetherIcon name="aether" /></a>}<AetherIcon name="design" /><strong>Aether UI</strong></>}
-      center={<Tabs tabs={[{ id: "components", label: "Components" }, { id: "icons", label: "Icons" }, { id: "workspace", label: "Workspaces" }]} activeID={category} onSelect={(id) => { setCategory(id); navigate(sections[id as keyof typeof sections][0]); }} />}
+      center={<Tabs tabs={[{ id: "components", label: "Widgets" }, { id: "features", label: "Feature windows" }, { id: "workspace", label: "Workspace chrome" }, { id: "icons", label: "Icons & assets" }]} activeID={category} onSelect={(id) => { setCategory(id); navigate(sections[id as keyof typeof sections][0]); }} />}
       trailing={<LayoutPresetButton preset={preset} onChange={setPreset} />}
     />
     <WorkspaceShell preset={preset} preservePanelContent style={{ flex: 1, minHeight: 0 }}

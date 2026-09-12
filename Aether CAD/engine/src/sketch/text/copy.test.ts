@@ -17,7 +17,7 @@ const variables = new Map([["word", "O"]]);
 async function create(frame = true) {
   const bytes = readFileSync(
     new URL(
-      "../../../../assets/fonts/noto-sans/NotoSans-Regular.ttf",
+      "../../../../../core/assets/fonts/noto-sans/NotoSans-Regular.ttf",
       import.meta.url,
     ),
   );

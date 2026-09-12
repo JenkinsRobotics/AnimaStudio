@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { cadRibbonWorkspaces } from "../cad-tool-catalog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CADAssemblyPresentationProjection } from "../cad-assembly-presentation";
 import { cadAssemblyWorkspace } from "../cad-assembly-workspace-store";
@@ -60,9 +61,7 @@ describe("AetherCADShell", () => {
   it("keeps every live CAD command in the React-owned shell", () => {
     const html = renderToStaticMarkup(<AetherCADShell />);
     for (const id of [
-      "new-part",
       "part-picker",
-      "save-part",
       "step-picker",
       "parts-list",
       "history-list",
@@ -71,20 +70,17 @@ describe("AetherCADShell", () => {
     ]) {
       expect(html).toContain(`id="${id}"`);
     }
-    for (const command of [
-      "new-part",
-      "open-part",
-      "save-part",
-      "insert-step",
-      "sketch",
-      "connector",
-      "fastened",
-      "fit-view",
-    ]) {
+    for (const command of ["sketch", "connector", "fastened", "fit-view"]) {
       expect(html).toContain(`data-command="${command}"`);
     }
+    const ribbonActions = cadRibbonWorkspaces.flatMap((workspace) => workspace.groups.flatMap((group) => group.tools.flatMap((tool) => [tool, ...(tool.variants ?? [])].map((choice) => choice.action))));
+    for (const command of ["new-part", "open-part", "save-part", "insert-step"]) {
+      expect(ribbonActions).toContain(command);
+    }
     expect(html).not.toContain("CAD command bridge");
-    expect(html).toContain('aria-label="Commands"');
+    // Commands moved from the header into the settings tray (Reference → Commands).
+    expect(html).not.toContain('aria-label="Commands"');
+    expect(html).toContain('aria-label="Settings"');
   });
 
   it("defaults to full-suite ribbon with left history and version controls", () => {
@@ -92,21 +88,27 @@ describe("AetherCADShell", () => {
     expect(html).toContain("chrome-suite toolbar-traditional");
     expect(html).toContain("cad-suite-workspace");
     expect(html).toContain('aria-label="Design"');
-    expect(html).toContain('aria-label="Model"');
+    expect(html).toContain('aria-label="Feature tree"');
     expect(html).toContain('aria-label="Version control"');
     expect(html).toContain('aria-label="History"');
     expect(html).toContain('aria-label="Interface theme"');
+    expect(html).toContain('aria-label="Design"');
+    expect(html).toContain('aria-label="Comments"');
+    expect(html).toContain('aria-label="Document notes"');
+    expect(html).toContain('aria-label="Action items"');
     expect(html).not.toContain('aria-label="Rebuild workbench"');
   });
 
-  it("retains the classic centered tabs and bottom history as a saved alternative", () => {
+  it("retains the classic chrome and bottom history as a saved alternative", () => {
     vi.stubGlobal("localStorage", {getItem: () => "classic"});
     try {
       const html = renderToStaticMarkup(<AetherCADShell />);
       expect(html).toContain("chrome-classic toolbar-traditional");
-      expect(html).toContain('aria-label="Animate"');
+      expect(html).toContain('aria-label="Design"');
+      expect(html).toContain("cad-suite-workspace");
+      expect(html).toContain('aria-label="Version control"');
+      expect(html).toContain('aria-label="Comments"');
       expect(html).toContain('aria-label="Rebuild workbench"');
-      expect(html).not.toContain("cad-suite-workspace");
       cadPresentation.patch({toolbarMode: "floating"});
       expect(renderToStaticMarkup(<AetherCADShell />)).toContain("chrome-classic toolbar-floating");
     } finally { vi.unstubAllGlobals(); }
@@ -120,19 +122,20 @@ describe("AetherCADShell", () => {
     expect(html).toContain("aui-float-panel");
     expect(html).toContain("aui-shell");
     expect(html).toContain("panel-bottom-docked");
-    expect(html).toContain('aria-label="Model placement"');
+    expect(html).not.toContain('aria-label="Model placement"');
+    expect(html).toContain("Feature tree");
     expect(html).toContain('aria-label="Properties placement"');
     expect(html).toContain('aria-label="History"');
-    expect(html).toContain('aria-label="Workspace layout"');
+    expect(html).toContain('aria-label="Studio mode:');
   });
 
   it("projects the typed command registry into the shared palette without inventing handlers", () => {
     const disconnected = buildCADCommandPaletteCommands(cadCommands.snapshot());
-    expect(disconnected).toHaveLength(57);
+    expect(disconnected).toHaveLength(59);
     expect(disconnected.map((command) => command.id)).toContain("fit-view");
     expect(disconnected.map((command) => command.id)).toEqual(expect.arrayContaining([
       "view-front", "view-back", "view-left", "view-right", "view-top", "view-bottom",
-      "background-graphite", "background-midnight", "background-slate",
+      "background-graphite", "background-midnight", "background-cad-light", "background-blueprint",
       "finish-matte", "finish-satin", "finish-gloss",
       "ground-none", "ground-grid", "ground-floor", "ground-both",
       "toggle-feature-edges", "reset-appearance",
@@ -182,7 +185,7 @@ describe("AetherCADShell", () => {
     expect(html).not.toContain('class="history-sidebar"');
     expect(html).toContain('id="part-width"');
     expect(html).toContain('id="items-filter"');
-    expect(html).toContain("Viewport appearance · this session");
+    expect(html).toContain("Aether CAD setting · saved on this device");
     expect(html).toContain('aria-label="Adjust Width"');
     expect(html).not.toContain('id="connector-card"');
     expect(html).not.toContain('id="loading-card"');
@@ -236,12 +239,14 @@ describe("AetherCADShell", () => {
     expect(html).toContain('aria-label="CAD workspace"');
     expect(html).toContain('aria-label="3D CAD viewport"');
     expect(html).toContain('aria-label="Workspace status"');
+    expect(html).toContain('aria-label="Workspace windows and tabs"');
+    expect(html).toContain('aria-label="Appearance');
     expect(html).toContain('aria-label="Workspace metrics"');
-    expect(html).toContain('aria-label="Workspace layout"');
+    expect(html).toContain('aria-label="Studio mode:');
     expect(html).toContain('data-layout="docked"');
     expect(html).toContain('class="backend" role="status"');
     expect(html).toContain('id="status-message" role="status"');
-    expect(html.match(/aria-live="polite"/g)).toHaveLength(4);
+    expect(html.match(/aria-live="polite"/g)).toHaveLength(3);
     expect(html.match(/aria-atomic="true"/g)).toHaveLength(2);
   });
 
@@ -253,7 +258,7 @@ describe("AetherCADShell", () => {
       expect(html).toContain('class="aui-shell"');
       expect(html).toContain('id="viewport"');
       expect(html).toContain('data-workspace-mode="modeling"');
-      expect(html).toContain('aria-label="Workspace layout"');
+      expect(html).toContain('aria-label="Studio mode:');
     }
   });
 
@@ -305,7 +310,7 @@ describe("AetherCADShell", () => {
     expect(html).toContain('type="range"');
     expect(html).toContain("Exact feature edges");
     expect(html).toContain("Reset appearance");
-    expect(html).toContain("Paper — adaptive grid required");
+    expect(html).toContain("Blueprint");
     expect(html).toContain("Canonical assignment graph required");
   });
 
@@ -323,7 +328,10 @@ describe("AetherCADShell", () => {
     expect(html).not.toContain('class="aui-bottom-panel aui-bottom-panel--collapsed"');
     expect(html).toContain('class="browser-panel active" data-panel="mates"');
     expect(html).toContain("Place Mate Connector");
-    expect(html).toContain("Plane face center");
+    // The hover readout card was removed: hovering is shown by highlighting the
+    // geometry itself, not by a floating panel over the viewport.
+    expect(html).not.toContain("Plane face center");
+    expect(html).not.toContain('class="hover-card"');
     expect(html).toContain('class="aui-progress-surface"');
     expect(html).toContain("Rebuilding exact feature history");
     expect(html).toContain("Rebuild Part");
@@ -462,14 +470,18 @@ describe("AetherCADShell", () => {
   it("renders Preferences and Help instead of inert header controls", () => {
     cadPresentation.patch({ startDialog: "preferences" });
     const preferences = renderToStaticMarkup(<AetherCADShell />);
-    expect(preferences).toContain('aria-label="Preferences"');
-    expect(preferences).toContain("Aether Dark");
+    expect(preferences).toContain('aria-label="Aether CAD Settings"');
+    expect(preferences).toContain("Plain project folders");
     expect(preferences).toContain("0.01 mm");
-    expect(preferences).toContain("canonical `.acad` workspace graph");
+    expect(preferences).toContain("Authoring Defaults");
+    // Sidebar panes for the macOS-style settings anatomy.
+    for (const pane of ["Workspace", "Layout", "UI", "Renderer", "Appearance", "Materials", "Lighting", "Navigation", "Developer"])
+      expect(preferences).toContain(pane);
 
     cadPresentation.patch({ startDialog: "help" });
     const help = renderToStaticMarkup(<AetherCADShell />);
-    expect(help).toContain('aria-label="Aether CAD Help"');
+    // Help now opens the settings tray on its Help pane.
+    expect(help).toContain('aria-label="Aether CAD Settings"');
     expect(help).toContain("Part workflow");
     expect(help).toContain("Assembly workflow");
     expect(help).toContain("Zoom to fit");

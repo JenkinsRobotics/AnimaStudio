@@ -1,9 +1,9 @@
-export interface PlaneFeature {id:string;name:string;type:"plane";plane:SketchPlane;offsetMillimeters:number;suppressed:boolean;}
+export interface PlaneFeature {id:string;name:string;type:"plane";plane:SketchPlane;offsetMillimeters:number;suppressed:boolean;definition?:PlaneDefinition;}
 import { validateSketchDrawing, type SketchDrawing, type SketchFrame } from "../sketch/drawing";
 import type { SketchPlane } from "../sketch/index";
-export function constructionPlaneFrame(plane:PlaneFeature):SketchFrame {
- const n:[number,number,number]=plane.plane==='XY'?[0,0,1]:plane.plane==='XZ'?[0,1,0]:[1,0,0];
- return {originMillimeters:n.map(v=>v*plane.offsetMillimeters) as [number,number,number],normal:n,xDirection:plane.plane==='YZ'?[0,0,-1]:[1,0,0]};
+import { resolvePlaneFrame, validatePlaneDefinition, type PlaneDefinition } from "./construction-planes";
+export function constructionPlaneFrame(plane:PlaneFeature,earlier:readonly {id:string;type:string}[]=[]):SketchFrame {
+ return resolvePlaneFrame(plane,earlier);
 }
 export interface ProfileFeature {
   id: string;
@@ -64,7 +64,7 @@ export function validateSolidFeature(
     if (!Number.isFinite(value) || value <= 0)
       throw new Error(`${label} must be positive.`);
   };
-  if(feature.type==="plane"){if(!["XY","XZ","YZ"].includes(feature.plane)||!Number.isFinite(feature.offsetMillimeters))throw new Error("Invalid construction plane.");return;}
+  if(feature.type==="plane"){if(!["XY","XZ","YZ"].includes(feature.plane)||!Number.isFinite(feature.offsetMillimeters))throw new Error("Invalid construction plane.");validatePlaneDefinition(feature,new Set([...earlier].filter(([,type])=>type==="plane").map(([id])=>id)));return;}
   if (feature.type === "profile") {
     if (
       !["XY", "XZ", "YZ"].includes(feature.plane) ||

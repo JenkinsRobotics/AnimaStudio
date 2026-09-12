@@ -45,6 +45,8 @@ export interface ExtrudeFeature {
 
 export type PartFeature = SketchFeature | ExtrudeFeature | SolidFeature;
 
+import { validateTreeOrganization, type TreeOrganization } from "./tree-organization";
+
 export interface PartDocument {
   format: typeof PART_DOCUMENT_FORMAT;
   formatVersion: typeof PART_DOCUMENT_VERSION;
@@ -56,6 +58,8 @@ export interface PartDocument {
   rollbackIndex?: number;
   sketchPresentation?: Record<string, import("./sketch-presentation").SketchPresentation>;
   bodyProperties?: Record<string, { name: string; visible: boolean; description?: string; category?: string }>;
+  /** Feature tree folders/grouping; organization only — never evaluation order. */
+  organization?: TreeOrganization;
 }
 
 export interface RectanglePartParameters {
@@ -237,6 +241,7 @@ export function validatePartDocument(
   const document = value as Partial<PartDocument>;
   const expressionVariables = evaluateDocumentVariables(document.variables);
   validateSketchPresentation(document.sketchPresentation);
+  validateTreeOrganization(document.organization);
   if (document.format !== PART_DOCUMENT_FORMAT) {
     throw new Error(
       `Unsupported Part format: ${String(document.format ?? "missing")}.`,

@@ -201,11 +201,25 @@ class Library:
             except AetherWorkspaceError as exc:
                 raise Problem(400, str(exc)) from None
             return {**self.metadata(row, uid), "project": project_projection(workspace)}
-        if action in ("history", "read_revision", "restore", "version"):
+        if action in ("history", "read_revision", "restore", "version", "branch_create"):
             return self.history.dispatch(action, user, row, data)
         if action == "read":
             if row["kind"] != "file":
                 raise Problem(400, "Choose a file to open.")
+            if data.get("branch") not in (None, "", "Main"):
+                head = self.db.execute(
+                    "SELECT head_revision FROM library_branches WHERE file_id=? AND name=?",
+                    (row["id"], str(data["branch"])),
+                ).fetchone()
+                if not head:
+                    raise Problem(404, "Branch not found.")
+                old_row = self.history.revision(row["id"], head["head_revision"])
+                return {
+                    **self.metadata(row, uid),
+                    "branch": str(data["branch"]),
+                    "revision": head["head_revision"],
+                    "data_base64": base64.b64encode(old_row["content"]).decode(),
+                }
             self.db.execute(
                 "INSERT OR REPLACE INTO library_recents VALUES (?,?,?)",
                 (uid, row["id"], time.time()),
@@ -215,6 +229,44 @@ class Library:
                 **self.metadata(row, uid),
                 "data_base64": base64.b64encode(row["content"]).decode(),
             }
+        if action == "save" and data.get("branch") not in (None, "", "Main"):
+            branch = str(data["branch"])
+            head = self.db.execute(
+                "SELECT head_revision FROM library_branches WHERE file_id=? AND name=?",
+                (row["id"], branch),
+            ).fetchone()
+            if not head:
+                raise Problem(404, "Branch not found.")
+            if data.get("expected_revision") != head["head_revision"]:
+                raise Problem(
+                    409, "This branch changed. Reopen it before saving your changes."
+                )
+            if row["kind"] != "file":
+                raise Problem(400, "Folders cannot contain file data.")
+            content = self.content(data)
+            next_revision = (
+                self.db.execute(
+                    "SELECT MAX(revision) AS top FROM library_history WHERE file_id=?",
+                    (row["id"],),
+                ).fetchone()["top"]
+                or row["revision"]
+            ) + 1
+            self.history.record(
+                row,
+                uid,
+                "save",
+                data.get("note", ""),
+                branch=branch,
+                parent=head["head_revision"],
+                revision=next_revision,
+                content=content,
+            )
+            self.db.execute(
+                "UPDATE library_branches SET head_revision=? WHERE file_id=? AND name=?",
+                (next_revision, row["id"], branch),
+            )
+            self.db.commit()
+            return {**self.metadata(row, uid), "branch": branch, "revision": next_revision}
         if action in ("save", "rename", "share"):
             if data.get("expected_revision") != row["revision"]:
                 raise Problem(
@@ -248,7 +300,11 @@ class Library:
             )
             if row["kind"] != "folder":
                 self.history.record(
-                    self.entry(uid, app, row["id"]), uid, action, data.get("note", "")
+                    self.entry(uid, app, row["id"]),
+                    uid,
+                    action,
+                    data.get("note", ""),
+                    parent=row["revision"],
                 )
             self.store.audit(user["username"], "library_" + action, row["id"])
             return self.metadata(self.entry(uid, app, row["id"]), uid)

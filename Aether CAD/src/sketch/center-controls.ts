@@ -14,8 +14,10 @@ export function mountCenterControls(
   chooseTool: (tool: string) => void,
   message: HTMLElement,
 ) {
+  const buttons = {} as Record<"arc" | "ellipse", HTMLButtonElement>;
   for (const kind of ["arc", "ellipse"] as const) {
     const button = document.createElement("button");
+    buttons[kind] = button;
     button.type = "button";
     button.textContent = `Select ${kind} center`;
     button.onclick = () => {
@@ -52,4 +54,5 @@ export function mountCenterControls(
     };
     parent.append(button);
   }
+  return { buttons };
 }

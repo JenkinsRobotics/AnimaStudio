@@ -8,7 +8,7 @@ it("generates distinct closed CAD profiles from all four bundled font styles", a
     const font = Uint8Array.from(
       readFileSync(
         new URL(
-          `../../../../assets/fonts/noto-sans/NotoSans-${style}.ttf`,
+          `../../../../../core/assets/fonts/noto-sans/NotoSans-${style}.ttf`,
           import.meta.url,
         ),
       ),

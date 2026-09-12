@@ -39,7 +39,7 @@ const click = (label) => {
   b.click();
 };
 const { Font, Glyph, Path } = createRequire(
-  new URL("../../../core/engine/package.json", import.meta.url),
+  new URL("../../engine/package.json", import.meta.url),
 )("opentype.js");
 function fontBytes() {
   const path = new Path();

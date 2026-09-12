@@ -7,7 +7,7 @@ it("preserves real compressed WOFF font tables and shaped outlines", async () =>
   const sfnt = Uint8Array.from(
       readFileSync(
         new URL(
-          "../../../../assets/fonts/noto-sans/NotoSans-Regular.ttf",
+          "../../../../../core/assets/fonts/noto-sans/NotoSans-Regular.ttf",
           import.meta.url,
         ),
       ),

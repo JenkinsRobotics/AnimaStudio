@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AppIcon, AetherIcon, Button, DocumentBar, ListBox } from "@aether/ui";
+import { AppIcon, AetherIcon, Button, ListBox } from "@aether/ui";
 import type { App } from "./main";
 
 export function PublicHome({
@@ -55,19 +55,6 @@ export function PublicHome({
         </div>
       </aside>
       <div className="studio-body">
-        <DocumentBar
-          windowChrome={false}
-          leading={
-            <strong>
-              {page === "home"
-                ? "Home"
-                : page === "apps"
-                  ? "Applications"
-                  : "Get started"}
-            </strong>
-          }
-          trailing={<Button onClick={onSignIn}>Sign in to Studio</Button>}
-        />
         <main className="studio-content">
           {page !== "start" ? (
             <>

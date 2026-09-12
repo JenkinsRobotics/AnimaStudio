@@ -4,9 +4,10 @@ import {
   AppIcon,
   AetherIcon,
   Button,
-  DocumentBar,
   ListBox,
   SelectField,
+  AppearanceToggle,
+  StatusBar,
   StatusDot,
   TextField,
 } from "@aether/ui";
@@ -35,6 +36,7 @@ export type User = {
   email_verified: boolean;
   avatar: string;
   theme: "dark" | "light" | "system";
+  theme_id?: string;
   role: string;
   active: boolean;
   must_change: boolean;
@@ -51,6 +53,7 @@ export type App = {
 type Status = {
   ready: boolean;
   name: string;
+  theme?: { base: string; apps: Record<string, string> };
   user: User | null;
   apps: App[];
   installation: Installation | null;
@@ -340,6 +343,7 @@ function Studio() {
       </div>
     );
   if (location.pathname === "/cad/" && !status.user.must_change) return <LibraryHome workspace={status.name} />;
+  if (location.pathname === "/animation/" && !status.user.must_change) return <LibraryHome workspace={status.name} app="animation" />;
   const user = status.user;
   const isAdmin = user.role === "admin" && !user.must_change;
   const navigation = [
@@ -369,6 +373,7 @@ function Studio() {
             icon: <AetherIcon name="hardware" />,
           },
           { id: "backups", label: "Backups", icon: <AetherIcon name="save" /> },
+          { id: "themes", label: "Appearance", icon: <AetherIcon name="appearance" /> },
           {
             id: "plugins",
             label: "Community plugins",
@@ -394,8 +399,6 @@ function Studio() {
     },
   ];
   const visiblePage = user.must_change ? "account" : page;
-  const title =
-    navigation.find((item) => item.id === visiblePage)?.label ?? "Home";
   const submitUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -460,7 +463,6 @@ function Studio() {
   return (
     <div className="studio aether-home-theme">
       <aside className="studio-sidebar">
-        <div data-aether-account="" style={{ marginBottom: 12 }} />
         <div className="workspace-identity">
           <span className="workspace-avatar">
             <AppIcon app="studio" size={34} />
@@ -515,27 +517,6 @@ function Studio() {
         </div>
       </aside>
       <div className="studio-body">
-        <DocumentBar
-          windowChrome={false}
-          leading={<strong>{title}</strong>}
-          trailing={
-            <>
-              <span className="header-caption">Aether Studio</span>
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  setBusy(true);
-                  refresh()
-                    .catch((e: Error) => report(e.message))
-                    .finally(() => setBusy(false));
-                }}
-                aria-label="Refresh server status"
-              >
-                <AetherIcon name="history" />
-              </Button>
-            </>
-          }
-        />
         <main className="studio-content">
           {banners}
           {visiblePage === "home" && (
@@ -545,8 +526,22 @@ function Studio() {
                   <h1>Your workspace, together.</h1>
                   <p>Open your tools and manage your Aether installation.</p>
                 </div>
-                <span className="badge">
-                  <StatusDot kind="ok" /> Online
+                <span className="page-heading-tools">
+                  <span className="badge">
+                    <StatusDot kind="ok" /> Online
+                  </span>
+                  <Button
+                    disabled={busy}
+                    onClick={() => {
+                      setBusy(true);
+                      refresh()
+                        .catch((e: Error) => report(e.message))
+                        .finally(() => setBusy(false));
+                    }}
+                    aria-label="Refresh server status"
+                  >
+                    <AetherIcon name="history" />
+                  </Button>
                 </span>
               </div>
               <Section title="Your applications">
@@ -1044,6 +1039,37 @@ function Studio() {
               )}
             </>
           )}
+          {visiblePage === "themes" && admin && (
+            <>
+              <div className="page-heading">
+                <div>
+                  <h1>Appearance</h1>
+                  <p>Workspace themes for every member. Every theme includes light and dark modes.</p>
+                </div>
+              </div>
+              <Section title="Workspace theme" description="Applied to everyone and every application unless overridden. Installed themes live in core/assets/themes.">
+                <form className="form" key={JSON.stringify(status.theme ?? {})} onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = new FormData(e.currentTarget);
+                  const apps: Record<string, string> = {};
+                  for (const id of ["studio", "cad", "animation", "ui"]) {
+                    const value = String(form.get("app-" + id) ?? "").trim();
+                    if (value) apps[id] = value;
+                  }
+                  await run("/api/admin/theme", { base: String(form.get("base") ?? ""), apps }, "Workspace theme updated.");
+                }}>
+                  <Field label="Base theme id"><TextField name="base" defaultValue={status.theme?.base ?? "aether-default"} required maxLength={64} /></Field>
+                  {(["studio", "cad", "animation", "ui"] as const).map((id) => (
+                    <Field key={id} label={({ studio: "Aether Studio", cad: "Aether CAD", animation: "Aether Animation", ui: "Aether UI" } as const)[id] + " override"}>
+                      <TextField name={"app-" + id} placeholder="Inherit base theme" defaultValue={status.theme?.apps?.[id] ?? ""} maxLength={64} />
+                    </Field>
+                  ))}
+                  <Button type="submit" primary disabled={busy}>Save workspace theme</Button>
+                </form>
+                <p className="hint" style={{ marginTop: 12 }}>Precedence: a member's personal theme, then the application override, then the base. "aether-default" is the built-in theme.</p>
+              </Section>
+            </>
+          )}
           {visiblePage === "activity" && admin && (
             <>
               <div className="page-heading">
@@ -1107,6 +1133,33 @@ function Studio() {
                 </div>
               )}
               {!user.must_change && <Section title="Personal details" description="Your full name appears in the workspace. Use your email address or username to sign in."><form className="form" key={user.email + user.full_name} onSubmit={async e => {e.preventDefault();await run("/api/profile",Object.fromEntries(new FormData(e.currentTarget)),"Account details updated.");}}><Field label="Full name"><TextField name="full_name" defaultValue={user.full_name} autoComplete="name" required maxLength={120} /></Field><Field label="Email address"><TextField name="email" type="email" defaultValue={user.email} autoComplete="email" required maxLength={254} /></Field><Field label="Current password to save details"><TextField name="current_password" type="password" autoComplete="current-password" required /></Field><Button type="submit" primary disabled={busy}>Save personal details</Button></form><p className="hint" style={{marginTop:12}}>{status.email_recovery_available ? "Email recovery is available. A recovery link verifies access to your mailbox when used." : "Email recovery becomes available after an administrator configures Email delivery."}</p></Section>}
+              {!user.must_change && <Section title="Profile picture" description="Shown beside your name across the suite. PNG or JPEG up to 256 KB.">
+                <div className="account-picture-row">
+                  {user.avatar ? <img className="account-picture" src={user.avatar} alt="" /> : <span className="account-picture account-picture-initial">{(user.full_name || user.username).slice(0, 1).toUpperCase()}</span>}
+                  <div className="account-picture-actions">
+                    <input id="account-picture-input" type="file" accept="image/png,image/jpeg" hidden onChange={async (event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (!file) return;
+                      if (file.size > 262144) { setError("Choose a PNG or JPEG smaller than 256 KB."); return; }
+                      const reader = new FileReader();
+                      reader.onload = () => { void run("/api/preferences", { avatar: reader.result }, "Profile picture updated."); };
+                      reader.readAsDataURL(file);
+                    }} />
+                    <Button disabled={busy} onClick={() => document.getElementById("account-picture-input")?.click()}>Choose picture…</Button>
+                    {user.avatar ? <Button disabled={busy} onClick={() => void run("/api/preferences", { avatar: "" }, "Profile picture removed.")}>Remove picture</Button> : null}
+                  </div>
+                </div>
+              </Section>}
+              {!user.must_change && <Section title="Theme" description="Override the workspace theme for your account. Leave empty to follow the workspace. Applies on every device you sign in from.">
+                <form className="form" key={user.theme_id ?? ""} onSubmit={async (e) => {
+                  e.preventDefault();
+                  await run("/api/preferences", { theme_id: String(new FormData(e.currentTarget).get("theme_id") ?? "").trim() }, "Theme updated.");
+                }}>
+                  <Field label="Personal theme id"><TextField name="theme_id" placeholder="Follow workspace theme" defaultValue={user.theme_id ?? ""} maxLength={64} /></Field>
+                  <Button type="submit" primary disabled={busy}>Save theme</Button>
+                </form>
+              </Section>}
               <Section
                 title="Change password"
                 description="Changing your password signs you out on every device."
@@ -1120,4 +1173,27 @@ function Studio() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<Studio />);
+/** Suite-wide bottom tray, matching the native app: shown on every Studio page. */
+function StudioTray() {
+  const [status, setStatus] = useState<Status | null>(null);
+  useEffect(() => {
+    api<Status>("/api/status").then(setStatus).catch(() => setStatus(null));
+    const sync = (event: Event) => {
+      const user = (event as CustomEvent<User | null>).detail;
+      setStatus((current) => (current ? { ...current, user } : current));
+    };
+    document.addEventListener("aether-account", sync);
+    return () => document.removeEventListener("aether-account", sync);
+  }, []);
+  return (
+    <div className="studio-tray aether-home-theme">
+      <StatusBar
+        leading={<div role="status" aria-live="polite" aria-atomic="true"><StatusDot kind={status?.ready ? "ok" : "busy"} /><span className="studio-tray-name">Aether Studio</span><span>{status?.name ?? "Connecting…"}</span></div>}
+        center={null}
+        trailing={<><span>{status?.user ? status.user.full_name || status.user.username : "Not signed in"}</span><AppearanceToggle /></>}
+      />
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(<><Studio /><StudioTray /></>);

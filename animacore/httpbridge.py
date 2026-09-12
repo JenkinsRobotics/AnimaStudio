@@ -61,6 +61,9 @@ def make_handler(session: Session, lock: threading.Lock, root: Path,
             self._cors()
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            # Without this, browsers heuristically cache served app builds and
+            # keep running stale bundles across rebuilds.
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
 

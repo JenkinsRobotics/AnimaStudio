@@ -31,6 +31,19 @@ export interface PreviewState {
   rememberedRadiusMillimeters?: number;
   effectivePoint: (point: SketchPoint) => SketchPoint;
 }
+/** Glyphs for the relationships the sketch infers while you draw. Kept to
+ *  single characters so they render inside the SVG without an icon font. */
+const INFERENCE_GLYPHS: Record<string, string> = {
+  Horizontal: "\u2014",
+  Vertical: "\u2758",
+  Endpoint: "\u25CF",
+  Midpoint: "\u25B8",
+  Center: "\u2299",
+  "Arc center": "\u2299",
+  Quadrant: "\u25C6",
+  Origin: "\u2A00",
+};
+
 export function renderSketchPreview(svg: SVGSVGElement, state: PreviewState) {
   const {
     started,
@@ -289,5 +302,36 @@ export function renderSketchPreview(svg: SVGSVGElement, state: PreviewState) {
     "font-size": bounds.width / 85,
     class: "sketch-preview-dimension",
   });
-  text.textContent = label + (snapLabel ? ` · ${snapLabel}` : "");
+  text.textContent = label;
+  // Onshape shows the constraint it is about to apply as a glyph beside the
+  // cursor, not as words in the dimension readout. Committing the geometry
+  // applies exactly this constraint (see inferLineAlignment).
+  if (snapLabel) {
+    const glyph = INFERENCE_GLYPHS[snapLabel];
+    const size = bounds.width / 60;
+    const bx = p[0] + bounds.width / 80;
+    const by = -p[1] + bounds.width / 55;
+    add("rect", {
+      x: bx,
+      y: by - size * 0.8,
+      width: size,
+      height: size,
+      rx: size / 6,
+      class: "sketch-inference-badge",
+    });
+    const mark = add("text", {
+      x: bx + size / 2,
+      y: by + size * 0.08,
+      "font-size": size * 0.72,
+      "text-anchor": "middle",
+      class: "sketch-inference-glyph",
+    });
+    mark.textContent = glyph ?? snapLabel.slice(0, 1);
+    mark.setAttribute("aria-label", snapLabel);
+    // Name the relationship without spelling it into the dimension readout:
+    // a native SVG tooltip, and the accessible name for the glyph.
+    const title = add("title", {});
+    title.textContent = snapLabel;
+    svg.setAttribute("data-inferred-constraint", snapLabel);
+  } else svg.removeAttribute("data-inferred-constraint");
 }

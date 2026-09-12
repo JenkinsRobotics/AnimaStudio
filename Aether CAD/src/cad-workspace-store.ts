@@ -16,9 +16,11 @@ export interface CADInspectorSection {
 
 export interface CADWorkspaceSnapshot {
   itemNodes: readonly TreeNode[];
+  bodyNodes: readonly TreeNode[];
   selectedItemIDs: ReadonlySet<string>;
   expandedItemIDs: ReadonlySet<string>;
   historyItems: readonly ListBoxItem[];
+  rollbackIndex: number;
   connectorItems: readonly ListBoxItem[];
   mateItems: readonly ListBoxItem[];
   problemItems: readonly ListBoxItem[];
@@ -29,10 +31,13 @@ export interface CADWorkspaceSnapshot {
 
 export type CADWorkspaceAction =
   | {type:"move-item";id:string;targetID:string;position:"before"|"inside"|"after"}
-  | { type: "select-item"; id: string }
+  | { type: "create-folder"; memberIDs: readonly string[] }
+  /** `ids`/`mode` carry the shared Tree's multi-selection; id-only means a plain click. */
+  | { type: "select-item"; id: string; ids?: readonly string[]; mode?: "single" | "toggle" | "range" }
   | { type: "toggle-item"; id: string }
   | { type: "item-action"; id: string; actionID: string }
   | { type: "activate-history"; id: string }
+  | { type: "rollback-to"; index: number }
   | { type: "select-connector"; id: string }
   | { type: "connector-action"; id: string; actionID: string };
 
@@ -41,9 +46,11 @@ type ActionHandler = (action: CADWorkspaceAction) => void;
 
 const initialSnapshot: CADWorkspaceSnapshot = Object.freeze({
   itemNodes: [],
+  bodyNodes: [],
   selectedItemIDs: new Set<string>(),
   expandedItemIDs: new Set<string>(),
   historyItems: [],
+  rollbackIndex: 0,
   connectorItems: [],
   mateItems: [],
   problemItems: [],

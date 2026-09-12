@@ -184,3 +184,15 @@ test("versioned layouts persist separately per preset and tolerate invalid stora
   restored.unmount();
   localStorage.removeItem(key);
 });
+
+test("chromeless docked panel renders content without the header chrome", () => {
+  const { container } = render(
+    <WorkspaceShell preset="docked" leftPanels={[{ id: "tree", title: "Feature tree", icon: "▣", content: <div>tree-content</div>, chromeless: true }]}>
+      canvas
+    </WorkspaceShell>
+  );
+  fireEvent.click(screen.getByLabelText("Feature tree"));
+  expect(screen.queryByText("tree-content")).not.toBeNull();
+  expect(container.querySelector(".aui-shell-panel-header")).toBeNull();
+  expect(screen.queryByLabelText("Close Feature tree")).toBeNull();
+});

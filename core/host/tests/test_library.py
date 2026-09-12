@@ -179,3 +179,57 @@ def test_preferences_are_shared_by_sessions_and_validate_image_type(library):
             host.dispatch("/api/preferences", body, tokens[0], "local")
     assert host.store.user_for(tokens[1])["theme"] == "dark"
     assert host.store.user_for(tokens[0])["id"] == owner
+
+
+
+def test_pdm_branches_and_commits(library):
+    import base64
+
+    host, owner, member, tokens, call = library
+    created = call(
+        "create",
+        {
+            "name": "part.acpart",
+            "scope": "personal",
+            "parent": None,
+            "data_base64": base64.b64encode(b'{"v":1}').decode(),
+        },
+    )
+    fid = created["id"]
+    call(
+        "version",
+        {"id": fid, "name": "V1", "message": "first checkpoint", "expected_revision": created["revision"]},
+    )
+    branch = call(
+        "branch_create",
+        {"id": fid, "name": "concept-b", "expected_revision": created["revision"]},
+    )
+    saved = call(
+        "save",
+        {
+            "id": fid,
+            "branch": "concept-b",
+            "expected_revision": branch["head_revision"],
+            "data_base64": base64.b64encode(b'{"v":2}').decode(),
+        },
+    )
+    assert saved["branch"] == "concept-b"
+    assert saved["revision"] > branch["head_revision"]
+    assert base64.b64decode(call("read", {"id": fid})["data_base64"]) == b'{"v":1}'
+    assert (
+        base64.b64decode(call("read", {"id": fid, "branch": "concept-b"})["data_base64"])
+        == b'{"v":2}'
+    )
+    history = call("history", {"id": fid})
+    assert any(v["name"] == "V1" and v["message"] == "first checkpoint" for v in history["versions"])
+    assert {b["name"] for b in history["branches"]} == {"Main", "concept-b"}
+    with pytest.raises(Problem):
+        call(
+            "save",
+            {
+                "id": fid,
+                "branch": "concept-b",
+                "expected_revision": branch["head_revision"],
+                "data_base64": base64.b64encode(b'{"v":3}').decode(),
+            },
+        )

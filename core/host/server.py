@@ -47,7 +47,7 @@ def safe_path(root, relative):
 
 
 def validate_settings(settings):
-    if set(settings) != {
+    if set(settings) - {"theme"} != {
         "name",
         "bind_address",
         "port",
@@ -378,8 +378,11 @@ class StudioHost:
                 raise Problem(403, "User account required.")
             theme = data.get("theme", user["theme"])
             avatar = data.get("avatar", user["avatar"])
+            theme_id = data.get("theme_id", user.get("theme_id", ""))
             if theme not in ("dark", "light", "system"):
                 raise Problem(400, "Choose dark, light or system appearance.")
+            if not isinstance(theme_id, str) or len(theme_id) > 64:
+                raise Problem(400, "Choose a valid theme.")
             if not isinstance(avatar, str) or len(avatar) > 350000:
                 raise Problem(400, "Choose a profile picture smaller than 256 KB.")
             if avatar:
@@ -403,7 +406,8 @@ class StudioHost:
                         400, "Choose a PNG or JPEG profile picture under 256 KB."
                     ) from None
             store.db.execute(
-                "UPDATE users SET theme=?,avatar=? WHERE id=?", (theme, avatar, uid)
+                "UPDATE users SET theme=?,avatar=?,theme_id=? WHERE id=?",
+                (theme, avatar, theme_id.strip(), uid),
             )
             store.audit(user["username"], "preferences_updated")
             return {"ok": True}
@@ -509,6 +513,35 @@ class StudioHost:
                     (int(data["restricted"]), data["id"]),
                 )
                 store.audit(user["username"], "app_access_changed", data["id"])
+                return {"ok": True}
+            if path == "/api/admin/theme":
+                base = data.get("base")
+                apps = data.get("apps", {})
+                if not isinstance(base, str) or not base.strip() or len(base) > 64:
+                    raise Problem(400, "Choose a base theme id.")
+                if not isinstance(apps, dict) or any(
+                    key not in ("studio", "cad", "animation", "ui")
+                    or not isinstance(value, str)
+                    or len(value) > 64
+                    for key, value in apps.items()
+                ):
+                    raise Problem(400, "Invalid per-application theme overrides.")
+                store.db.execute(
+                    "UPDATE settings SET value=? WHERE key='theme'",
+                    (
+                        json.dumps(
+                            {
+                                "base": base.strip(),
+                                "apps": {
+                                    key: value.strip()
+                                    for key, value in apps.items()
+                                    if value.strip()
+                                },
+                            }
+                        ),
+                    ),
+                )
+                store.audit(user["username"], "theme_changed", base.strip())
                 return {"ok": True}
             if path == "/api/admin/service":
                 if data.get("action") == "revoke":
@@ -840,6 +873,33 @@ def make_handler(host):
                     )
 
         def do_GET(self):  # noqa: N802
+            fast_path = unquote(urlsplit(self.path).path)
+            # Public suite assets stream without the host lock: they are hot,
+            # auth-free, and must not queue behind API handlers.
+            if fast_path in ("/suite/account.js", "/suite/account.css"):
+                asset = REPO / "core/session" / fast_path.rsplit("/", 1)[-1]
+                self.reply(
+                    200,
+                    asset.read_bytes(),
+                    "text/javascript" if fast_path.endswith(".js") else "text/css",
+                )
+                return
+            if fast_path.startswith("/icons/"):
+                name = fast_path.rsplit("/", 1)[-1]
+                if name in {
+                    app + extension
+                    for app in ("studio", "cad", "animation", "ui")
+                    for extension in (".png", ".svg")
+                }:
+                    self.reply(
+                        200,
+                        (REPO / "core/assets/branding/apps" / name).read_bytes(),
+                        "image/png" if name.endswith(".png") else "image/svg+xml",
+                    )
+                else:
+                    self.reply(404, {"error": "Icon not found."})
+                return
+            static_response = None
             with host.lock:
                 try:
                     _, token = self.context()
@@ -851,6 +911,9 @@ def make_handler(host):
                             {
                                 "ready": host.store.ready(),
                                 "name": host.store.settings()["name"],
+                                "theme": host.store.settings().get(
+                                    "theme", {"base": "aether-default", "apps": {}}
+                                ),
                                 "user": user,
                                 "email_recovery_available": host.mailer.config()[
                                     "enabled"
@@ -1046,7 +1109,7 @@ def make_handler(host):
                             )
                             return
                         host.require_app(app, user)
-                        if not route and app != "cad":
+                        if not route and app not in ("cad", "animation"):
                             self.reply(
                                 302, b"", headers={"Location": f"/{app}/index.html"}
                             )
@@ -1073,7 +1136,7 @@ def make_handler(host):
                         else:
                             target = (
                                 (REPO / "studio/dist/index.html")
-                                if app == "cad" and not route
+                                if app in ("cad", "animation") and not route
                                 else safe_path(host.packages[app][2], route)
                             )
                     else:
@@ -1085,30 +1148,42 @@ def make_handler(host):
                             404,
                             "File not found. Build the application before enabling it.",
                         )
-                    body = target.read_bytes()
-                    if target.name == "index.html":
-                        icon = app if app in host.packages else "studio"
-                        metadata = f'<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="/icons/{icon}.svg"><link rel="apple-touch-icon" href="/icons/{icon}.png"><meta name="theme-color" content="#171a20"></head>'
-                        metadata = metadata.replace(
-                            "</head>",
-                            '<link rel="stylesheet" href="/suite/account.css"><script type="module" src="/suite/account.js"></script></head>',
-                        )
-                        if app == "cad" and not route:
-                            body = body.replace(
-                                b"<title>Aether Studio</title>",
-                                b"<title>Aether CAD</title>",
-                            )
-                        body = body.replace(b"</head>", metadata.encode())
-                    self.reply(
-                        200,
-                        body,
-                        mimetypes.guess_type(target)[0] or "application/octet-stream",
-                        {"X-Aether-Revision": hashlib.sha256(body).hexdigest()},
-                    )
+                    static_response = (target, app, route)
                 except Problem as error:
                     self.reply(error.status, {"error": error.message})
+                    return
                 except Exception:
                     self.reply(500, {"error": "Unable to load this resource."})
+                    return
+            # App files stream OUTSIDE the host lock: multi-megabyte bundles
+            # must not serialize every other request (200-user readiness).
+            # Routing and auth above are unchanged.
+            if static_response is None:
+                return
+            target, app, route = static_response
+            try:
+                body = target.read_bytes()
+                if target.name == "index.html":
+                    icon = app if app in host.packages else "studio"
+                    metadata = f'<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="/icons/{icon}.svg"><link rel="apple-touch-icon" href="/icons/{icon}.png"><meta name="theme-color" content="#171a20"></head>'
+                    metadata = metadata.replace(
+                        "</head>",
+                        '<link rel="stylesheet" href="/suite/account.css"><script type="module" src="/suite/account.js"></script></head>',
+                    )
+                    if app in ("cad", "animation") and not route:
+                        body = body.replace(
+                            b"<title>Aether Studio</title>",
+                            b"<title>Aether CAD</title>",
+                        )
+                    body = body.replace(b"</head>", metadata.encode())
+                self.reply(
+                    200,
+                    body,
+                    mimetypes.guess_type(target)[0] or "application/octet-stream",
+                    {"X-Aether-Revision": hashlib.sha256(body).hexdigest()},
+                )
+            except Exception:
+                self.reply(500, {"error": "Unable to load this resource."})
 
     return Handler
 

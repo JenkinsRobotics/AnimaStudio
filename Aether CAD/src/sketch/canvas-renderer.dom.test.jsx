@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { renderSketchCanvas } from "./canvas-renderer";
+import { renderSketchCanvas, SKETCH_PLANE_HALF_MILLIMETRES } from "./canvas-renderer";
 const require = createRequire(
   new URL("../../../core/ui/package.json", import.meta.url),
 );
@@ -203,4 +203,31 @@ it('keeps a cubic edge movable when an endpoint or control remains free',()=>{
  renderSketchCanvas(svg,d,{x:-60,y:-40,width:120,height:80},[]);
  expect(svg.querySelector('.sketch-entity-edge').getAttribute('data-entity-constraint-state')).toBe('under-constrained');
  expect([...svg.querySelectorAll('.sketch-point')].every(n=>n.getAttribute('data-entity-constraint-state')==='under-constrained')).toBe(true);
+});
+
+// The plane square IS the sketch's reference frame made visible: origin at the
+// frame origin, fixed size, fixed area. It must not move or resize with the
+// pan/zoom viewport, and everything describing it stays inside it.
+it('draws the plane as one fixed square on the origin, whatever the viewport', () => {
+  const half = SKETCH_PLANE_HALF_MILLIMETRES;
+  for (const bounds of [
+    { x: -100, y: -100, width: 200, height: 200 },
+    { x: -60, y: -180, width: 120, height: 260 },
+    { x: 20, y: -40, width: 150, height: 80 },
+  ]) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.dataset.sketchName = 'Sketch 3';
+    renderSketchCanvas(svg, { contours: [] }, bounds, []);
+    const card = svg.querySelector('.sketch-plane-face');
+    expect([
+      card.getAttribute('x'), card.getAttribute('y'),
+      card.getAttribute('width'), card.getAttribute('height'),
+    ]).toEqual([String(-half), String(-half), String(half * 2), String(half * 2)]);
+    const origin = svg.querySelector('.sketch-origin');
+    expect([origin.getAttribute('cx'), origin.getAttribute('cy')]).toEqual(['0', '0']);
+    expect(svg.querySelector('.sketch-plane-title').textContent).toBe('Sketch 3');
+    for (const line of svg.querySelectorAll('.sketch-grid, .sketch-axis'))
+      for (const attr of ['x1', 'y1', 'x2', 'y2'])
+        expect(Math.abs(Number(line.getAttribute(attr)))).toBeLessThanOrEqual(half);
+  }
 });

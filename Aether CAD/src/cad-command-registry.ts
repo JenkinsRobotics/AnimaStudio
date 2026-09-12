@@ -24,6 +24,7 @@ export type CADCommandID =
   | "new-part"
   | "open-part"
   | "save-part"
+  | "commit-part"
   | "insert-step"
   | "sketch"
   | "rebuild-part"
@@ -61,7 +62,8 @@ export type CADCommandID =
   | "toggle-contact-shadows"
   | "background-graphite"
   | "background-midnight"
-  | "background-slate"
+  | "background-cad-light"
+  | "background-blueprint"
   | "finish-matte"
   | "finish-satin"
   | "finish-gloss"
@@ -69,6 +71,8 @@ export type CADCommandID =
   | "ground-grid"
   | "ground-floor"
   | "ground-both"
+  | "toggle-origin"
+  | "toggle-axes"
   | "toggle-feature-edges"
   | "reset-appearance"
   | "selection-auto"
@@ -88,9 +92,15 @@ export interface CADCommandState {
 type Handler = () => void | Promise<void>;
 type Listener = () => void;
 
+/** Constraint kinds that surface as commands; "pattern" authors through the
+ * pattern group editor instead. Boot registration must use this same list —
+ * registering an id absent from cadCommandIDs breaks startup. */
+export const sketchConstraintCommandKinds: readonly DrawingConstraintKind[] =
+  drawingConstraintKinds.filter((kind) => kind !== "pattern");
+
 export const cadCommandIDs: readonly CADCommandID[] = [
   ...contextualDrawingTools.map(tool=>`sketch-${tool}` as const),
-  ...drawingConstraintKinds.filter(kind => kind !== "pattern").map(kind => `sketch-constraint-${kind}` as const),
+  ...sketchConstraintCommandKinds.map(kind => `sketch-constraint-${kind}` as const),
   ...directModificationTools.map(tool=>`sketch-${tool}` as const),
   ...modificationTools.map(tool=>`sketch-${tool}` as const),
   ...sketchVariantTools.map(tool => `sketch-${tool}` as const),
@@ -107,6 +117,7 @@ export const cadCommandIDs: readonly CADCommandID[] = [
   "new-part",
   "open-part",
   "save-part",
+  "commit-part",
   "insert-step",
   "sketch",
   "rebuild-part",
@@ -144,7 +155,8 @@ export const cadCommandIDs: readonly CADCommandID[] = [
   "toggle-contact-shadows",
   "background-graphite",
   "background-midnight",
-  "background-slate",
+  "background-cad-light",
+  "background-blueprint",
   "finish-matte",
   "finish-satin",
   "finish-gloss",
@@ -152,6 +164,8 @@ export const cadCommandIDs: readonly CADCommandID[] = [
   "ground-grid",
   "ground-floor",
   "ground-both",
+  "toggle-origin",
+  "toggle-axes",
   "toggle-feature-edges",
   "reset-appearance",
   "selection-auto",

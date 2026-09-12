@@ -20,12 +20,14 @@ import { bindEndpointDragGesture } from "./sketch/endpoint-drag-gesture";
 import { arcChordStart, arcChordPoints } from "./sketch/arc-chord-tool";
 import { placeTangentArc } from "./sketch/tangent-arc-tool";
 import { renderSketchSelection } from "./sketch/selection-renderer";
+import { openFeatureWindow } from "@aether/ui";
 import { cadCommands, isCADCommandID } from "./cad-command-registry";
 import type { SketchEntityRef } from "@aether/core/sketch";
 import { bindTrimGesture } from "./sketch/trim-gesture";
 import { directModification } from "./sketch/direct-modification";
 import { renderContourList } from "./sketch/contour-list";
 import { renderSketchCanvas } from "./sketch/canvas-renderer";
+import { renderConstraintMarks, renderHoveredConstraints } from "./sketch/constraint-marks";
 import { placeDrawingPoint } from "./sketch/drawing-tool";
 
 import { mountConstraintPanel } from "./sketch/constraint-panel";
@@ -37,7 +39,7 @@ import {
 import { instructions } from "./sketch/tool-instructions";
 
 import { renderSketchPreview } from "./sketch/preview";
-import { constructionPlaneFrame } from "../../core/engine/src/document/solid-features";
+import { constructionPlaneFrame } from "@aether/core/document";
 import { rollbackPosition } from "@aether/core/document";
 import { snapSketchPoint } from "./sketch-snapping";
 import { solveDrawingConstraints } from "@aether/core/sketch";
@@ -50,7 +52,7 @@ import {
   type SketchFrame,
 } from "@aether/core/sketch";
 import { updatePartDocumentVariables, type PartDocument } from "@aether/core/document";
-import type { ProfileFeature } from "../../core/engine/src/document/solid-features";
+import type { ProfileFeature } from "@aether/core/document";
 import { cadSelection } from "./cad-selection-store";
 import "./sketch-workspace.css";
 export function openSketchWorkspace(
@@ -61,32 +63,74 @@ export function openSketchWorkspace(
   if (document.querySelector(".cad-sketch-workspace")) return;
   const source = getDocument();
   if (!source) return;
+  // A feature is created the moment the tool is clicked: it gets its id and
+  // name immediately, appears in the tree, and is invalid (red) until it has
+  // a plane — matching Onshape.
+  const featureID = existing?.id ?? crypto.randomUUID();
+  const featureName =
+    existing?.name ??
+    `Sketch ${source.features.filter((f) => f.type === "profile" || f.type === "sketch").length + 1}`;
+  const announceDraft = (hasPlane: boolean) =>
+    window.dispatchEvent(
+      new CustomEvent("aether-sketch-editing", {
+        detail: { id: featureID, name: featureName, hasPlane, existing: Boolean(existing) },
+      }),
+    );
   let variables = structuredClone(source.variables);
   const projected = projectionAuthoring(source, existing);
   const viewport = document.querySelector<HTMLElement>(".cad-studio-viewport");
   if (!viewport) return;
+  const offscreenControls = document.createElement("div");
+  offscreenControls.className = "cad-header-committed";
   const root = document.createElement("section");
   root.className = "cad-sketch-workspace choosing-plane";
   root.setAttribute("aria-label", "Sketch workspace");
-  const sidebar = document.createElement("aside");
-  root.append(sidebar);
-  const heading = document.createElement("h2");
-  heading.textContent = existing ? "Edit " + existing.name : "Create 2D sketch";
-  sidebar.append(heading);
+  // The sketch window IS the shared gallery feature widget — the whole point
+  // of the gallery is that products pull these, never re-build them.
+  let commitSketch = () => {};
+  let discardSketch = () => {};
+  const win = openFeatureWindow({
+    viewport,
+    className: "cad-sketch-window",
+    title: featureName,
+    acceptLabel: "Finish sketch",
+    discardLabel: "Cancel sketch",
+    onAccept: () => commitSketch(),
+    onDiscard: () => discardSketch(),
+  });
+  const sidebar = win.body;
+  // Keep the window inside the workspace section so sketch chrome lives and
+  // dies together (and stays queryable as one unit).
+  root.append(win.panel);
+  // The sketch window shows NO running narration. Tool state, profile counts
+  // and constraint hints belong in a status bar, not in a feature dialog —
+  // Onshape's Sketch panel carries none of it, and neither does the gallery's.
+  // This element keeps the existing reporting wired (tests read it, and it is
+  // an aria-live region for assistive tech) while staying out of the window.
+  // Anything the user MUST act on goes through fail() -> win.setError instead.
   const message = document.createElement("p");
   message.setAttribute("role", "status");
-  sidebar.append(message);
+  message.className = "cad-header-committed";
+  // First in document order: the window's own (empty) status element would
+  // otherwise be what `[role="status"]` finds.
+  root.prepend(message);
+  /** A real failure: shown in the window's error block and disables commit. */
+  const fail = (text: string) => {
+    message.textContent = text;
+    win.setError(text || null);
+  };
   const constraintStatus = document.createElement("p");
   constraintStatus.className = "sketch-constraint-state";
   constraintStatus.setAttribute("aria-label", "Sketch constraint state");
-  sidebar.append(constraintStatus);
-  const updateSelectionConstraintStatus = mountSelectionConstraintStatus(sidebar);
+  let updateSelectionConstraintStatus: ReturnType<typeof mountSelectionConstraintStatus>;
   const planeChoices = document.createElement("div");
   sidebar.append(planeChoices);
   let plane: "XY" | "XZ" | "YZ" = existing?.plane ?? "XY",
     frame: SketchFrame | undefined = existing?.frame;
   let started = false,
-    tool = "line",
+    // Placing the plane must not arm a drawing tool — the first viewport click
+    // belongs to selection until a tool is picked from the ribbon.
+    tool = "select",
     pending: SketchPoint[] = [],
     activePath = -1,
     busy = false;
@@ -94,6 +138,11 @@ export function openSketchWorkspace(
   let selectedEntity: SketchEntityRef | null = null,
     activeTool = "";
   let construction = false;
+  /** Onshape draws the applied relationships on the geometry; the Show
+   *  constraints row turns them off. Dimensions are separate annotations. */
+  let showConstraints = true;
+  /** The entity under the pointer, for the hover constraint readout. */
+  let hoveredEntity: SketchEntityRef | null = null;
   let snapLabel = "",
     gridSnap = true,
     geometrySnap = true,
@@ -124,8 +173,59 @@ export function openSketchWorkspace(
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("aria-label", "2D sketch canvas");
   svg.setAttribute("tabindex", "0");
+  svg.classList.add("cad-sketch-canvas");
+  // The renderer draws the Onshape-style plane card and needs the sketch name;
+  // carried on the element so it survives being reparented into the CSS3D layer.
+  svg.dataset.sketchName = featureName;
   root.prepend(svg);
-  let bounds = { x: -60, y: -40, width: 120, height: 80 };
+  // The view opens framed on the whole sketch-plane square with a margin, so the
+  // plane reads as a drawn object you can see the edges of.
+  let bounds = { x: -100, y: -100, width: 200, height: 200 };
+  // In-world mode: the 3D viewer hosts the svg on the sketch plane and owns
+  // navigation; this bridge supplies plane raycasts and scale. Null = legacy
+  // flat overlay (tests, gallery, no viewer present).
+  type SurfaceBridge = {
+    toSketch(clientX: number, clientY: number): SketchPoint | null;
+    scaleAt(clientX?: number, clientY?: number): number | null;
+    updateBounds(next: typeof bounds): void;
+  };
+  let surface: SurfaceBridge | null = null;
+  // Grow (never shrink) the viewBox to hold the drawing; keeps the in-world
+  // plane card under the whole sketch. ponytail: arc bulges/ellipse extremes
+  // beyond their control points can still clip visually; widen per-type if it
+  // shows up in practice.
+  const fitBoundsToContent = (): boolean => {
+    const pts: SketchPoint[] = [...pending];
+    for (const c of drawing.contours) {
+      if (c.type === "circle")
+        pts.push(
+          [c.center[0] - c.radius, c.center[1] - c.radius],
+          [c.center[0] + c.radius, c.center[1] + c.radius],
+        );
+      else if (c.type === "path") {
+        pts.push(c.start);
+        for (const s of c.segments) {
+          pts.push(s.end);
+          const extra = s as { controls?: SketchPoint[]; through?: SketchPoint; center?: SketchPoint };
+          if (extra.controls) pts.push(...extra.controls);
+          if (extra.through) pts.push(extra.through);
+          if (extra.center) pts.push(extra.center);
+        }
+      }
+    }
+    if (!pts.length) return false;
+    const pad = 25;
+    const xs = pts.map((p) => p[0]);
+    const vys = pts.map((p) => -p[1]);
+    const minX = Math.min(bounds.x, Math.min(...xs) - pad);
+    const maxX = Math.max(bounds.x + bounds.width, Math.max(...xs) + pad);
+    const minY = Math.min(bounds.y, Math.min(...vys) - pad);
+    const maxY = Math.max(bounds.y + bounds.height, Math.max(...vys) + pad);
+    if (minX === bounds.x && minY === bounds.y && maxX === bounds.x + bounds.width && maxY === bounds.y + bounds.height)
+      return false;
+    bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    return true;
+  };
   const controls = document.createElement("div");
   controls.className = "sketch-edit-controls";
   sidebar.append(controls);
@@ -141,19 +241,55 @@ export function openSketchWorkspace(
     parent.append(b);
     return b;
   };
-  const start = (p: typeof plane, f?: SketchFrame) => {
+  // "Is the sketch asking for a plane?" — one switch, because the class and the
+  // event must always move together. They lived at six separate sites, and the
+  // one that cleared the plane moved the class without the event, so the viewer
+  // stayed out of picking mode and only the first pick ever committed.
+  const setChoosingPlane = (choosing: boolean) => {
+    root.classList.toggle("choosing-plane", choosing);
     window.dispatchEvent(
-      new CustomEvent("aether-sketch-plane-selection", { detail: false }),
+      new CustomEvent("aether-sketch-plane-selection", { detail: choosing }),
     );
+  };
+  let renderSketchPlaneChip: ((label: string) => void) | undefined;
+  const start = (p: typeof plane, f?: SketchFrame) => {
+    setChoosingPlane(false);
     plane = p;
     frame = f;
     started = true;
-    root.classList.remove("choosing-plane");
     planeChoices.hidden = true;
     controls.hidden = false;
+    renderSketchPlaneChip?.(f ? "Selected plane" : `${p} plane`);
     pending = [];
     window.dispatchEvent(
       new CustomEvent("aether-sketch-mode", { detail: true }),
+    );
+    announceDraft(true);
+    setActiveTool("select");
+    win.panel.removeAttribute("data-feature-state");
+    fitBoundsToContent();
+    window.dispatchEvent(
+      new CustomEvent("aether-sketch-surface", {
+        detail: {
+          svg,
+          frame:
+            f ??
+            constructionPlaneFrame({
+              id: "",
+              name: "",
+              type: "plane",
+              plane: p,
+              offsetMillimeters: 0,
+              suppressed: false,
+            }),
+          bounds,
+          connect: (bridge: SurfaceBridge) => {
+            surface = bridge;
+            root.classList.add("in-world");
+            window.addEventListener("keydown", globalKey);
+          },
+        },
+      }),
     );
     render();
   };
@@ -163,13 +299,15 @@ export function openSketchWorkspace(
     ["Right (YZ)", "YZ"],
   ] as const)
     button(label, () => start(p), planeChoices);
-  for (const feature of source.features.slice(0, rollbackPosition(source)))
+  const priorFeatures = source.features.slice(0, rollbackPosition(source));
+  priorFeatures.forEach((feature, featureIndex) => {
     if (feature.type === "plane" && !feature.suppressed)
       button(
         feature.name,
-        () => start(feature.plane, constructionPlaneFrame(feature)),
+        () => start(feature.plane, constructionPlaneFrame(feature, priorFeatures.slice(0, featureIndex))),
         planeChoices,
       );
+  });
   button(
     "Use selected planar face",
     () => window.dispatchEvent(new CustomEvent("aether-sketch-face-request")),
@@ -334,7 +472,7 @@ export function openSketchWorkspace(
   const fitSpline = mountFitSplineTool(controls,root,{
     state:()=>({tool,pending,drawing,construction,busy}),
     commit:next=>{checkpoint();drawing=next;pending=[];cursor=null;activePath=-1;render();},
-    error:text=>{message.textContent=text;},
+    error:text=>{fail(text);},
   });
   const variablePanel = mountSketchVariables(controls,()=>({drawing,variables}),(next,definitions)=>{
     checkpoint();drawing=next;variables=definitions;pending=[];cursor=null;activePath=-1;render();
@@ -382,9 +520,14 @@ export function openSketchWorkspace(
     variablePanel.dispose();
     clipboard.dispose();
     fitSpline.dispose();
-    window.dispatchEvent(
-      new CustomEvent("aether-sketch-plane-selection", { detail: false }),
-    );
+    setChoosingPlane(false);
+    if (surface) {
+      surface = null;
+      window.dispatchEvent(new CustomEvent("aether-sketch-surface-end"));
+    }
+    window.removeEventListener("keydown", globalKey);
+    window.removeEventListener("aether-sketch-finish", finishEvent);
+    win.close();
     root.remove();
     window.removeEventListener("aether-sketch-tool", toolEvent);
     window.removeEventListener("aether-sketch-plane", reference);
@@ -393,6 +536,7 @@ export function openSketchWorkspace(
     window.dispatchEvent(
       new CustomEvent("aether-sketch-mode", { detail: false }),
     );
+    window.dispatchEvent(new CustomEvent("aether-sketch-editing", { detail: null }));
   };
   const finish = button(
     "Finish sketch",
@@ -404,8 +548,8 @@ export function openSketchWorkspace(
         if(tool === "fit-spline" && pending.length) throw Error("Finish spline or cancel the unfinished curve before finishing the sketch.");
         drawing = solveDrawingConstraints(drawing);
         validateSketchDrawing(drawing);
-        if (!drawing.contours.length && !projected)
-          throw new Error("Draw a contour before finishing.");
+        // An empty sketch is valid — the plane choice alone defines it, and
+        // Core keeps sketches without contours (they just can't drive solids).
         if (getDocument() !== source)
           throw new Error(
             "The document changed while sketching. Cancel and reopen to avoid overwriting it.",
@@ -413,11 +557,9 @@ export function openSketchWorkspace(
         busy = true;
         finish.disabled = true;
         const feature: ProfileFeature = {
-          id: existing?.id ?? crypto.randomUUID(),
+          id: featureID,
           type: "profile",
-          name:
-            existing?.name ??
-            `Sketch ${source.features.filter((f) => f.type === "profile" || f.type === "sketch").length + 1}`,
+          name: featureName,
           suppressed: existing?.suppressed ?? false,
           plane,
           offsetMillimeters: existing?.offsetMillimeters ?? 0,
@@ -432,7 +574,7 @@ export function openSketchWorkspace(
         await apply(next);
         cleanup();
       } catch (error) {
-        message.textContent = (error as Error).message;
+        fail((error as Error).message);
       } finally {
         busy = false;
         finish.disabled = false;
@@ -440,13 +582,96 @@ export function openSketchWorkspace(
     },
     actions,
   );
-  button(
+  const cancelButton = button(
     "Cancel",
     () => {
       if (!busy) cleanup();
     },
     actions,
   );
+  // --- Gallery Sketch anatomy: plane entities box + display rows only ----
+  commitSketch = () => finish.click();
+  discardSketch = () => cancelButton.click();
+  finish.classList.add("cad-header-committed");
+  cancelButton.classList.add("cad-header-committed");
+  // Tool parameters and edit drawers live in the sketch toolbar strip —
+  // the feature window describes the sketch (its plane), nothing else.
+  // No sketch options window (Jonathan, 2026-09-11): drawing tools and their
+  // commands live in the ribbon; the feature window describes the plane.
+  // These controls stay attached but never render — they remain the wiring
+  // behind ribbon commands and keyboard/canvas interaction.
+  offscreenControls.append(controls, actions);
+  root.append(offscreenControls);
+  // Planes are picked by clicking them in the viewport or the Model tree;
+  // the legacy buttons stay in the DOM for the test harness only.
+  planeChoices.classList.add("cad-header-committed");
+  const planeBox = win.entitiesBox("Sketch plane");
+  const renderPlaneChip = (label: string) => {
+    planeBox.render([
+      {
+        label,
+        onRemove: () => {
+          if (drawing.contours.length || drawing.textItems?.length) {
+            message.textContent =
+              "This sketch has geometry — cancel and start a new sketch to draw on another plane.";
+            return;
+          }
+          started = false;
+          win.panel.setAttribute("data-feature-state", "invalid");
+          announceDraft(false);
+          planeBox.render([]);
+          setChoosingPlane(true);
+          message.textContent = "";
+          if (surface) {
+            surface = null;
+            window.dispatchEvent(new CustomEvent("aether-sketch-surface-end"));
+          }
+        },
+      },
+    ]);
+  };
+  {
+    const displayRow = (label: string, wire?: (input: HTMLInputElement) => void) => {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.setAttribute("aria-label", label);
+      if (wire) wire(input);
+      else {
+        input.disabled = true;
+        input.title = "Planned — not functional yet.";
+      }
+      win.row(label, input);
+    };
+    displayRow("Disable imprinting");
+    displayRow("Show constraints", (input) => {
+      // On by default, as in Onshape: you should see the relationships holding
+      // the sketch together without asking for them.
+      input.checked = showConstraints;
+      input.onchange = () => {
+        showConstraints = input.checked;
+        render();
+      };
+    });
+    displayRow("Show expressions");
+    displayRow("Show errors", (input) => {
+      input.checked = true;
+      input.onchange = () => {
+        constraintStatus.hidden = !input.checked;
+      };
+    });
+  }
+  // Window body = the gallery Sketch card exactly: plane entities box, the
+  // four display rows, and the widget's own status slot. CAD's additional
+  // live regions (constraint state, selection constraints) stay attached
+  // off-view so behavior and tests are unchanged.
+  offscreenControls.append(constraintStatus);
+  updateSelectionConstraintStatus = mountSelectionConstraintStatus(offscreenControls);
+  renderSketchPlaneChip = renderPlaneChip;
+  if (!existing) {
+    win.panel.setAttribute("data-feature-state", "invalid");
+    announceDraft(false);
+  }
+  
   // Preview is presentation-only: no feature/undo mutation until a point is placed.
   const effectivePoint = (p: SketchPoint): SketchPoint => {
     const c = drawing.contours[activePath];
@@ -483,14 +708,16 @@ export function openSketchWorkspace(
     updateSelectionConstraintStatus(drawing, selectedEntity);
   }
   function render() {
+    if (surface && fitBoundsToContent()) surface.updateBounds(bounds);
     variablePanel.sync();
     textPanel.sync();
     controls.hidden = !started;
     finish.disabled = !started;
     svg.style.visibility = started ? "visible" : "hidden";
     if (!started) {
-      message.textContent =
-        "Select a reference plane in the Model tree, or select a flat model face and use it here.";
+      // No prompt text: the empty "Sketch plane" box is the instruction, exactly
+      // as in the gallery's Sketch window.
+      message.textContent = "";
       return;
     }
     sides.parentElement!.hidden = !tool.endsWith("polygon");
@@ -519,6 +746,9 @@ export function openSketchWorkspace(
     const closed = profiles.filter(contourClosed).length;
     message.textContent = `${frame ? "Planar face" : plane} · ${tool} · ${closed} closed / ${profiles.length - closed} open profiles. ${instructions[tool] ?? ""}`;
     renderSketchCanvas(svg, drawing, bounds, pending, dimensionPositions);
+    if (showConstraints) renderConstraintMarks(svg, drawing, bounds);
+    if (hoveredEntity && cursor)
+      renderHoveredConstraints(svg, drawing, hoveredEntity, cursor, bounds);
     projected?.render(svg);
     renderPreview();
     renderSelection();
@@ -563,7 +793,7 @@ export function openSketchWorkspace(
         render();
         if (result.message) message.textContent = result.message;
       } catch (error) {
-        message.textContent = (error as Error).message;
+        fail((error as Error).message);
       }
       return;
     }
@@ -581,6 +811,7 @@ export function openSketchWorkspace(
         renderSelection();
         const selector = pickEntityB ? entityB : entityA;
         selectPickedReference(selector, picked);
+        selector.closest("details")?.toggleAttribute("open", true);
         message.textContent = `${pickEntityB ? "Entity B" : "Entity A"}: ${picked.label}. ${hints[kind.value]}`;
         pickEntityB = !pickEntityB;
       } else {
@@ -619,24 +850,32 @@ export function openSketchWorkspace(
       render();
       if (result.committed) recentSizing.offer(tool, previousContourCount, activePath);
     } catch (error) {
-      message.textContent = (error as Error).message;
+      fail((error as Error).message);
     }
   }
   const pointerPoint = (e: MouseEvent): SketchPoint | null => {
-    const point = svg.createSVGPoint();
-    point.x = e.clientX;
-    point.y = e.clientY;
-    const matrix = svg.getScreenCTM();
-    if (!matrix) return null;
-    const p = point.matrixTransform(matrix.inverse());
-    const raw: SketchPoint = [p.x, -p.y];
+    let raw: SketchPoint;
+    if (surface) {
+      const hit = surface.toSketch(e.clientX, e.clientY);
+      if (!hit) return null;
+      raw = hit;
+    } else {
+      const point = svg.createSVGPoint();
+      point.x = e.clientX;
+      point.y = e.clientY;
+      const matrix = svg.getScreenCTM();
+      if (!matrix) return null;
+      const p = point.matrixTransform(matrix.inverse());
+      raw = [p.x, -p.y];
+    }
     if (isDirectModificationTool(tool)) return raw;
     const contour = drawing.contours[activePath];
     const anchor =
       pending[0] ??
       (contour?.type === "path" ? contour.segments.at(-1)?.end : undefined);
-    const tolerance =
-      (bounds.width * 8) / Math.max(svg.getBoundingClientRect().width, 800);
+    const tolerance = surface
+      ? 8 * (surface.scaleAt(e.clientX, e.clientY) ?? bounds.width / 100)
+      : (bounds.width * 8) / Math.max(svg.getBoundingClientRect().width, 800);
     const snapped = geometrySnap
       ? snapSketchPoint(raw, drawing, anchor, tolerance, gridSnap)
       : {
@@ -683,6 +922,10 @@ export function openSketchWorkspace(
     point: pointerPoint,
     drawing: () => drawing,
     pointTolerance: () => {
+      if (surface) {
+        const scale = surface.scaleAt();
+        if (scale) return 6 * scale;
+      }
       const matrix = svg.getScreenCTM();
       const scale = matrix ? Math.hypot(matrix.a, matrix.b) : NaN;
       return Number.isFinite(scale) && scale > 0
@@ -736,10 +979,14 @@ export function openSketchWorkspace(
   svg.addEventListener("pointermove", (e) => {
     if (endpointGesture.active() || trimGesture.active() || selectionDrag.active()) return;
     cursor = pointerPoint(e);
+    // Onshape reveals what constrains an entity as soon as you point at it,
+    // whether or not constraint display is switched on.
+    hoveredEntity = cursor ? (pickSelectableSketchEntity(drawing, cursor)?.ref ?? null) : null;
     renderPreview();
   });
   svg.addEventListener("pointerleave", () => {
     cursor = null;
+    hoveredEntity = null;
     renderPreview();
   });
   svg.addEventListener("click", (e) => {
@@ -778,8 +1025,9 @@ export function openSketchWorkspace(
         "Select sketch edges or vertices. Click empty space to deselect.";
       return;
     }
-    if (e.target !== svg) return;
+    if (!surface && e.target !== svg) return;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      if (surface) return; // in-world: the 3D camera owns panning
       e.preventDefault();
       bounds.x +=
         ((e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0) *
@@ -792,17 +1040,24 @@ export function openSketchWorkspace(
       render();
     }
   };
+  const finishEvent = () => finish.click();
+  window.addEventListener("aether-sketch-finish", finishEvent);
   root.addEventListener("keydown", workspaceKey);
   svg.addEventListener("keydown", (e) => {
     if (!e.bubbles) workspaceKey(e);
   });
+  // In-world mode the svg cannot take focus (pointer-events:none in the CSS3D
+  // layer), so keyboard shortcuts listen globally, skipping sidebar-focused events
+  // that the root listener already handles.
+  const globalKey = (e: KeyboardEvent) => {
+    if (root.contains(e.target as Node)) return;
+    workspaceKey(e);
+  };
   cadSelection.dispatch({ type: "set-filter", filter: "face" });
   viewport.append(root);
   if (existing) start(plane, frame);
   else {
-    window.dispatchEvent(
-      new CustomEvent("aether-sketch-plane-selection", { detail: true }),
-    );
+    setChoosingPlane(true);
     render();
   }
 }

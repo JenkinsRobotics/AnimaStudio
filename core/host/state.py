@@ -42,6 +42,7 @@ DEFAULT_SETTINGS = {
     "public_url": "http://localhost:8780",
     "tls_cert": "",
     "tls_key": "",
+    "theme": {"base": "aether-default", "apps": {}},
 }
 
 
@@ -52,6 +53,11 @@ class Store:
         directory.chmod(0o700)
         self.db = sqlite3.connect(directory / "studio.sqlite3", check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        # Team-scale concurrency: WAL lets readers proceed during writes and
+        # busy_timeout absorbs short contention across handler threads.
+        self.db.executescript(
+            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;"
+        )
         self.db.executescript("""
             PRAGMA foreign_keys=ON;
             CREATE TABLE IF NOT EXISTS users (
@@ -80,6 +86,7 @@ class Store:
             ("email_verified", "INTEGER NOT NULL DEFAULT 0"),
             ("theme", "TEXT NOT NULL DEFAULT 'dark'"),
             ("avatar", "TEXT NOT NULL DEFAULT ''"),
+            ("theme_id", "TEXT NOT NULL DEFAULT ''"),
         ]:
             if name not in columns:
                 self.db.execute(f"ALTER TABLE users ADD COLUMN {name} {definition}")
@@ -174,7 +181,10 @@ class Store:
     def sign_in(self, username, password, address):
         username = str(username).strip().lower()[:254]
         now = time.time()
-        keys = ["ip:" + address, "user:" + username]
+        # Loopback is every local user's address, so counting failures against
+        # it would let ten bad attempts lock out the whole installation.
+        shared_address = address in {"127.0.0.1", "::1", "localhost"}
+        keys = ["user:" + username] if shared_address else ["ip:" + address, "user:" + username]
         for key in keys:
             attempt = self.db.execute(
                 "SELECT * FROM attempts WHERE key=?", (key,)
@@ -199,7 +209,10 @@ class Store:
                 )
             self.audit(username, "sign_in_failed")
             raise Problem(401, "Username or password is incorrect.")
-        self.db.execute("DELETE FROM attempts WHERE key=?", ("user:" + username,))
+        # Clear every counter this sign-in was throttled by, not just the user
+        # one — otherwise the address bucket keeps climbing to a lockout.
+        for key in keys:
+            self.db.execute("DELETE FROM attempts WHERE key=?", (key,))
         self.db.execute("DELETE FROM sessions WHERE expires<?", (now,))
         token = secrets.token_urlsafe(32)
         self.db.execute(
@@ -230,7 +243,7 @@ class Store:
                 }
             return None
         row = self.db.execute(
-            """SELECT u.id,u.username,u.full_name,u.email,u.email_verified,u.theme,u.avatar,u.role,u.active,u.must_change
+            """SELECT u.id,u.username,u.full_name,u.email,u.email_verified,u.theme,u.theme_id,u.avatar,u.role,u.active,u.must_change
             FROM users u JOIN sessions s ON s.user_id=u.id
             WHERE s.token=? AND s.expires>? AND u.active=1""",
             (self.token_hash(token), time.time()),

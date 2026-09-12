@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "build": "node ../dev/check-theme-literals.mjs && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "check:theme": "node ../dev/check-theme-literals.mjs"
   },
   "dependencies": {
     "@aether/ui": "file:../core/ui",

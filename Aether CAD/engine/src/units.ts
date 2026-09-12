@@ -1,6 +1,10 @@
 import { evaluateQuantityExpression } from "./quantity-expression";
 export { evaluateQuantityExpression } from "./quantity-expression";
-import catalog from "../../assets/cad/units.json";
+// The CAD unit catalog is genuinely shared: this engine and the server's
+// animacore/cad_document.py both read it, so it stays in core/assets/ per the
+// suite contract. ponytail: the only path out of this package — if a third
+// consumer appears, give the catalog a typed module instead of a raw import.
+import catalog from "../../../core/assets/cad/units.json";
 export const unitCatalog = catalog;
 export type UnitFamily = keyof typeof catalog;
 export type UnitPreferences = Partial<

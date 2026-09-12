@@ -22,8 +22,15 @@ export interface TreeNode {
   disabled?: boolean;
   /** Visually de-emphasized (for example suppressed/hidden entities). */
   dimmed?: boolean;
-  /** Hover-revealed trailing actions; clicks never change selection. */
-  actions?: readonly { id: string; label: string; icon: ReactNode }[];
+  /** Extra class on the row element for application-specific presentation. */
+  className?: string;
+  /** Row presentation variant. "divider" renders a slim draggable rule
+   * (feature-history rollback lines) instead of a normal row. */
+  variant?: "divider";
+  /** Semantic row tone; "error" marks failing entities. */
+  tone?: "error";
+  /** Hover-revealed trailing actions; clicks never change selection; `pinned` keeps one visible without hover. */
+  actions?: readonly { id: string; label: string; icon: ReactNode; pinned?: boolean }[];
   children?: readonly TreeNode[];
   /** Shows a live child status row while an expanded branch resolves. */
   childrenLoading?: boolean;
@@ -405,6 +412,9 @@ export function Tree({
     if (selected) rowClasses.push("aui-tree-row--selected");
     if (node.dimmed) rowClasses.push("aui-tree-row--dimmed");
     if (node.disabled) rowClasses.push("aui-tree-row--disabled");
+    if (node.variant === "divider") rowClasses.push("aui-tree-row--divider");
+    if (node.tone === "error") rowClasses.push("aui-tree-row--error");
+    if (node.className) rowClasses.push(node.className);
     if (dragTarget?.id === node.id) {
       rowClasses.push(`aui-tree-row--drop-${dragTarget.position}`);
     }
@@ -516,7 +526,7 @@ export function Tree({
                 type="button"
                 title={action.label}
                 aria-label={action.label}
-                className="aui-tree-action"
+                className={action.pinned ? "aui-tree-action aui-tree-action--pinned" : "aui-tree-action"}
                 tabIndex={-1}
                 disabled={node.disabled}
                 onClick={(event) => {

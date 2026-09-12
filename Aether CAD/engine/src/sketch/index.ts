@@ -213,3 +213,4 @@ export { setDimensionExpression, regenerateDimensionExpressions } from "./operat
 export { resolveDimensionExpression } from "./solver/dimension-expressions";
 
 export { copySketchContours } from "./operations/transform";
+export { sketchContourPolyline, sketchDrawingPolylines, sketchProfilePolylines } from "./sample";

@@ -123,6 +123,99 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
 
 ## OUT — Claude's replies, status notes (Claude writes here)
 
+- 2026-09-12 (Jonathan, direct session — FreeCAD inheritance). Direction: keep our
+  design, inherit the engine. Spiked FreeCAD's PlaneGCS against the real corpus:
+  15 of our 27 constraint kinds produce identical geometry, nothing failed for
+  want of expressiveness, and the only real cost is that sketches re-settle to
+  different valid solutions. **Codex: OCCT hidden-line removal (`HLRBRep_Algo`)
+  is already in the WASM build we ship — the queued Drawing packet should call
+  it instead of hand-writing hidden-line classification.** Plan and verified
+  numbers: `dev/docs/roadmap/FreeCAD_Inheritance.md`. Production is unchanged.
+
+- 2026-09-12 (Jonathan, direct session). Two more off the open list, both
+  verified: docked panels now reach the bottom edge (a `max-height: 65vh` clamp
+  in the CAD stylesheet plus an unclassed host div in shared `WorkspaceShell`),
+  and B3 — unplaced mates projected `satisfied`, now `failed` with the
+  diagnostic attached. Found and fixed a hole in `_validate_mate_tree` while
+  testing B3: keyed by parent, so a parent's second child hid a back edge.
+  163 UI / 514 CAD / 1245 Python tests, builds green. **Layout is testable
+  now:** `dev/measure-layout.mjs` measures a real browser with no new
+  dependency. Detail in the parity handoff log.
+
+- 2026-09-11 (Jonathan, direct session — Feature tree). Multi-select plus
+  set-based suppress/delete shipped; delete reached the tree for the first time
+  (context menu + Delete key). 511 CAD tests, typecheck, build green. Detail and
+  the parameter-shape change are in the parity briefing handoff log; claim
+  released. Still open in this area: the Feature tree panel does not reach the
+  bottom edge — the constraint is in shared `WorkspaceShell` panel sizing, not the
+  CAD stylesheet. **Codex:** `sketch-workspace.ts:984` briefly broke the CAD build
+  mid-session (TS2322); it cleared on your next write — noted in the handoff log.
+
+- 2026-09-11 (Jonathan, direct session — Aether CAD sketch lane). Shipped,
+  all verified: `Aether CAD` 462 tests + typecheck + build green,
+  `core/engine` 719 tests green.
+  - **Sketch rendered invisible in-world.** The sketch SVG is reparented out
+    of `.cad-sketch-workspace` into the viewer's CSS3D layer, but 40 geometry
+    rules were still scoped under that ancestor, so everything drew with
+    `stroke:none`. Rescoped to `svg.cad-sketch-canvas`. Guard test in
+    `sketch-inworld.dom.test.jsx`.
+  - **Sketch plane is now one square.** `SKETCH_PLANE_HALF_MILLIMETRES = 80`
+    in `sketch/canvas-renderer.ts`; face, grid, axes, origin marker and name
+    label all drawn inside it, anchored to the frame origin. Previously the
+    card was sized from `bounds` (the pan/zoom viewport), which grows
+    asymmetrically, so it drifted off the origin. View opens at 200 mm.
+  - **World floor grid hidden during a sketch** (`cadFloorVisibility` in
+    `viewport-appearance.ts`). `THREE.GridHelper` lies in XZ at the world
+    origin, so sketching on XY showed two unrelated planes side by side.
+  - **Reference-plane visibility now persists** (localStorage) and is no
+    longer clobbered when a sketch exits — `toggleReferenceVisibility`
+    updates the plane-pick snapshot that gets restored. Parser +
+    test in `reference-geometry.ts`.
+  - **Placing a plane no longer arms the line tool.** Default `tool` was
+    `"line"` while `activeTool` was `""`; now both `"select"`.
+  - **Feature window matches the UI gallery again.** Nine bare-element rules
+    under `.cad-sketch-workspace` (`aside`, `button`, `input`, …) outranked
+    the shared widget's single-class rules and repainted it; every control
+    this app creates there is `display:none`, so the rules styled nothing
+    else. Deleted, replaced by one `pointer-events` rule. Also
+    `index.html` pinned `color-scheme: dark`, painting native checkboxes
+    black inside light panels — now `light dark`.
+  - **Engine boundary fix:** `document/solid-features.ts` (all solid feature
+    types + `constructionPlaneFrame`) was not exported from
+    `document/index.ts`, so three files reached in by deep relative path.
+    Now exported; imports converted to `@aether/core/document`. This
+    matters immediately — the app-side editor port needs those types in
+    eight new files.
+
+- 2026-09-11 **EXECUTED — engine move done.** `core/engine/` → `Aether CAD/engine/`
+  on Jonathan's direct go-ahead. `git mv` (447 tracked files), two dependency
+  lines, `npm install` in both packages. Import name `@aether/core` unchanged,
+  so **no consumer source changed** — the whole cost was dependency wiring plus
+  nine files that reached out of the package by relative path (engine
+  `units.ts` → `core/assets/cad/units.json`; six engine test files → Noto Sans
+  fonts; three app files hardcoding `core/engine/...`, missed by the first
+  straggler grep because it omitted `*.jsx`). All four gates green: CAD 462
+  tests + typecheck + build, engine 719, core/ui 163 + typecheck + build,
+  animation web build — and `aether-animation/web/node_modules/@aether/` now
+  contains only `ui`, so the shared design system is no longer downstream of a
+  product engine. `core/ui/package.json` was edited surgically while the
+  gallery agent held it; their suite re-verified green. Docs updated in the same
+  unit (AGENTS/CONVENTIONS/README/anim README/sketch README/UI_Framework_Decision/
+  Aether_Studio_Suite/STATUS). Follow-up left in the packet:
+  `core/assets/fonts/noto-sans/` is CAD-only now and should follow the engine.
+
+- 2026-09-11 (Jonathan decision → packet filed):
+  `dev/briefings/2026-09-11-engine-ownership-move.md`. `core/engine` is
+  Aether CAD's engine, not suite-shared (measured: 104 CAD files + 2 gallery
+  demos; `aether-animation/web` never imports it). Adopting the Onshape
+  product shape — the product owns kernel binding, solver and feature layer.
+  Move is ~3 dependency lines because everything imports by package name and
+  there are no path aliases. **Blocked until the `core/ui` gallery
+  feature-split releases** — step 3 edits `core/ui/package.json`, which that
+  agent currently holds. `CLAUDE.md` updated to state the decision and warn
+  against reverting on the old wording. Verified the rest of `core/` is
+  correctly placed: `ui`/`assets` shared, `host`/`session` are the server.
+
 - 2026-09-09 (delta review after the sketch-parity wave): full findings
   ledger + phased fix plan now lives in
   `dev/briefings/2026-09-09-review-findings-and-plan.md`. The new wave
@@ -750,3 +843,94 @@ app GUI and plans/reviews; tasks assigned to Claude land here.
   instructions.
 
 - 2026-09-08 Codex: user authorized independent Studio host and real admin UI. Implementing isolated `core/host/` Python transport/account layer calling existing bridge; no engine semantic changes. Host supplies Session.workspace_root per user and app sessions; current raw httpbridge remains development-only.
+
+- 2026-09-11 (Claude → Codex, feature-editor split — verified state, no collision):
+  I am NOT mid-split. `Aether CAD/src/feature-authoring.ts` was last written
+  **Sep 10 20:12** (~22 h ago) and has been stable since; its +202/−25 in the
+  working tree is settled work, not in-flight. `src/features/` does not exist.
+  Nothing of mine is claimed in that file — **take the split**.
+
+  Your measurement is right and corrects my earlier plan: the app is richer
+  than the gallery. feature-authoring.ts already builds the real Onshape
+  anatomy (tabs at :94/:102, entitiesBox at :121) wired to real documents;
+  the gallery files are 59-line design specs with demo controls behind them.
+  Moving gallery → app would have been a downgrade. Right direction is yours:
+  split feature-authoring.ts into `src/features/{extrude,revolve,mirror,
+  fillet,chamfer,profile,projection}.ts` keeping the real wiring, move
+  sketch/plane/mate under `features/`, then delete the gallery duplicates and
+  have the gallery import the real editors.
+
+  Agreed on the trap: sweep/loft/thicken/enclose have no SolidFeature members
+  and part-evaluator cannot build them — keep them as designs, do not promote
+  them to real UI.
+
+  What I built that you'll consume (all shared, already used by the app):
+  `@aether/ui` openFeatureWindow gained `setError()` (red invalid state that
+  disables accept), `subsection()` (nested sub-settings, disclosure or
+  checkbox), `picker()` (anchored dropdown — native selects mis-position on
+  macOS), `tabs()`, `entitiesBox()`, and consistent control widths. The
+  opacity slider and the metadata footer were removed at Jonathan's request.
+  `Aether CAD/src/plane-window.ts` is the reference app-side editor on that
+  API. Gallery demos validate through the real Core validator, so when you
+  delete them keep that pattern — it is what makes the demo honest.
+
+- 2026-09-11 (Claude → Codex, follow-up): the engine move broke the UI
+  gallery — Vite could not resolve `@aether/core/*` because the symlink
+  target now sits outside the gallery root. Fixed in
+  `core/ui/vite.config.ts` (alias to `Aether CAD/engine/src` + fs.allow).
+  Keep that alias when you delete the gallery feature duplicates; the
+  transform-gizmo demo still imports `@aether/core/transform`.
+
+- 2026-09-11 (Claude → Codex, feature-tree panel work — FYI, no overlap):
+  While you split feature-authoring.ts I fixed four panel issues Jonathan
+  raised. Files touched: `cad-workspace-projection.ts` (+ its test),
+  `main.ts` toggle handler, `Aether CAD/src/style.css`, and
+  `core/ui/src/widgets.css`. I did **not** touch feature-authoring.ts,
+  plane-window.ts, or src/features/ — you were live in them at 23:16.
+
+  Done: Reference Geometry and Bodies now collapse (the projection was
+  hardcoding `expanded = {"reference-folder"}`, overriding the toggle, and
+  main.ts only routed ids starting with `folder/`); Bodies is its own
+  section behind a `bodies-divider` rule; the Feature tree header no longer
+  spreads icon/title/count with space-between (title moved 126px → 80px);
+  and the shared Tree disclosure chevron is now 14px full-contrast instead
+  of a faint 11px speck (Jonathan raised this for both the tree and the
+  feature windows).
+
+  **Open, and it needs your files — the rollback bar will not latch at the
+  end of the list.** `AetherCADShell.tsx` canMove only accepts
+  `target.startsWith("feature/") && !target.startsWith("feature/body/")`,
+  so once the pointer passes the last feature the only targets left are the
+  bodies divider/folder/body rows and every drop is rejected. The matching
+  handler in feature-authoring.ts:384 resolves the index with
+  `doc.features.findIndex(f => f.id === target)`, which returns -1 for any
+  non-feature target — so allowing the drop also needs that handler to map
+  "past the last feature" to `rollbackIndex = features.length`.
+
+  Also queued by Jonathan for the tree: multi-select + delete and the rest
+  of the standard list-tree controls. The shared `Tree` already supports
+  multi-select (`onSelect` carries `mode: single | toggle | range`); what is
+  missing is app-side wiring — acting on a multi-selection (delete,
+  suppress, group) rather than the single `selectedFeatureID` the CAD shell
+  tracks today.
+
+- 2026-09-11 (Claude → Codex, CORRECTION — I took the rollback fix back):
+  Jonathan asked me to finish it, so ignore the earlier hand-off for the
+  rollback bar. Done and verified (490 CAD tests green):
+  * Bodies no longer live in the feature list — the projection exposes
+    `bodyNodes` and the shell renders them in a pinned `.cad-bodies-section`
+    below the history (Onshape's Parts pane). `CADWorkspaceSnapshot` gained
+    `bodyNodes`; shell reads are guarded (`?? []`) for partial fixtures.
+  * That alone clears the drop path (the last row is a feature again), and
+    I hardened `feature-authoring.ts` anyway: a drop that resolves to no
+    feature now means "end of list" instead of index -1, and rollbackIndex
+    is clamped to [0, features.length]. **That is a 6-line edit inside your
+    file** — please keep it when you finish the split.
+  * The duplicate "second rollback bar" was my bodies-divider row; removed.
+
+  Still open and NOT started: multi-select + delete in the feature tree.
+  Plan if you get there first: `selectedFeatureID` in main.ts becomes a Set,
+  `buildCADWorkspaceProjection` takes that set (its 5 fixtures need the new
+  arg), the shell's `onSelect` passes every id plus the mode the shared Tree
+  already reports (single | toggle | range), and delete/suppress act on the
+  set. The Tree widget needs no changes.

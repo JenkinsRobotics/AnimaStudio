@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ComponentPropsWithoutRef, KeyboardEvent, ReactNode } from "react";
 
 /** The horizontal tool ribbon strip (groups with captions).
  *  ←/→ move focus across enabled tools, spanning group boundaries. */
@@ -32,7 +32,7 @@ export function RibbonGroup({ label, children }: { label: string; children: Reac
   );
 }
 
-export interface RibbonToolProps {
+export interface RibbonToolProps extends Omit<ComponentPropsWithoutRef<"button">, "onClick"> {
   icon: ReactNode;
   label: string;
   active?: boolean;
@@ -41,11 +41,12 @@ export interface RibbonToolProps {
 }
 
 /** Icon-over-label ribbon tool button. */
-export function RibbonTool({ icon, label, active, disabled, onClick }: RibbonToolProps) {
+export function RibbonTool({ icon, label, active, disabled, onClick, ...buttonProps }: RibbonToolProps) {
   const classes = ["aui-ribbon-tool"];
   if (active) classes.push("aui-ribbon-tool--active");
   return (
     <button
+      {...buttonProps}
       type="button"
       className={classes.join(" ")}
       disabled={disabled}

@@ -17,20 +17,32 @@ async function request(path, body) {
     throw new Error(data.error || "Unable to update your account.");
   return data;
 }
+let workspaceTheme = null;
+function applyTheme() {
+  // Precedence: the member's personal theme, then the application override,
+  // then the workspace base. Modes (System/Light/Dark) work inside any theme.
+  const first = location.pathname.split("/")[1];
+  const scope = ["cad", "animation", "ui"].includes(first) ? first : "studio";
+  const personal = account && account.theme_id && account.theme_id.trim();
+  const effective =
+    personal ||
+    (workspaceTheme && (workspaceTheme.apps?.[scope] || workspaceTheme.base)) ||
+    "aether-default";
+  const root = document.documentElement;
+  for (const name of Array.from(root.classList))
+    if (name.startsWith("aether-theme-")) root.classList.remove(name);
+  if (effective !== "aether-default")
+    root.classList.add("aether-theme-" + effective);
+}
 function apply() {
-  const theme = account?.theme || "dark";
-  document.documentElement.dataset.aetherTheme =
-    theme === "system"
-      ? matchMedia("(prefers-color-scheme: light)").matches
-        ? "light"
-        : "dark"
-      : theme;
+  applyTheme();
   for (const update of subscribers) update();
 }
 async function refresh() {
   try {
     const status = await request("/api/status");
     account = status.user;
+    workspaceTheme = status.theme || null;
     apply();
     document.dispatchEvent(
       new CustomEvent("aether-account", { detail: account }),
@@ -49,7 +61,6 @@ document.addEventListener("aether-account-refresh", () => {
   refresh();
   channel?.postMessage("changed");
 });
-matchMedia("(prefers-color-scheme: light)").addEventListener("change", apply);
 function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text) node.textContent = text;
@@ -93,63 +104,26 @@ class AetherAccount extends HTMLElement {
     );
     summary.append(label);
     const menu = element("div", "", "suite-account-menu");
-    menu.append(
+    const identity = element("div", "", "suite-account-identity");
+    identity.append(
       element("strong", account.full_name || account.username),
       element("small", account.email || account.username),
     );
-    const field = element("label", "Appearance");
-    const select = element("select");
-    select.setAttribute("aria-label", "Account appearance");
-    for (const value of ["dark", "light", "system"]) {
-      const option = element("option", value[0].toUpperCase() + value.slice(1));
-      option.value = value;
-      select.append(option);
-    }
-    select.value = account.theme || "dark";
+    menu.append(identity);
     const error = element("p");
     error.setAttribute("role", "alert");
-    const save = async (body) => {
-      try {
-        await request("/api/preferences", body);
-        await refresh();
-        channel?.postMessage("changed");
-      } catch (e) {
-        error.textContent = e.message;
-      }
+    const item = (text, go) => {
+      const row = element("button", text, "suite-account-item");
+      row.type = "button";
+      row.onclick = go;
+      menu.append(row);
+      return row;
     };
-    select.onchange = () => save({ theme: select.value });
-    field.append(select);
-    menu.append(field);
-    const picture = element("label", "Profile picture");
-    const input = element("input");
-    input.type = "file";
-    input.accept = "image/png,image/jpeg";
-    input.setAttribute("aria-label", "Profile picture");
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      if (file.size > 262144) {
-        error.textContent = "Choose a PNG or JPEG smaller than 256 KB.";
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => save({ avatar: reader.result });
-      reader.readAsDataURL(file);
-    };
-    picture.append(input);
-    menu.append(picture);
-    if (account.avatar) {
-      const remove = element("button", "Remove picture");
-      remove.onclick = () => save({ avatar: "" });
-      menu.append(remove);
-    }
-    const profile = element("a", "Manage account");
-    profile.href = "/?account=1";
-    menu.append(profile);
-    const studio = element("a", "Aether Studio");
-    studio.href = "/";
-    menu.append(studio);
-    const logout = element("button", "Sign out");
+    item("My account", () => location.assign("/?account=1"));
+    item("Aether Studio", () => location.assign("/"));
+    menu.append(element("div", "", "suite-account-separator"));
+    const logout = element("button", "Sign out", "suite-account-item");
+    logout.type = "button";
     logout.onclick = async () => {
       try {
         await request("/api/logout", {});

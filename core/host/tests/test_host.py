@@ -371,3 +371,17 @@ def test_setup_persists_workspace_and_app_choices_atomically(tmp_path):
     reopened = Store(instance.store.directory)
     assert reopened.ready() and reopened.settings()["name"] == "Workshop"
     assert not instance.store.setup_path.exists()
+
+
+def test_theme_settings_flow(tmp_path):
+    from core.host.state import Store
+
+    store = Store(tmp_path / "state")
+    assert store.settings()["theme"] == {"base": "aether-default", "apps": {}}
+    store.db.execute(
+        "UPDATE settings SET value=? WHERE key='theme'",
+        ('{"base": "community-neon", "apps": {"cad": "aether-default"}}',),
+    )
+    store.db.commit()
+    assert store.settings()["theme"]["base"] == "community-neon"
+    assert store.settings()["theme"]["apps"]["cad"] == "aether-default"

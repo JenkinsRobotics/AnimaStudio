@@ -47,7 +47,11 @@ per the normal process when work starts.
   exists/not-self; an A↔B cycle empties `root_instance_ids` and
   round-trips through save/load (`_build_instance` doesn't check
   either). Fix: acyclicity check on move AND on load.
-- [ ] **B3. Unconverged mates project `satisfied`.**
+- [x] **B3. Unconverged mates project `satisfied`.** [executed 2026-09-12 —
+  unplaced mates now project `failed` (already in the frozen contract) and
+  carry the `solve_unconverged` diagnostic id. Also closed a hole found
+  while testing it: `_validate_mate_tree` keyed its walk by parent, so a
+  parent's second child hid a back edge; the walk now goes child to parent.]
   `aether_workspace.py:531-536` — `solve_state` is only
   suppressed|warning|satisfied; solver `status: "unconverged"` is
   invisible per-mate.

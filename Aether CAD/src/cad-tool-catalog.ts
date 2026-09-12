@@ -1,4 +1,4 @@
-import { drawingConstraintKinds } from "@aether/core/sketch";
+import { sketchConstraintCatalog, sketchDimensionKinds } from "./sketch/constraint-catalog";
 import type { ToolIconName } from "@aether/ui";
 import type { CADCommandID } from "./cad-command-registry";
 
@@ -51,7 +51,6 @@ export interface CADRibbonWorkspaceDefinition {
 }
 
 const solidProducer = "Requires a canonical Core solid-feature command that is not connected yet.";
-const sketchProducer = "Requires the canonical constrained-sketch editor and solver.";
 const assemblyProducer = "Requires a canonical Core Assembly mutation or mate solver command that is not connected yet.";
 const analysisProducer = "Requires an exact Core analysis contract and result producer.";
 const exportProducer = "Requires a canonical Core export producer for this format.";
@@ -64,6 +63,57 @@ const tool = (
   action?: CADToolActionID,
   unavailableReason?: string,
 ): CADToolDefinition => ({ id, label, icon, action, unavailableReason });
+
+/** Icon for a constraint kind. Falls back to a neutral glyph so a newly added
+ *  kind shows up rather than crashing the ribbon. */
+const constraintIcon = (kind: string): ToolIconName =>
+  (({
+    coincident: "point", horizontal: "parallel", vertical: "perpendicular",
+    parallel: "parallel", perpendicular: "perpendicular", concentric: "concentric",
+    equal: "parallel", midpoint: "point", tangent: "tangent", curvature: "curvature",
+    normal: "normal", symmetric: "symmetric", quadrant: "quadrant",
+    "ellipse-shape": "ellipse", "ellipse-locus": "ellipse", "spline-shape": "curve",
+    offset: "offset", slot: "slot", distance: "measure",
+    "horizontal-distance": "measure", "vertical-distance": "measure",
+    length: "measure", radius: "circle", diameter: "circle", angle: "angle",
+    fix: "ground",
+  }) as Record<string, ToolIconName>)[kind] ?? "point";
+
+const constraintTool = (kind: string, label: string): CADToolDefinition =>
+  tool(`sketch-constraint-${kind}`, label, constraintIcon(kind), `sketch-constraint-${kind}` as CADToolActionID);
+
+/** One Constrain button; every other relationship lives in its dropdown, in
+ *  Onshape's menu order. */
+const constraintRibbonTool = (): CADToolDefinition => {
+  const [first, ...rest] = sketchConstraintCatalog;
+  return {
+    ...constraintTool(first.kind, first.label),
+    id: "sketch-constrain",
+    variants: rest.map((entry) => constraintTool(entry.kind, entry.label)),
+  };
+};
+
+/** One Dimension button. Onshape drives every dimension type from this tool
+ *  rather than listing them beside the relationships. */
+const dimensionRibbonTool = (): CADToolDefinition => {
+  const labels: Record<string, string> = {
+    distance: "Dimension",
+    "horizontal-distance": "Horizontal distance",
+    "vertical-distance": "Vertical distance",
+    length: "Length",
+    radius: "Radius",
+    diameter: "Diameter",
+    angle: "Angle",
+  };
+  const [first, ...rest] = sketchDimensionKinds;
+  return {
+    ...constraintTool(first, labels[first] ?? first),
+    id: "sketch-dimension",
+    icon: "measure",
+    label: "Dimension",
+    variants: rest.map((kind) => constraintTool(kind, labels[kind] ?? kind)),
+  };
+};
 
 export const cadRibbonWorkspaces: readonly CADRibbonWorkspaceDefinition[] = [
   {
@@ -86,6 +136,7 @@ export const cadRibbonWorkspaces: readonly CADRibbonWorkspaceDefinition[] = [
       { id: "home-project", label: "Project", tools: [
         tool("home-open", "Open Part", "open", "open-part"),
         tool("home-save", "Save Part", "save", "save-part"),
+        tool("home-commit", "Commit", "commit", "commit-part"),
         tool("home-import", "Insert STEP", "import", "insert-step"),
         tool("home-recovery", "Recover", "history", "show-recovery"),
       ] },
@@ -128,17 +179,19 @@ export const cadRibbonWorkspaces: readonly CADRibbonWorkspaceDefinition[] = [
         tool("sketch-split", "Split", "trim", "sketch-split"),
         tool("sketch-project", "Project sketch", "plane", "sketch-project"),
       ] },
-      { id: "sketch-constraints", label: "Constrain", tools: drawingConstraintKinds.filter(kind => kind !== "pattern").map(kind=>tool(
-        `sketch-constraint-${kind}`,kind[0].toUpperCase()+kind.slice(1).replaceAll("-", " "),
-        ({coincident:"point",horizontal:"parallel",vertical:"perpendicular",parallel:"parallel",perpendicular:"perpendicular",concentric:"concentric",equal:"parallel",midpoint:"point",tangent:"tangent",curvature:"curvature",normal:"normal",symmetric:"symmetric",quadrant:"quadrant","ellipse-shape":"ellipse","ellipse-locus":"ellipse","spline-shape":"curve",offset:"offset",slot:"slot",distance:"measure","horizontal-distance":"measure","vertical-distance":"measure",length:"measure",radius:"circle",diameter:"circle",angle:"angle",fix:"ground"} as const)[kind],
-        `sketch-constraint-${kind}`,
-      )) },
+      // Onshape collapses relationships into ONE Constrain button with a
+      // dropdown, and dimensions onto a separate Dimension tool — not 26 flat
+      // buttons. Both lists come from the constraint catalog so the ribbon, the
+      // canvas glyphs and the keyboard map can never disagree.
+      // Two separate groups, not one: the contextual Sketch tab gives each
+      // section a single dropdown, so pairing them would put relationships and
+      // dimensions in one mixed menu. One icon each, everything else behind it.
+      { id: "sketch-constraints", label: "Constrain", tools: [constraintRibbonTool()] },
+      { id: "sketch-dimensions", label: "Dimension", tools: [dimensionRibbonTool()] },
       { id: "sketch-insert", label: "Insert", tools: [tool("sketch-text", "Text", "text", "sketch-text"), tool("sketch-import-dxf", "Import DXF", "import", "sketch-import-dxf")] },
-      { id: "sketch-navigate", label: "Navigate", tools: [
-        tool("sketch-select", "Select", "select", "sketch-select"),
-        tool("sketch-pan", "Pan", "pan", undefined, sketchProducer),
-        tool("sketch-fit", "Fit", "fit", "fit-view"),
-      ] },
+      // No Navigate group: Select, Pan and Fit are viewport controls, not sketch
+      // tools, and Onshape's sketch toolbar carries none of them. Escape returns
+      // to Select, and clicking an active tool toggles back to it.
     ],
   },
   {
@@ -292,7 +345,8 @@ export const cadRibbonWorkspaces: readonly CADRibbonWorkspaceDefinition[] = [
       { id: "view-material", label: "Material", tools: [
         tool("view-background-graphite", "Graphite", "material", "background-graphite"),
         tool("view-background-midnight", "Midnight", "material", "background-midnight"),
-        tool("view-background-slate", "Slate", "material", "background-slate"),
+        tool("view-background-cad-light", "CAD Light", "material", "background-cad-light"),
+        tool("view-background-blueprint", "Blueprint", "material", "background-blueprint"),
         tool("view-finish-matte", "Matte", "material", "finish-matte"),
         tool("view-finish-satin", "Satin", "material", "finish-satin"),
         tool("view-finish-gloss", "Gloss", "material", "finish-gloss"),
@@ -323,6 +377,7 @@ export const cadRibbonWorkspaces: readonly CADRibbonWorkspaceDefinition[] = [
         tool("manage-home", "Start", "home", "show-home"),
         tool("manage-open", "Open Part", "open", "open-part"),
         tool("manage-save", "Save Part", "save", "save-part"),
+        tool("manage-commit", "Commit", "commit", "commit-part"),
         tool("manage-recover", "Recover", "history", "show-recovery"),
         tool("manage-configurations", "Configurations", "properties", undefined, projectProducer),
         tool("manage-templates", "Templates", "document", undefined, projectProducer),

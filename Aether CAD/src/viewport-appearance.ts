@@ -1,5 +1,5 @@
 import * as THREE from "three/webgpu";
-import type { CADDisplayStyle } from "./cad-appearance-store";
+import type { CADDisplayStyle, CADFloorMode } from "./cad-appearance-store";
 
 export interface CADDisplayStylePolicy {
   surfaceWireframe: boolean;
@@ -26,6 +26,21 @@ export function cadDisplayStylePolicy(
     case "ghost":
       return { surfaceWireframe: false, surfaceOpacity: 0.22, surfaceDepthWrite: false, edgesVisible: edgesEnabled, edgeOpacity: 0.42, masksSurfaceWithBackground: false };
   }
+}
+
+/** The world floor/grid lies in its own plane at the world origin. A sketch
+ * carries its own grid on its own plane, so during sketching the two read as
+ * two unrelated planes floating near each other. Hide the world floor for the
+ * duration; the sketch plane is the only surface that should be visible. */
+export function cadFloorVisibility(
+  mode: CADFloorMode,
+  sketching: boolean,
+): { grid: boolean; floor: boolean } {
+  if (sketching) return { grid: false, floor: false };
+  return {
+    grid: mode === "grid" || mode === "both",
+    floor: mode === "floor" || mode === "both",
+  };
 }
 
 /** Shared CAD viewport materials. Keep visual policy out of interaction code. */

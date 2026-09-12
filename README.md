@@ -36,7 +36,7 @@ importable engine and UI packages.
 | Aether CAD | `Aether CAD/` | React/TypeScript editor, exact OCCT/WASM Part modeling, engine-backed Assembly workflows |
 | Aether Animation (formerly Anima Studio) | `aether-animation/web/` | React/TypeScript authoring rebuild using the Python engine; earlier Swift app archived |
 | Aether Dynamics | `aether-dynamics/` | Product scaffold; simulation application planned |
-| Aether Core | `core/engine/` | Shared TypeScript contracts, sketch/document/geometry/assembly modules and OCCT kernel adapter |
+| Aether CAD engine | `Aether CAD/engine/` | The CAD product's own TypeScript engine (`@aether/core`): sketch/document/geometry/assembly modules and the OCCT kernel adapter. Product-owned, not suite-shared |
 | Aether UI | `core/ui/` | Shared React widgets, design tokens and workspace chrome |
 | AnimaCore | `animacore/` | Canonical Python animation engine and persistent Assembly workspace producer; consolidation into Core remains planned |
 | Onshape-style mockup | `onshape mockup/` | React/TypeScript/Three.js interaction prototype; fixture geometry, not a CAD engine |
@@ -81,7 +81,7 @@ the primary product UI.
 
 - [Suite architecture and migration plan](dev/docs/roadmap/Aether_Studio_Suite.md)
 - [Shared UI decision](dev/docs/roadmap/UI_Framework_Decision.md)
-- [Core architecture](core/engine/ARCHITECTURE.md)
+- [CAD engine architecture](Aether%20CAD/engine/ARCHITECTURE.md)
 - [Animation product](aether-animation/README.md)
 - [Shipped status](dev/docs/reality/STATUS.md)
 - [Contributor contract](AGENTS.md) and [conventions](CONVENTIONS.md)

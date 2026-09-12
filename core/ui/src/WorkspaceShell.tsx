@@ -23,6 +23,8 @@ export interface WorkspacePanel {
   title: string;
   icon: ReactNode;
   content: ReactNode;
+  /** Docked presentation renders no title/float/close header; the panel content owns its heading. Rail toggle still closes it. */
+  chromeless?: boolean;
 }
 
 const PRESET_ORDER: readonly LayoutPreset[] = ["floating", "docked", "canvas"];
@@ -218,7 +220,11 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
   if (props.preservePanelContent && typeof document !== "undefined") {
     for (const panel of allPanels) {
       if (!panelHosts.current.has(panel.id)) {
-        panelHosts.current.set(panel.id, document.createElement("div"));
+        const host = document.createElement("div");
+        // Named so the docked height chain reaches the app's own panel: an
+        // unclassed div here left every panel content-height.
+        host.className = "aui-shell-panel-host";
+        panelHosts.current.set(panel.id, host);
       }
     }
   }
@@ -398,7 +404,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 
   const stackedCard = (side: "left" | "right", panel: WorkspacePanel) => (
     <div key={panel.id} className="aui-shell-panel" style={{ width: widthFor(side) }}>
-      <div className="aui-shell-panel-header">
+      {panel.chromeless ? null : <div className="aui-shell-panel-header">
         <span>{panel.title}</span>
         <span className="aui-float-panel-actions">
           <button
@@ -420,7 +426,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
             ✕
           </button>
         </span>
-      </div>
+      </div>}
       <div className="aui-shell-panel-body">{panelContent(panel)}</div>
     </div>
   );

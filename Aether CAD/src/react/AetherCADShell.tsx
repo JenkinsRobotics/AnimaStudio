@@ -1,8 +1,13 @@
 import { CADQuantityField } from "./CADQuantityField";
+import { CADSettingsWindow } from "./CADSettingsWindow";
+import { CADViewPanel } from "./CADViewPanel";
+import { CADMetricsOverlay, CADPerformancePanel } from "./CADPerformancePanel";
+import type { CADDocumentType } from "../cad-toolbar-layouts";
 import { unitChoice } from "@aether/core/units";
 import { documentUnits, subscribeDocumentUnits } from "../document-preferences";
 import { CADDocumentControls } from "./CADDocumentControls";
 import { CADVersionsPanel } from "./CADVersionsPanel";
+import { CADHistoryTimeline } from "./CADHistoryTimeline";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import {
@@ -21,7 +26,11 @@ import {
   FieldRow,
   IconButton,
   ListBox,
+  Menu,
   MenuButton,
+  StudioModeButton,
+  WorkspaceWindowMenu,
+  AppearanceToggle,
   NumberField,
   PanelPlacementMenu,
   ProgressOverlay,
@@ -37,7 +46,6 @@ import {
   Tree,
   ViewportNavigationCube,
   WorkspaceShell,
-  LayoutPresetButton,
   StatusBar,
   StatusDot,
   type WorkspacePanelState,
@@ -65,8 +73,6 @@ import {
   type CADPanelID,
   type CADPanelPlacement,
   type CADPresentationSnapshot,
-  type CADToolbarMode,
-  type CADWorkspaceLayout,
 } from "../cad-presentation-store";
 import {
   cadAppearance,
@@ -118,6 +124,7 @@ const cadCommandCatalog: readonly Omit<CommandPaletteCommand, "disabled" | "disa
   { id: "new-part", label: "New Part", category: "File", keywords: ["create workspace"], shortcut: "⌘N", recent: true, icon: "+" },
   { id: "open-part", label: "Open Part", category: "File", keywords: ["load cadpart"], shortcut: "⌘O", icon: "↗" },
   { id: "save-part", label: "Save Part", category: "File", keywords: ["write cadpart"], shortcut: "⌘S", recent: true, icon: "↓" },
+  { id: "commit-part", label: "Commit", category: "File", keywords: ["checkpoint version name message"], recent: true, icon: "●" },
   { id: "insert-step", label: "Insert STEP", category: "Insert", keywords: ["import stp exact geometry"], icon: "⇧" },
   { id: "sketch", label: "Create Sketch", category: "Create", keywords: ["plane profile"], shortcut: "R", icon: "⌁" },
   { id: "rebuild-part", label: "Rebuild Part", category: "Create", keywords: ["evaluate extrude"], icon: "↻" },
@@ -155,7 +162,8 @@ const cadCommandCatalog: readonly Omit<CommandPaletteCommand, "disabled" | "disa
   { id: "toggle-contact-shadows", label: "Toggle Contact Shadows", category: "Scene", keywords: ["floor depth"], icon: "◒" },
   { id: "background-graphite", label: "Graphite Background", category: "Appearance", keywords: ["viewport backdrop"], icon: "●" },
   { id: "background-midnight", label: "Midnight Background", category: "Appearance", keywords: ["viewport backdrop blue"], icon: "◐" },
-  { id: "background-slate", label: "Slate Background", category: "Appearance", keywords: ["viewport backdrop gray"], icon: "◒" },
+  { id: "background-cad-light", label: "CAD Light Theme", category: "Appearance", keywords: ["viewport backdrop light paper"], icon: "◒" },
+  { id: "background-blueprint", label: "Blueprint Theme", category: "Appearance", keywords: ["viewport backdrop cyan drafting"], icon: "◒" },
   { id: "finish-matte", label: "Matte Body Finish", category: "Appearance", keywords: ["material rough"], icon: "□" },
   { id: "finish-satin", label: "Satin Body Finish", category: "Appearance", keywords: ["material balanced"], icon: "▧" },
   { id: "finish-gloss", label: "Gloss Body Finish", category: "Appearance", keywords: ["material shiny"], icon: "■" },
@@ -178,13 +186,15 @@ export function buildCADCommandPaletteCommands(
   states: Readonly<Record<CADCommandID, CADCommandState>>,
 ): readonly CommandPaletteCommand[] {
   return cadCommandCatalog.map((command) => {
-    const state = states[command.id as CADCommandID];
-    const disabled = !state.registered || !state.enabled;
+    // Guard against ids absent from the registry seed: a stale catalog entry
+    // must degrade to a disabled command, never crash the shell at boot.
+    const state = states[command.id as CADCommandID] as CADCommandState | undefined;
+    const disabled = !state || !state.registered || !state.enabled;
     return {
       ...command,
       disabled,
       disabledReason: disabled
-        ? state.registered
+        ? state?.registered
           ? "Unavailable in the current workspace state."
           : "Command is not connected."
         : undefined,
@@ -304,36 +314,6 @@ function CommandButton({
   );
 }
 
-function WorkspaceLayoutMenu({ layout, toolbarMode }: { layout: CADWorkspaceLayout; toolbarMode: CADToolbarMode }) {
-  const items: MenuItem[] = [
-    { id: "docked", label: "Docked workbench", icon: "▦", checked: layout === "docked" },
-    { id: "expanded", label: "Expanded floating docks", icon: "□", checked: layout === "expanded" },
-    { id: "canvas", label: "Canvas only", icon: "◇", checked: layout === "canvas" },
-    { id: "toolbar-traditional", label: "Traditional ribbon", icon: "☷", kind: "radio", checked: toolbarMode === "traditional", separatorBefore: true },
-    { id: "toolbar-floating", label: "Floating tools", icon: "✥", kind: "radio", checked: toolbarMode === "floating" },
-    { id: "reset-panels", label: "Reset panel placements", icon: "↺", separatorBefore: true },
-  ];
-  return (
-    <MenuButton
-      className="layout-menu-button"
-      label="Workspace layout"
-      items={items}
-      onSelect={(id) => {
-        if (id === "toolbar-traditional" || id === "toolbar-floating") {
-          cadPresentation.dispatch({ type: "select-toolbar-mode", mode: id === "toolbar-traditional" ? "traditional" : "floating" });
-          return;
-        }
-        if (id === "reset-panels") {
-          cadPresentation.dispatch({ type: "reset-panel-placements" });
-          return;
-        }
-        cadPresentation.dispatch({ type: "select-layout", layout: id as CADWorkspaceLayout });
-      }}
-    >
-      <AetherIcon name="layout" />
-    </MenuButton>
-  );
-}
 
 function CADPanelPlacementMenu({ panel, label, placement }: { panel: CADPanelID; label: string; placement: CADPanelPlacement }) {
   return <PanelPlacementMenu
@@ -359,6 +339,89 @@ function countTreeMatches(nodes: readonly TreeNode[], filter: string): number {
   return count;
 }
 
+/* ponytail: static mockups — greyed-out until each workflow gets real host backing. */
+function MockNote() { return <p className="cad-mock-note">Planned — not functional yet.</p>; }
+
+function CommentsPanel() {
+  return (
+    <section className="cad-mock-panel" aria-label="Comments">
+      <div className="cad-mock-toolbar"><Button disabled title="Planned — not functional yet">All ▾</Button><Button disabled title="Planned — not functional yet">Unresolved ▾</Button></div>
+      <textarea className="cad-mock-input" placeholder="Add comment" rows={3} disabled />
+      <div className="cad-mock-toolbar"><Button primary disabled>Add</Button><Button disabled>Cancel</Button></div>
+      <MockNote />
+    </section>
+  );
+}
+
+function DocumentNotesPanel() {
+  return (
+    <section className="cad-mock-panel" aria-label="Document notes">
+      <div className="cad-mock-toolbar"><IconButton label="Edit notes" disabled><AetherIcon name="notes" /></IconButton></div>
+      <div className="cad-mock-empty"><AetherIcon name="notes" /><p>Instructions, description, or notes for this document</p></div>
+      <MockNote />
+    </section>
+  );
+}
+
+function ActionItemsPanel() {
+  return (
+    <section className="cad-mock-panel" aria-label="Action items">
+      <input className="cad-mock-input" type="search" placeholder="Search in Action items" aria-label="Search in Action items" disabled />
+      <div className="cad-mock-toolbar"><Button disabled title="Planned — not functional yet">Type ▾</Button><Button disabled title="Planned — not functional yet">Status ▾</Button><Button disabled title="Planned — not functional yet">Assignee ▾</Button></div>
+      <div className="cad-mock-empty"><AetherIcon name="tasks" /><p>No action items found for the current filter.</p></div>
+      <MockNote />
+    </section>
+  );
+}
+
+const CONTEXT_LATER = "Planned — not functional yet.";
+function findTreeNode(nodes: readonly TreeNode[], id: string): TreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const child = node.children ? findTreeNode(node.children, id) : null;
+    if (child) return child;
+  }
+  return null;
+}
+/** Onshape-reference context menu: working rows use existing actions; the rest are greyed out for later build-out. */
+function featureContextMenuItems(node: TreeNode): MenuItem[] {
+  const later = (id: string, label: string): MenuItem => ({ id, label, disabled: true, disabledReason: CONTEXT_LATER });
+  const fromActions: MenuItem[] = (node.actions ?? []).map((action) => ({ id: action.id, label: action.label, icon: action.icon }));
+  if (node.id.startsWith("reference/")) return [
+    { id: "later-rename", label: "Rename", disabled: true, disabledReason: "Reference geometry keeps its canonical names." },
+    ...fromActions,
+    later("later-new-sketch", "New sketch…"),
+    later("later-offset-plane", "Offset plane…"),
+    later("later-hide-other-planes", "Hide other planes"),
+    later("later-hide-all-planes", "Hide all planes"),
+    { ...later("later-section-view", "Section view…"), separatorBefore: true },
+    later("later-add-comment", "Add comment"),
+    later("later-zoom-selection", "Zoom to selection"),
+    later("later-view-normal", "View normal to"),
+  ];
+  if (node.id.startsWith("folder/")) return [...fromActions, later("later-add-comment", "Add comment")];
+  if (node.id.startsWith("feature/body/")) return [
+    ...fromActions,
+    later("later-zoom-selection", "Zoom to selection"),
+    later("later-add-comment", "Add comment"),
+    later("later-view-normal", "View normal to"),
+  ];
+  if (node.id.startsWith("feature/")) {
+    const sketch = node.id.startsWith("feature/sketch/") || node.id.startsWith("feature/profile/");
+    return [
+      { id: "rename-feature", label: "Rename" },
+      { id: "delete-feature", label: "Delete" },
+      ...fromActions,
+      ...(sketch ? [later("later-copy-sketch", "Copy sketch"), later("later-hide-other-sketches", "Hide other sketches"), later("later-hide-all-sketches", "Hide all sketches")] : []),
+      { ...later("later-section-view", "Section view…"), separatorBefore: true },
+      later("later-dynamic-suppression", "Dynamic suppression"),
+      later("later-add-comment", "Add comment"),
+      later("later-view-normal", "View normal to"),
+    ];
+  }
+  return [];
+}
+
 function ItemsPanel({ active }: { active: boolean }) {
   const workspace = useSyncExternalStore(
     cadWorkspace.subscribe,
@@ -372,13 +435,16 @@ function ItemsPanel({ active }: { active: boolean }) {
     cadPresentation.snapshot,
   );
   const filterRef = useRef<HTMLInputElement>(null);
+  const [contextMenu, setContextMenu] = useState<{ node: TreeNode; x: number; y: number } | null>(null);
   useEffect(() => {
     if (presentation.itemFilterFocusSerial > 0) filterRef.current?.focus();
   }, [presentation.itemFilterFocusSerial]);
   return (
     <section className={`browser-panel${active ? " active" : ""}`} data-panel="items">
-      <header className="browser-title">
-        <div><strong>Items</strong><small>Geometry · Features · Bodies</small></div>
+      <div className="cad-feature-tree-top">
+      <header className="browser-title cad-feature-tree-title">
+        <CadIcon name="model" />
+        <strong>Feature tree</strong>
         <span id="part-count">{workspace.partCount}</span>
       </header>
       <SearchField
@@ -389,40 +455,88 @@ function ItemsPanel({ active }: { active: boolean }) {
         placeholder="All Items"
         value={filter}
         onQueryChange={setFilter}
-        resultCount={countTreeMatches(workspace.itemNodes, filter)}
+        resultCount={filter ? countTreeMatches(workspace.itemNodes, filter) : undefined}
       />
-      <div id="parts-list" className="parts-list">
+      </div>
+      <div
+        id="parts-list"
+        className="parts-list"
+        onKeyDown={(event) => {
+          if (event.key !== "Delete" && event.key !== "Backspace") return;
+          // A row being renamed owns its own Backspace.
+          if ((event.target as HTMLElement).tagName === "INPUT") return;
+          const row = [...workspace.selectedItemIDs].find(
+            (id) => id.startsWith("feature/") && !id.startsWith("feature/body/"),
+          );
+          if (!row) return;
+          event.preventDefault();
+          cadWorkspace.dispatch({ type: "item-action", id: row, actionID: "delete-feature" });
+        }}
+      >
         <Tree
           ariaLabel="CAD items"
           nodes={workspace.itemNodes}
           onActivate={id=>cadWorkspace.dispatch({type:"item-action",id,actionID:"edit-feature"})}
           onMove={(id,targetID,position)=>cadWorkspace.dispatch({type:"move-item",id,targetID,position})}
-          canMove={(id,target,position)=>position!=="inside"&&(id==="rollback-bar"||id.startsWith("feature/"))&&target.startsWith("feature/")&&!id.startsWith("feature/body/")&&!target.startsWith("feature/body/")}
+          canMove={(id,target,position)=>{
+            // Bodies left the feature list, so the last feature row is the end
+            // of the list; dropping "after" it must latch at the very end.
+            if(id==="rollback-bar")return position!=="inside"&&target.startsWith("feature/")&&!target.startsWith("feature/body/");
+            if(id.startsWith("folder/"))return position==="inside"&&target.startsWith("folder/")&&id!==target;
+            if(id.startsWith("feature/")&&!id.startsWith("feature/body/")){
+              if(position==="inside")return target.startsWith("folder/");
+              return target.startsWith("feature/")&&!target.startsWith("feature/body/");
+            }
+            return false;
+          }}
 
           selectedIDs={workspace.selectedItemIDs}
           expandedIDs={workspace.expandedItemIDs}
           filter={filter}
-          onSelect={(ids) => {
-            const id = ids[0];
-            if (id) cadWorkspace.dispatch({ type: "select-item", id });
+          onSelect={(ids, mode) => {
+            const rows = ids.filter((id) => id !== "rollback-bar");
+            if (rows.length) cadWorkspace.dispatch({ type: "select-item", id: rows[0], ids: rows, mode });
           }}
           onToggle={(id) => cadWorkspace.dispatch({ type: "toggle-item", id })}
+          onContextMenu={(id, x, y) => {
+            const node = findTreeNode(workspace.itemNodes, id);
+            if (node && node.id !== "rollback-bar" && featureContextMenuItems(node).length) setContextMenu({ node, x, y });
+          }}
           onAction={(id, actionID) => cadWorkspace.dispatch({ type: "item-action", id, actionID })}
-          emptyState="No matching items"
+          emptyState={presentation.backendState === "failed" && !workspace.itemNodes.length
+            ? "Aether CAD could not start — see the status bar and browser console."
+            : "No matching items"}
         />
       </div>
-      <div className="sidebar-footer"><button type="button" disabled title="Workspace folders require the canonical workspace graph"><CadIcon name="folder" /></button><button type="button" disabled title="No additional Items commands are available">•••</button></div>
+      {workspace.bodyNodes?.length ? (
+        <div className="cad-bodies-section" aria-label="Bodies">
+          <Tree
+            nodes={workspace.bodyNodes ?? []}
+            selectedIDs={workspace.selectedItemIDs}
+            expandedIDs={workspace.expandedItemIDs}
+            onSelect={(ids) => { const id = ids[0]; if (id) cadWorkspace.dispatch({ type: "select-item", id }); }}
+            onToggle={(id) => cadWorkspace.dispatch({ type: "toggle-item", id })}
+            onContextMenu={(id, x, y) => {
+              const node = findTreeNode(workspace.bodyNodes ?? [], id);
+              if (node && featureContextMenuItems(node).length) setContextMenu({ node, x, y });
+            }}
+            onAction={(id, actionID) => cadWorkspace.dispatch({ type: "item-action", id, actionID })}
+          />
+        </div>
+      ) : null}
+      {contextMenu ? <Menu open anchor={{ x: contextMenu.x, y: contextMenu.y }} placement="bottom-start" ariaLabel="Feature options" items={featureContextMenuItems(contextMenu.node)} onSelect={(actionID) => { setContextMenu(null); cadWorkspace.dispatch({ type: "item-action", id: contextMenu.node.id, actionID }); }} onClose={() => setContextMenu(null)} /> : null}
+      <div className="sidebar-footer"><button type="button" title="New folder — groups the selected features" aria-label="New folder" disabled={!presentation.partOpen} onClick={() => cadWorkspace.dispatch({ type: "create-folder", memberIDs: [...workspace.selectedItemIDs].filter((id) => id.startsWith("feature/") && !id.startsWith("feature/body/")) })}><CadIcon name="folder" /></button><button type="button" disabled title="No additional Items commands are available">•••</button></div>
     </section>
   );
 }
 
 function ParametersPanel({ active }: { active: boolean }) {
-  const units=useSyncExternalStore(subscribeDocumentUnits,documentUnits,documentUnits);
   const presentation = useSyncExternalStore(
     cadPresentation.subscribe,
     cadPresentation.snapshot,
     cadPresentation.snapshot,
   );
+  const units=useSyncExternalStore(subscribeDocumentUnits,documentUnits,documentUnits);
   return (
     <section className={`browser-panel${active ? " active" : ""}`} data-panel="parameters">
       <header className="browser-title"><div><strong>Modeling</strong><small>Sketch and solid parameters</small></div><span>{unitChoice(units,"length").unit}</span></header>
@@ -798,11 +912,27 @@ function VisualizationPanel({ active }: { active: boolean }) {
   );
   return (
     <section className={`browser-panel${active ? " active" : ""}`} data-panel="visualization">
-      <header className="browser-title"><div><strong>Visualization</strong><small>Viewport appearance · this session</small></div><span>GPU</span></header>
+      <header className="browser-title"><div><strong>Visualization</strong><small>Aether CAD setting · saved on this device</small></div><span>GPU</span></header>
       <div className="visualization-panel-scroll">
         <section className="visualization-controls" aria-label="Viewport appearance">
           <div className="panel-heading"><span>DISPLAY</span></div>
           <div className="visualization-fields">
+            <FieldRow label="Environment theme">
+              <SelectField
+                aria-label="Environment theme"
+                value={appearance.environmentTheme}
+                options={[
+                  { value: "aether", label: "Aether" },
+                  { value: "onshape", label: "Onshape" },
+                  { value: "custom", label: "Custom", disabled: true },
+                ]}
+                onChange={(event) => {
+                  const theme = event.target.value;
+                  if (theme === "aether" || theme === "onshape")
+                    cadAppearance.dispatch({ type: "apply-environment-theme", theme });
+                }}
+              />
+            </FieldRow>
             <FieldRow label="Style">
               <SelectField
                 aria-label="Viewport display style"
@@ -817,15 +947,16 @@ function VisualizationPanel({ active }: { active: boolean }) {
                 onChange={(event) => cadAppearance.dispatch({ type: "set-display-style", style: event.target.value as CADDisplayStyle })}
               />
             </FieldRow>
-            <FieldRow label="Background" htmlFor="appearance-background">
+            <FieldRow label="Theme" htmlFor="appearance-background">
               <SelectField
                 id="appearance-background"
                 value={appearance.background}
                 options={[
+                  { value: "midnight", label: "Midnight" },
                   { value: "graphite", label: "Graphite" },
-                  { value: "midnight", label: "Midnight blue" },
-                  { value: "slate", label: "Slate" },
-                  { value: "paper", label: "Paper — adaptive grid required", disabled: true },
+                  { value: "cad-light", label: "CAD Light" },
+                  { value: "blueprint", label: "Blueprint" },
+                  { value: "onshape", label: "Onshape" },
                 ]}
                 onChange={(event) => cadAppearance.dispatch({ type: "set-background", background: event.target.value as CADBackgroundPreset })}
               />
@@ -857,6 +988,9 @@ function VisualizationPanel({ active }: { active: boolean }) {
             </FieldRow>
             <FieldRow label="Ground">
               <SegmentedControl ariaLabel="Viewport ground mode" value={appearance.floorMode} options={[{ id: "none", label: "None" }, { id: "grid", label: "Grid" }, { id: "floor", label: "Floor" }, { id: "both", label: "Both" }]} onChange={(mode) => cadAppearance.dispatch({ type: "set-floor-mode", mode: mode as CADFloorMode })} />
+            </FieldRow>
+            <FieldRow label="Grid opacity">
+              <Slider ariaLabel="Grid opacity" value={appearance.gridOpacityPercent} min={0} max={100} step={5} unit="%" onChange={(percent) => cadAppearance.dispatch({ type: "set-grid-opacity-percent", percent })} />
             </FieldRow>
             <Checkbox checked={appearance.contactShadowsVisible} onChange={(event) => cadAppearance.dispatch({ type: "set-contact-shadows-visible", visible: event.target.checked })} label="Contact shadows" description="Ground part placement with renderer-owned shadows." />
             <Button onClick={() => cadAppearance.dispatch({ type: "reset" })}>Reset appearance</Button>
@@ -909,11 +1043,12 @@ function WorkbenchBottomPanel({ presentation, sidebar = false }: { presentation:
     cadWorkspace.snapshot,
     cadWorkspace.snapshot,
   );
-  const history = <div id="history-list" className="history-list"><ListBox ariaLabel="Feature history" items={workspace.historyItems} selectedIDs={new Set()} onSelect={(ids) => { const id = ids[0]; if (id) cadWorkspace.dispatch({ type: "activate-history", id }); }} onActivate={(id) => cadWorkspace.dispatch({ type: "activate-history", id })} emptyState="Create or import geometry to build history." /></div>;
+  const historyList = <div id="history-list" className="history-list"><ListBox ariaLabel="Feature history" items={workspace.historyItems} selectedIDs={new Set()} onSelect={(ids) => { const id = ids[0]; if (id) cadWorkspace.dispatch({ type: "activate-history", id }); }} onActivate={(id) => cadWorkspace.dispatch({ type: "activate-history", id })} emptyState="Create or import geometry to build history." /></div>;
+  const historyTimeline = <div id="history-list" className="cad-history-timeline-wrap"><CADHistoryTimeline items={workspace.historyItems} rollbackIndex={workspace.rollbackIndex} /></div>;
   const problems = <div className="problems-list"><ListBox ariaLabel="Rebuild problems" items={workspace.problemItems} selectedIDs={new Set()} selectionMode="none" emptyState="No rebuild problems." /></div>;
   if (sidebar) return <section className="cad-sidebar-history" aria-label="Feature history sidebar">
     <Tabs tabs={[{id: "history", label: "History"}, {id: "problems", label: "Problems"}]} activeID={presentation.bottomPanelActiveID} onSelect={id => cadPresentation.dispatch({type: "select-bottom-panel", id: id as "history" | "problems"})} />
-    {presentation.bottomPanelActiveID === "history" ? history : problems}
+    {presentation.bottomPanelActiveID === "history" ? historyList : problems}
   </section>;
   return (
     <div className={`cad-bottom-workbench${sidebar ? " cad-sidebar-history" : ""}`}>
@@ -925,7 +1060,7 @@ function WorkbenchBottomPanel({ presentation, sidebar = false }: { presentation:
         onSelect={(id) => cadPresentation.dispatch({ type: "select-bottom-panel", id: id as "history" | "problems" })}
         onCollapsedChange={(collapsed) => cadPresentation.dispatch({ type: "set-bottom-panel-collapsed", collapsed })}
         tabs={[
-          { id: "history", label: "History", badge: workspace.historyItems.length, icon: "↺", content: history },
+          { id: "history", label: "History", badge: workspace.historyItems.length, icon: "↺", content: historyTimeline },
           { id: "problems", label: "Problems", badge: workspace.problemItems.length || undefined, icon: "!", content: problems },
         ]}
       />
@@ -1073,7 +1208,6 @@ function ViewportSurface({
         <div className="mate-step"><span className={`step-dot${presentation.targetPick.startsWith("Choose") ? " active" : ""}`}>2</span><div><b>Target connector</b><span>{presentation.targetPick}</span></div></div>
         <p>Click visible connector anchors or use Pick in the connector list. Origins and X axes align; primary Z axes oppose.</p>
       </div> : null}
-      {presentation.hover ? <div id="hover-card" className="hover-card"><b>{presentation.hover.partName}</b><span>{presentation.hover.label}</span><small>{presentation.hover.detail}</small></div> : null}
       {presentation.awaitingSketchPlane ? <div id="sketch-plane-card" className="sketch-plane-card">
         <header><div><b>Create Sketch</b><span>Select a plane</span></div><button type="button" title="Cancel" onClick={() => cadPresentation.dispatch({ type: "cancel-sketch-plane" })}>×</button></header>
         <p>Choose <b>Top</b>, <b>Front</b>, or <b>Right Plane</b> in the Items browser. The new sketch opens normal to that plane with its center anchored to the Origin.</p>
@@ -1634,43 +1768,6 @@ function AssemblyRelationDialog({ presentation }: { presentation: CADPresentatio
   );
 }
 
-function UtilityDialogs({ presentation }: { presentation: CADPresentationSnapshot }) {
-  const units=useSyncExternalStore(subscribeDocumentUnits,documentUnits,documentUnits);
-  const close = () => cadPresentation.dispatch({ type: "show-start-dialog", dialog: null });
-  return (
-    <>
-      <Dialog open={presentation.startDialog === "preferences"} title="Preferences" onClose={close} actions={<Button primary onClick={close}>Done</Button>}>
-        <div className="cad-preferences">
-          <section><header><strong>Appearance</strong><small>Current application presentation</small></header>
-            <FieldRow label="Theme" htmlFor="preference-theme"><SelectField id="preference-theme" value="dark" options={[{ value: "dark", label: "Aether Dark" }, { value: "light", label: "Light — unavailable", disabled: true }]} disabled /></FieldRow>
-            <FieldRow label="Tool presentation"><SegmentedControl ariaLabel="Tool presentation" value={presentation.toolbarMode} options={[{ id: "traditional", label: "Traditional" }, { id: "floating", label: "Floating" }]} onChange={(mode) => cadPresentation.dispatch({ type: "select-toolbar-mode", mode: mode as CADToolbarMode })} /></FieldRow>
-            <Checkbox checked disabled label="Follow reduced-motion preference" description="Animations use the operating-system accessibility setting." />
-            <Checkbox disabled label="High-contrast override" description="Dedicated override is not implemented; system contrast remains respected by shared controls." />
-          </section>
-          <section><header><strong>Navigation</strong><small>Viewport input</small></header>
-            <FieldRow label="Preset" htmlFor="preference-navigation"><SelectField id="preference-navigation" value="cad" options={[{ value: "cad", label: "CAD: RMB orbit · MMB pan" }]} disabled /></FieldRow>
-            <FieldRow label="Fit shortcut"><output>F</output></FieldRow>
-            <FieldRow label="Sketch shortcut"><output>R</output></FieldRow>
-          </section>
-          <section><header><strong>Units and precision</strong><small>Current Part contract</small></header>
-            <FieldRow label="Length units" htmlFor="preference-units"><SelectField id="preference-units" value={unitChoice(units,"length").unit} options={[{value:unitChoice(units,"length").unit,label:unitChoice(units,"length").unit+" — change in Document controls → Workspace units"}]} disabled /></FieldRow>
-            <FieldRow label="Display precision"><output>0.01 mm</output></FieldRow>
-            <p className="cad-form-note">Per-workspace preference persistence arrives with the canonical `.acad` workspace graph.</p>
-          </section>
-        </div>
-      </Dialog>
-      <Dialog open={presentation.startDialog === "help"} title="Aether CAD Help" onClose={close} actions={<Button primary onClick={close}>Close Help</Button>}>
-        <div className="cad-help-center">
-          <section><strong>Part workflow</strong><ol><li>Start New Part and choose a principal plane.</li><li>Rough in the center rectangle and apply dimensions/constraints.</li><li>Finish Sketch to rebuild the exact OCCT Body.</li></ol></section>
-          <section><strong>Assembly workflow</strong><ol><li>Import STEP Parts or create a Part.</li><li>Place exact mate connectors on inferred topology.</li><li>Choose Fastened and pick moving then target connectors.</li></ol></section>
-          <section className="cad-shortcut-list"><strong>Keyboard and viewport</strong><dl><div><dt>F</dt><dd>Zoom to fit</dd></div><div><dt>R</dt><dd>Open Sketch</dd></div><div><dt>Esc</dt><dd>Cancel the active tool or plane choice</dd></div><div><dt>RMB</dt><dd>Orbit</dd></div><div><dt>MMB</dt><dd>Pan</dd></div><div><dt>Wheel</dt><dd>Zoom</dd></div></dl></section>
-          <p className="cad-form-note">Problems reports definition warnings. Properties shows canonical Part values and exact topology statistics.</p>
-        </div>
-      </Dialog>
-    </>
-  );
-}
-
 export function AetherCADShell() {
   const presentation = useSyncExternalStore(
     cadPresentation.subscribe,
@@ -1692,6 +1789,23 @@ export function AetherCADShell() {
   const suite = chromeTheme === "suite";
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [ribbonWorkspace, setRibbonWorkspace] = useState<CADRibbonWorkspaceID>("solid");
+  const [sketchEditing, setSketchEditing] = useState(false);
+  useEffect(() => {
+    const onSketchMode = (event: Event) => setSketchEditing(Boolean((event as CustomEvent).detail));
+    window.addEventListener("aether-sketch-mode", onSketchMode);
+    return () => window.removeEventListener("aether-sketch-mode", onSketchMode);
+  }, []);
+  const shellAssembly = useSyncExternalStore(
+    cadAssemblyWorkspace.subscribe,
+    cadAssemblyWorkspace.snapshot,
+    cadAssemblyWorkspace.snapshot,
+  );
+  const documentType: CADDocumentType =
+    shellAssembly.loadState === "ready" && shellAssembly.data !== null
+      ? "assembly"
+      : presentation.partOpen
+        ? "part"
+        : "project";
   useEffect(() => {
     const onSketchMode=(event:Event)=>setRibbonWorkspace((event as CustomEvent).detail ? "sketch" : "solid");
     window.addEventListener("aether-sketch-mode",onSketchMode);
@@ -1825,47 +1939,34 @@ export function AetherCADShell() {
         leading={
           <>
             
-            <a href="/cad/" title="Aether CAD Home" aria-label="Aether CAD Home" style={{display: "inline-flex", color: "inherit"}} onClick={event => {if (!window.location.pathname.startsWith("/cad/")) {event.preventDefault(); cadPresentation.dispatch({type: "show-start-screen", screen: "home"});}}}><AppIcon app="cad" size={30} /></a>
+            <a href="/cad/" title="Aether CAD Home" aria-label="Aether CAD Home" style={{display: "inline-flex", color: "inherit"}} onClick={event => {if (!window.location.pathname.startsWith("/cad/")) {event.preventDefault(); cadPresentation.dispatch({type: "show-start-screen", screen: "home"});}}}><AppIcon app="cad" size={36} /></a>
             <CADDocumentControls name={presentation.documentName} partOpen={presentation.partOpen} />
+            <input id="part-picker" type="file" accept=".acpart,.cadpart,application/json" hidden />
+            <input id="assembly-picker" type="file" accept=".acad,.acasm,.aether,application/vnd.acad.workspace+zip,application/zip" hidden />
+            <input id="step-picker" type="file" accept=".step,.stp" multiple hidden />
             <span className="cad-header-divider" aria-hidden="true" />
-            <div className="document-toolbar">
-              <CommandIconButton id="new-part" command="new-part" label="New Part"><AetherIcon name="new" /></CommandIconButton>
-              <CommandIconButton command="open-part" label="Open Part"><AetherIcon name="open" /></CommandIconButton>
-              <input id="part-picker" type="file" accept=".acpart,.cadpart,application/json" hidden />
-              <input id="assembly-picker" type="file" accept=".acad,.acasm,.aether,application/vnd.acad.workspace+zip,application/zip" hidden />
-              <CommandIconButton id="save-part" command="save-part" label="Save Part"><AetherIcon name="save" /></CommandIconButton>
-              <CommandIconButton command="insert-step" label="Insert STEP"><AetherIcon name="import" /></CommandIconButton>
-              <input id="step-picker" type="file" accept=".step,.stp" multiple hidden />
+            <div className="aui-studio-chrome-group">
+              <StudioModeButton
+                preset={presentation.workspaceLayout === "expanded" ? "floating" : presentation.workspaceLayout}
+                onChange={(preset) => cadPresentation.dispatch({ type: "select-layout", layout: preset === "floating" ? "expanded" : preset })}
+                extraItems={[
+                  { id: "toolbar-traditional", label: "Traditional ribbon", kind: "radio", checked: presentation.toolbarMode === "traditional", separatorBefore: true },
+                  { id: "toolbar-floating", label: "Floating tools", kind: "radio", checked: presentation.toolbarMode === "floating" },
+                  { id: "reset-panels", label: "Reset panel placements", separatorBefore: true },
+                ]}
+                onExtraSelect={(id) => {
+                  if (id === "reset-panels") cadPresentation.dispatch({ type: "reset-panel-placements" });
+                  else cadPresentation.dispatch({ type: "select-toolbar-mode", mode: id === "toolbar-traditional" ? "traditional" : "floating" });
+                }}
+              />
+              <WorkspaceWindowMenu />
+              <AppearanceToggle />
             </div>
+            <IconButton label="Settings" onClick={() => cadPresentation.dispatch({ type: "show-start-dialog", dialog: "preferences" })}><AetherIcon name="settings" /></IconButton>
           </>
-        }
-        center={!suite ?
-          <Tabs
-            tabs={[
-              { id: "design", label: "Design", icon: <AetherIcon name="design" /> },
-              { id: "animate", label: "Animate", icon: <AetherIcon name="animate" />, disabled: true, title: "Animation authoring opens in Aether Animation until suite routing is connected." },
-              { id: "show", label: "Show", icon: <AetherIcon name="show" />, disabled: true, title: "Show sequencing opens in Aether Animation until suite routing is connected." },
-              { id: "hardware", label: "Hardware", icon: <AetherIcon name="hardware" />, disabled: true, title: "Hardware mapping opens in Aether Animation until suite routing is connected." },
-            ]}
-            activeID="design"
-            onSelect={() => {}}
-          /> : null
         }
         trailing={
-          <>
-            <div className="backend" role="status" aria-live="polite" aria-atomic="true"><StatusDot kind={presentation.backendState === "ready" ? "ok" : presentation.backendState === "failed" ? "error" : "busy"} /><span id="backend-label">{presentation.backendLabel}</span></div>
-            <LayoutPresetButton preset={presentation.workspaceLayout === "expanded" ? "floating" : presentation.workspaceLayout} onChange={(preset) => cadPresentation.dispatch({ type: "select-layout", layout: preset === "floating" ? "expanded" : preset })} />
-            <WorkspaceLayoutMenu layout={presentation.workspaceLayout} toolbarMode={presentation.toolbarMode} />
-            <MenuButton label="Interface theme" items={[
-              {id: "suite", label: "Full suite — default", kind: "radio", checked: suite},
-              {id: "classic", label: "Classic — centered workspaces", kind: "radio", checked: !suite},
-            ]} onSelect={id => chooseChromeTheme(id as "suite" | "classic")}>Theme ▾</MenuButton>
-            <Button disabled={!presentation.partOpen} title={presentation.partOpen ? "Export Part" : "Create or open a Part to export"} onClick={() => cadPresentation.dispatch({ type: "show-start-dialog", dialog: "export" })}>Export</Button>
-            <IconButton label="Commands" title="Commands · ⌘K" onClick={() => setCommandPaletteOpen(true)}><AetherIcon name="commands" /></IconButton>
-            <IconButton label="Settings" onClick={() => cadPresentation.dispatch({ type: "show-start-dialog", dialog: "preferences" })}><AetherIcon name="settings" /></IconButton>
-            <div data-aether-account="" />
-            <IconButton label="Help" onClick={() => cadPresentation.dispatch({ type: "show-start-dialog", dialog: "help" })}><AetherIcon name="help" /></IconButton>
-          </>
+          <div data-aether-account="" />
         }
       />
       <section
@@ -1885,29 +1986,27 @@ export function AetherCADShell() {
           onPanelStateChange={updateStudioPanels}
           toolbar={<CADTraditionalRibbon
             suite={suite}
+            documentType={documentType}
+            sketchEditing={sketchEditing}
             activeWorkspace={ribbonWorkspace}
-            documentName={presentation.documentName}
             partOpen={presentation.partOpen}
             onSelectWorkspace={selectRibbonWorkspace}
             onAction={runRibbonAction}
-            onUseFloatingTools={() => {
-              cadPresentation.dispatch({ type: "select-layout", layout: "expanded" });
-              cadPresentation.dispatch({ type: "select-toolbar-mode", mode: "floating" });
-            }}
           />}
-          leftPanels={[{ id: "browser", title: "Model", icon: <AetherIcon name="design" />, content: <>
-            <CADPanelPlacementMenu panel="browser" label="Model" placement={presentation.panelPlacements.browser} />
-            <ItemsPanel active />
-          </> }, ...(suite ? [
+          leftPanels={[{ id: "browser", title: "Feature tree", icon: <AetherIcon name="design" />, chromeless: true, content: <ItemsPanel active /> },
             {id: "versions", title: "Version control", icon: <AetherIcon name="document" />, content: <CADVersionsPanel documentName={presentation.documentName} />},
-            {id: "history", title: "History", icon: <CadIcon name="history" />, content: <WorkbenchBottomPanel presentation={presentation} sidebar />},
-          ] : [])]}
+            ...(suite ? [{id: "history", title: "History", icon: <CadIcon name="history" />, content: <WorkbenchBottomPanel presentation={presentation} sidebar />}] : []),
+            {id: "comments", title: "Comments", icon: <AetherIcon name="comment" />, content: <CommentsPanel />},
+            {id: "notes", title: "Document notes", icon: <AetherIcon name="notes" />, content: <DocumentNotesPanel />},
+            {id: "tasks", title: "Action items", icon: <AetherIcon name="tasks" />, content: <ActionItemsPanel />}]}
           rightPanels={[
             { id: "inspector", title: "Properties", icon: <AetherIcon name="settings" />, content: <InspectorPanel placement={presentation.panelPlacements.inspector} /> },
             { id: "parameters", title: "Parameters", icon: <AetherIcon name="settings" />, content: <ParametersPanel active /> },
             { id: "mates", title: "Assembly", icon: <AetherIcon name="design" />, content: <MatesPanel active /> },
             { id: "inspect", title: "Inspect", icon: <AetherIcon name="search" />, content: <InspectPanel active /> },
-            { id: "visualization", title: "Appearance", icon: <AetherIcon name="settings" />, content: <VisualizationPanel active /> },
+            { id: "view", title: "View", icon: <AetherIcon name="cube" />, content: <CADViewPanel active /> },
+            { id: "visualization", title: "Appearance", icon: <AetherIcon name="palette" />, content: <VisualizationPanel active /> },
+            { id: "performance", title: "Performance", icon: <AetherIcon name="gauge" />, content: <CADPerformancePanel active /> },
           ]}
           bottom={suite ? undefined : <WorkbenchBottomPanel presentation={presentation} />}
         >
@@ -1924,7 +2023,16 @@ export function AetherCADShell() {
       <AssemblyMateDOFDialog presentation={presentation} />
       <AssemblyRelationDialog presentation={presentation} />
       <ExportCenter presentation={presentation} />
-      <UtilityDialogs presentation={presentation} />
+      <CADMetricsOverlay />
+      <CADSettingsWindow
+        open={presentation.startDialog === "preferences" || presentation.startDialog === "help"}
+        initialPane={presentation.startDialog === "help" ? "help" : "workspace"}
+        onClose={() => cadPresentation.dispatch({ type: "show-start-dialog", dialog: null })}
+        chromeTheme={chromeTheme}
+        onChromeTheme={chooseChromeTheme}
+        paletteCommands={buildCADCommandPaletteCommands(commands)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+      />
       <CommandPalette
         open={commandPaletteOpen}
         commands={buildCADCommandPaletteCommands(commands)}
@@ -1933,7 +2041,14 @@ export function AetherCADShell() {
         onClose={() => setCommandPaletteOpen(false)}
         onSelect={(id) => cadCommands.execute(id as CADCommandID)}
       />
-      <StatusBar><span id="status-message" role="status" aria-live="polite" aria-atomic="true" data-tone={presentation.statusTone}>{presentation.statusMessage}</span>{presentation.loading?.backgrounded ? <button className="cad-background-task" type="button" onClick={() => cadPresentation.dispatch({ type: "show-loading" })}>Show import task</button> : null}<span id="metrics" aria-label="Workspace metrics" data-cylinder-axis-candidates={presentation.cylinderAxisCandidates} data-analytic-center-candidates={presentation.analyticCenterCandidates}>{presentation.metricsText}</span></StatusBar>
+      <StatusBar
+        leading={<div className="backend" role="status" aria-live="polite" aria-atomic="true"><StatusDot kind={presentation.backendState === "ready" ? "ok" : presentation.backendState === "failed" ? "error" : "busy"} /><span className="cad-app-name">Aether CAD</span><span id="backend-label">{presentation.backendLabel}</span></div>}
+        center={<><span id="status-message" role="status" aria-live="polite" aria-atomic="true" data-tone={presentation.statusTone}>{presentation.statusMessage}</span>{presentation.loading?.backgrounded ? <button className="cad-background-task" type="button" onClick={() => cadPresentation.dispatch({ type: "show-loading" })}>Show import task</button> : null}</>}
+        trailing={<><span id="metrics" aria-label="Workspace metrics" data-cylinder-axis-candidates={presentation.cylinderAxisCandidates} data-analytic-center-candidates={presentation.analyticCenterCandidates}>{presentation.metricsText}</span><MenuButton label="Interface theme" placement="top-end" items={[
+          {id: "suite", label: "Full suite — default", kind: "radio", checked: suite},
+          {id: "classic", label: "Classic — centered workspaces", kind: "radio", checked: !suite},
+        ]} onSelect={id => chooseChromeTheme(id as "suite" | "classic")}>Theme ▾</MenuButton></>}
+      />
     </main>
   );
 }

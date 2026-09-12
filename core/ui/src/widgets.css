@@ -214,7 +214,7 @@
 }
 .aui-tree-row--selected {
   background: var(--aether-color-bg-selected);
-  color: white;
+  color: var(--aether-color-text-on-selected);
   box-shadow: inset 2px 0 var(--aether-color-selection-edge);
 }
 .aui-tree-row--dimmed { opacity: 0.45; }
@@ -222,12 +222,15 @@
 .aui-tree-disclosure {
   display: grid;
   place-items: center;
-  width: 14px;
+  /* Onshape-scale disclosure: a clear chevron, not a faint speck. */
+  width: 18px;
   height: 18px;
+  font-size: 14px;
+  line-height: 1;
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--aether-color-text-faint);
+  color: var(--aether-color-text);
   font-size: 9px;
   cursor: pointer;
 }
@@ -235,9 +238,11 @@
 .aui-tree-icon { color: var(--aether-color-accent-icon); }
 .aui-tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aui-tree-badge { color: var(--aether-color-text-faint); font-size: var(--aether-font-size-caption); }
-.aui-tree-actions { display: none; gap: 4px; }
-.aui-tree-row:hover .aui-tree-actions,
-.aui-tree-row:focus-visible .aui-tree-actions { display: inline-flex; }
+.aui-tree-actions { display: inline-flex; gap: 4px; }
+.aui-tree-action { display: none; }
+.aui-tree-row:hover .aui-tree-action,
+.aui-tree-row:focus-visible .aui-tree-action,
+.aui-tree-action--pinned { display: inline-flex; }
 .aui-tree-action {
   border: 0;
   padding: 0 2px;
@@ -289,6 +294,9 @@
 /* DocumentBar.tsx — 48px top app-window row */
 .aui-document-bar {
   position: relative;
+  /* Above workspace chrome (viewport cube, rails, start center); below
+     menus/dialogs (100+). Popovers inside the bar inherit this layer. */
+  z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -351,6 +359,9 @@
 .aui-shell-center { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--aether-color-bg-shell); }
 
 .aui-shell-panel { display: flex; flex-direction: column; min-height: 0; }
+/* A docked panel fills the rail's height; the stack's free space is shared
+   between panels on top of their content heights. */
+.aui-shell-stack > .aui-shell-panel { flex: 1 1 auto; }
 .aui-shell-panel + .aui-shell-panel { border-top: 1px solid var(--aether-color-border); }
 .aui-shell-panel-header {
   display: flex;
@@ -363,7 +374,11 @@
   letter-spacing: var(--aether-font-letter-caps);
   text-transform: uppercase;
 }
-.aui-shell-panel-body { min-height: 0; overflow: auto; }
+.aui-shell-panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* Preserved panel content is hosted in a detached div and portalled in; both
+   links pass the definite height down so `height: 100%` works for the app. */
+.aui-shell-panel-slot,
+.aui-shell-panel-host { height: 100%; min-height: 0; }
 
 /* Floating chrome: adaptive panel fill + border + shadow (never a
    translucent material — it reads wrong over a dark 3D canvas). */
@@ -569,7 +584,9 @@
   border-right: 1px solid var(--aether-color-border);
   background: var(--aether-color-bg-panel);
 }
-.aui-dock-panel-body { min-height: 0; overflow: auto; }
+/* Fills the panel column. Without flex-grow the body sizes to its content, so
+   a docked tree stops short of the available height and leaves dead space. */
+.aui-dock-panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 
 /* PanelHeading.tsx */
 .aui-panel-heading {
@@ -599,12 +616,12 @@
 }
 .aui-text-field:focus {
   border-color: var(--aether-color-border-focus);
-  box-shadow: 0 0 0 2px rgba(43, 156, 243, 0.12);
+  box-shadow: var(--aether-focus-halo);
 }
 .aui-text-field--invalid,
 .aui-text-field--invalid:focus {
   border-color: var(--aether-color-error);
-  box-shadow: 0 0 0 2px rgba(255, 90, 98, 0.12);
+  box-shadow: var(--aether-focus-halo);
 }
 .aui-text-field-wrap { position: relative; display: inline-block; }
 .aui-text-field-wrap > .aui-text-field { padding-right: 34px; }
@@ -633,7 +650,7 @@
 }
 .aui-search-field:focus-within {
   border-color: var(--aether-color-border-focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--aether-color-border-focus) 18%, transparent);
+  box-shadow: var(--aether-focus-halo);
 }
 .aui-search-field-icon { padding-left: 8px; color: var(--aether-color-text-faint); font-size: 14px; }
 .aui-search-field input,
@@ -688,12 +705,12 @@
 .aui-number-field-wrap:has(.aui-number-field-scrub) .aui-number-field { padding-left: 27px; }
 .aui-number-field:focus {
   border-color: var(--aether-color-border-focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--aether-color-border-focus) 18%, transparent);
+  box-shadow: var(--aether-focus-halo);
 }
 .aui-number-field--invalid,
 .aui-number-field--invalid:focus {
   border-color: var(--aether-color-error);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--aether-color-error) 18%, transparent);
+  box-shadow: var(--aether-focus-halo);
 }
 .aui-number-field--mixed { color: var(--aether-color-text-dim); font-style: italic; }
 .aui-number-field-unit {
@@ -1235,6 +1252,24 @@
   font-family: var(--aether-font-family);
   font-size: 11px;
 }
+.aui-status-bar__leading,
+.aui-status-bar__trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--aether-space-3);
+  flex: none;
+  min-width: 0;
+}
+.aui-status-bar__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--aether-space-3);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
 .aui-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--aether-color-warn); }
 .aui-status-dot--ok { background: var(--aether-color-ok); }
 .aui-status-dot--error { background: var(--aether-color-error); }
@@ -1257,7 +1292,7 @@
   border-radius: 10px;
   background: color-mix(in srgb, var(--aether-color-bg-panel) 88%, transparent);
   color: var(--aether-color-text-soft);
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--aether-color-bg-app) 55%, transparent);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--aether-color-shadow) 55%, transparent);
   font-family: var(--aether-font-family);
   user-select: none;
 }
@@ -1324,7 +1359,7 @@
   padding: var(--aether-space-2);
   background: var(--aether-color-bg-panel);
   color: var(--aether-color-text);
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--aether-color-bg-app) 78%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--aether-color-shadow) 78%, transparent);
   font-family: var(--aether-font-family);
   font-size: var(--aether-font-size-body);
   list-style: none;
@@ -1391,7 +1426,7 @@
   padding: var(--aether-space-4);
   background: var(--aether-color-bg-panel);
   color: var(--aether-color-text);
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--aether-color-bg-app) 78%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--aether-color-shadow) 78%, transparent);
   font-family: var(--aether-font-family);
   font-size: var(--aether-font-size-body);
 }
@@ -1408,7 +1443,7 @@
   padding: var(--aether-space-3) var(--aether-space-4);
   background: var(--aether-color-bg-control);
   color: var(--aether-color-text-soft);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--aether-color-bg-app) 75%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--aether-color-shadow) 75%, transparent);
   font-family: var(--aether-font-family);
   font-size: var(--aether-font-size-label);
   line-height: 1.35;
@@ -1493,7 +1528,7 @@
   padding: 16px;
   background: var(--aether-color-bg-panel);
   color: var(--aether-color-text-dim);
-  box-shadow: 0 12px 34px color-mix(in srgb, var(--aether-color-bg-app) 78%, transparent);
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--aether-color-shadow) 78%, transparent);
   font-family: var(--aether-font-family);
 }
 .aui-progress-heading { display: flex; justify-content: space-between; gap: 12px; }
@@ -1852,3 +1887,216 @@ html[data-aether-native-window="true"] .aui-native-titlebar-space { display: blo
   --tool-metalSide-a: #b8c8d6;
   --tool-metalSide-b: #829aaf;
 }
+
+/* FeatureWindow.ts — suite-standard floating feature editor (Onshape anatomy). */
+/* Products set --aether-feature-window-top/-right to clear their own chrome:
+   a feature window must never cover the toolbar it was launched from, and
+   ribbon height differs per product. Height is content-driven, capped. */
+.aui-feature-window { position:absolute; top:var(--aether-feature-window-top, 60px); right:var(--aether-feature-window-right, 170px); left:var(--aether-feature-window-left, auto); width:300px; max-height:calc(100% - var(--aether-feature-window-top, 60px) - 16px); z-index:14; border:1px solid var(--aether-color-border); border-radius:10px; box-shadow:0 14px 34px rgba(0,0,0,.45); display:flex; flex-direction:column; overflow:hidden; padding:0; }
+.aui-feature-window .aui-float-panel-body { padding:10px 12px 12px; overflow:auto; display:grid; gap:8px; align-content:start; }
+/* An empty status or alert line must not reserve a row: that is what left a
+   band of dead space under the last control. */
+.aui-feature-window p[role="status"]:empty,
+.aui-feature-window p[role="alert"]:empty,
+.aui-feature-window .aui-feature-error:empty { display:none; }
+/* The form is a layout wrapper, not a visible block. */
+.aui-feature-window form { display:contents; }
+
+.aui-feature-entities { border:1px solid var(--aether-color-accent,#399cff); border-radius:6px; padding:6px; display:grid; gap:4px; }
+.aui-feature-entities-caption { font:600 10px system-ui; color:var(--aether-color-text-faint,#8995a5); }
+.aui-feature-entity { display:flex; justify-content:space-between; align-items:center; font:12px system-ui; color:var(--aether-color-text); padding:1px 2px; }
+.aui-feature-entity button { padding:0 6px; margin:0; }
+.aui-feature-row { display:flex; align-items:center; gap:8px; font:12px var(--aether-font-family,system-ui); color:var(--aether-color-text); min-width:0; }
+.aui-feature-row > span:first-child { flex:1; min-width:0; }
+/* One control system across the window: same height, border, radius, type.
+   Row controls share a width so every row lines up; the method picker and
+   any body-level control span the entities-box width. */
+.aui-feature-window input[type="text"],
+.aui-feature-window input[type="number"],
+.aui-feature-window select {
+  box-sizing:border-box; height:26px; padding:3px 8px;
+  border:1px solid var(--aether-color-border); border-radius:6px;
+  background:var(--aether-color-bg-control); color:var(--aether-color-text);
+  font:12px var(--aether-font-family,system-ui);
+}
+.aui-feature-window select { padding-right:6px; }
+.aui-feature-row input[type="text"],
+.aui-feature-row input[type="number"] { flex:0 1 104px; min-width:64px; text-align:right; }
+.aui-feature-row select { flex:0 1 132px; min-width:88px; }
+.aui-feature-row-control { display:inline-flex; align-items:center; gap:6px; min-width:0; }
+/* Body-level controls (method pickers) match the entities box exactly. */
+.aui-feature-window > .aui-float-panel-body > select,
+.aui-feature-window > .aui-float-panel-body > input[type="text"],
+.aui-feature-method { width:100%; display:block; }
+
+.aui-feature-tabs { display:flex; gap:2px; border-bottom:1px solid var(--aether-color-border); }
+.aui-feature-tabs button { flex:1; padding:4px 2px; margin:0; border:0; background:transparent; color:var(--aether-color-text-faint,#8995a5); font:12px system-ui; cursor:pointer; border-bottom:2px solid transparent; border-radius:0; }
+.aui-feature-tabs button.active { color:var(--aether-color-accent,#399cff); border-bottom-color:var(--aether-color-accent,#399cff); font-weight:600; }
+.aui-feature-expand { color:var(--aether-color-text-faint,#8995a5); }
+
+/* Document-bar controls read as plain toolbar glyphs (native macOS style):
+   no boxes; hover highlight; rail-style accent when active/pressed. */
+.aui-document-bar .aui-icon-button,
+.aui-document-bar .aui-menu-trigger,
+.aui-document-bar .aui-button {
+  border: 0;
+  background: transparent;
+  color: var(--aether-color-text-dim);
+}
+.aui-document-bar .aui-icon-button:hover:not(:disabled),
+.aui-document-bar .aui-menu-trigger:hover:not(:disabled),
+.aui-document-bar .aui-button:hover:not(:disabled) {
+  background: var(--aether-color-bg-hover);
+  color: var(--aether-color-text);
+}
+.aui-document-bar .aui-icon-button[aria-pressed="true"],
+.aui-document-bar .aui-icon-button--active,
+.aui-document-bar .aui-menu-trigger[aria-expanded="true"] {
+  background: var(--aether-color-accent-strong);
+  color: white;
+}
+
+/* StudioChrome.tsx — native header trio (WorkspaceChrome.swift metrics: 28x24, radius 6, 7px gaps). */
+.aui-studio-chrome-group { display: inline-flex; align-items: center; gap: 7px; }
+.aui-studio-mode,
+.aui-menu-trigger.aui-workspace-windows {
+  display: grid; place-items: center; width: 28px; height: 24px; padding: 0;
+  border-radius: 6px; border: 0; background: transparent;
+  color: var(--aether-color-text-dim); cursor: pointer;
+}
+.aui-studio-mode svg,
+.aui-menu-trigger.aui-workspace-windows svg { width: 15px; height: 15px; }
+.aui-studio-mode:hover,
+.aui-menu-trigger.aui-workspace-windows:hover {
+  background: var(--aether-color-bg-hover);
+  color: var(--aether-color-text);
+}
+.aui-appearance-toggle {
+  display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  border: 0; border-radius: 6px; background: transparent;
+  color: var(--aether-color-text-dim); cursor: pointer;
+}
+.aui-appearance-toggle svg { width: 15px; height: 15px; }
+.aui-appearance-toggle:hover { background: var(--aether-color-bg-hover); color: var(--aether-color-text); }
+
+/* SettingsWindow.tsx — suite-standard per-app settings (macOS anatomy). */
+.aui-settings-scrim { position:fixed; inset:0; background:rgba(0,0,0,.45); display:grid; place-items:center; z-index:60; }
+.aui-settings-window { display:flex; width:min(880px, 94vw); height:min(640px, 88vh); border-radius:12px; overflow:hidden; border:1px solid var(--aether-color-border); background:var(--aether-color-bg-app,#111922); box-shadow:0 24px 64px rgba(0,0,0,.55); }
+.aui-settings-sidebar { width:196px; flex:none; padding:14px 10px; background:var(--aether-color-bg-panel,#202832); border-right:1px solid var(--aether-color-border); display:flex; flex-direction:column; gap:2px; overflow:auto; }
+.aui-settings-close { width:12px; height:12px; margin:0 0 10px 2px; padding:0; border-radius:50%; border:1px solid rgba(0,0,0,.35); background:#ff5f57; cursor:pointer; }
+.aui-settings-close:hover { filter:brightness(1.1); }
+.aui-settings-section { display:flex; flex-direction:column; gap:1px; margin-bottom:10px; }
+.aui-settings-section-title { font:600 10px system-ui; letter-spacing:.4px; text-transform:uppercase; color:var(--aether-color-text-faint,#8995a5); margin:4px 8px; }
+.aui-settings-item { display:flex; align-items:center; gap:8px; padding:5px 8px; margin:0; border:0; border-radius:6px; background:transparent; color:var(--aether-color-text); font:13px system-ui; text-align:left; cursor:pointer; }
+.aui-settings-item:hover:not(:disabled) { background:var(--aether-color-bg-control,#2a3440); }
+.aui-settings-item.active { background:var(--aether-color-accent,#399cff); color:#fff; }
+.aui-settings-item:disabled { color:var(--aether-color-text-faint,#8995a5); opacity:.55; cursor:default; }
+.aui-settings-content { flex:1; min-width:0; display:flex; flex-direction:column; }
+.aui-settings-title { padding:12px 20px 8px; font:600 13px system-ui; color:var(--aether-color-text); text-align:center; }
+.aui-settings-pane { flex:1; overflow:auto; padding:8px 22px 22px; display:grid; gap:14px; align-content:start; }
+.aui-settings-card { border:1px solid var(--aether-color-border); border-radius:10px; padding:14px 16px; background:var(--aether-color-bg-panel,#202832); display:grid; gap:10px; }
+.aui-settings-card.notice { border-color:var(--aether-color-warning,#e8a13c); }
+.aui-settings-card.notice .aui-settings-card-title { color:var(--aether-color-warning,#e8a13c); }
+.aui-settings-card-title { font:600 13px system-ui; color:var(--aether-color-text); }
+.aui-settings-card-caption { font:12px system-ui; color:var(--aether-color-text-faint,#8995a5); margin:0; }
+.aui-settings-row { display:grid; gap:3px; }
+.aui-settings-row.disabled { opacity:.55; pointer-events:none; }
+.aui-settings-row-main { display:flex; align-items:center; gap:12px; }
+.aui-settings-row-label { flex:1; font:13px system-ui; color:var(--aether-color-text); }
+.aui-settings-row-control { display:inline-flex; align-items:center; gap:8px; }
+.aui-settings-row-caption { font:11px system-ui; color:var(--aether-color-text-faint,#8995a5); margin:0; }
+/* Gallery/inline embedding: neutralize the fixed scrim. */
+.aui-settings-inline .aui-settings-scrim { position:relative; inset:auto; background:transparent; display:block; }
+.aui-settings-card-header { display:flex; align-items:center; gap:8px; }
+.aui-settings-card-icon { display:inline-flex; width:17px; height:17px; color:var(--aether-color-accent,#399cff); }
+.aui-settings-card-icon svg { width:100%; height:100%; }
+.aui-settings-row-icon { display:inline-flex; width:15px; height:15px; color:var(--aether-color-text); opacity:.85; }
+.aui-settings-row-icon svg { width:100%; height:100%; }
+.aui-settings-row-value { font:12px system-ui; color:var(--aether-color-text-faint,#8995a5); }
+.aui-settings-row.stacked .aui-settings-row-wide { width:100%; }
+.aui-settings-row-wide input[type="range"] { width:100%; }
+/* macOS pill switch (checkbox.aui-switch). */
+input.aui-switch { appearance:none; -webkit-appearance:none; width:34px; height:20px; border-radius:10px; background:var(--aether-color-bg-control,#3a4450); border:1px solid var(--aether-color-border); position:relative; cursor:pointer; margin:0; transition:background .15s; }
+input.aui-switch::after { content:""; position:absolute; top:1px; left:1px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.35); transition:left .15s; }
+input.aui-switch:checked { background:var(--aether-color-accent,#399cff); }
+input.aui-switch:checked::after { left:15px; }
+input.aui-switch:disabled { opacity:.55; cursor:default; }
+
+/* CollapsibleSidebar.tsx */
+.aui-sidebar { display: flex; flex-direction: column; min-height: 0; }
+.aui-sidebar-toggle { align-self: flex-end; display: grid; place-items: center; width: 28px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--aether-color-text-dim); cursor: pointer; }
+.aui-sidebar-toggle:hover { background: var(--aether-color-bg-hover); color: var(--aether-color-text); }
+.aui-sidebar-toggle svg { width: 15px; height: 15px; }
+.aui-sidebar-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.aui-sidebar--collapsed .aui-sidebar-label { display: none; }
+.aui-sidebar--collapsed .aui-sidebar-toggle { align-self: center; }
+
+.aui-feature-unit { color: var(--aether-color-text-dim); font-size: 11px; }
+
+/* Tree row variants (promoted from product CSS, 2026-09-11 — unchanged look).
+   divider: a slim draggable rule, e.g. a feature-history rollback line.
+   error:   a failing entity. */
+.aui-tree-row--divider { position: relative; height: 15px; cursor: row-resize; border-radius: 0; }
+.aui-tree-row--divider:hover:not(.aui-tree-row--disabled) { background: transparent; }
+.aui-tree-row--divider:focus-visible { outline: none; }
+.aui-tree-row--divider .aui-tree-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.aui-tree-row--divider::after { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; height: 5px; transform: translateY(-50%); border-radius: 3px; background: var(--aether-color-accent); }
+.aui-tree-row--divider:hover::after,
+.aui-tree-row--divider:focus-visible::after { filter: brightness(1.2); }
+.aui-tree-row--divider .aui-tree-disclosure,
+.aui-tree-row--divider .aui-tree-icon { display: none; }
+.aui-tree-row--error { color: var(--aether-color-error); }
+.aui-tree-row--error .aui-tree-badge { color: inherit; }
+.aui-tree-icon .aui-tool-icon { width: 16px; height: 16px; vertical-align: middle; }
+
+/* Sidebar constant-geometry contract (promoted from product CSS, 2026-09-11 —
+   unchanged look). A row is [icon slot][label], size-row tall on a size-grid
+   rhythm, identical expanded and collapsed, so icons never move. Section
+   headers become dividers in the rail. */
+.aui-sidebar { padding: 10px 10px 16px; box-sizing: border-box; transition: width 0.15s ease; }
+.aui-sidebar .aui-sidebar-body { gap: 8px; }
+.aui-sidebar nav { display: grid; gap: var(--aether-size-grid); }
+.aui-sidebar nav button,
+.aui-sidebar-row { height: var(--aether-size-row); padding: 0; gap: 0; }
+.aui-sidebar nav button svg,
+.aui-sidebar-row svg { flex: none; width: 16px; height: 16px; margin: 0 10px; }
+.aui-sidebar .aui-sidebar-toggle { width: var(--aether-size-icon-slot); height: var(--aether-size-row); }
+.aui-sidebar--collapsed { width: 56px; }
+.aui-sidebar--collapsed nav button { justify-content: center; }
+
+/* A feature window whose feature is not yet valid (Onshape: red title). */
+.aui-feature-window[data-feature-state="invalid"] .aui-float-panel-title { color: var(--aether-color-error); }
+
+/* Feature window accept/discard: distinct, labelled actions (not bare glyphs). */
+/* Accept reads as a filled green action; discard is a plain red glyph. */
+.aui-feature-accept { display:inline-flex; align-items:center; justify-content:center; width:30px; height:24px; padding:0; border:0; border-radius:5px; background:var(--aether-color-ok,#2f9e44); color:#fff; font:700 13px var(--aether-font-family,system-ui); cursor:pointer; }
+.aui-feature-accept:hover:not(:disabled) { filter:brightness(1.08); }
+.aui-feature-accept:disabled { opacity:.45; cursor:not-allowed; }
+.aui-feature-discard { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; padding:0; border:0; border-radius:5px; background:transparent; color:var(--aether-color-danger,#e5484d); font:700 13px var(--aether-font-family,system-ui); cursor:pointer; }
+.aui-feature-discard:hover { color:var(--aether-color-danger,#e5484d); filter:brightness(1.15); }
+.aui-feature-window.invalid { border-color:var(--aether-color-danger,#e5484d); }
+.aui-feature-window.invalid .aui-float-panel-title { color:var(--aether-color-danger,#e5484d); }
+.aui-feature-error { margin:0; padding:7px 9px; border-radius:6px; border:1px solid var(--aether-color-danger,#e5484d); background:color-mix(in srgb, var(--aether-color-danger,#e5484d) 12%, transparent); color:var(--aether-color-danger,#e5484d); font:12px var(--aether-font-family,system-ui); }
+/* Nested sub-settings: children indent under their parent toggle. */
+.aui-feature-subsection { display:grid; gap:6px; }
+.aui-feature-subsection-header { display:flex; align-items:center; gap:8px; font:12px var(--aether-font-family,system-ui); color:var(--aether-color-text); }
+.aui-feature-subsection-header > span:first-child { flex:1; }
+.aui-feature-disclosure { display:inline-flex; align-items:center; gap:6px; width:100%; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.aui-feature-chevron { color:var(--aether-color-text); width:14px; font-size:15px; line-height:1; }
+.aui-feature-subsection-body { display:grid; gap:8px; margin-left:10px; padding-left:10px; border-left:1px solid var(--aether-color-border); }
+.aui-feature-subsection-body:empty { display:none; }
+/* Our display rules would otherwise beat the UA [hidden] rule, leaving
+   dependent rows and closed sub-settings on screen. */
+.aui-feature-window [hidden] { display: none !important; }
+/* Anchored dropdown: the popup opens under its field, never over it. */
+.aui-feature-picker { position:relative; display:inline-flex; min-width:0; }
+.aui-feature-picker-trigger { display:inline-flex; align-items:center; justify-content:space-between; gap:8px; width:100%; box-sizing:border-box; height:26px; padding:3px 8px; border:1px solid var(--aether-color-border); border-radius:6px; background:var(--aether-color-bg-control); color:var(--aether-color-text); font:12px var(--aether-font-family,system-ui); cursor:pointer; text-align:left; }
+.aui-feature-picker-trigger:hover { border-color:var(--aether-color-accent,#399cff); }
+.aui-feature-picker-chevron { color:var(--aether-color-text); font-size:15px; line-height:1; margin-left:2px; }
+.aui-feature-picker-menu { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:40; display:grid; gap:1px; padding:4px; border:1px solid var(--aether-color-border); border-radius:6px; background:var(--aether-color-bg-panel); box-shadow:0 10px 26px var(--aether-color-shadow,#060809); max-height:220px; overflow:auto; }
+.aui-feature-picker-menu > button { display:flex; align-items:center; gap:6px; padding:5px 8px; border:0; border-radius:4px; background:transparent; color:var(--aether-color-text); font:12px var(--aether-font-family,system-ui); text-align:left; cursor:pointer; }
+.aui-feature-picker-menu > button:hover { background:var(--aether-color-bg-control); }
+.aui-feature-picker-menu > button[aria-selected="true"]::before { content:"✓"; color:var(--aether-color-accent,#399cff); }
+.aui-feature-picker-menu > button[aria-selected="false"]::before { content:""; width:9px; }
+.aui-feature-row .aui-feature-picker { flex:0 1 132px; min-width:88px; }
+.aui-feature-window > .aui-float-panel-body > .aui-feature-picker { width:100%; }

@@ -24,8 +24,10 @@ move into Core is scheduled.
 
 Product-specific = timelines, show control, performance capture, avatar and
 blendshape mapping, character-library UX, hardware panels, output buses, and
-raw device adapters. Mathematical state/evaluation shared by multiple products
-belongs in `/core/engine/`.
+raw device adapters. This product's mathematical state and evaluation belong in
+`animacore/` (Python), its own engine. `Aether CAD/engine/` is the CAD
+product's engine — do not import it here; genuinely shared presentation lives
+in `core/ui/`.
 
 
 ## Current launcher and shared interface

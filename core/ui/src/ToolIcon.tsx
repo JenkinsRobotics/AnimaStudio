@@ -78,6 +78,7 @@ import icon61 from "../../assets/icons/tools/replace-face.svg?raw";
 import icon62 from "../../assets/icons/tools/revolve.svg?raw";
 import icon63 from "../../assets/icons/tools/rotate.svg?raw";
 import icon64 from "../../assets/icons/tools/save.svg?raw";
+import commitIcon from "../../assets/icons/tools/commit.svg?raw";
 import icon65 from "../../assets/icons/tools/scale.svg?raw";
 import icon66 from "../../assets/icons/tools/select.svg?raw";
 import icon67 from "../../assets/icons/tools/settings.svg?raw";
@@ -183,6 +184,7 @@ const artwork = {
   "revolve": icon62,
   "rotate": icon63,
   "save": icon64,
+  "commit": commitIcon,
   "scale": icon65,
   "select": icon66,
   "settings": icon67,

@@ -1,9 +1,13 @@
 import { openProjectionEditor } from "./sketch/projection-editor";
+import { assignItems, canNestFolder, createFolder, deleteFolder, emptyTreeOrganization, moveFolder, renameFolder } from "@aether/core/document";
 import { rectangleSketchRevision } from "@aether/core/sketch";
 import { openSketchWorkspace } from "./sketch-workspace";
+import { openPlaneWindow } from "./plane-window";
+import { openFeatureWindow } from "@aether/ui";
+import { featureEditor } from "./features";
+import { unitSuffix, type FeatureEditor, type FeatureEditorContext } from "./features/shared";
 import { unitChoice } from "@aether/core/units";
 import { documentUnits } from "./document-preferences";
-import { mountProfileCanvas } from "./profile-canvas";
 import {
   rollbackPosition,
   insertFeature,
@@ -50,7 +54,42 @@ export function mountFeatureAuthoring(
     parent.append(b);
     return b;
   };
+
+/** Present dialog controls with the gallery's feature-window anatomy:
+ * tab rows, entity chips, label-left parameter rows with unit suffixes.
+ * Per-feature layout lives in `src/features/<feature>.ts`; anything a feature
+ * does not lay out itself falls through to plain parameter rows.
+ * Presentation only — inputs keep their form association and submit path. */
+const presentFeatureWindow = (
+  win: ReturnType<typeof openFeatureWindow>,
+  form: HTMLFormElement,
+  controls: Record<string, HTMLInputElement | HTMLSelectElement>,
+  editor: FeatureEditor | undefined,
+  context: FeatureEditorContext,
+) => {
+  form.id ||= "cad-feature-form";
+  editor?.layout?.(context, controls);
+  for (const label of [...form.querySelectorAll("label")]) {
+    const input = label.querySelector<HTMLInputElement | HTMLSelectElement>("input,select");
+    if (!input) continue;
+    let caption = (label.firstChild?.textContent ?? input.getAttribute("aria-label") ?? "").trim();
+    const unitMatch = caption.match(/\(([^)]+)\)\s*$/);
+    const unit = unitMatch?.[1];
+    if (unitMatch) caption = caption.slice(0, unitMatch.index).trim();
+    input.setAttribute("form", form.id);
+    const extras: HTMLElement[] = [input];
+    if (unit) extras.push(unitSuffix(unit));
+    win.row(caption, ...extras);
+    label.remove();
+  }
+  win.body.append(form);
+};
+
   const show = (type: string, existing?: PartFeature) => {
+    if (type === "plane") {
+      void openPlaneWindow(getDocument, apply, existing?.type === "plane" ? existing : undefined);
+      return;
+    }
     if (type === "profile") {
       if(existing?.type === "profile" && existing.profile.type === "projection") {
         try { openProjectionEditor(getDocument,apply,existing); } catch(e){error.textContent=(e as Error).message;}
@@ -66,13 +105,17 @@ export function mountFeatureAuthoring(
     }
     const doc = structuredClone(source);
     const feature = existing as any;
-    const modal = document.createElement("dialog");
-    modal.className = "feature-dialog";
     const form = document.createElement("form");
-    modal.append(form);
-    const title = document.createElement("h2");
-    title.textContent = (existing ? "Edit " : "Add ") + type;
-    form.append(title);
+    const win = openFeatureWindow({
+      viewport: document.querySelector<HTMLElement>(".cad-studio-viewport") ?? document.body,
+      className: "cad-feature-dialog",
+      title: (existing ? "Edit " : "Add ") + type,
+      acceptLabel: "Apply and rebuild",
+      discardLabel: "Cancel",
+      onAccept: () => form.requestSubmit(),
+      onDiscard: () => win.close(),
+    });
+    win.body.append(form);
     const lengthUnit = unitChoice(documentUnits(), "length"),
       angleUnit = unitChoice(documentUnits(), "angle");
     const field = (name: string, value: string, choices?: string[]) => {
@@ -129,153 +172,66 @@ export function mountFeatureAuthoring(
     // IDs stay canonical; option labels are human-readable feature names.
     const reference = (label: string, types: string[], value?: string) => {
       const choices = before.filter((f) => types.includes(f.type));
-      const select = field(
-        label,
-        value ?? choices.at(-1)?.id ?? "",
-        choices.map((f) => f.id),
-      );
-      Array.from(select.children).forEach(
-        (o, i) => (o.textContent = choices[i].name),
-      );
+      // Nothing is pre-selected. Auto-picking the last matching feature looked
+      // like a choice the user had made, and hid the fact that the feature was
+      // not yet valid. An empty select always means "not yet chosen".
+      const select = field(label, value ?? "", ["", ...choices.map((f) => f.id)]);
+      Array.from(select.children).forEach((option, index) => {
+        option.textContent = index === 0 ? "" : choices[index - 1].name;
+      });
       return select;
     };
-    const controls: Record<string, HTMLInputElement | HTMLSelectElement> = {};
-    if(type==="plane"){controls.plane=field("Reference plane",feature?.plane??"XY",["XY","XZ","YZ"]);controls.offset=field("Offset (mm)",String(feature?.offsetMillimeters??10));}
-    if (type === "profile") {
-      controls.plane = field("Plane", feature?.plane ?? "XY", [
-        "XY",
-        "XZ",
-        "YZ",
-      ]);
-      controls.offset = field(
-        "Plane offset (mm)",
-        String(feature?.offsetMillimeters ?? 0),
-      );
-      controls.shape = field("Profile", feature?.profile.type ?? "circle", [
-        "circle",
-        "polygon",
-      ]);
-      controls.radius = field(
-        "Circle radius (mm)",
-        String(feature?.profile.radiusMillimeters ?? 10),
-      );
-      controls.center = field(
-        "Circle center x,y (mm)",
-        feature?.profile.centerMillimeters?.join(",") ?? "0,0",
-      );
-      controls.points = field(
-        "Polygon points x,y; x,y (mm)",
-        feature?.profile.pointsMillimeters
-          ?.map((p: number[]) => p.join(","))
-          .join("; ") ?? "0,0; 20,0; 20,10; 0,10",
-      );
-    } else if (type === "extrude" || type === "revolve") {
-      controls.source = reference(
-        "Sketch",
-        ["sketch", "profile"],
-        feature?.profileFeatureId,
-      );
-      controls.operation = field(
-        "Operation",
-        feature?.operation ??
-          (doc.features.some((f) => ["extrude", "revolve"].includes(f.type))
-            ? "add"
-            : "new"),
-        ["new", "add", "cut"],
-      );
-      if (type === "extrude")
-        controls.distance = field(
-          "Distance (mm)",
-          String(feature?.distanceMillimeters ?? 10),
-        );
-      else {
-        controls.axis = field("Axis", feature?.axis ?? "Z", ["X", "Y", "Z"]);
-        controls.angle = field(
-          "Angle (degrees)",
-          String(feature?.angleDegrees ?? 360),
-        );
-      }
-    } else if (type === "mirror") {
-      controls.source = reference(
-        "Feature",
-        ["extrude", "revolve", "mirror"],
-        feature?.sourceFeatureId,
-      );
-      controls.plane = field("Mirror plane", feature?.plane ?? "YZ", [
-        "XY",
-        "XZ",
-        "YZ",
-      ]);
-      controls.offset = field(
-        "Plane offset (mm)",
-        String(feature?.offsetMillimeters ?? 0),
-      );
-      controls.operation = field("Operation", feature?.operation ?? "add", [
-        "add",
-        "cut",
-      ]);
-    } else if(type!=="plane")
-      controls.radius = field(
-        "All-edge size (mm)",
-        String(feature?.radiusMillimeters ?? 0.5),
-      );
-    if (type === "profile")
-      mountProfileCanvas(
-        form,
-        controls,
-        lengthUnit.unit,
-        lengthUnit.factor / 0.001,
-      );
-    if (!["profile", "sketch"].includes(type)) {
-      const bodies = availableBodies({
-        ...doc,
-        features: before,
-        rollbackIndex: undefined,
-      });
-      controls.target = field(
-        "Target body",
-        feature?.targetBodyId ?? bodies.at(-1)?.id ?? "",
-        bodies.map((b) => b.id),
-      );
-      Array.from(controls.target.children).forEach(
-        (o, i) => (o.textContent = bodies[i].name),
-      );
-      const targetVisibility = () => {
-        controls.target.parentElement!.hidden =
-          controls.operation?.value === "new";
-      };
-      controls.operation?.addEventListener("change", targetVisibility);
-      targetVisibility();
-    }
-    if (type === "fillet" || type === "chamfer") {
-      controls.edgeScope = field(
-        "Edges",
-        feature?.edgePlane ? "plane" : "all",
-        ["all", "plane"],
-      );
-      controls.edgePlane = field(
-        "Edge plane",
-        feature?.edgePlane?.plane ?? "XY",
-        ["XY", "XZ", "YZ"],
-      );
-      controls.edgeOffset = field(
-        "Edge plane offset (mm)",
-        String(feature?.edgePlane?.offsetMillimeters ?? 0),
-      );
-    }
+    const editor = featureEditor(type);
+    const context: FeatureEditorContext = {
+      win,
+      form,
+      field,
+      reference,
+      feature,
+      doc,
+      lengthUnitLabel: lengthUnit.unit,
+      angleUnitLabel: angleUnit.unit,
+    };
+    const controls: Record<string, HTMLInputElement | HTMLSelectElement> =
+      editor?.controls(context) ?? {};
+    // Target body is shared by every solid feature, so it stays here rather
+    // than being repeated in each editor.
+    const bodies = availableBodies({
+      ...doc,
+      features: before,
+      rollbackIndex: undefined,
+    });
+    controls.target = field(
+      "Target body",
+      feature?.targetBodyId ?? bodies.at(-1)?.id ?? "",
+      bodies.map((b) => b.id),
+    );
+    Array.from(controls.target.children).forEach(
+      (o, i) => (o.textContent = bodies[i].name),
+    );
+    const targetVisibility = () => {
+      controls.target.parentElement!.hidden = controls.operation?.value === "new";
+    };
+    controls.operation?.addEventListener("change", targetVisibility);
+    targetVisibility();
     const alert = document.createElement("p");
     alert.setAttribute("role", "alert");
     form.append(alert);
-    button(
-      "Cancel",
-      () => {
-        modal.close();
-        modal.remove();
-      },
-      form,
-    );
+    // The window header ✓/✕ are the commit controls (gallery anatomy);
+    // a hidden submit keeps native Enter submission working.
     const submit = button("Apply and rebuild", () => {}, form);
     submit.type = "submit";
+    submit.hidden = true;
+    presentFeatureWindow(win, form, controls, editor, context);
+    // Validate live, exactly like the plane window: the accept control stays
+    // disabled while the feature is incomplete, so an invalid feature can never
+    // be submitted and then rejected.
+    const validate = () => win.setError(editor?.validate?.(controls, context) ?? null);
+    for (const control of Object.values(controls)) {
+      control.addEventListener("change", validate);
+      control.addEventListener("input", validate);
+    }
+    validate();
     form.onsubmit = async (e) => {
       e.preventDefault();
       submit.disabled = true;
@@ -300,60 +256,17 @@ export function mountFeatureAuthoring(
           type,
           name: name.value,
           suppressed: feature?.suppressed ?? false,
+          ...(editor?.serialize(values, context) ?? {}),
         };
-        if(type === "plane") Object.assign(next,{plane:values.plane,offsetMillimeters:Number(values.offset)});
-        else if (type === "profile")
-          Object.assign(next, {
-            plane: values.plane,
-            offsetMillimeters: Number(values.offset),
-            profile:
-              values.shape === "circle"
-                ? {
-                    type: "circle",
-                    radiusMillimeters: Number(values.radius),
-                    centerMillimeters: values.center.split(",").map(Number),
-                  }
-                : {
-                    type: "polygon",
-                    pointsMillimeters: values.points
-                      .split(";")
-                      .map((p) => p.trim().split(",").map(Number)),
-                  },
-          });
-        else if (type === "extrude" || type === "revolve")
-          Object.assign(next, {
-            profileFeatureId: values.source,
-            operation: values.operation,
-            ...(type === "extrude"
-              ? { distanceMillimeters: Number(values.distance) }
-              : { axis: values.axis, angleDegrees: Number(values.angle) }),
-          });
-        else if (type === "mirror")
-          Object.assign(next, {
-            sourceFeatureId: values.source,
-            plane: values.plane,
-            offsetMillimeters: Number(values.offset),
-            operation: values.operation,
-          });
-        else next.radiusMillimeters = Number(values.radius);
         if (feature?.bodyId) next.bodyId = feature.bodyId;
         if (values.target && values.operation !== "new")
           next.targetBodyId = values.target;
-        if (
-          (type === "fillet" || type === "chamfer") &&
-          values.edgeScope === "plane"
-        )
-          next.edgePlane = {
-            plane: values.edgePlane,
-            offsetMillimeters: Number(values.edgeOffset),
-          };
         if (existing)
           doc.features[doc.features.findIndex((f) => f.id === existing.id)] =
             next;
         await apply(existing ? doc : insertFeature(doc, next));
         refresh();
-        modal.close();
-        modal.remove();
+        win.close();
       } catch (e) {
         alert.textContent = (e as Error).message;
       } finally {
@@ -366,7 +279,7 @@ export function mountFeatureAuthoring(
         async () => {
           try {
             await apply(moveFeature(source, existing.id, -1));
-            modal.remove();
+            win.close();
           } catch (e) {
             alert.textContent = (e as Error).message;
           }
@@ -378,7 +291,7 @@ export function mountFeatureAuthoring(
         async () => {
           try {
             await apply(moveFeature(source, existing.id, 1));
-            modal.remove();
+            win.close();
           } catch (e) {
             alert.textContent = (e as Error).message;
           }
@@ -397,7 +310,7 @@ export function mountFeatureAuthoring(
             return;
           try {
             await apply(removeFeature(source, existing.id));
-            modal.remove();
+            win.close();
           } catch (e) {
             alert.textContent = (e as Error).message;
           }
@@ -405,8 +318,7 @@ export function mountFeatureAuthoring(
         form,
       );
     }
-    document.body.append(modal);
-    modal.showModal();
+
   };
   let busy = false;
   const change = async (doc: PartDocument) => {
@@ -424,24 +336,82 @@ export function mountFeatureAuthoring(
   };
   // The canonical apply path refreshes the shared Model tree.
   const refresh = () => {};
+  /** The feature-tree selection the action arrived with, in history order, or
+   *  just the clicked feature when it is not part of that selection. */
+  const selectionWith = (
+    doc: PartDocument,
+    action: { selectedFeatureIDs?: readonly string[] },
+    clicked: PartFeature,
+  ): string[] => {
+    const selected = new Set(action.selectedFeatureIDs ?? []);
+    if (!selected.has(clicked.id)) return [clicked.id];
+    return doc.features.filter((feature) => selected.has(feature.id)).map((feature) => feature.id);
+  };
   window.addEventListener("aether-feature-action", (event) => {
     const action = (event as CustomEvent).detail;
     const doc = getDocument();
     if (!doc) return;
+    if (action.type === "rollback-to") {
+      const index = Math.max(0, Math.min(doc.features.length, action.index));
+      void change({ ...doc, rollbackIndex: index >= doc.features.length ? undefined : index });
+      return;
+    }
+    if (action.type === "create-folder") {
+      const name = prompt("Folder name", `Folder ${(doc.organization?.folders.length ?? 0) + 1}`);
+      if (!name?.trim()) return;
+      const memberIDs = (action.memberIDs as readonly string[]).map((rowID) => rowID.split("/").slice(2).join("/")).filter(Boolean);
+      void change({ ...doc, organization: createFolder(doc.organization ?? emptyTreeOrganization(), { id: crypto.randomUUID(), name }, memberIDs) });
+      return;
+    }
+    const folderID = typeof action.id === "string" && action.id.startsWith("folder/") ? action.id.slice("folder/".length) : null;
+    if (folderID && action.type === "item-action") {
+      const organization = doc.organization ?? emptyTreeOrganization();
+      if (action.actionID === "folder-rename" || action.actionID === "edit-feature") {
+        const current = organization.folders.find((entry) => entry.id === folderID);
+        const name = prompt("Folder name", current?.name ?? "Folder");
+        if (name?.trim()) void change({ ...doc, organization: renameFolder(organization, folderID, name) });
+      } else if (action.actionID === "folder-delete") {
+        void change({ ...doc, organization: deleteFolder(organization, folderID) });
+      } else if (action.actionID === "folder-unnest") {
+        void change({ ...doc, organization: moveFolder(organization, folderID, null) });
+      }
+      return;
+    }
     const id = action.id.split("/").slice(2).join("/");
     const f = doc.features.find((f) => f.id === id);
     if (action.type === "move-item") {
+      if (folderID && action.targetID.startsWith("folder/") && action.position === "inside") {
+        const organization = doc.organization ?? emptyTreeOrganization();
+        const targetFolder = action.targetID.slice("folder/".length);
+        if (canNestFolder(organization, folderID, targetFolder)) {
+          void change({ ...doc, organization: moveFolder(organization, folderID, targetFolder) });
+        }
+        return;
+      }
+      if (f && action.targetID.startsWith("folder/") && action.position === "inside") {
+        void change({ ...doc, organization: assignItems(doc.organization ?? emptyTreeOrganization(), [f.id], action.targetID.slice("folder/".length)) });
+        return;
+      }
       const target = action.targetID.split("/").slice(2).join("/");
-      let position =
-        doc.features.findIndex((f) => f.id === target) +
-        (action.position === "after" ? 1 : 0);
+      const targetIndex = doc.features.findIndex((f) => f.id === target);
+      // A drop that lands on anything but a feature (past the end of the list,
+      // a folder rule, the bar itself) means "the end" — never index -1.
+      let position = targetIndex < 0
+        ? doc.features.length
+        : targetIndex + (action.position === "after" ? 1 : 0);
       if (action.id === "rollback-bar")
-        void change({ ...doc, rollbackIndex: position });
+        void change({
+          ...doc,
+          rollbackIndex: Math.min(Math.max(position, 0), doc.features.length),
+        });
       else if (f) {
         const index = doc.features.indexOf(f);
         if (index < position) position--;
         try {
-          void change(moveFeature(doc, f.id, position - index));
+          const moved = moveFeature(doc, f.id, position - index);
+          // Reordering next to a foldered feature adopts that feature's folder.
+          const organization = moved.organization;
+          void change(organization ? { ...moved, organization: assignItems(organization, [f.id], organization.membership[target] ?? null) } : moved);
         } catch (e) {
           error.textContent = (e as Error).message;
         }
@@ -458,12 +428,42 @@ export function mountFeatureAuthoring(
         return;
       }
       show(f.type, f);
-    } else if (action.actionID === "suppress-feature" && f)
-      void change(setFeatureSuppressed(doc, f.id, !f.suppressed));
+    } else if (action.actionID === "suppress-feature" && f) {
+      const target = !f.suppressed;
+      void change(selectionWith(doc, action, f).reduce(
+        (next, id) => next.features.some((feature) => feature.id === id && feature.suppressed !== target)
+          ? setFeatureSuppressed(next, id, target)
+          : next,
+        doc,
+      ));
+    } else if (action.actionID === "delete-feature" && f) {
+      const ids = selectionWith(doc, action, f);
+      const affected = new Set(ids.flatMap((id) => [...dependentFeatures(doc, id)]));
+      const extra = affected.size - ids.length;
+      const what = ids.length > 1 ? `${ids.length} features` : f.name;
+      if (!confirm(`Delete ${what}${extra > 0 ? ` and ${extra} dependent feature${extra > 1 ? "s" : ""}` : ""}?`)) return;
+      try {
+        void change(ids.reduce(
+          (next, id) => next.features.some((feature) => feature.id === id) ? removeFeature(next, id) : next,
+          doc,
+        ));
+      } catch (e) {
+        window.alert((e as Error).message);
+      }
+    }
     else if (action.actionID === "rollback-before" && f)
       void change({ ...doc, rollbackIndex: doc.features.indexOf(f) });
     else if (action.actionID === "rollback-start")
       void change({ ...doc, rollbackIndex: 0 });
+    else if (action.actionID === "rename-feature" && f) {
+      const name = prompt("Feature name", f.name);
+      if (name?.trim()) void change({ ...doc, features: doc.features.map((feature) => feature.id === f.id ? { ...feature, name } : feature) });
+    }
+    else if (action.actionID === "rollback-back" || action.actionID === "rollback-forward") {
+      const current = doc.rollbackIndex ?? doc.features.length;
+      const index = Math.max(0, Math.min(doc.features.length, current + (action.actionID === "rollback-back" ? -1 : 1)));
+      void change({ ...doc, rollbackIndex: index >= doc.features.length ? undefined : index });
+    }
     else if (action.actionID === "rollback-end")
       void change({ ...doc, rollbackIndex: undefined });
     else if (

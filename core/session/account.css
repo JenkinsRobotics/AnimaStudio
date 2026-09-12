@@ -43,9 +43,9 @@ aether-account {
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   width: 260px;
-  padding: 18px;
+  padding: 12px;
   border: 1px solid var(--aether-color-border);
   border-radius: 12px;
   background: var(--aether-color-bg-panel);
@@ -55,28 +55,30 @@ aether-account {
   color: var(--aether-color-text-dim);
   overflow-wrap: anywhere;
 }
-.suite-account-menu label {
+.suite-account-identity {
   display: grid;
-  gap: 8px;
+  gap: 2px;
+  padding-bottom: 4px;
 }
-.suite-account-menu button,
-.suite-account-menu select {
-  border: 1px solid var(--aether-color-border);
+.suite-account-item {
+  display: block;
+  width: 100%;
+  border: 0;
   border-radius: 6px;
-  background: var(--aether-color-bg-control);
+  background: transparent;
   color: inherit;
-  padding: 7px;
+  padding: 8px 9px;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.suite-account-menu input {
-  max-width: 100%;
-  font: inherit;
+.suite-account-item:hover {
+  background: var(--aether-color-bg-hover);
 }
-.suite-account-menu a {
-  color: var(--aether-color-accent);
-  text-decoration: none;
+.suite-account-separator {
+  height: 1px;
+  margin: 2px 0;
+  background: var(--aether-color-border);
 }
 .suite-account-menu p:empty {
   display: none;
@@ -84,33 +86,6 @@ aether-account {
 .suite-account-menu p {
   color: var(--aether-color-error);
   margin: 0;
-}
-html[data-aether-theme="light"],
-html[data-aether-theme="light"] .aether-home-theme {
-  color-scheme: light;
-  --aether-color-bg-app: #f5f6f8;
-  --aether-color-bg-shell: #fff;
-  --aether-color-bg-bar: #fff;
-  --aether-color-bg-panel: #fff;
-  --aether-color-bg-rail: #f1f3f6;
-  --aether-color-bg-inset: #edf0f4;
-  --aether-color-bg-control: #fff;
-  --aether-color-bg-control-hover: #e8edf5;
-  --aether-color-bg-hover: #edf1f7;
-  --aether-color-bg-row-hover: #edf1f7;
-  --aether-color-bg-selected: #dce9ff;
-  --aether-color-border: #d4dae2;
-  --aether-color-border-control: #bcc7d5;
-  --aether-color-border-control-hover: #8294ab;
-  --aether-color-text: #202b39;
-  --aether-color-text-soft: #35445a;
-  --aether-color-text-dim: #58677b;
-  --aether-color-text-faint: #718198;
-  --aether-color-accent: #235fdf;
-  --aether-color-accent-icon: #235fdf;
-}
-html[data-aether-theme="dark"] {
-  color-scheme: dark;
 }
 @media (max-width: 1000px) {
   .suite-account-name {
